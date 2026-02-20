@@ -2,6 +2,12 @@
 
 Lichens Innovation **Agent Skills** repository — reusable instructions to extend coding agents (Cursor, GitHub Copilot, Claude Code, etc.).
 
+- [skills](#skills)
+  - [Installation](#installation)
+  - [Removing a skill](#removing-a-skill)
+  - [How a skill becomes active (Cursor, Copilot, Claude Code)](#how-a-skill-becomes-active-cursor-copilot-claude-code)
+  - [Popular skill repositories](#popular-skill-repositories)
+
 ## Installation
 
 From a project or any directory:
