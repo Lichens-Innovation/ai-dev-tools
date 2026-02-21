@@ -2,6 +2,7 @@
  * TYPE SAFETY — TypeScript
  * Rule: NEVER use `any`. Define precise interfaces and use union types.
  */
+export {};
 
 // ─────────────────────────────────────────────
 // INTERFACES vs `any`
@@ -17,10 +18,10 @@ interface Market {
   resolvedAt?: Date; // optional field
 }
 
-async function getMarket(id: string): Promise<Market> {
+const getMarket = async (id: string): Promise<Market> => {
   const data = await fetch(`/api/markets/${id}`).then((r) => r.json());
   return data as Market; // validated by API contract
-}
+};
 
 // ❌ BAD — `any` defeats the entire purpose of TypeScript
 async function getMarketBad(id: any): Promise<any> {
@@ -36,13 +37,12 @@ type UserRole = "admin" | "moderator" | "user" | "guest";
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type SortDirection = "asc" | "desc";
 
-function sortMarkets(markets: Market[], direction: SortDirection): Market[] {
-  return [...markets].sort((a, b) =>
+const sortMarkets = (markets: Market[], direction: SortDirection): Market[] =>
+  [...markets].sort((a, b) =>
     direction === "asc"
       ? a.name.localeCompare(b.name)
       : b.name.localeCompare(a.name)
   );
-}
 
 // ❌ BAD — no autocomplete, no safety
 function sortMarketsBad(markets: any[], direction: string): any[] {
@@ -63,7 +63,7 @@ interface ApiResponse<T> {
   meta?: { total: number; page: number; limit: number };
 }
 
-async function apiFetch<T>(url: string): Promise<ApiResponse<T>> {
+const apiFetch = async <T>(url: string): Promise<ApiResponse<T>> => {
   try {
     const response = await fetch(url);
     if (!response.ok) {
@@ -74,7 +74,7 @@ async function apiFetch<T>(url: string): Promise<ApiResponse<T>> {
   } catch (error) {
     return { success: false, error: String(error) };
   }
-}
+};
 
 // Usage — TypeScript infers the type
 const result = await apiFetch<Market[]>("/api/markets");
@@ -87,12 +87,12 @@ if (result.success && result.data) {
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — `unknown` forces you to check before use
-function parseConfig(input: unknown): Record<string, string> {
+const parseConfig = (input: unknown): Record<string, string> => {
   if (typeof input !== "object" || input === null) {
     throw new Error("Config must be an object");
   }
   return input as Record<string, string>;
-}
+};
 
 // ❌ BAD — `any` skips all checks
 function parseConfigBad(input: any) {
@@ -115,11 +115,10 @@ interface UserProfile {
 }
 
 // ✅ GOOD — safe access; ?? for null/undefined default only
-function getUserCity(user: UserProfile): string {
-  return user.address?.city ?? "Unknown city";
-}
-const pageSize = config.pageSize ?? 10; // 0 would be kept with ??, replaced with ||
-const label = status?.description ?? "-";
+const getUserCity = (user: UserProfile): string =>
+  user.address?.city ?? "Unknown city";
+// Example: const pageSize = config.pageSize ?? 10; // 0 would be kept with ??, replaced with ||
+// Example: const label = status?.description ?? "-";
 
 // ❌ BAD — || replaces 0, "", false too (often unintended)
 // const pageSize = config.pageSize || 10;   // 0 becomes 10

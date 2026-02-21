@@ -3,7 +3,7 @@
  * Rule: Functional components only. Always type props. Default values in destructuring.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, FunctionComponent } from "react";
 
 // ─────────────────────────────────────────────
 // BASIC COMPONENT — props interface + defaults
@@ -18,23 +18,21 @@ interface ButtonProps {
   size?: "sm" | "md" | "lg";
 }
 
-export function Button({
+export const Button: FunctionComponent<ButtonProps> = ({
   children,
   onClick,
   disabled = false,
   variant = "primary",
   size = "md",
-}: ButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`btn btn-${variant} btn-${size}`}
-    >
-      {children}
-    </button>
-  );
-}
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`btn btn-${variant} btn-${size}`}
+  >
+    {children}
+  </button>
+);
 
 // ❌ BAD — untyped, no defaults
 export function ButtonBad(props: any) {
@@ -52,7 +50,11 @@ interface DataDisplayProps {
 }
 
 // ✅ GOOD — one condition per line, readable
-export function DataDisplay({ isLoading, error, data }: DataDisplayProps) {
+export const DataDisplay: FunctionComponent<DataDisplayProps> = ({
+  isLoading,
+  error,
+  data,
+}) => {
   if (isLoading) return <Spinner />;
   if (error) return <ErrorMessage message={error.message} />;
   if (!data) return null;
@@ -64,7 +66,7 @@ export function DataDisplay({ isLoading, error, data }: DataDisplayProps) {
       ))}
     </ul>
   );
-}
+};
 
 // ❌ BAD — ternary hell, unreadable
 export function DataDisplayBad({ isLoading, error, data }: DataDisplayProps) {
@@ -93,7 +95,10 @@ interface MarketCardProps {
 }
 
 // ✅ GOOD — clear structure: types → state → effects → handlers → render
-export function MarketCard({ marketId, onClose }: MarketCardProps) {
+export const MarketCard: FunctionComponent<MarketCardProps> = ({
+  marketId,
+  onClose,
+}) => {
   // State
   const [market, setMarket] = useState<Market | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,7 +108,7 @@ export function MarketCard({ marketId, onClose }: MarketCardProps) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadMarket() {
+    const loadMarket = async () => {
       try {
         setIsLoading(true);
         const data = await fetchMarket(marketId);
@@ -113,16 +118,16 @@ export function MarketCard({ marketId, onClose }: MarketCardProps) {
       } finally {
         if (!cancelled) setIsLoading(false);
       }
-    }
+    };
 
     loadMarket();
     return () => { cancelled = true; }; // Cleanup to avoid state updates on unmount
   }, [marketId]);
 
   // Handlers
-  function handleCloseClick() {
+  const handleCloseClick = () => {
     onClose?.();
-  }
+  };
 
   // Render
   if (isLoading) return <Spinner />;
@@ -136,7 +141,7 @@ export function MarketCard({ marketId, onClose }: MarketCardProps) {
       {onClose && <button onClick={handleCloseClick}>Close</button>}
     </div>
   );
-}
+};
 
 // ─────────────────────────────────────────────
 // COMPONENT SIZE RULE
@@ -151,8 +156,9 @@ export function MarketCard({ marketId, onClose }: MarketCardProps) {
 // useMarketList.ts      (custom hook for data logic)
 
 // Stubs
-async function fetchMarket(id: string): Promise<Market> {
-  return { id, name: "Example", status: "active" };
-}
-function Spinner() { return <div>Loading...</div>; }
-function ErrorMessage({ message }: { message: string }) { return <div>{message}</div>; }
+const fetchMarket = async (id: string): Promise<Market> =>
+  ({ id, name: "Example", status: "active" });
+const Spinner = () => <div>Loading...</div>;
+const ErrorMessage: FunctionComponent<{ message: string }> = ({ message }) => (
+  <div>{message}</div>
+);

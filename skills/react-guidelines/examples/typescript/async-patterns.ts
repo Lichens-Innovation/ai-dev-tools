@@ -8,14 +8,14 @@
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — parallel execution (~300ms if each takes 300ms)
-async function loadDashboard(userId: string) {
+const loadDashboard = async (userId: string) => {
   const [user, markets, stats] = await Promise.all([
     fetchUser(userId),
     fetchMarkets(userId),
     fetchStats(userId),
   ]);
   return { user, markets, stats };
-}
+};
 
 // ❌ BAD — sequential when not needed (~900ms for same result)
 async function loadDashboardSlow(userId: string) {
@@ -30,7 +30,7 @@ async function loadDashboardSlow(userId: string) {
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — continues even if some fail
-async function loadOptionalWidgets(userId: string) {
+const loadOptionalWidgets = async (userId: string) => {
   const results = await Promise.allSettled([
     fetchRecommendations(userId),
     fetchNotifications(userId),
@@ -40,18 +40,18 @@ async function loadOptionalWidgets(userId: string) {
   return results.map((result) =>
     result.status === "fulfilled" ? result.value : null
   );
-}
+};
 
 // ─────────────────────────────────────────────
 // SEQUENTIAL when order/dependency matters
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — sequential here because step 2 depends on step 1
-async function createAndNotify(data: MarketData) {
+const createAndNotify = async (data: MarketData) => {
   const market = await createMarket(data);       // Must exist first
   await notifySubscribers(market.id);            // Depends on market.id
   return market;
-}
+};
 
 // ─────────────────────────────────────────────
 // TIMEOUT PATTERN
@@ -59,17 +59,17 @@ async function createAndNotify(data: MarketData) {
 
 const REQUEST_TIMEOUT_MS = 5000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms)
   );
   return Promise.race([promise, timeout]);
-}
+};
 
 // ✅ GOOD — never hang indefinitely
-async function fetchWithTimeout(url: string) {
+const fetchWithTimeout = async (url: string) => {
   return withTimeout(fetch(url), REQUEST_TIMEOUT_MS);
-}
+};
 
 // ─────────────────────────────────────────────
 // RETRY PATTERN
@@ -78,10 +78,10 @@ async function fetchWithTimeout(url: string) {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
-async function withRetry<T>(
+const withRetry = async <T>(
   fn: () => Promise<T>,
   retries = MAX_RETRIES
-): Promise<T> {
+): Promise<T> => {
   try {
     return await fn();
   } catch (error) {
@@ -89,19 +89,19 @@ async function withRetry<T>(
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     return withRetry(fn, retries - 1);
   }
-}
+};
 
 // Usage
-async function fetchReliable(url: string) {
+const fetchReliable = async (url: string) => {
   return withRetry(() => fetch(url).then((r) => r.json()));
-}
+};
 
 // ─────────────────────────────────────────────
 // ASYNC ITERATION — avoid holding all in memory
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — process in batches
-async function processLargeList(ids: string[]) {
+const processLargeList = async (ids: string[]) => {
   const BATCH_SIZE = 10;
   const results: unknown[] = [];
 
@@ -112,7 +112,7 @@ async function processLargeList(ids: string[]) {
   }
 
   return results;
-}
+};
 
 // ❌ BAD — may exhaust API rate limits or memory
 async function processLargeListBad(ids: string[]) {
@@ -121,12 +121,12 @@ async function processLargeListBad(ids: string[]) {
 
 // Stubs
 interface MarketData { name: string; }
-async function fetchUser(id: string) { return { id }; }
-async function fetchMarkets(id: string) { return []; }
-async function fetchStats(id: string) { return {}; }
-async function fetchRecommendations(id: string) { return []; }
-async function fetchNotifications(id: string) { return []; }
-async function fetchAnnouncements() { return []; }
-async function createMarket(data: MarketData) { return { id: "1", ...data }; }
-async function notifySubscribers(id: string) {}
-async function processItem(id: string) { return { id }; }
+const fetchUser = async (id: string) => ({ id });
+const fetchMarkets = async (id: string) => [];
+const fetchStats = async (id: string) => ({});
+const fetchRecommendations = async (id: string) => [];
+const fetchNotifications = async (id: string) => [];
+const fetchAnnouncements = async () => [];
+const createMarket = async (data: MarketData) => ({ id: "1", ...data });
+const notifySubscribers = async (id: string) => {};
+const processItem = async (id: string) => ({ id });

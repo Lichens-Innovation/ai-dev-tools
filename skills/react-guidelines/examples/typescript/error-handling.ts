@@ -3,13 +3,14 @@
  * Rule: ALL async functions must have try/catch with meaningful error messages.
  *       Never silently swallow errors.
  */
+export {};
 
 // ─────────────────────────────────────────────
 // BASIC FETCH WITH ERROR HANDLING
 // ─────────────────────────────────────────────
 
 // ✅ GOOD
-async function fetchData(url: string) {
+const fetchData = async (url: string) => {
   try {
     const response = await fetch(url);
 
@@ -22,7 +23,7 @@ async function fetchData(url: string) {
     console.error("Fetch failed:", error);
     throw new Error(`Failed to fetch data from ${url}`);
   }
-}
+};
 
 // ❌ BAD — no error handling, raw response.json() can fail too
 async function fetchDataBad(url: string) {
@@ -53,7 +54,7 @@ class ValidationError extends Error {
 }
 
 // ✅ GOOD — differentiated error handling
-async function createMarket(data: unknown) {
+const createMarket = async (data: unknown) => {
   try {
     const validated = validateMarketData(data);
     const result = await saveMarket(validated);
@@ -70,7 +71,7 @@ async function createMarket(data: unknown) {
     // Re-throw unexpected errors
     throw error;
   }
-}
+};
 
 // ─────────────────────────────────────────────
 // RESULT PATTERN (functional alternative)
@@ -81,7 +82,7 @@ type Result<T, E = Error> =
   | { success: false; error: E };
 
 // ✅ GOOD — explicit success/failure without throwing
-async function safeParseJson<T>(text: string): Promise<Result<T>> {
+const safeParseJson = async <T>(text: string): Promise<Result<T>> => {
   try {
     const data = JSON.parse(text) as T;
     return { success: true, data };
@@ -91,7 +92,7 @@ async function safeParseJson<T>(text: string): Promise<Result<T>> {
       error: new Error(`Invalid JSON: ${(error as Error).message}`),
     };
   }
-}
+};
 
 // Usage
 const result = await safeParseJson<{ name: string }>('{"name": "Alice"}');
@@ -115,16 +116,16 @@ async function silentFail() {
 }
 
 // ✅ GOOD — at minimum, log and rethrow
-async function properFail() {
+const properFail = async () => {
   try {
     await doSomethingRisky();
   } catch (error) {
     console.error("doSomethingRisky failed:", error);
     throw error;
   }
-}
+};
 
 // Placeholder stubs for the examples above
-function validateMarketData(data: unknown) { return data; }
-async function saveMarket(data: unknown) { return data; }
-async function doSomethingRisky() {}
+const validateMarketData = (data: unknown) => data;
+const saveMarket = async (data: unknown) => data;
+const doSomethingRisky = async () => {};

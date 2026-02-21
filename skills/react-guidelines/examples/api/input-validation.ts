@@ -44,7 +44,7 @@ type MarketQuery = z.infer<typeof MarketQuerySchema>;
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — safe parse returns success/error, no throw
-async function createMarketHandler(body: unknown) {
+const createMarketHandler = async (body: unknown) => {
   const result = CreateMarketSchema.safeParse(body);
 
   if (!result.success) {
@@ -58,13 +58,11 @@ async function createMarketHandler(body: unknown) {
   // result.data is fully typed as CreateMarketInput
   const market = await createMarket(result.data);
   return { success: true, data: market };
-}
+};
 
 // ✅ GOOD — parse (throws on invalid) for trusted internal use
-function processMarketData(data: unknown): CreateMarketInput {
-  // Throws ZodError with detailed message if invalid
-  return CreateMarketSchema.parse(data);
-}
+const processMarketData = (data: unknown): CreateMarketInput =>
+  CreateMarketSchema.parse(data);
 
 // ─────────────────────────────────────────────
 // ENVIRONMENT VARIABLES VALIDATION
@@ -79,7 +77,7 @@ const EnvSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
-function loadEnv() {
+const loadEnv = () => {
   const result = EnvSchema.safeParse(process.env);
   if (!result.success) {
     console.error("❌ Invalid environment variables:");
@@ -87,7 +85,7 @@ function loadEnv() {
     process.exit(1);
   }
   return result.data;
-}
+};
 
 export const env = loadEnv(); // Validated and typed
 
@@ -125,9 +123,8 @@ const RegisterUserSchema = z.object({
 // ERROR FORMATTING FOR CLIENTS
 // ─────────────────────────────────────────────
 
-function formatZodError(error: z.ZodError): Record<string, string[]> {
-  return error.flatten().fieldErrors as Record<string, string[]>;
-}
+const formatZodError = (error: z.ZodError): Record<string, string[]> =>
+  error.flatten().fieldErrors as Record<string, string[]>;
 
 // Usage
 const result = RegisterUserSchema.safeParse({ email: "bad", password: "short" });
@@ -137,4 +134,5 @@ if (!result.success) {
 }
 
 // Stubs
-async function createMarket(data: CreateMarketInput) { return { id: "1", ...data }; }
+const createMarket = async (data: CreateMarketInput) =>
+  ({ id: "1", ...data });

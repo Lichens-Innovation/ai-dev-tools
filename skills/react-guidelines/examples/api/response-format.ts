@@ -27,31 +27,27 @@ interface ApiResponse<T> {
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — typed helper functions for consistent responses
-function successResponse<T>(data: T, meta?: PaginationMeta): ApiResponse<T> {
-  return { success: true, data, ...(meta ? { meta } : {}) };
-}
+const successResponse = <T>(data: T, meta?: PaginationMeta): ApiResponse<T> =>
+  ({ success: true, data, ...(meta ? { meta } : {}) });
 
-function errorResponse(message: string): ApiResponse<never> {
-  return { success: false, error: message };
-}
+const errorResponse = (message: string): ApiResponse<never> =>
+  ({ success: false, error: message });
 
-function paginatedResponse<T>(
+const paginatedResponse = <T>(
   data: T[],
   total: number,
   page: number,
   limit: number
-): ApiResponse<T[]> {
-  return {
-    success: true,
-    data,
-    meta: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-}
+): ApiResponse<T[]> => ({
+  success: true,
+  data,
+  meta: {
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  },
+});
 
 // ─────────────────────────────────────────────
 // ROUTE HANDLER EXAMPLES (Next.js / Express style)
@@ -64,7 +60,9 @@ interface Market {
 }
 
 // ✅ GOOD — single item
-async function getMarketHandler(marketId: string): Promise<ApiResponse<Market>> {
+const getMarketHandler = async (
+  marketId: string
+): Promise<ApiResponse<Market>> => {
   try {
     const market = await findMarketById(marketId);
 
@@ -77,13 +75,13 @@ async function getMarketHandler(marketId: string): Promise<ApiResponse<Market>> 
     console.error("getMarketHandler error:", error);
     return errorResponse("Internal server error");
   }
-}
+};
 
 // ✅ GOOD — paginated list
-async function listMarketsHandler(
+const listMarketsHandler = async (
   page = 1,
   limit = 20
-): Promise<ApiResponse<Market[]>> {
+): Promise<ApiResponse<Market[]>> => {
   try {
     const { markets, total } = await fetchMarketsPaginated(page, limit);
     return paginatedResponse(markets, total, page, limit);
@@ -91,10 +89,12 @@ async function listMarketsHandler(
     console.error("listMarketsHandler error:", error);
     return errorResponse("Failed to load markets");
   }
-}
+};
 
 // ✅ GOOD — create with validation
-async function createMarketHandler(body: unknown): Promise<ApiResponse<Market>> {
+const createMarketHandler = async (
+  body: unknown
+): Promise<ApiResponse<Market>> => {
   try {
     const validated = validateCreateMarket(body);
     const market = await insertMarket(validated);
@@ -106,7 +106,7 @@ async function createMarketHandler(body: unknown): Promise<ApiResponse<Market>> 
     console.error("createMarketHandler error:", error);
     return errorResponse("Failed to create market");
   }
-}
+};
 
 // ─────────────────────────────────────────────
 // HTTP STATUS CODE CONVENTIONS
@@ -127,7 +127,7 @@ async function createMarketHandler(body: unknown): Promise<ApiResponse<Market>> 
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — always check success before using data
-async function loadMarket(id: string) {
+const loadMarket = async (id: string) => {
   const response = await fetch(`/api/markets/${id}`).then(
     (r) => r.json() as Promise<ApiResponse<Market>>
   );
@@ -137,7 +137,7 @@ async function loadMarket(id: string) {
   }
 
   return response.data; // TypeScript knows this is Market
-}
+};
 
 // ─────────────────────────────────────────────
 // Stubs
@@ -147,18 +147,13 @@ class ValidationError extends Error {
   constructor(message: string) { super(message); this.name = "ValidationError"; }
 }
 
-async function findMarketById(id: string): Promise<Market | null> {
-  return { id, name: "Example", status: "active" };
-}
+const findMarketById = async (id: string): Promise<Market | null> =>
+  ({ id, name: "Example", status: "active" });
 
-async function fetchMarketsPaginated(page: number, limit: number) {
-  return { markets: [] as Market[], total: 0 };
-}
+const fetchMarketsPaginated = async (page: number, limit: number) =>
+  ({ markets: [] as Market[], total: 0 });
 
-async function insertMarket(data: unknown): Promise<Market> {
-  return { id: "new", name: "New Market", status: "active" };
-}
+const insertMarket = async (data: unknown): Promise<Market> =>
+  ({ id: "new", name: "New Market", status: "active" });
 
-function validateCreateMarket(body: unknown) {
-  return body;
-}
+const validateCreateMarket = (body: unknown) => body;

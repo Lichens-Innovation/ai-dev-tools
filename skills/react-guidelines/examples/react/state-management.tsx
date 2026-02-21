@@ -4,13 +4,13 @@
  *       Co-locate state with the component that owns it.
  */
 
-import { useState, useReducer, useCallback } from "react";
+import { useState, useReducer, useCallback, FunctionComponent } from "react";
 
 // ─────────────────────────────────────────────
 // FUNCTIONAL UPDATES — avoid stale closures
 // ─────────────────────────────────────────────
 
-export function Counter() {
+export const Counter: FunctionComponent = () => {
   const [count, setCount] = useState(0);
 
   // ✅ GOOD — functional update, always uses latest value
@@ -29,7 +29,7 @@ export function Counter() {
       <button onClick={reset}>Reset</button>
     </div>
   );
-}
+};
 
 // ─────────────────────────────────────────────
 // useReducer — for complex state with multiple sub-values
@@ -59,7 +59,10 @@ const initialFilters: MarketFilters = {
 };
 
 // ✅ GOOD — reducer keeps state transitions explicit and testable
-function filtersReducer(state: MarketFilters, action: FilterAction): MarketFilters {
+const filtersReducer = (
+  state: MarketFilters,
+  action: FilterAction
+): MarketFilters => {
   switch (action.type) {
     case "SET_STATUS":
       return { ...state, status: action.payload, page: 1 }; // reset page on filter change
@@ -74,9 +77,9 @@ function filtersReducer(state: MarketFilters, action: FilterAction): MarketFilte
     default:
       return state;
   }
-}
+};
 
-export function MarketFiltersPanel() {
+export const MarketFiltersPanel: FunctionComponent = () => {
   const [filters, dispatch] = useReducer(filtersReducer, initialFilters);
 
   return (
@@ -103,26 +106,26 @@ export function MarketFiltersPanel() {
       <pre>{JSON.stringify(filters, null, 2)}</pre>
     </div>
   );
-}
+};
 
 // ─────────────────────────────────────────────
 // STATE CO-LOCATION — keep state close to use
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — modal open state lives in the component that controls the modal
-export function UserList() {
+export const UserList: FunctionComponent = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
-  function handleEditUser(userId: string) {
+  const handleEditUser = (userId: string) => {
     setSelectedUserId(userId);
     setIsModalOpen(true);
-  }
+  };
 
-  function handleCloseModal() {
+  const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedUserId(null);
-  }
+  };
 
   return (
     <div>
@@ -135,7 +138,7 @@ export function UserList() {
       )}
     </div>
   );
-}
+};
 
 // ─────────────────────────────────────────────
 // DERIVED STATE — compute from existing state, don't duplicate
@@ -143,7 +146,7 @@ export function UserList() {
 
 interface Item { id: string; name: string; selected: boolean; }
 
-export function ItemList() {
+export const ItemList: FunctionComponent = () => {
   const [items, setItems] = useState<Item[]>([
     { id: "1", name: "Apple", selected: false },
     { id: "2", name: "Banana", selected: true },
@@ -156,13 +159,13 @@ export function ItemList() {
   // ❌ BAD — storing derived state separately causes sync issues
   // const [selectedCount, setSelectedCount] = useState(0);
 
-  function toggleItem(id: string) {
+  const toggleItem = (id: string) => {
     setItems((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, selected: !item.selected } : item
       )
     );
-  }
+  };
 
   return (
     <div>
@@ -180,4 +183,4 @@ export function ItemList() {
       ))}
     </div>
   );
-}
+};
