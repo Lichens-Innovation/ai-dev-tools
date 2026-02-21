@@ -24,9 +24,8 @@ const getMarket = async (id: string): Promise<Market> => {
 };
 
 // ❌ BAD — `any` defeats the entire purpose of TypeScript
-async function getMarketBad(id: any): Promise<any> {
-  return fetch(`/api/markets/${id}`).then((r) => r.json());
-}
+const getMarketBad = async (id: any): Promise<any> =>
+  fetch(`/api/markets/${id}`).then((r) => r.json());
 
 // ─────────────────────────────────────────────
 // UNION TYPES — prefer over loose strings
@@ -45,11 +44,10 @@ const sortMarkets = (markets: Market[], direction: SortDirection): Market[] =>
   );
 
 // ❌ BAD — no autocomplete, no safety
-function sortMarketsBad(markets: any[], direction: string): any[] {
-  return markets.sort((a, b) =>
+const sortMarketsBad = (markets: any[], direction: string): any[] =>
+  markets.sort((a, b) =>
     direction === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
   );
-}
 
 // ─────────────────────────────────────────────
 // GENERICS — reusable typed utilities
@@ -95,9 +93,8 @@ const parseConfig = (input: unknown): Record<string, string> => {
 };
 
 // ❌ BAD — `any` skips all checks
-function parseConfigBad(input: any) {
-  return input; // could be anything, TypeScript won't complain
-}
+const parseConfigBad = (input: any) =>
+  input; // could be anything, TypeScript won't complain
 
 // ─────────────────────────────────────────────
 // OPTIONAL CHAINING & NULLISH COALESCING
@@ -125,6 +122,5 @@ const getUserCity = (user: UserProfile): string =>
 // const label = status?.description || "-"; // "" becomes "-"
 
 // ❌ BAD — will throw if address is undefined
-function getUserCityBad(user: UserProfile): string {
-  return user.address!.city!; // non-null assertion = lying to TypeScript
-}
+const getUserCityBad = (user: UserProfile): string =>
+  user.address!.city!; // non-null assertion = lying to TypeScript

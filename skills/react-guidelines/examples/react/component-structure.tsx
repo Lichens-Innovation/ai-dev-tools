@@ -35,9 +35,9 @@ export const Button: FunctionComponent<ButtonProps> = ({
 );
 
 // ❌ BAD — untyped, no defaults
-export function ButtonBad(props: any) {
-  return <button onClick={props.onClick}>{props.children}</button>;
-}
+export const ButtonBad: FunctionComponent<any> = (props) => (
+  <button onClick={props.onClick}>{props.children}</button>
+);
 
 // ─────────────────────────────────────────────
 // CONDITIONAL RENDERING — clear patterns
@@ -69,15 +69,18 @@ export const DataDisplay: FunctionComponent<DataDisplayProps> = ({
 };
 
 // ❌ BAD — ternary hell, unreadable
-export function DataDisplayBad({ isLoading, error, data }: DataDisplayProps) {
-  return isLoading ? (
+export const DataDisplayBad: FunctionComponent<DataDisplayProps> = ({
+  isLoading,
+  error,
+  data,
+}) =>
+  isLoading ? (
     <Spinner />
   ) : error ? (
     <ErrorMessage message={error.message} />
   ) : data ? (
     <ul>{data.map((item, i) => <li key={i}>{item}</li>)}</ul>
   ) : null;
-}
 
 // ─────────────────────────────────────────────
 // COMPONENT WITH DATA FETCHING

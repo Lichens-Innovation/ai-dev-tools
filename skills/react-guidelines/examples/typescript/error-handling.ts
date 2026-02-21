@@ -26,10 +26,10 @@ const fetchData = async (url: string) => {
 };
 
 // ❌ BAD — no error handling, raw response.json() can fail too
-async function fetchDataBad(url: string) {
+const fetchDataBad = async (url: string) => {
   const response = await fetch(url);
   return response.json();
-}
+};
 
 // ─────────────────────────────────────────────
 // TYPED ERRORS
@@ -107,13 +107,13 @@ if (result.success) {
 // ─────────────────────────────────────────────
 
 // ❌ BAD — empty catch, error is lost
-async function silentFail() {
+const silentFail = async () => {
   try {
     await doSomethingRisky();
   } catch (_) {
     // 🚫 Error silently swallowed — never do this
   }
-}
+};
 
 // ✅ GOOD — at minimum, log and rethrow
 const properFail = async () => {

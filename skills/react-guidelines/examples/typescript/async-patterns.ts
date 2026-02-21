@@ -18,12 +18,12 @@ const loadDashboard = async (userId: string) => {
 };
 
 // ❌ BAD — sequential when not needed (~900ms for same result)
-async function loadDashboardSlow(userId: string) {
+const loadDashboardSlow = async (userId: string) => {
   const user = await fetchUser(userId);       // wait 300ms
   const markets = await fetchMarkets(userId); // wait 300ms more
   const stats = await fetchStats(userId);     // wait 300ms more
   return { user, markets, stats };
-}
+};
 
 // ─────────────────────────────────────────────
 // PROMISE.ALLSETTLED — when failures are acceptable
@@ -115,9 +115,8 @@ const processLargeList = async (ids: string[]) => {
 };
 
 // ❌ BAD — may exhaust API rate limits or memory
-async function processLargeListBad(ids: string[]) {
-  return Promise.all(ids.map(processItem)); // 10,000 concurrent requests!
-}
+const processLargeListBad = async (ids: string[]) =>
+  Promise.all(ids.map(processItem)); // 10,000 concurrent requests!
 
 // Stubs
 interface MarketData { name: string; }

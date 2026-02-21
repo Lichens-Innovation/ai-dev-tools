@@ -10,14 +10,14 @@
 // ─────────────────────────────────────────────
 
 // ❌ SMELL — 80-line function doing 5 things
-async function processOrderBad(orderId: string) {
+const processOrderBad = async (orderId: string) => {
   // 15 lines: validate order
   // 15 lines: check inventory
   // 15 lines: charge payment
   // 15 lines: update database
   // 15 lines: send confirmation email
   // 5 lines: return result
-}
+};
 
 // ✅ REFACTORED — each step is named and testable
 async function processOrder(orderId: string) {
@@ -36,14 +36,14 @@ async function processOrder(orderId: string) {
 // ─────────────────────────────────────────────
 
 // ❌ SMELL
-function createUser(
+const createUser = (
   name: string,
   email: string,
   role: string,
   teamId: string,
   isVerified: boolean,
   sendWelcomeEmail: boolean
-) {}
+) => {};
 
 // ✅ REFACTORED
 interface CreateUserParams {
@@ -64,7 +64,7 @@ function createUserClean({ name, email, role, teamId, isVerified = false, sendWe
 // ─────────────────────────────────────────────
 
 // ❌ SMELL — `true` is meaningless at call site
-function fetchMarkets(userId: string, includeArchived: boolean) {}
+const fetchMarkets = (userId: string, includeArchived: boolean) => {};
 fetchMarkets("u1", true); // True what? Has to look at definition
 
 // ✅ OPTION A — named options object
@@ -82,17 +82,17 @@ function fetchAllMarkets(userId: string) {}
 // ─────────────────────────────────────────────
 
 // ❌ SMELL — nearly identical blocks
-async function getActiveMarketsForUser(userId: string) {
+const getActiveMarketsForUser = async (userId: string) => {
   const response = await fetch(`/api/markets?userId=${userId}&status=active`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
-}
+};
 
-async function getClosedMarketsForUser(userId: string) {
+const getClosedMarketsForUser = async (userId: string) => {
   const response = await fetch(`/api/markets?userId=${userId}&status=closed`); // copy-paste
   if (!response.ok) throw new Error(`HTTP ${response.status}`);               // copy-paste
   return response.json();
-}
+};
 
 // ✅ REFACTORED — parameterized
 type MarketStatus = "active" | "closed" | "resolved";
@@ -110,7 +110,7 @@ async function getMarketsForUser(userId: string, status: MarketStatus) {
 // ─────────────────────────────────────────────
 
 // ❌ SMELL — what does each string represent?
-function transferFunds(from: string, to: string, amount: number) {}
+const transferFunds = (from: string, to: string, amount: number) => {};
 transferFunds("u_123", "u_456", 50.00); // Which is userId? accountId?
 
 // ✅ REFACTORED — branded types
@@ -154,7 +154,7 @@ count = count + 1;
 
 // ❌ SMELL — comment compensates for bad name
 // Check if user can edit
-function check(u: any): boolean { return u.role === "admin"; }
+const check = (u: any): boolean => u.role === "admin";
 
 // ✅ GOOD — name is self-explanatory, comment explains why
 function canEditMarket(user: { role: string }): boolean {
@@ -180,8 +180,8 @@ const SEARCH_DEBOUNCE_MS = 1500;
 // [ ] Does it mutate anything from outside? → if yes: refactor to pure
 
 // Stubs
-async function validateAndFetchOrder(id: string) { return { id }; }
-async function checkInventoryAvailability(order: any) {}
-async function chargePayment(order: any) { return {}; }
-async function persistOrderCompletion(order: any, payment: any) {}
-async function sendOrderConfirmation(order: any) {}
+const validateAndFetchOrder = async (id: string) => ({ id });
+const checkInventoryAvailability = async (order: any) => {};
+const chargePayment = async (order: any) => ({});
+const persistOrderCompletion = async (order: any, payment: any) => {};
+const sendOrderConfirmation = async (order: any) => {};
