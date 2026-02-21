@@ -26,8 +26,7 @@ const getMarket = async (id: string): Promise<Market> => {
 };
 
 // ❌ BAD — `any` defeats the entire purpose of TypeScript
-const getMarketBad = async (id: any): Promise<any> =>
-  fetch(`/api/markets/${id}`).then((r) => r.json());
+const getMarketBad = async (id: any): Promise<any> => fetch(`/api/markets/${id}`).then((r) => r.json());
 
 // ─────────────────────────────────────────────
 // UNION TYPES — prefer over loose strings
@@ -49,11 +48,9 @@ const sortMarkets = ({ markets, direction }: SortMarketsArgs): Market[] => {
   return [...markets].sort((a, b) => b.name.localeCompare(a.name));
 };
 
-// ❌ BAD — no autocomplete, no safety
+// ❌ BAD — no autocomplete, no safety, note using early returns to avoid many nested if statements
 const sortMarketsBad = (markets: any[], direction: string): any[] =>
-  markets.sort((a, b) =>
-    direction === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
-  );
+  markets.sort((a, b) => (direction === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
 
 // ─────────────────────────────────────────────
 // GENERICS — reusable typed utilities
@@ -78,7 +75,7 @@ const apiFetch = async <T>(url: string): Promise<ApiResponse<T>> => {
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
     }
-    const data = await response.json() as T;
+    const data = (await response.json()) as T;
     return { success: true, data };
   } catch (error: unknown) {
     return { success: false, error: String(error) };
@@ -104,8 +101,7 @@ const parseConfig = (input: unknown): Record<string, string> => {
 };
 
 // ❌ BAD — `any` skips all checks
-const parseConfigBad = (input: any) =>
-  input; // could be anything, TypeScript won't complain
+const parseConfigBad = (input: any) => input; // could be anything, TypeScript won't complain
 
 // ─────────────────────────────────────────────
 // OPTIONAL CHAINING & NULLISH COALESCING
@@ -123,8 +119,7 @@ interface UserProfile {
 }
 
 // ✅ GOOD — safe access; ?? for null/undefined default only
-const getUserCity = (user: UserProfile): string =>
-  user.address?.city ?? "Unknown city";
+const getUserCity = (user: UserProfile): string => user.address?.city ?? "Unknown city";
 // Example: const pageSize = config.pageSize ?? 10; // 0 would be kept with ??, replaced with ||
 // Example: const label = status?.description ?? "-";
 
@@ -133,5 +128,4 @@ const getUserCity = (user: UserProfile): string =>
 // const label = status?.description || "-"; // "" becomes "-"
 
 // ❌ BAD — will throw if address is undefined
-const getUserCityBad = (user: UserProfile): string =>
-  user.address!.city!; // non-null assertion = lying to TypeScript
+const getUserCityBad = (user: UserProfile): string => user.address!.city!; // non-null assertion = lying to TypeScript
