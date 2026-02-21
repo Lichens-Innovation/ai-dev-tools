@@ -65,7 +65,7 @@ After reading this skill:
 | Immutability patterns      | `examples/typescript/immutability.ts`   | When working with state/objects/arrays |
 | Error handling             | `examples/typescript/error-handling.ts` | When writing async code                |
 | Async / Promise patterns   | `examples/typescript/async-patterns.ts` | When using await/Promise               |
-| Type safety                | `examples/typescript/type-safety.ts`    | When defining interfaces/types (no inline types; extract named types) |
+| Type safety                | `examples/typescript/type-safety.ts`    | When defining interfaces/types (no inline types; no nested types; extract named types) |
 
 ### React
 

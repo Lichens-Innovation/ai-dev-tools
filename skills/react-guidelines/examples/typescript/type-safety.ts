@@ -2,6 +2,7 @@
  * TYPE SAFETY — TypeScript
  * Rule: NEVER use `any`. Define precise interfaces and use union types.
  *       Do NOT define types inline — extract to named types (DRY, reuse).
+ *       Do NOT nest type definitions — extract nested object shapes to named types (reuse, clarity).
  */
 export {};
 
@@ -104,12 +105,24 @@ const parseConfig = (input: unknown): Record<string, string> => {
 const parseConfigBad = (input: any) => input; // could be anything, TypeScript won't complain
 
 // ─────────────────────────────────────────────
-// OPTIONAL CHAINING & NULLISH COALESCING
+// NO NESTED TYPES — extract nested shapes to named types
 // ─────────────────────────────────────────────
-// Rule: Prefer ?? (nullish coalescing) over || for null/undefined.
-// || treats 0, "", false as falsy and replaces them; ?? only replaces null and undefined.
+// Rule: Do not define object types inline inside another interface.
+//       Extract them to named types for reuse, clarity, and single source of truth.
+
+interface UserAddress {
+  city?: string;
+  country?: string;
+}
 
 interface UserProfile {
+  id: string;
+  name: string;
+  address?: UserAddress;
+}
+
+// ❌ BAD — nested inline type (not reusable, harder to read)
+interface UserProfileBad {
   id: string;
   name: string;
   address?: {
@@ -117,6 +130,12 @@ interface UserProfile {
     country?: string;
   };
 }
+
+// ─────────────────────────────────────────────
+// OPTIONAL CHAINING & NULLISH COALESCING
+// ─────────────────────────────────────────────
+// Rule: Prefer ?? (nullish coalescing) over || for null/undefined.
+// || treats 0, "", false as falsy and replaces them; ?? only replaces null and undefined.
 
 // ✅ GOOD — safe access; ?? for null/undefined default only
 const getUserCity = (user: UserProfile): string => user.address?.city ?? "Unknown city";
