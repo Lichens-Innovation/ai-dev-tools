@@ -42,12 +42,12 @@ interface SortMarketsArgs {
   markets: Market[];
   direction: SortDirection;
 }
-const sortMarkets = ({ markets, direction }: SortMarketsArgs): Market[] =>
-  [...markets].sort((a, b) =>
-    direction === "asc"
-      ? a.name.localeCompare(b.name)
-      : b.name.localeCompare(a.name)
-  );
+const sortMarkets = ({ markets, direction }: SortMarketsArgs): Market[] => {
+  if (direction === "asc") {
+    return [...markets].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return [...markets].sort((a, b) => b.name.localeCompare(a.name));
+};
 
 // ❌ BAD — no autocomplete, no safety
 const sortMarketsBad = (markets: any[], direction: string): any[] =>
