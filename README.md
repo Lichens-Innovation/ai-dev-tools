@@ -107,6 +107,8 @@ Other well-known places to discover and install agent skills:
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills)                       | Official Vercel collection (React, Next.js, web design, PR descriptions, etc.). Install: `npx skills add vercel-labs/agent-skills` |
 | [anthropics/skills](https://github.com/anthropics/skills)                                     | Anthropic’s public Agent Skills repo — creative, technical, and document skills for Claude.                                        |
 | [github/awesome-copilot — skills](https://github.com/github/awesome-copilot/tree/main/skills) | Curated skills in the Awesome Copilot repo (GitHub Copilot).                                                                       |
+| [claude-plugins.dev](https://claude-plugins.dev/)                                             | Plugin/skill registry with CLI installation.                                                                                        |
+| [SkillsMP](https://www.skillsmp.com/)                                                         | Skills marketplace (Claude, Codex, ChatGPT, etc.).                                                                                  |
 
 To list skills in any repo without installing: `npx skills add owner/repo --list`.
 
