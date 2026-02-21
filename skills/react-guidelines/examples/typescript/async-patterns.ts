@@ -84,7 +84,7 @@ const withRetry = async <T>(
 ): Promise<T> => {
   try {
     return await fn();
-  } catch (error) {
+  } catch (error: unknown) {
     if (retries === 0) throw error;
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     return withRetry(fn, retries - 1);

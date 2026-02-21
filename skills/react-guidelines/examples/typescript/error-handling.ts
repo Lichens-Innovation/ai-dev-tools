@@ -19,7 +19,7 @@ const fetchData = async (url: string) => {
     }
 
     return await response.json();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Fetch failed:", error);
     throw new Error(`Failed to fetch data from ${url}`);
   }
@@ -59,7 +59,7 @@ const createMarket = async (data: unknown) => {
     const validated = validateMarketData(data);
     const result = await saveMarket(validated);
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ValidationError) {
       // Handle validation errors differently
       return { success: false, errors: error.fields };
@@ -86,7 +86,7 @@ const safeParseJson = async <T>(text: string): Promise<Result<T>> => {
   try {
     const data = JSON.parse(text) as T;
     return { success: true, data };
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       success: false,
       error: new Error(`Invalid JSON: ${(error as Error).message}`),
@@ -110,7 +110,7 @@ if (result.success) {
 const silentFail = async () => {
   try {
     await doSomethingRisky();
-  } catch (_) {
+  } catch (_: unknown) {
     // 🚫 Error silently swallowed — never do this
   }
 };
@@ -119,7 +119,7 @@ const silentFail = async () => {
 const properFail = async () => {
   try {
     await doSomethingRisky();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("doSomethingRisky failed:", error);
     throw error;
   }

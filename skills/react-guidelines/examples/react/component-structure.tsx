@@ -116,7 +116,7 @@ export const MarketCard: FunctionComponent<MarketCardProps> = ({
         setIsLoading(true);
         const data = await fetchMarket(marketId);
         if (!cancelled) setMarket(data);
-      } catch (err) {
+      } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
         if (!cancelled) setIsLoading(false);

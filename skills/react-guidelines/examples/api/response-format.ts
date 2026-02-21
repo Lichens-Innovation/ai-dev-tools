@@ -71,7 +71,7 @@ const getMarketHandler = async (
     }
 
     return successResponse(market);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("getMarketHandler error:", error);
     return errorResponse("Internal server error");
   }
@@ -85,7 +85,7 @@ const listMarketsHandler = async (
   try {
     const { markets, total } = await fetchMarketsPaginated(page, limit);
     return paginatedResponse(markets, total, page, limit);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("listMarketsHandler error:", error);
     return errorResponse("Failed to load markets");
   }
@@ -99,7 +99,7 @@ const createMarketHandler = async (
     const validated = validateCreateMarket(body);
     const market = await insertMarket(validated);
     return successResponse(market);
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ValidationError) {
       return errorResponse(error.message);
     }

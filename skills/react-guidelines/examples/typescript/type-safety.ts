@@ -69,7 +69,7 @@ const apiFetch = async <T>(url: string): Promise<ApiResponse<T>> => {
     }
     const data = await response.json() as T;
     return { success: true, data };
-  } catch (error) {
+  } catch (error: unknown) {
     return { success: false, error: String(error) };
   }
 };

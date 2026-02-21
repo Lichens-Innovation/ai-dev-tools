@@ -42,7 +42,7 @@ const fetchBad = async (url: string) => {
 const silentFail = async () => {
   try {
     await fetchBad("/api/data");
-  } catch (_) {
+  } catch (_: unknown) {
     // 🚫 Error lost forever — impossible to debug
   }
 };
@@ -51,7 +51,7 @@ const silentFail = async () => {
 const halfBaked = async () => {
   try {
     return await fetchBad("/api/data");
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e); // logged but still swallowed — caller thinks success
   }
 };
