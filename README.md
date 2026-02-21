@@ -95,7 +95,7 @@ Two built-in skills help you create skills from scratch. Summary:
 | Process | 6 steps (including init + package) | 4 phases (Discovery → Verify) |
 | Resources | scripts / references / assets clearly defined | scripts/ and optional files (reference.md, examples.md) |
 | Packaging | Yes → distributable `.skill` file | No, skills created in place |
-| Best practices | Structure, progressive disclosure, "what not to include" | Descriptions, anti-patterns, patterns d’écriture, checklist |
+| Best practices | Structure, progressive disclosure, "what not to include" | Descriptions, anti-patterns, writing patterns, checklist |
 
 ## Popular skill repositories
 
