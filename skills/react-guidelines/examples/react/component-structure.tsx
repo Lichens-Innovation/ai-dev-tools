@@ -14,7 +14,7 @@ type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps {
   children: React.ReactNode;
-  onClick: () => void;
+  onClick: VoidFunction;
   disabled?: boolean;
   variant?: ButtonVariant;
   size?: ButtonSize;
@@ -98,7 +98,7 @@ interface Market {
 
 interface MarketCardProps {
   marketId: string;
-  onClose?: () => void;
+  onClose?: VoidFunction;
 }
 
 // ✅ GOOD — clear structure: types → state → effects → handlers → render
