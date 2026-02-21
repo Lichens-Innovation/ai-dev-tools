@@ -36,7 +36,11 @@ type UserRole = "admin" | "moderator" | "user" | "guest";
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type SortDirection = "asc" | "desc";
 
-const sortMarkets = (markets: Market[], direction: SortDirection): Market[] =>
+interface SortMarketsArgs {
+  markets: Market[];
+  direction: SortDirection;
+}
+const sortMarkets = ({ markets, direction }: SortMarketsArgs): Market[] =>
   [...markets].sort((a, b) =>
     direction === "asc"
       ? a.name.localeCompare(b.name)

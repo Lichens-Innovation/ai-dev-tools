@@ -141,8 +141,12 @@ const processDeep = (user: any, market: any) => {
   }
 };
 
-// ✅ GOOD — early returns flatten the structure
-const processClean = (user: any, market: any) => {
+// ✅ GOOD — early returns flatten the structure (destructuring when >1 param)
+interface ProcessCleanArgs {
+  user: any;
+  market: any;
+}
+const processClean = ({ user, market }: ProcessCleanArgs) => {
   if (!user?.isVerified) return;
   if (!market?.isActive) return;
   if (user.balance <= market.minimumBet) return;

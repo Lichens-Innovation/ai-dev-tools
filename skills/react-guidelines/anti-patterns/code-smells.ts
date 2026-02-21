@@ -67,13 +67,17 @@ function createUserClean({ name, email, role, teamId, isVerified = false, sendWe
 const fetchMarkets = (userId: string, includeArchived: boolean) => {};
 fetchMarkets("u1", true); // True what? Has to look at definition
 
-// ✅ OPTION A — named options object
-function fetchMarketsClean(userId: string, options?: { includeArchived?: boolean }) {}
-fetchMarketsClean("u1", { includeArchived: true }); // Self-documenting
+// ✅ OPTION A — named options object (destructuring when >1 param)
+interface FetchMarketsCleanArgs {
+  userId: string;
+  includeArchived?: boolean;
+}
+const fetchMarketsClean = ({ userId, includeArchived }: FetchMarketsCleanArgs) => {};
+fetchMarketsClean({ userId: "u1", includeArchived: true }); // Self-documenting
 
 // ✅ OPTION B — separate functions when behavior diverges significantly
-function fetchActiveMarkets(userId: string) {}
-function fetchAllMarkets(userId: string) {}
+const fetchActiveMarkets = (userId: string) => {};
+const fetchAllMarkets = (userId: string) => {};
 
 // ─────────────────────────────────────────────
 // SMELL 4: DUPLICATED CODE (DRY violation)
@@ -94,14 +98,18 @@ const getClosedMarketsForUser = async (userId: string) => {
   return response.json();
 };
 
-// ✅ REFACTORED — parameterized
+// ✅ REFACTORED — parameterized (destructuring when >1 param)
 type MarketStatus = "active" | "closed" | "resolved";
 
-async function getMarketsForUser(userId: string, status: MarketStatus) {
+interface GetMarketsForUserArgs {
+  userId: string;
+  status: MarketStatus;
+}
+const getMarketsForUser = async ({ userId, status }: GetMarketsForUserArgs) => {
   const response = await fetch(`/api/markets?userId=${userId}&status=${status}`);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
-}
+};
 
 // ─────────────────────────────────────────────
 // SMELL 5: PRIMITIVE OBSESSION

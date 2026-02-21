@@ -27,18 +27,28 @@ interface ApiResponse<T> {
 // ─────────────────────────────────────────────
 
 // ✅ GOOD — typed helper functions for consistent responses
-const successResponse = <T>(data: T, meta?: PaginationMeta): ApiResponse<T> =>
+interface SuccessResponseArgs<T> {
+  data: T;
+  meta?: PaginationMeta;
+}
+const successResponse = <T>({ data, meta }: SuccessResponseArgs<T>): ApiResponse<T> =>
   ({ success: true, data, ...(meta ? { meta } : {}) });
 
 const errorResponse = (message: string): ApiResponse<never> =>
   ({ success: false, error: message });
 
-const paginatedResponse = <T>(
-  data: T[],
-  total: number,
-  page: number,
-  limit: number
-): ApiResponse<T[]> => ({
+interface PaginatedResponseArgs<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+const paginatedResponse = <T>({
+  data,
+  total,
+  page,
+  limit,
+}: PaginatedResponseArgs<T>): ApiResponse<T[]> => ({
   success: true,
   data,
   meta: {
@@ -70,7 +80,7 @@ const getMarketHandler = async (
       return errorResponse(`Market ${marketId} not found`);
     }
 
-    return successResponse(market);
+    return successResponse({ data: market });
   } catch (error: unknown) {
     console.error("getMarketHandler error:", error);
     return errorResponse("Internal server error");
@@ -78,13 +88,17 @@ const getMarketHandler = async (
 };
 
 // ✅ GOOD — paginated list
-const listMarketsHandler = async (
+interface ListMarketsHandlerArgs {
+  page?: number;
+  limit?: number;
+}
+const listMarketsHandler = async ({
   page = 1,
-  limit = 20
-): Promise<ApiResponse<Market[]>> => {
+  limit = 20,
+}: ListMarketsHandlerArgs = {}): Promise<ApiResponse<Market[]>> => {
   try {
     const { markets, total } = await fetchMarketsPaginated(page, limit);
-    return paginatedResponse(markets, total, page, limit);
+    return paginatedResponse({ data: markets, total, page, limit });
   } catch (error: unknown) {
     console.error("listMarketsHandler error:", error);
     return errorResponse("Failed to load markets");
@@ -98,7 +112,7 @@ const createMarketHandler = async (
   try {
     const validated = validateCreateMarket(body);
     const market = await insertMarket(validated);
-    return successResponse(market);
+    return successResponse({ data: market });
   } catch (error: unknown) {
     if (error instanceof ValidationError) {
       return errorResponse(error.message);

@@ -9,19 +9,15 @@
 
 // ✅ GOOD — parallel execution (~300ms if each takes 300ms)
 const loadDashboard = async (userId: string) => {
-  const [user, markets, stats] = await Promise.all([
-    fetchUser(userId),
-    fetchMarkets(userId),
-    fetchStats(userId),
-  ]);
+  const [user, markets, stats] = await Promise.all([fetchUser(userId), fetchMarkets(userId), fetchStats(userId)]);
   return { user, markets, stats };
 };
 
 // ❌ BAD — sequential when not needed (~900ms for same result)
 const loadDashboardSlow = async (userId: string) => {
-  const user = await fetchUser(userId);       // wait 300ms
+  const user = await fetchUser(userId); // wait 300ms
   const markets = await fetchMarkets(userId); // wait 300ms more
-  const stats = await fetchStats(userId);     // wait 300ms more
+  const stats = await fetchStats(userId); // wait 300ms more
   return { user, markets, stats };
 };
 
@@ -37,9 +33,7 @@ const loadOptionalWidgets = async (userId: string) => {
     fetchAnnouncements(),
   ]);
 
-  return results.map((result) =>
-    result.status === "fulfilled" ? result.value : null
-  );
+  return results.map((result) => (result.status === "fulfilled" ? result.value : null));
 };
 
 // ─────────────────────────────────────────────
@@ -48,8 +42,8 @@ const loadOptionalWidgets = async (userId: string) => {
 
 // ✅ GOOD — sequential here because step 2 depends on step 1
 const createAndNotify = async (data: MarketData) => {
-  const market = await createMarket(data);       // Must exist first
-  await notifySubscribers(market.id);            // Depends on market.id
+  const market = await createMarket(data); // Must exist first
+  await notifySubscribers(market.id); // Depends on market.id
   return market;
 };
 
@@ -57,9 +51,13 @@ const createAndNotify = async (data: MarketData) => {
 // TIMEOUT PATTERN
 // ─────────────────────────────────────────────
 
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 5 * PeriodsInMS.oneSecond;
 
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+interface WithTimeoutArgs<T> {
+  promise: Promise<T>;
+  ms: number;
+}
+const withTimeout = <T>({ promise, ms }: WithTimeoutArgs<T>): Promise<T> => {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms)
   );
@@ -68,7 +66,7 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
 
 // ✅ GOOD — never hang indefinitely
 const fetchWithTimeout = async (url: string) => {
-  return withTimeout(fetch(url), REQUEST_TIMEOUT_MS);
+  return withTimeout({ promise: fetch(url), ms: REQUEST_TIMEOUT_MS });
 };
 
 // ─────────────────────────────────────────────
@@ -76,24 +74,25 @@ const fetchWithTimeout = async (url: string) => {
 // ─────────────────────────────────────────────
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+const RETRY_DELAY_MS = PeriodsInMS.oneSecond;
 
-const withRetry = async <T>(
-  fn: () => Promise<T>,
-  retries = MAX_RETRIES
-): Promise<T> => {
+interface WithRetryArgs<T> {
+  fn: () => Promise<T>;
+  retries?: number;
+}
+const withRetry = async <T>({ fn, retries = MAX_RETRIES }: WithRetryArgs<T>): Promise<T> => {
   try {
     return await fn();
   } catch (error: unknown) {
     if (retries === 0) throw error;
     await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-    return withRetry(fn, retries - 1);
+    return withRetry({ fn, retries: retries - 1 });
   }
 };
 
 // Usage
 const fetchReliable = async (url: string) => {
-  return withRetry(() => fetch(url).then((r) => r.json()));
+  return withRetry({ fn: () => fetch(url).then((r) => r.json()) });
 };
 
 // ─────────────────────────────────────────────
@@ -115,11 +114,12 @@ const processLargeList = async (ids: string[]) => {
 };
 
 // ❌ BAD — may exhaust API rate limits or memory
-const processLargeListBad = async (ids: string[]) =>
-  Promise.all(ids.map(processItem)); // 10,000 concurrent requests!
+const processLargeListBad = async (ids: string[]) => Promise.all(ids.map(processItem)); // 10,000 concurrent requests!
 
 // Stubs
-interface MarketData { name: string; }
+interface MarketData {
+  name: string;
+}
 const fetchUser = async (id: string) => ({ id });
 const fetchMarkets = async (id: string) => [];
 const fetchStats = async (id: string) => ({});
