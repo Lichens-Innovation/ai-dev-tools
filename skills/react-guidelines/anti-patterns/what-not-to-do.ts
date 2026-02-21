@@ -176,7 +176,7 @@ if (role === "admin_v2") {}      // Why v2? Is there v1?
 
 // ✅ GOOD
 const MAX_RETRIES = 3;
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes, readable
+const SESSION_TIMEOUT_MS = 30 * PeriodsInMS.oneMinute; // 30 minutes self-explanatory
 const ADMIN_ROLE = "admin_v2" as const;
 
 declare const retryCount: number;

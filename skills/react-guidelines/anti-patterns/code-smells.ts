@@ -169,10 +169,10 @@ function canEditMarket(user: { role: string }): boolean {
   return user.role === "admin";
 }
 
-// ✅ GOOD — comment explains non-obvious decision (the WHY)
-// We use 1500ms instead of 1000ms because the upstream API
+// ✅ GOOD — comment explains non-obvious decision (the WHY); duration self-explanatory via PeriodsInMS
+// We use 1.5s instead of 1s because the upstream API
 // has a documented 1200ms cold-start on cache miss
-const SEARCH_DEBOUNCE_MS = 1500;
+const SEARCH_DEBOUNCE_MS = 1.5 * PeriodsInMS.oneSecond;
 
 // ─────────────────────────────────────────────
 // QUICK SMELL CHECKLIST (for code review)

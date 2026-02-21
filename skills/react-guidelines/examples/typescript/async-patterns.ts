@@ -51,7 +51,7 @@ const createAndNotify = async (data: MarketData) => {
 // TIMEOUT PATTERN
 // ─────────────────────────────────────────────
 
-const REQUEST_TIMEOUT_MS = 5 * PeriodsInMS.oneSecond;
+const REQUEST_TIMEOUT_MS = 5 * PeriodsInMS.oneSecond; // 5 seconds self-explanatory
 
 interface WithTimeoutArgs<T> {
   promise: Promise<T>;
@@ -74,7 +74,7 @@ const fetchWithTimeout = async (url: string) => {
 // ─────────────────────────────────────────────
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = PeriodsInMS.oneSecond;
+const RETRY_DELAY_MS = PeriodsInMS.oneSecond; // 1 second self-explanatory
 
 interface WithRetryArgs<T> {
   fn: () => Promise<T>;

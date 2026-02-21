@@ -152,6 +152,8 @@ const TEST_REQUEST_STATUSES = {
 if (maxRetryCount > 3) {
 } // What is 3?
 const timeout = 1800000; // What is 1800000?
+// ✅ GOOD — use PeriodsInMS for self-explanatory duration
+const timeoutGood = 30 * PeriodsInMS.oneMinute; // 30 minutes
 
 // ─────────────────────────────────────────────
 // INTERFACES & TYPES — PascalCase, noun-based
