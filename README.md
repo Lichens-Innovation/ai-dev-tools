@@ -1,6 +1,6 @@
 # skills
 
-Lichens Innovation **Agent Skills** repository — reusable instructions to extend coding agents (Cursor, GitHub Copilot, Claude Code, etc.).
+Lichens Innovation **Agent Skills** repository — reusable instructions to extend coding agents (Cursor, GitHub Copilot, Claude Code, etc.). Agent Skills started as an open standard from Anthropic (2025); Cursor and GitHub Copilot adopted it shortly after. For the full timeline and how the ecosystem evolved, see [SKILLS-HISTORY.md](./SKILLS-HISTORY.md).
 
 - [skills](#skills)
   - [Installation](#installation)
