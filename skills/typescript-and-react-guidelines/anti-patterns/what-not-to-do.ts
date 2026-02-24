@@ -192,3 +192,22 @@ const ADMIN_ROLE = "admin_v2" as const;
 declare const retryCount: number;
 declare function fn(): void;
 declare const role: string;
+
+// ─────────────────────────────────────────────
+// [12] REACT RENDER FUNCTIONS & HOOKS — examples/react/component-structure.tsx
+// ─────────────────────────────────────────────
+
+// ❌ {renderXyz()} pattern — extract to a named sub-component instead
+// const ListBad = () => (
+//   <div>
+//     {renderHeader()}   // ❌ inline render function; recreated every render
+//     {items.map(i => renderRow(i))}
+//   </div>
+// );
+
+// ❌ Misusing `use` prefix for a non-hook (plain function)
+// const useFormatDate = (d: Date) => d.toISOString(); // ❌ not a hook; breaks Rules of Hooks
+
+// ❌ useMemo/useCallback for trivial computations
+// const doubled = useMemo(() => count * 2, [count]);     // ❌ simple math, no need to memoize
+// const handleClick = useCallback(() => setOpen(true), []); // ❌ simple handler, often unnecessary
