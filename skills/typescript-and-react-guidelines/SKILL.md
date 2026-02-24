@@ -1,7 +1,7 @@
 ---
-name: coding-standards
+name: typescript-and-react-guidelines
 version: 1.0.0
-last-updated: 2026-02-21
+last-updated: 2026-02-24
 changelog:
   - 1.0.0: Initial version
 description: |
