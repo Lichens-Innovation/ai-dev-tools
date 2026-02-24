@@ -27,7 +27,7 @@ const processOrder = async (orderId: string) => {
   const order = await validateAndFetchOrder(orderId);
   await checkInventoryAvailability(order);
   const payment = await chargePayment(order);
-  await persistOrderCompletion(order, payment);
+  await persistOrderCompletion({ order, payment });
   await sendOrderConfirmation(order);
   return { success: true, orderId };
 };
@@ -49,16 +49,23 @@ const createUser = (
 ) => {};
 
 // ✅ REFACTORED
-interface CreateUserParams {
+interface CreateUserArgs {
   name: string;
   email: string;
   role: string;
   teamId: string;
-  isVerified?: boolean;        // optional with default
-  sendWelcomeEmail?: boolean;  // optional with default
+  isVerified?: boolean; // optional with default
+  sendWelcomeEmail?: boolean; // optional with default
 }
 
-const createUserClean = ({ name, email, role, teamId, isVerified = false, sendWelcomeEmail = true }: CreateUserParams) => {};
+const createUserClean = ({
+  name,
+  email,
+  role,
+  teamId,
+  isVerified = false,
+  sendWelcomeEmail = true,
+}: CreateUserArgs) => {};
 
 // ─────────────────────────────────────────────
 // SMELL 3: BOOLEAN FLAG PARAMETER
@@ -97,7 +104,7 @@ const getActiveMarketsForUser = async (userId: string) => {
 
 const getClosedMarketsForUser = async (userId: string) => {
   const response = await fetch(`/api/markets?userId=${userId}&status=closed`); // copy-paste
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);               // copy-paste
+  if (!response.ok) throw new Error(`HTTP ${response.status}`); // copy-paste
   return response.json();
 };
 
@@ -122,7 +129,7 @@ const getMarketsForUser = async ({ userId, status }: GetMarketsForUserArgs) => {
 
 // ❌ SMELL — what does each string represent?
 const transferFunds = (from: string, to: string, amount: number) => {};
-transferFunds("u_123", "u_456", 50.00); // Which is userId? accountId?
+transferFunds("u_123", "u_456", 50.0); // Which is userId? accountId?
 
 // ✅ REFACTORED — branded types
 type UserId = string & { readonly _brand: "UserId" };
@@ -195,5 +202,14 @@ const SEARCH_DEBOUNCE_MS = 1.5 * PeriodsInMS.oneSecond;
 const validateAndFetchOrder = async (id: string) => ({ id });
 const checkInventoryAvailability = async (order: any) => {};
 const chargePayment = async (order: any) => ({});
-const persistOrderCompletion = async (order: any, payment: any) => {};
 const sendOrderConfirmation = async (order: any) => {};
+
+interface Order {
+  id: string;
+}
+
+interface PersistOrderCompletionArgs {
+  order: Order;
+  payment: number;
+}
+const persistOrderCompletion = async ({ order, payment }: PersistOrderCompletionArgs) => {};
