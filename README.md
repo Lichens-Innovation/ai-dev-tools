@@ -68,6 +68,20 @@ You can use the `rm` alias: `npx skills rm hello-world`. To see what is installe
 | Remove from specific agents only     | `npx skills remove hello-world --agent cursor --agent claude-code` |
 | List installed skills                | `npx skills list`                                                  |
 
+## Validating skills
+
+You can validate that a skill’s `SKILL.md` frontmatter and structure follow the [Agent Skills specification](https://agentskills.io/specification) using [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref). From the root of this repository:
+
+```bash
+# Validate a specific skill (e.g. typescript-and-react-guidelines)
+skills-ref validate ./skills/typescript-and-react-guidelines
+
+# Validate all skills in the repo (if you have multiple skills)
+skills-ref validate ./skills
+```
+
+Install `skills-ref` according to the [agentskills repo](https://github.com/agentskills/agentskills). This checks that `name`, `description`, and optional fields comply with the spec and that the skill directory structure is valid.
+
 ## How a skill becomes active (Cursor, Copilot, Claude Code)
 
 1. **Installation**  

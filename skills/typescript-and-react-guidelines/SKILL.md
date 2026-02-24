@@ -1,45 +1,24 @@
 ---
 name: typescript-and-react-guidelines
-version: 1.1.0
-last-updated: 2026-02-24
-changelog:
-  - 1.1.0: Bonified from development-standards.mdc — new sections (Code Style, React Components, Hooks, Error Handling, Architecture, Comments, Logging, Function Parameters, TypeScript Best Practices, React Native), extended non-negotiables and Pre-output Validation, anti-patterns for renderXyz/use prefix/useMemo/useCallback
-  - 1.0.0: Initial version
 description: |
-  LOAD THIS SKILL when: creating or editing any TypeScript, JavaScript, React, or Node.js file,
-  naming variables/functions/components, designing API endpoints, handling async operations,
-  structuring React components, reviewing code for quality, refactoring existing code,
-  or setting up a new project structure. Also trigger when the user asks "how should I name...",
-  "what's the best way to...", "is this good practice...", or "can you review this code".
-  DO NOT load for: CSS-only changes, documentation writing, JSON config edits, shell scripts.
+  TypeScript, React, and Node.js coding standards: naming, types, hooks, components, error handling,
+  refactoring, code review. Use when creating/editing TS/JS/React files, naming variables or
+  components, designing API endpoints, handling async, structuring components, or when the user
+  asks "how should I name...", "what's the best way to...", "is this good practice...", "can you
+  review this code". Keywords: TypeScript, React, hooks, React Query, Jest, RTL, naming, immutability.
+  Do not load for: CSS-only changes, documentation writing, JSON config edits, shell scripts.
+metadata:
+  version: "1.1.0"
+  last-updated: "2026-02-24"
+  changelog: "See references/CHANGELOG.md"
 allowed-tools: Read, Write, Edit, Grep, Glob
 ---
 
 # Coding Standards & Best Practices
 
-## ⚠️ NON-NEGOTIABLE RULES (apply before anything else)
+## Non-negotiable rules
 
-Rules are ordered by impact on **readability**, **maintainability**, **comprehensibility**, and **evolvability** — highest impact first.
-
-1. **NEVER mutate** objects or arrays — always use spread (or immutable methods). Mutations break predictability, debugging, and React’s model; they make refactors and evolution risky.
-2. **NEVER use `any`** — define precise interfaces/types. Types are the main documentation and safety net; `any` removes both and makes the codebase hard to understand and change.
-3. **NO inline types** — extract types/interfaces to named declarations. Single source of truth, reuse, and self-documenting code; changes stay in one place.
-4. **NO deep nesting** — use early returns. Flat control flow is the largest readability win; nested conditionals are hard to scan and maintain.
-5. **Functions under 50 lines / Files under 800 lines** — split when exceeded. Small units are scannable, testable, and keep a single responsibility; large blocks are the opposite.
-6. **ALWAYS handle errors** in async functions with try/catch — never swallow silently; include a context prefix in error messages (e.g. `[ComponentName] description`); rethrow only when adding context or transforming the error type so the caller can handle it. Unhandled or silent errors make behavior incomprehensible and bugs hard to fix.
-7. **NO magic numbers or unexplained strings** — extract as named constants (e.g. UPPER_SNAKE_CASE for constants). Names explain intent and centralize values for safe evolution.
-8. **Prefer `??` over `||`** for null/undefined — nullish coalescing only replaces `null`/`undefined`; `||` also replaces `0`, `""`, and `false`, which often causes subtle bugs.
-9. **ALWAYS use arrow functions** at top level — `const fn = () => {}`; no `function` keyword for module-level functions. Consistent style reduces cognitive load.
-10. **React: use setState updater** when the next state depends on the previous — `setCount((prev) => prev + 1)`. Using the current state variable directly can be stale and cause wrong behavior.
-11. **React: explicit booleans in conditionals** — e.g. `hasItems && <List />`, not `items.length && <List />` (avoids rendering `0`). Conditionals must be clearly boolean.
-12. **React: list keys from stable id** — prefer `key={item.id}` (or other stable id); avoid `key={index}` unless the list is static and not reordered.
-13. **useEffect: always return a cleanup** when you set up subscriptions, intervals, or listeners — return a cleanup function to avoid leaks and updates after unmount.
-14. **NO `console.log` in production client code** — use a logger with levels (e.g. info, error, warn, debug); include a context prefix in messages (e.g. `[ComponentName] description`). `console.log` is acceptable in server-side/API code for debugging.
-15. **React: store selected items by ID** — keep `selectedId` (or similar) in state and derive the full item from the list with `find(id)`; storing the whole object can go stale when the list changes.
-16. **React: prefer named exports** — use named exports for components; default export only when required by the framework (e.g. Expo Router route files).
-17. **React: no `{renderXyz()}` pattern** — extract render logic into named sub-components instead of inline render functions.
-18. **Reserve `use` prefix for real hooks** — do not use the `use` prefix for non-hook functions; it breaks the Rules of Hooks and confuses readers.
-19. **Prefer plain functions over custom hooks** when React primitives are not needed — use a pure TypeScript function instead of a hook when you don't need state, effects, or context.
+Apply [non-negotiable rules](references/rules.md) (19 rules, ordered by impact) before anything else.
 
 ---
 
@@ -48,7 +27,7 @@ Rules are ordered by impact on **readability**, **maintainability**, **comprehen
 After reading this skill:
 
 1. Apply ALL rules to every file you create or modify
-2. Run the **Pre-output Validation** checklist before returning any code
+2. Run the [Pre-output Validation](references/validation.md) checklist before returning any code
 3. If a rule conflicts with a user request, flag it explicitly and propose a compliant alternative
 4. Reference specific rule names when explaining choices (e.g., "Per the KISS principle, I simplified this by...")
 5. Load example files **on demand** — only read the relevant file for the task at hand
@@ -211,25 +190,29 @@ When working in a React Native or Expo project:
 
 ---
 
-## Pre-output Validation (MANDATORY)
+## Pre-output validation
 
-Before returning any code, verify each point:
+Before returning any code, run the [Pre-output Validation checklist](references/validation.md).
 
-- [ ] No direct mutations → convert to spread/immutable pattern
-- [ ] No `any` types → replace with proper interfaces
-- [ ] No inline types → extract to named types/interfaces (DRY, reuse)
-- [ ] No deep nesting (>4 levels) → refactor with early returns
-- [ ] Every function **under 50 lines** / file **under 800 lines** → split if needed
-- [ ] All async functions have **try/catch** (no silent swallow); error messages include context prefix; rethrow only when adding context or transforming error
-- [ ] No magic numbers or unexplained strings → extract as named constants (UPPER_SNAKE_CASE for constants)
-- [ ] Prefer `??` over `||` for null/undefined defaults
-- [ ] React: `setState` uses updater when next state depends on previous → `setX((prev) => ...)`
-- [ ] React: conditional rendering uses explicit booleans (e.g. `hasItems &&`, not `items.length &&`)
-- [ ] React: list keys use stable id (not index) when list can change
-- [ ] React: selected items stored by ID; full item derived from list
-- [ ] React: no `{renderXyz()}` pattern → use named sub-components
-- [ ] `useEffect` with subscriptions/intervals/listeners returns cleanup → add if missing
-- [ ] No `console.log` in client code → use logger with levels and context prefix; server/API debug use is acceptable
-- [ ] New file names are **kebab-case** (e.g. `market-list-item.tsx`, `use-auth.ts`, `settings-screen.tsx`) → rename if not
-- [ ] Components use named exports; default export only when required by framework
-- [ ] No `use` prefix on non-hook functions; prefer plain functions over custom hooks when React not needed
+---
+
+## Templates
+
+Skeletons to copy and adapt (file names in kebab-case):
+
+| Type       | File                        | Use when |
+| ---------- | --------------------------- | -------- |
+| Hook       | [assets/hook-template.ts](assets/hook-template.ts) | Creating a data-fetching or effect hook |
+| Hook (TanStack Query) | [assets/hook-tanstack-query-template.ts](assets/hook-tanstack-query-template.ts) | Creating a hook with @tanstack/react-query (queryKey, queryFn, placeholderData) |
+| Component  | [assets/component-template.tsx](assets/component-template.tsx) | Creating a React component |
+| Utility    | [assets/utils-template.ts](assets/utils-template.ts) | Creating pure or side-effect helpers (`*.utils.ts`) |
+
+---
+
+## Validation
+
+Validate this skill's frontmatter and structure with [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref):
+
+```bash
+skills-ref validate ./skills/typescript-and-react-guidelines
+```
