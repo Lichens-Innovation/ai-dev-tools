@@ -20,3 +20,4 @@ Before returning any code, verify each point:
 - [ ] New file names are **kebab-case** (e.g. `market-list-item.tsx`, `use-auth.ts`, `settings-screen.tsx`) → rename if not
 - [ ] Components use named exports; default export only when required by framework
 - [ ] No `use` prefix on non-hook functions; prefer plain functions over custom hooks when React not needed
+- [ ] Async data (loading + error + result): TanStack Query used (useQuery/useMutation); query key factory (e.g. XxxQueryKey.list(), .detail(id)) when adding or changing queries

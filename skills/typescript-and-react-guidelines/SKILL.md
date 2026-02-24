@@ -125,6 +125,11 @@ Components and hooks are still **exported** with PascalCase (components) or came
 - **Handlers** — use a single arrow function per handler (e.g. `const handleClick = () => { ... }`); avoid function factories that return handlers.
 - **Selected items** — store selection by ID in state and derive the full item from the list (e.g. `selectedItem = items.find(i => i.id === selectedId)`); avoids stale references when the list updates.
 
+### Data fetching (async: loading, error, data)
+
+- **Prefer TanStack Query** — for any async call that involves `isLoading`, error handling, and result data, use `useQuery` (or `useMutation` for writes) instead of manual `useState` + `useEffect`. You get caching, deduplication, and consistent loading/error state for free.
+- **Query key factory** — define a single source of truth for cache keys (e.g. `XxxQueryKey.all`, `XxxQueryKey.list(...)`, `XxxQueryKey.detail(id)`). See [references/query-keys-example.ts](references/query-keys-example.ts) and [assets/hook-tanstack-query-template.ts](assets/hook-tanstack-query-template.ts).
+
 ---
 
 ## Error Handling
