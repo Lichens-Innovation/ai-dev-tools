@@ -61,17 +61,24 @@ After reading this skill:
 
 | Topic                      | Example File                            | When to load                                                                           |
 | -------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
-| Variable & function naming | `examples/typescript/naming.ts`         | When naming anything (arrow functions only)                                            |
+| Variable & function naming (incl. boolean prefixes) | `examples/typescript/naming.ts`         | When naming anything (arrow functions only; booleans: is/has/should/can/will)          |
 | Immutability patterns      | `examples/typescript/immutability.ts`   | When working with state/objects/arrays                                                 |
 | Error handling             | `examples/typescript/error-handling.ts` | When writing async code                                                                |
 | Async / Promise patterns   | `examples/typescript/async-patterns.ts` | When using await/Promise                                                               |
 | Type safety                | `examples/typescript/type-safety.ts`    | When defining interfaces/types (no inline types; no nested types; extract named types) |
+| Control flow & readability | `examples/typescript/control-flow.ts`   | Early returns, const vs let, Array.includes/some, nullish coalescing, destructuring    |
 
 ### React
 
 | Topic               | Example File                             | When to load              |
 | ------------------- | ---------------------------------------- | ------------------------- |
 | Component structure | `examples/react/component-structure.tsx` | When creating a component |
+
+### Testing
+
+| Topic              | Example File                                | When to load                                      |
+| ------------------ | ------------------------------------------- | ------------------------------------------------- |
+| Unit test patterns | `examples/testing/unit-testing-patterns.tsx` | When writing Jest/RTL tests (AAA, screen, spyOn, it.each, getByRole, mock factory) |
 
 ### Anti-patterns (read during code review)
 

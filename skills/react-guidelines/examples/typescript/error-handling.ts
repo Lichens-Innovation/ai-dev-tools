@@ -169,7 +169,7 @@ const silentFail = async () => {
   }
 };
 
-// ✅ GOOD — at minimum, log and rethrow
+// ✅ GOOD — at minimum, log (or send to Sentry); rethrow only if caller should handle
 const properFail = async () => {
   try {
     await doSomethingRisky();
@@ -178,6 +178,39 @@ const properFail = async () => {
     throw error;
   }
 };
+
+// ─────────────────────────────────────────────
+// AVOID CATCH THAT ONLY RE-THROWS THE SAME EXCEPTION
+// ─────────────────────────────────────────────
+// Either handle/log the error or let it propagate without a try-catch.
+
+// ❌ BAD — redundant; catch adds no value
+const processDataBad = (data?: string) => {
+  try {
+    if (!data) throw new Error("Data is required");
+    internalProcess(data);
+  } catch (error) {
+    throw error; // No handling, no logging — remove the try-catch
+  }
+};
+
+// ✅ GOOD — either handle (e.g. log and return) or omit try-catch and let propagate
+const processDataGood = (data: string) => {
+  try {
+    internalProcess(data);
+  } catch (error: unknown) {
+    console.error("[processData] failed:", error);
+    // Handle: return default, cleanup, or rethrow with context
+  }
+};
+
+// ✅ GOOD — no try-catch; let caller handle
+const processDataPropagate = (data: string) => {
+  if (!data) throw new Error("Data is required");
+  internalProcess(data);
+};
+
+const internalProcess = (_data: string) => {};
 
 // Placeholder stubs for the examples above
 const validateMarketData = (data: unknown) => data;

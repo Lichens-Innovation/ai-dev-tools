@@ -88,6 +88,29 @@ const n = 3; // magic number
 const arr: User[] = []; // what is in this array?
 
 // ─────────────────────────────────────────────
+// BOOLEAN VARIABLES — Avoid generic names; prefer descriptive prefixes
+// ─────────────────────────────────────────────
+// Use is, has, should, can, will so the purpose of the boolean is clear at a glance.
+
+// ❌ BAD — Generic names; unclear what they represent or when they should be true/false
+// const active = true;
+// const enabled = false;
+// const valid = true;
+// if (active) { ... }
+// if (enabled) { ... }
+
+// ✅ GOOD — Descriptive prefixes: is (state), has (possession), should (recommendation), can (ability), will (intention)
+const isActive = true;
+const isEnabled = false;
+const isValid = true;
+const hasPermissions = true;
+const shouldSave = false;
+const canProceed = true;
+const willRetry = false;
+// if (isActive) { ... }
+// if (hasPermissions) { ... }
+
+// ─────────────────────────────────────────────
 // FUNCTIONS — arrow functions only, camelCase, verb-noun or get/set/is/has/can
 // ─────────────────────────────────────────────
 

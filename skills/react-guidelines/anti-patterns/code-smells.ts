@@ -1,6 +1,9 @@
 /**
  * CODE SMELLS — Detection & Refactoring Guide
  * Use during code review to identify patterns that indicate deeper problems.
+ * For preferred patterns, see: examples/typescript/ (naming, type-safety, control-flow,
+ * error-handling, async-patterns), examples/react/component-structure.tsx,
+ * examples/testing/unit-testing-patterns.tsx.
  */
 
 // ─────────────────────────────────────────────

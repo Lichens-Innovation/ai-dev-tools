@@ -148,3 +148,51 @@ const getUserCity = (user: UserProfile): string => user.address?.city ?? "Unknow
 
 // ❌ BAD — will throw if address is undefined
 const getUserCityBad = (user: UserProfile): string => user.address!.city!; // non-null assertion = lying to TypeScript
+
+// ─────────────────────────────────────────────
+// RECORD<K, V> — prefer over custom index signature
+// ─────────────────────────────────────────────
+
+// ✅ GOOD — Record is concise and works well with Partial, Pick, etc.
+type ViewedItems = Record<string, Date>;
+type Status = "pending" | "completed" | "failed";
+type TaskStatuses = Record<Status, Date>;
+
+// ❌ BAD — custom index signature is verbose
+// type ViewedItemsBad = { [key: string]: Date };
+
+// ─────────────────────────────────────────────
+// OPTIONAL PARAMETERS — use param?: Type, not param: Type | undefined
+// ─────────────────────────────────────────────
+
+// ✅ GOOD — optional param syntax is clear and concise
+const greet = (name?: string): string => (name ? `Hello, ${name}!` : "Hello!");
+
+// ❌ BAD — param: Type | undefined is verbose
+// const greetBad = (name: string | undefined): string => ...
+
+// ─────────────────────────────────────────────
+// ENUMS — use explicit numeric (or string) values for stability
+// ─────────────────────────────────────────────
+// Implicit ordinal enums can change when members are reordered; explicit values survive serialization.
+
+// ✅ GOOD — explicit values; stable across refactors and serialization
+enum UserRole {
+  Admin = 1,
+  User = 2,
+  Guest = 3,
+}
+
+// ❌ BAD — implicit ordinal (0, 1, 2); reordering breaks stored values
+// enum UserRoleBad { Admin, User, Guest }
+
+// ─────────────────────────────────────────────
+// TODO COMMENTS — add ticket ID for traceability
+// ─────────────────────────────────────────────
+// Prefer: // TODO: JIRA-1234 - description
+
+// ✅ GOOD
+// const contentType = ""; // TODO: JIRA-1234 - Determine the appropriate content type
+
+// ❌ BAD — no reference to track or assign
+// const contentType = ""; // TODO

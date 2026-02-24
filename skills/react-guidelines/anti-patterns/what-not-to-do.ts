@@ -2,6 +2,9 @@
  * ANTI-PATTERNS — What NOT to do
  * This file consolidates all BAD patterns for quick reference during code review.
  * Each section links to the GOOD patterns in examples/.
+ *
+ * Example files: naming.ts, immutability.ts, type-safety.ts, error-handling.ts,
+ * async-patterns.ts, control-flow.ts, component-structure.tsx, unit-testing-patterns.tsx.
  */
 
 // ─────────────────────────────────────────────
@@ -126,7 +129,7 @@ const handleFormSubmit = async (formData: Record<string, string>) => {
 // [8] NESTING
 // ─────────────────────────────────────────────
 
-// ❌ Deep nesting (5+ levels)
+// ❌ Deep nesting (5+ levels) — see examples/typescript/control-flow.ts for early returns
 const processDeep = (user: any, market: any) => {
   if (user) {
     if (user.isVerified) {
@@ -141,7 +144,7 @@ const processDeep = (user: any, market: any) => {
   }
 };
 
-// ✅ GOOD — early returns flatten the structure (destructuring when >1 param)
+// ✅ GOOD — early returns flatten the structure (examples/typescript/control-flow.ts)
 interface ProcessCleanArgs {
   user: any;
   market: any;
@@ -154,7 +157,14 @@ const processClean = ({ user, market }: ProcessCleanArgs) => {
 };
 
 // ─────────────────────────────────────────────
-// [9] CONSOLE LOGS IN PRODUCTION CODE
+// [9] UNIT TESTING — examples/testing/unit-testing-patterns.tsx
+// ─────────────────────────────────────────────
+
+// ❌ Unstructured test (no AAA); destructuring getByText from render; getByTestId for everything; shared mutable mock object
+// ❌ Multiple similar it() blocks instead of it.each; mocking hook without jest.spyOn
+
+// ─────────────────────────────────────────────
+// [10] CONSOLE LOGS IN PRODUCTION CODE
 // ─────────────────────────────────────────────
 
 // ❌ Debug logs left in
@@ -166,7 +176,7 @@ const fetchUserBad = async (id: string) => {
 };
 
 // ─────────────────────────────────────────────
-// [10] MAGIC NUMBERS & STRINGS
+// [11] MAGIC NUMBERS & STRINGS
 // ─────────────────────────────────────────────
 
 // ❌ Inline magic values
