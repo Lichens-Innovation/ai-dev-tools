@@ -13,7 +13,7 @@ When reviewing staged changes:
 
 1. **Get the staged diff**: `git diff --cached` or `git diff --staged`
 2. **Analyze each change** against the four criteria below
-3. **Provide structured feedback** using the format specified
+3. **Provide structured feedback** using the template in this skill: `templates/review-summary.md` (relative to the skill directory)
 
 ## Review Criteria
 
@@ -37,6 +37,7 @@ Identify potential breaking changes:
 - **Edge cases**: Are existing edge cases still handled correctly?
 
 **Red flags:**
+
 - Removing error handling without replacement
 - Changing return types or function signatures
 - Modifying shared utilities without checking usages
@@ -55,6 +56,7 @@ Assess long-term code health:
 - **Patterns**: Are established patterns followed consistently?
 
 **Signs of improvement:**
+
 - Extracting reusable utilities
 - Reducing nested conditionals
 - Breaking large functions into smaller ones
@@ -72,64 +74,25 @@ Evaluate code clarity:
 - **Magic numbers**: Are constants extracted and named?
 
 **Signs of improvement:**
+
 - More descriptive variable names
 - Reduced nesting levels
 - Clearer control flow
 - Better type annotations
 - Consistent code style
 
-## Review Format
-
-Structure feedback as:
-
-```markdown
-## Review Summary
-
-**Overall assessment**: [✅ Pass / ⚠️ Needs attention / ❌ Issues found]
-
-### Contextual Sense
-- [ ] Changes align with stated purpose
-- [ ] Scope is appropriate
-- [ ] No unrelated changes
-
-**Findings**: [Specific observations]
-
-### Regression Prevention
-- [ ] No breaking behavior changes
-- [ ] No unintended side effects
-- [ ] Edge cases preserved
-
-**Findings**: [Specific concerns or confirmations]
-
-### Maintainability & Evolvability
-- [ ] Code structure improved
-- [ ] Complexity reduced
-- [ ] Better testability
-
-**Findings**: [Specific improvements or concerns]
-
-### Readability
-- [ ] Code is clearer
-- [ ] Naming is descriptive
-- [ ] Formatting is consistent
-
-**Findings**: [Specific observations]
-
-## Recommendations
-
-[Actionable suggestions, prioritized by severity]
-```
-
 ## Common Patterns to Check
 
 ### Refactoring Patterns
 
 **Good refactoring:**
+
 - Extract function → Verify all call sites updated
 - Rename variable → Verify all references updated
 - Move code → Verify imports and dependencies updated
 
 **Risky refactoring:**
+
 - Changing shared utilities without checking all usages
 - Modifying type definitions without updating consumers
 - Removing "unused" code that might be used dynamically
@@ -137,13 +100,16 @@ Structure feedback as:
 ### Code Quality Improvements
 
 **Verify improvements are real:**
+
 - Not just moving code around
 - Actually reducing complexity
+- Actually improving readability
 - Making code more testable, not just prettier
 
 ### Readability Improvements
 
 **Ensure clarity gains:**
+
 - Names are actually more descriptive
 - Structure is genuinely easier to follow
 - Comments add value, not noise
