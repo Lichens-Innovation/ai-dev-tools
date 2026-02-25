@@ -1,10 +1,10 @@
 ---
 name: single-responsibility
 description: |
-  Strategies to simplify components and methods: decomposition order (utilities, hooks, sub-components),
+  Strategies to simplify components, hooks, and methods: decomposition order (utilities, hooks, sub-components),
   early returns, control flow, parameter design, and code smell fixes. Use when refactoring a large
-  component or function, reducing complexity, applying single responsibility, or when the user asks
-  how to simplify a component or method.
+  component, hook, or function, reducing complexity, applying single responsibility, or when the user asks
+  how to simplify a component, hook, or method.
 metadata:
   version: "1.0.0"
   last-updated: "2026-02-25"
@@ -14,7 +14,7 @@ allowed-tools: Read, Write, Edit, Grep, Glob
 
 # Single Responsibility — Simplify Components & Methods
 
-Apply these strategies to keep components and methods focused, testable, and readable. Rules are split into **component** vs **method** simplification.
+Apply these strategies to keep components, hooks, and methods focused, testable, and readable. Rules are split into **component**, **hook**, and **method** simplification.
 
 ---
 
@@ -57,6 +57,38 @@ Apply in this order:
 - **Selected items** — Store selection by **ID** in state; **derive** the full item from the list (e.g. `selectedItem = items.find(i => i.id === selectedId)`). Avoids stale references when the list updates.
 - **useMemo / useCallback — only when necessary** — Default: do not use. They add complexity and recent React compilers already optimize renders. Avoid for trivial cases (e.g. `useMemo(() => count * 2, [count])`, `useCallback(() => setOpen(true), [])`). Use only when: **profiling** shows a real performance problem.
 - **Data fetching** — Prefer **TanStack Query** (`useQuery` / `useMutation`) instead of manual `useState` + `useEffect` — reduces boilerplate and keeps the component simpler.
+
+---
+
+## Simplifying a hook
+
+Rules that apply when reducing complexity of a **custom React hook**. Apply single responsibility by extracting pure logic into utilities and splitting broad hooks into smaller, focused ones.
+
+### Decomposition order
+
+1. **Extract pure JS utilities first** — Any logic that has no dependency on React (no `useState`, `useEffect`, context, etc.) → move to **pure functions**. Put them in `<component-name>.utils.ts` next to the component or `<hook-name>.utils.ts` next to the hook, or in `src/utils/` if reusable. Examples: formatting, validation, computing derived values from plain data, building query params or request bodies. Pure functions are easier to test and reuse outside the hook.
+
+2. **Consider enriching an existing state manager** — Before creating new specialized hooks, check if the project already uses a **state manager** (e.g. **Zustand**, **MobX**, Redux). If so, consider **adding the business logic there**: actions, derived state, and domain rules can live in the store and **slim down the hooks**. Hooks then become thin selectors or one-off bindings (e.g. `useStore(selector)`), and the store encapsulates the domain. Prefer extending the existing store over multiplying hooks that each hold their own state.
+
+3. **Split into specialized hooks** — If no store fits or the logic is purely local/UI, and the hook still handles several concerns (e.g. fetching + filtering + pagination) or states, extract **one hook per concern**: e.g. `useFetchItems`, `useItemsFilter`, `usePagination`. Compose them in the component or in a thin “orchestrator” hook that only wires the others. Each hook should have **one clear responsibility** and a name that reflects it.
+
+### Hook design
+
+- **Narrow return shape** — Prefer returning a small, stable object (e.g. `{ data, isLoading, error }` or `{ value, onChange }`). Avoid returning large bags of unrelated state and setters; split into separate hooks instead.
+- **Plain function vs hook** — If the logic doesn’t need React primitives (state, effects, context), use a **plain function** in a `.utils.ts` file instead of a custom hook. Only introduce a hook when you need React’s lifecycle or state.
+- **Dependencies** — Keep hook inputs explicit (parameters); avoid reading from context or globals inside the hook unless that’s the hook’s sole purpose. Easier to test and reason about.
+
+### File and naming
+
+- **One hook per file** when the hook is non-trivial; file name: `use-<name>.ts` (e.g. `use-market-filters.ts`, `use-pagination.ts`). Reusable hooks → `src/hooks/`; feature-specific → feature’s `hooks/` subdirectory.
+- **Co-locate utilities** — `<hook-name>.utils.ts` next to the hook for helpers used only by that hook; shared logic → `src/utils/` or domain-specific utils module.
+
+### Quick checklist (hooks)
+
+- [ ] Does the hook contain logic with no React dependency? → extract to pure functions in `.utils.ts`.
+- [ ] Does the hook do more than one thing? → consider enriching the project’s state manager (Zustand, MobX, etc.) first; otherwise split into smaller hooks (e.g. fetch vs filter vs pagination) and compose.
+- [ ] Could this be a plain function? → if it doesn’t need state/effects/context, use a utility instead of a hook.
+- [ ] Is the return type a large, mixed bag? → consider splitting the hook or returning a smaller, focused API.
 
 ---
 
