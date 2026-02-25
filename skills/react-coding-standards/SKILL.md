@@ -38,12 +38,13 @@ When the skill is invoked on code (selected files, git staged files, branch):
 
 ### Phase 2 — Apply corrections
 
-1. For **each** violation from the report:
+1. **Rename folders and files first** (if naming violations were found): Apply the file and folder naming patterns from [references/common-naming-patterns.md](references/common-naming-patterns.md) (kebab-case, suffixes/prefixes by intent, folder structure). Rename before changing code so that import paths are updated in one pass.
+2. For **each** remaining violation from the report:
    - Open the corresponding reference file and find the **Prefer** section paired with that Avoid rule.
    - Apply the recommended correction (refactor) so the code follows the Prefer pattern.
-2. **Preserve** business logic and behavior; only change structure, naming, or patterns.
-3. **Prefer minimal edits**: one logical change per violation, no unnecessary rewrites.
-4. When several standards apply to the same area, prioritize in this order:
+3. **Preserve** business logic and behavior; only change structure, naming, or patterns.
+4. **Prefer minimal edits**: one logical change per violation, no unnecessary rewrites.
+5. When several standards apply to the same area, prioritize in this order:
    - TypeScript safety (types, `any`, optional params)
    - Naming clarity (boolean prefixes, descriptive names)
    - React architecture (hooks, components, state, keys)
