@@ -44,12 +44,14 @@ Generate a concise pull request description by analyzing git changes and using t
    - Before filling the template, group all changes by theme/area (e.g. auth, API, UI, tests, docs)
    - Do not repeat the same subject: one entry per theme, even if multiple files or commits touch it
    - Extract key changes from git diff and commits, already grouped by theme as above
-   - Fill "Changes Description" with one bullet per theme/area; use sub-bullets only when a theme has distinct sub-changes
+   - Fill "Changes Description" using the template’s two-level structure:
+     - **Level 1 (category):** one top-level bullet per theme/area (`{level1_changes_description_category}`)
+     - **Level 2 (sub-details):** one or more sub-bullets under each category for distinct sub-changes (`{level2_change_detail_for_that_category}`); omit sub-bullets when a category has only one simple change
    - Keep each bullet point brief (one line when possible)
    - Use emojis sparingly (🚧 for WIP, ✅ for done, etc.)
    - Mark checklist items appropriately:
      - **Documentation:** check the box if the PR introduces documentation (JSDoc in changed files, or markdown files `.md` detected in the diff).
-     - **Tests:** check the box if the PR adds or updates unit tests (test files detected in the diff, e.g. `*.test.*`, `*.spec.*`, or paths under `test/` / `__tests__/`).
+     - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories used by mainstream test runners (do not assume a specific framework such as Jest or Vitest).
    - Leave "Related Issue(s)" and "Screen capture(s)" as 🚫 if not applicable
 
 6. **Enforce 600 character limit**
@@ -71,10 +73,10 @@ Provide ready-to-copy markdown in this format:
 
 ## PR Description
 
-<filled-template-markdown including Summary then grouped Changes Description>
+<filled-template-markdown including Summary then Changes Description with level-1 bullets (themes) and optional level-2 sub-bullets (sub-changes)>
 ```
 
-**Grouping rule:** Never list the same subject twice. If several commits or files relate to the same theme (e.g. "auth", "tests", "docs"), merge them into a single bullet in the summary and in Changes Description.
+**Grouping rule:** Never list the same subject twice. If several commits or files relate to the same theme (e.g. "auth", "tests", "docs"), merge them into a single level-1 bullet in the summary and in Changes Description; use level-2 sub-bullets only for distinct sub-changes within that theme.
 
 ## Example
 
@@ -100,7 +102,9 @@ feat(auth): implement user authentication
 
 ## Changes Description
 
-- **Auth:** login component, auth service updates.
+- **Auth:** login component and auth service.
+  - Login component added.
+  - Auth service updated.
 - **Tests:** auth tests added.
 
 ## Checklist
@@ -111,6 +115,6 @@ feat(auth): implement user authentication
 ## Character Count Tips
 
 - Use abbreviations when appropriate (e.g., "auth" instead of "authentication")
-- Combine related changes into single bullet points (grouping avoids repetition)
+- Combine related changes into single level-1 bullets; use level-2 sub-bullets only when a category has several distinct sub-changes (grouping avoids repetition)
 - Remove template placeholders if not needed
 - Prioritize Summary and "Changes Description" over other sections

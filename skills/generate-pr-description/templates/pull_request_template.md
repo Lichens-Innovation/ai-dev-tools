@@ -1,6 +1,7 @@
 ## Changes Description
 
--
+- {level1_changes_description_category}
+  - {level2_change_detail_for_that_category}
 
 ## Checklist
 
