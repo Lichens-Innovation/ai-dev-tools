@@ -41,43 +41,47 @@
     - [❌ Avoid Using `||` to Handle `null` and `undefined` Exclusively](#-avoid-using--to-handle-null-and-undefined-exclusively)
     - [✅ Prefer Using `??` to Handle `null` and `undefined`](#-prefer-using--to-handle-null-and-undefined)
     - [ℹ️ Explanation](#ℹ️-explanation-9)
+  - [Prefer Strict Inequality `!==` Over Loose Inequality `!=`](#prefer-strict-inequality--over-loose-inequality-)
+    - [❌ Avoid Using `!=` for Inequality Comparisons](#-avoid-using--for-inequality-comparisons)
+    - [✅ Prefer Using `!==` for Strict Inequality](#-prefer-using--for-strict-inequality)
+    - [ℹ️ Explanation](#ℹ️-explanation-10)
   - [Prefer Using Optional Parameters Over `Type | undefined`](#prefer-using-optional-parameters-over-type--undefined)
     - [❌ Avoid Using `param: Type | undefined` for Optional Parameters](#-avoid-using-param-type--undefined-for-optional-parameters)
     - [✅ Prefer Using Optional Parameters with `param?: Type`](#-prefer-using-optional-parameters-with-param-type)
-    - [ℹ️ Explanation](#ℹ️-explanation-10)
+    - [ℹ️ Explanation](#ℹ️-explanation-11)
   - [Prefer Using Explicit Numeric Values for TypeScript Enums](#prefer-using-explicit-numeric-values-for-typescript-enums)
     - [❌ Avoid Using Implicit Ordinal Values for Enums](#-avoid-using-implicit-ordinal-values-for-enums)
     - [✅ Prefer Using Explicit Numeric Values for Enums](#-prefer-using-explicit-numeric-values-for-enums)
-    - [ℹ️ Explanation](#ℹ️-explanation-11)
+    - [ℹ️ Explanation](#ℹ️-explanation-12)
   - [Prefer Using `useWindowDimensions` Hook Over `Dimensions.get` in React Native](#prefer-using-usewindowdimensions-hook-over-dimensionsget-in-react-native)
     - [❌ Avoid Using `Dimensions.get` for Getting Window Dimensions](#-avoid-using-dimensionsget-for-getting-window-dimensions)
     - [✅ Prefer Using `useWindowDimensions` Hook for Getting Window Dimensions](#-prefer-using-usewindowdimensions-hook-for-getting-window-dimensions)
-    - [ℹ️ Explanation](#ℹ️-explanation-12)
+    - [ℹ️ Explanation](#ℹ️-explanation-13)
   - [Prefer Using Early Returns Over Multiple Nested If-Then-Else](#prefer-using-early-returns-over-multiple-nested-if-then-else)
     - [❌ Avoid Multiple Nested If-Then-Else Statements](#-avoid-multiple-nested-if-then-else-statements)
     - [✅ Prefer Using Early Returns for Improved Readability and Maintainability](#-prefer-using-early-returns-for-improved-readability-and-maintainability)
-    - [ℹ️ Explanation](#ℹ️-explanation-13)
+    - [ℹ️ Explanation](#ℹ️-explanation-14)
     - [📚 References:](#references)
   - [Prefer Using Object Destructuring for readability and clarity](#prefer-using-object-destructuring-for-readability-and-clarity)
     - [❌ Avoid Complex Interpolation Without Destructuring](#-avoid-complex-interpolation-without-destructuring)
     - [✅ Prefer Using Object Destructuring for Clarity](#-prefer-using-object-destructuring-for-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-14)
+    - [ℹ️ Explanation](#ℹ️-explanation-15)
   - [Prefer Extracting and Exporting Types over Inline Typing](#prefer-extracting-and-exporting-types-over-inline-typing)
     - [❌ Avoid Using Inline Typing for Function Parameters](#-avoid-using-inline-typing-for-function-parameters)
     - [✅ Prefer Extracting and Exporting Types for Reusability and Maintainability](#-prefer-extracting-and-exporting-types-for-reusability-and-maintainability)
-    - [ℹ️ Explanation](#ℹ️-explanation-15)
+    - [ℹ️ Explanation](#ℹ️-explanation-16)
   - [Prefer Using TypeScript `Record` Utility Type over Custom Index Signatures](#prefer-using-typescript-record-utility-type-over-custom-index-signatures)
     - [❌ Avoid Custom Index Signatures for Object Types](#-avoid-custom-index-signatures-for-object-types)
     - [✅ Prefer Using TypeScript `Record` Utility Type for Simplicity and Clarity](#-prefer-using-typescript-record-utility-type-for-simplicity-and-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-16)
+    - [ℹ️ Explanation](#ℹ️-explanation-17)
   - [Prefer Adding a Task Ticket ID to `TODO` Comments for Better Tracking](#prefer-adding-a-task-ticket-id-to-todo-comments-for-better-tracking)
     - [❌ Avoid Using `TODO` Comments Without a Ticket Reference](#-avoid-using-todo-comments-without-a-ticket-reference)
     - [✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability](#-prefer-adding-a-task-management-ticket-id-to-todo-comments-for-better-traceability)
-    - [ℹ️ Explanation](#ℹ️-explanation-17)
+    - [ℹ️ Explanation](#ℹ️-explanation-18)
   - [Prefer Arrow Functions Over Function Declarations](#prefer-arrow-functions-over-function-declarations)
     - [❌ Avoid Using `function` Declarations for Top-Level or Module-Scoped Logic](#-avoid-using-function-declarations-for-top-level-or-module-scoped-logic)
     - [✅ Prefer Arrow Functions Assigned to `const` for Consistency and Lexical `this`](#-prefer-arrow-functions-assigned-to-const-for-consistency-and-lexical-this)
-    - [ℹ️ Explanation](#ℹ️-explanation-18)
+    - [ℹ️ Explanation](#ℹ️-explanation-19)
 
 # Typescript coding guidelines
 
@@ -612,6 +616,48 @@ console.log(getDefault('')) // Output: '' (intended)
 - **Use `??` for Nullish Coalescing:** The `??` operator (nullish coalescing) is designed to handle only `null` and `undefined` values, providing a more precise and intended behavior.
 - **Correctness:** `??` ensures that only `null` and `undefined` are treated as needing a default value, whereas `||` would incorrectly replace valid falsy values.
 - **Readability and Intent:** Using `??` makes the code more readable and clearly conveys the intent to handle only `null` and `undefined`, leading to fewer bugs and more maintainable code.
+
+## Prefer Strict Inequality `!==` Over Loose Inequality `!=`
+
+### ❌ Avoid Using `!=` for Inequality Comparisons
+
+```ts
+// This code uses != (loose inequality), which applies type coercion and can lead to surprising results
+const value = 0
+
+if (value != null) {
+  console.log('Value is not null or undefined')
+}
+
+// Loose inequality can treat different types as equal (e.g. 0 != '' is false, 0 !== '' is true)
+const count = 0
+if (count != '') {
+  console.log('Count is set')
+}
+```
+
+### ✅ Prefer Using `!==` for Strict Inequality
+
+```ts
+// This code uses !== (strict inequality), which compares both value and type without coercion
+const value = 0
+
+if (value !== null && value !== undefined) {
+  console.log('Value is not null or undefined')
+}
+
+// Strict inequality compares type and value: 0 !== '' is true, so intent is clear
+const count = 0
+if (count !== '' && count !== undefined) {
+  console.log('Count is set')
+}
+```
+
+### ℹ️ Explanation
+
+- **Avoid Using `!=` (Loose Inequality):** The `!=` operator applies type coercion before comparing. Values of different types can be considered equal (e.g. `0 != ''`, `null != undefined`), which can hide bugs and make behavior harder to predict.
+- **Prefer Using `!==` (Strict Inequality):** The `!==` operator compares both value and type without coercion. It matches TypeScript’s type system and makes the intended comparison explicit.
+- **Consistency and Safety:** Using `!==` (and `===` for equality) throughout the codebase avoids coercion pitfalls, improves readability, and aligns with common lint rules (e.g. `eqeqeq`).
 
 ## Prefer Using Optional Parameters Over `Type | undefined`
 
