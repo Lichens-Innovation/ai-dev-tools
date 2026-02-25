@@ -74,6 +74,10 @@
     - [❌ Avoid Using `TODO` Comments Without a Ticket Reference](#-avoid-using-todo-comments-without-a-ticket-reference)
     - [✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability](#-prefer-adding-a-task-management-ticket-id-to-todo-comments-for-better-traceability)
     - [ℹ️ Explanation](#ℹ️-explanation-17)
+  - [Prefer Arrow Functions Over Function Declarations](#prefer-arrow-functions-over-function-declarations)
+    - [❌ Avoid Using `function` Declarations for Top-Level or Module-Scoped Logic](#-avoid-using-function-declarations-for-top-level-or-module-scoped-logic)
+    - [✅ Prefer Arrow Functions Assigned to `const` for Consistency and Lexical `this`](#-prefer-arrow-functions-assigned-to-const-for-consistency-and-lexical-this)
+    - [ℹ️ Explanation](#ℹ️-explanation-18)
 
 # Typescript coding guidelines
 
@@ -114,15 +118,15 @@ console.log(user.address) // No type checking, may cause runtime error
 ```ts
 // This code uses Type and Interface for type definitions, making it more readable and maintainable
 
-// Using Interface for objects
+// Prefer interface for object shapes
 interface User {
   name: string
   age: number
   address?: string // Optional property
 }
 
-// Using Type for more complex types
-type ApiResponse<T> = {
+// Use type for generic wrappers or complex aliases (e.g. Record, unions, literal types)
+interface ApiResponse<T> {
   data: T
   status: number
   error?: string // Optional property
@@ -162,11 +166,8 @@ console.log(user.address) // Type checking, avoids runtime errors
   - **Poor Maintainability:** As projects grow, the use of `any` can lead to more bugs and make the code harder to maintain.
   - **No Intellisense Support:** Development tools provide better support (like autocomplete and suggestions) when specific types are used.
 
-- **Use Type or Interface:** Defining types using `type` or `interface` ensures:
-  - **Type Safety:** Helps catch errors at compile time, improving reliability.
-  - **Readability:** Makes the code easier to understand and reason about.
-  - **Maintainability:** Easier to manage and refactor the code with clear type definitions.
-  - **Intellisense Support:** Provides better development experience with autocompletion and type hints.
+- **Prefer interface for object shapes:** Use `interface` for object definitions in good examples; use `type` for unions, literal types, enums, or complex aliases (e.g. `Record<K, V>`).
+- **Type Safety, Readability, Maintainability:** Clear type definitions ensure type safety, improve readability, and make the code easier to refactor, with better IDE support.
 
 ### Additional Resources
 
@@ -348,11 +349,11 @@ console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, emai
 
 ```tsx
 // This code uses object destructuring for better readability and flexibility
-type CreateUserArgs = {
-  firstName: string,
-  lastName: string,
-  age: number,
-  email: string,
+interface CreateUserArgs {
+  firstName: string
+  lastName: string
+  age: number
+  email: string
   middleName?: string // Optional parameter
 }
 
@@ -871,10 +872,12 @@ By following these best practices and using early returns, you can create code t
 
 ```ts
 // this code uses complex interpolation without destructuring, making it harder to read
-const AddArgs = { a: number, b: number }
-add({ a, b }: AddArgs) => a + b
-
-double(n: number) => n * 2
+interface AddArgs {
+  a: number
+  b: number
+}
+const add = ({ a, b }: AddArgs) => a + b
+const double = (n: number) => n * 2
 
 const obj = {
   level1: {
@@ -895,10 +898,12 @@ const badInterpolationExample = `The sum of ${a} and ${b} is ${add({ a, b })}, t
 ### ✅ Prefer Using Object Destructuring for Clarity
 
 ```ts
-const AddArgs = { a: number, b: number }
-add({ a, b }: AddArgs) => a + b
-
-double(n: number) => n * 2
+interface AddArgs {
+  a: number
+  b: number
+}
+const add = ({ a, b }: AddArgs) => a + b
+const double = (n: number) => n * 2
 
 const obj = {
   level1: {
@@ -957,9 +962,9 @@ export const logBookViewItem = ({
 ### ✅ Prefer Extracting and Exporting Types for Reusability and Maintainability
 
 ```tsx
-// This code extracts types into reusable and exportable type aliases, improving readability, reusability, and maintainability.
+// This code extracts types into reusable and exportable interfaces (or types for unions/literals), improving readability, reusability, and maintainability.
 
-export type BookViewItemInfos = {
+export interface BookViewItemInfos {
   viewedItem: StateBook | null
   isOnline: boolean
   origin?: BooksOrigin | null
@@ -983,7 +988,8 @@ export const logBookViewItem = ({
   - **Maintainability:** Inline types are less reusable and can lead to duplication across your codebase. If the type changes, you’ll need to update every instance of that inline type, increasing the risk of errors.
 
 - **Prefer Extracted and Exported Types:**
-  - **Readability:** By extracting types into separate, named type aliases, you make the code cleaner and more readable. The function signature is easier to understand without the distraction of detailed type definitions.
+  - **Prefer interface for object shapes** in good examples; use `type` for unions, literal types, enums, or complex aliases (e.g. `Record<K, V>`).
+  - **Readability:** By extracting types into separate, named definitions (interface or type), you make the code cleaner and more readable. The function signature is easier to understand without the distraction of detailed type definitions.
   - **Reusability:** Extracted types can be reused across your application, reducing redundancy and making your codebase more DRY (Don’t Repeat Yourself).
   - **Maintainability:** When types are defined separately, updates can be made in one place, ensuring consistency and reducing the risk of introducing bugs.
 
@@ -1110,4 +1116,74 @@ export const logBookViewItem = ({
   - **Accountability:** With a ticket number, it’s clear who is responsible for completing the task, and it’s easier to follow up during code reviews or project status meetings.
   - **Documentation:** Adding a ticket number also serves as documentation for why the `TODO` exists, making it clear to others (or your future self) what needs to be done and why.
 
-By following these practices, you ensure that your codebase remains organized and that tasks don’t fall through the cracks, leading to better project management and smoother development workflows.
+By following these practices, you ensure that your codebase remains organized and that tasks don't fall through the cracks, leading to better project management and smoother development workflows.
+
+## Prefer Arrow Functions Over Function Declarations
+
+Using arrow functions assigned to `const` keeps the codebase consistent, avoids `this` binding issues, and aligns with the rest of the reference (all examples use arrow functions). Use function declarations only when hoisting is required (e.g. recursive helpers before definition) or when the style guide explicitly allows it.
+
+### ❌ Avoid Using `function` Declarations for Top-Level or Module-Scoped Logic
+
+```ts
+// Top-level or module-scoped logic using function declarations; less consistent with the rest of the codebase and can introduce this-binding surprises when passed as callbacks.
+
+function formatUserName(firstName: string, lastName: string): string {
+  return `${firstName} ${lastName}`.trim()
+}
+
+export function getDisplayStatus(status: Status): string {
+  switch (status) {
+    case Status.Active:
+      return 'Active'
+    case Status.Pending:
+      return 'Pending'
+    default:
+      return 'Unknown'
+  }
+}
+
+const handleClick = () => {
+  const label = formatUserName('Jane', 'Doe') // mixing styles
+  console.log(getDisplayStatus(Status.Active))
+}
+```
+
+### ✅ Prefer Arrow Functions Assigned to `const` for Consistency and Lexical `this`
+
+```ts
+// Arrow functions assigned to const; consistent style and no this-binding issues when passed as callbacks.
+
+const formatUserName = (firstName: string, lastName: string): string => {
+  return `${firstName} ${lastName}`.trim()
+}
+
+export const getDisplayStatus = (status: Status): string => {
+  switch (status) {
+    case Status.Active:
+      return 'Active'
+    case Status.Pending:
+      return 'Pending'
+    default:
+      return 'Unknown'
+  }
+}
+
+const handleClick = () => {
+  const label = formatUserName('Jane', 'Doe')
+  console.log(getDisplayStatus(Status.Active))
+}
+```
+
+### ℹ️ Explanation
+
+- **Avoid Function Declarations for General Logic:**
+  - **Consistency:** The codebase and this reference use arrow functions throughout. Mixing `function` declarations with arrow functions reduces consistency and makes style decisions ambiguous.
+  - **`this` binding:** When a `function` is passed as a callback (e.g. to event handlers or promises), its `this` depends on how it is called, which can lead to bugs. Arrow functions inherit `this` from the enclosing scope, which is usually what you want in React and modern TypeScript.
+
+- **Prefer Arrow Functions Assigned to `const`:**
+  - **Consistency:** Using `const fn = () => {}` everywhere (including exports) keeps one clear pattern and matches the examples in this document.
+  - **Lexical `this`:** Arrow functions do not have their own `this`, so they are safe to pass as callbacks without binding.
+  - **Scoping:** Assigning to `const` makes it clear the reference is not reassigned and keeps the temporal dead zone predictable.
+
+- **Exceptions:** Use a `function` declaration when you need the function to be hoisted (e.g. a recursive helper that calls itself before its definition in the same block), or when a tool or style guide explicitly requires it. In React components, prefer arrow function components or `function` only when hoisting is necessary.
+

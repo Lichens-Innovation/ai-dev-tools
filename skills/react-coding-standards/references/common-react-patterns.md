@@ -373,11 +373,18 @@ return (...)
 export const computeTotal = (numbers: number[] = []) =>
   numbers.reduce((acc, value) => acc + value, 0)
 
-type MultiplyByArgs = { numbers?: number[], by?: number }
+interface MultiplyByArgs {
+  numbers?: number[]
+  by?: number
+}
 export const multiplyBy = ({ numbers = [], by = 1 }: MultiplyByArgs) =>
   numbers.map((value) => value * by)
 
-type BuildPersonArgs = { firstName: string, lastName: string, age: number }
+interface BuildPersonArgs {
+  firstName: string
+  lastName: string
+  age: number
+}
 export const buildPersonFullName = (person: BuildPersonArgs) =>
   `${firstName} ${lastName} (${age} years old)`
 ```
@@ -438,7 +445,7 @@ const Component = () => {
 
 ```tsx
 // This function is correctly named to reflect that it's a pure utility function
-type CalculateDiscountArgs = {
+interface CalculateDiscountArgs {
   price: number
   discount: number
 }
@@ -626,11 +633,11 @@ const items = [
 
 ```tsx
 // This code uses external utility functions for better readability and maintainability
-type MyItemType = {
-  id: number,
-  name: string,
-  isActive: boolean,
-  isAvailable: boolean,
+interface MyItemType {
+  id: number
+  name: string
+  isActive: boolean
+  isAvailable: boolean
   age: number
 }
 
@@ -639,7 +646,9 @@ export const itemComparator = (a: MyItemType, b: MyItemType) => a.name.localeCom
 export const formatItem = (item: MyItemType) => `${item.name} (${item.age} years old)`
 
 // then inside the component (once the above functions have been imported)
-type Props = { items: MyItemType[] }
+interface Props {
+  items: MyItemType[]
+}
 const Component: FunctionComponent<Props> = ({ items }) => {
   const filteredAndSortedItems = items.filter(canDisplayFilter).sort(itemComparator)
   const hasItems = filteredAndSortedItems.length > 0
@@ -1232,11 +1241,11 @@ const List = ({ users }: { users: User[] }) => {
 
 ```tsx
 // Accessing props directly throughout the code creates clutter
-type TodoListProps = {
-  todos: string[];
-  selectedTodo: string;
-  onSelectTodo: (todo: string) => void;
-};
+interface TodoListProps {
+  todos: string[]
+  selectedTodo: string
+  onSelectTodo: (todo: string) => void
+}
 
 const TodoList = (props: TodoListProps) => {
   return (
@@ -1261,11 +1270,11 @@ const TodoList = (props: TodoListProps) => {
 ### ✅ Prefer Props Destructuring
 
 ```tsx
-type TodoListProps = {
-  todos: string[];
-  selectedTodo: string;
-  onSelectTodo: (todo: string) => void;
-};
+interface TodoListProps {
+  todos: string[]
+  selectedTodo: string
+  onSelectTodo: (todo: string) => void
+}
 
 const TodoList = ({ todos, selectedTodo, onSelectTodo }: TodoListProps) => {
   return (
@@ -1513,10 +1522,13 @@ Moving static data and functions outside the component:
 When storing the selected item from a list, avoid storing the entire item object. This can lead to issues if the item changes or is removed from the list.
 
 ```tsx
-interface Item = { id: number; name: string };
+interface Item {
+  id: number
+  name: string
+}
 
 interface ListWrapperProps {
-  items: Item[];
+  items: Item[]
 }
 
 const ListWrapper: React.FC<ListWrapperProps> = ({ items }) => {
@@ -1541,13 +1553,16 @@ const ListWrapper: React.FC<ListWrapperProps> = ({ items }) => {
 Store the selected item by its ID (which should be stable). This ensures the UI remains correct even if the item is removed from the list or one of its properties changes.
 
 ```tsx
-interface Item = { id: number; name: string };
+interface Item {
+  id: number
+  name: string
+}
 interface ListWrapperProps {
-  items: Item[];
+  items: Item[]
 }
 
 const ListWrapper: React.FC<ListWrapperProps> = ({ items }) => {
-  const [selectedItemId, setSelectedItemId] = React.useState<number | undefined>();
+  const [selectedItemId, setSelectedItemId] = React.useState<number | undefined>()
   // We derive the selected item from the list
   const selectedItem = items.find((item) => item.id === selectedItemId);
 
