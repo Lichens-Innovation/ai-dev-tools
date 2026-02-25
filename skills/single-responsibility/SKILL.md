@@ -90,6 +90,10 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ## Shared (components and methods)
 
+### Object destructuring
+
+- Use **object destructuring** when reading or passing object attributes so that attribute names are explicit and the code stays readable. Applies to: **component props** (e.g. `const { isLoading, error, data } = props` or in the signature), **function parameters** (e.g. `const fn = ({ a, b }: Args) => ...`), and **local objects** when you use several properties (e.g. `const { name, status } = item`). Prefer destructuring when it clarifies usage; avoid when a single property is used once.
+
 ### Coupling (shotgun surgery)
 
 - **Signal:** One feature change requires edits in many files.
