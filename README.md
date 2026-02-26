@@ -1,6 +1,6 @@
 # Artificial Intelligence Lichens Tools
 
-Lichens Innovation repository for **AI-assisted development tools** — a single place for rules, agents, skills, MCP (Model Context Protocol) servers, and any other artifacts that enhance coding with AI (Cursor, GitHub Copilot, Claude Code, etc.). This repo started with Agent Skills and has grown to cover the full spectrum of configurable AI dev tooling. For the skills timeline and ecosystem evolution, see [skills history](./SKILLS-HISTORY.md).
+Lichens Innovation repository for **AI-assisted development tools** — a single place for rules, agents, skills, MCP (Model Context Protocol) servers, and any other artifacts that enhance coding with AI (Cursor, GitHub Copilot, Claude Code, etc.). This repo started with Agent Skills and has grown to cover the full spectrum of configurable AI dev tooling.
 
 - [Artificial Intelligence Lichens Tools](#artificial-intelligence-lichens-tools)
   - [Skills](#skills)
@@ -14,6 +14,10 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
   - [MCP](#mcp)
 
 ## Skills
+
+Per the [Agent Skills specification](https://agentskills.io/specification), a **skill** is a directory containing a `SKILL.md` (name, description, instructions). Agents inject it into context when the task matches its usage. Skills add domain knowledge, step-by-step instructions, and optional scripts or references so the agent can follow best practices and handle specific tasks (e.g. code review, PDFs, APIs) consistently.
+
+For the skills timeline and ecosystem evolution, see [skills history](./SKILLS-HISTORY.md).
 
 ### Installation
 
