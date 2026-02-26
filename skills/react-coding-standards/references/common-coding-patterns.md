@@ -375,6 +375,7 @@ console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, emai
 - **Avoid Multiple Positional Parameters:** Using multiple positional parameters, especially with optional ones, can make the function call less readable and more error-prone. You may need to pass `undefined` explicitly to skip the optional parameter, which is not intuitive.
 - **Use Object Destructuring:** Using object destructuring for function parameters improves readability by clearly naming each parameter. This makes the function call more intuitive and less prone to errors.
 - **Readability and Flexibility:** Destructuring enhances readability and allows for more flexibility in function calls, especially when dealing with optional parameters. It also makes the code easier to maintain and extend.
+- **Colocate the parameter interface:** When an interface is defined only for a single method’s signature, place it **immediately above that method** so the signature is self-documented and the type stays next to its only consumer.
 
 ## Prefer `Array.some()` Over Checking `Array.find()` for Undefined
 

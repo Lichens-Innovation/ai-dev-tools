@@ -50,7 +50,7 @@ Apply in this order:
 - **Handlers:** one arrow function per handler (e.g. `const handleClick = () => { ... }`); avoid factories that return handlers. If an arrow function handler is only depending on pure typescript it can be externalized into `component-name.utils.ts` next to the component.
 - **Early returns in render** — Keep the main path flat: `if (isLoading) return <Spinner />; if (error) return <ErrorMessage />; ...` One condition per line; avoid nested ternary operators (“ternary hell”).
 - **Boolean in JSX** — Use explicit boolean (e.g. `const hasItems = items.length > 0; { hasItems && <List /> }`) so `0` is not rendered.
-- **Static data** — Constants and pure functions that don't depend on props or state → **outside the component** (relocate into `component-name.utils.ts` or `component-name.types.ts`) to avoid new references every render.
+- **Static data** — Constants and pure functions that don't depend on props or state → **outside the component** (relocate into `component-name.utils.ts`) to avoid new references every render.
 
 ### React-specific
 
@@ -136,7 +136,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 - **200–400 lines** typical per file; **800 lines** absolute maximum.
 - **One responsibility per file** (high cohesion, low coupling).
-- File names: **kebab-case**. Examples: `market-list-item.tsx`, `use-market-filters.ts`, `<name>.utils.ts`, `<name>.types.ts` (e.g. `market-list.utils.ts`, `market-list.types.ts`).
+- File names: **kebab-case**. Examples: `market-list-item.tsx`, `use-market-filters.ts`, `<name>.utils.ts`, (e.g. `market-list.utils.ts`).
 
 ### Quick checklist
 

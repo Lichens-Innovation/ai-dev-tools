@@ -38,7 +38,7 @@ The following patterns are derived from real codebase usage. **Use kebab-case ev
 | ------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | React hooks              | `use-<name>.ts`                                    | `use-pump-test.ts`, `use-export-csv-mutation.ts`                           | `pumpTestHook.ts`, `usePumpTest.ts` (camelCase)             |
 | Pure utilities           | `<domain>.utils.ts` or `<feature>-<name>.utils.ts` | `pump.utils.ts`, `test-list-table.utils.ts`, `action-edit-dialog.utils.ts` | `pumpUtils.ts`, `utils/pump.ts` without suffix              |
-| Type definitions         | `<domain>.types.ts` or `<feature>.types.ts`        | `auth.types.ts`, `navigation.types.ts`, `table-state.types.ts`             | `authTypes.ts`, `types.ts` (generic at root)                |
+| Type definitions         | `<domain>.types.ts`                                | `auth.types.ts`, `navigation.types.ts`                                     | `types.ts` (generic at root)                                |
 | Store / state            | `<domain>.store.ts`                                | `app.store.ts`, `table-state.store.ts`, `ui-preferences.store.ts`          | `appStore.ts`, `store.ts`                                   |
 | Constants                | `<domain>.constants.ts` or `constants.ts` at scope | `app.constants.ts`, `constants.ts`                                         | `appConstants.ts`, `const.ts`                               |
 | Generated code           | `*.gen.ts`                                         | `types.gen.ts`, `sdk.gen.ts`, `client.gen.ts`                              | `types.generated.ts` (prefer short suffix)                  |
@@ -79,7 +79,7 @@ The following patterns are derived from real codebase usage. **Use kebab-case ev
 ### Avoid / Prefer summary
 
 - **Prefer** kebab-case for every file and folder name. **Avoid** camelCase, PascalCase, and snake_case in file/folder names (e.g. `usePumpTest.ts`, `TestList/`, `my_module/` → use `use-pump-test.ts`, `test-list/`).
-- **Avoid** generic filenames at root (`utils.ts`, `types.ts`, `config.ts`). **Prefer** domain-prefixed or scoped names (`logger.utils.ts`, `auth.types.ts`, `msal-config.ts`).
+- **Avoid** generic filenames at root (`utils.ts`, `types.ts`, `config.ts`). **Prefer** domain-prefixed or scoped names (`logger.utils.ts`, `auth.types.ts`, `msal-config.ts`). Use a dedicated `<domain>.types.ts` when types are reused in more than one place; otherwise colocate types next to their single consumer.
 - **Avoid** abbreviations in file names when unclear (`export2xlsx.tsx`). **Prefer** readable names (`export-to-xlsx.tsx` or `table-header-export-xlsx.tsx`).
 - **Avoid** mixing suffix order (e.g. `*.utils.ts` vs `*.ts.utils`). **Prefer** consistent suffix after a dot: `<name>.<role>.ts`.
 - **Avoid** putting all hooks in a single global `hooks/` folder when they are feature-specific. **Prefer** colocating `hooks/use-*.ts` under the feature (e.g. `screens/test-list/hooks/`).
