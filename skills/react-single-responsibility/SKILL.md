@@ -138,8 +138,8 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### File and size guidelines
 
-- **200–400 lines** typical per file; **1000 lines** absolute maximum.
-- **One responsibility per file** (high cohesion, low coupling).
+- **`*.tsx` (components)** — Must not exceed **100 lines**. Beyond that, the file is considered complex and requires decomposition (extract utilities, sub-components or hooks).
+- **`*.ts` (pure TypeScript)** — **200–400 lines** typical per file; **2000 lines** absolute maximum.
 - File names: **kebab-case**. Examples: `market-list-item.tsx`, `use-market-filters.ts`, `<name>.utils.ts`, (e.g. `market-list.utils.ts`).
 
 ### Quick checklist

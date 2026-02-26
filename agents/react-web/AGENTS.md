@@ -36,12 +36,17 @@ Execute all steps in order; do not summarize the workflow.
 
 4. **Run react-single-responsibility** — Read [skills/react-single-responsibility/SKILL.md](skills/react-single-responsibility/SKILL.md). Execute the skill's simplification strategies on all files in scope. Let the skill define decomposition order, structure, and rules; do not repeat them here.
 
-5. **Re-validate** — Re-run **Phase 1 only** of react-coding-standards (violation collection) on all files modified in steps 2, 3 and 4. This checks in-code violations only; file and folder structure is not re-audited here.
+5. **Re-validate coding standards** — Re-run **Phase 1 only** of react-coding-standards (violation collection) on all files modified in previous steps. This checks in-code violations only; file and folder structure is not re-audited here.
+   - If any violations are found → log them, then go back to step 3 (new iteration).
+   - If no violations → proceed to step 6.
+   - **Max 2 iterations.** If violations still exist after 2 full cycles, report the remaining issues and stop.
+
+6. **Re-validate single-responsibility** — Re-run the react-single-responsibility criteria (checklists and simplification rules from the skill) on all files modified in previous steps. This checks single-responsibility and simplification only; file and folder structure is not re-audited here.
    - If any violations are found → log them, then go back to step 3 (new iteration).
    - If no violations → normalization is complete. Proceed to the summary.
    - **Max 2 iterations.** If violations still exist after 2 full cycles, report the remaining issues and stop.
 
-6. **Produce the summary** (see Output below).
+7. **Produce the summary** (see Output below).
 
 ---
 
