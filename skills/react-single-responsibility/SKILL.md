@@ -38,24 +38,24 @@ Rules that apply when reducing complexity of a **React component**.
 
 Apply in this order:
 
-1. **Extract pure utilities first** — Logic with no React dependency → pure functions. More than one argument → object destructuring and an extracted parameter interface. Reusable → `src/utils/xyz.utils.ts`; feature-specific → `component-name.utils.ts` next to the component.
+1. **Extract pure utilities first** — Logic with no React dependency → pure functions. More than one argument → object destructuring within the method signature. Reusable → `src/utils/xyz.utils.ts`; feature-specific → `component-name.utils.ts` next to the component.
 
 2. **Extract logic into hooks** — State, effects, derived logic → hooks (`use-xyz.ts`). Reusable → `src/hooks/`; feature-specific → feature's `hooks/` subdirectory. Prefer a **plain arrow function** over a custom hook when you don't need React primitives.
 
-3. **Split the visual layer into sub-components** — If render/TSX exceeds roughly **40 lines**, extract sub-components with clear props and a single responsibility. **Avoid internal `renderXyz()` methods**: turn each into a **regular component** (own file, own props). Each sub-component **must live in its own file**; use **parent file name as prefix**: `parent-name-<sub-component-name>.tsx` (e.g. `market-list-item.tsx`, `market-list-filters.tsx` for parent `market-list.tsx`). Large component (~100+ lines) → split into list container, list item, filters, and hook(s) as necessary for data logic.
+3. **Split the visual layer into sub-components** — If render/TSX exceeds roughly **40 lines**, extract sub-components with clear props and a single responsibility. **Avoid internal `renderXyz()` methods**: turn each into a **regular component** (own file, own props). Each sub-component **must live in its own file**; use **parent file name as prefix**: `parent-name-<sub-component-name>.tsx` (e.g. `market-list-item.tsx`, `market-list-filters.tsx` for parent `market-list.tsx`). Large component (~100+ lines) → split into list container, list item, filters, pure functions and hook(s) as necessary for data logic.
 
 ### Structure and readability
 
-- **Order inside the component:** types → state → effects → handlers → render.
+- **Order inside the component:** types → state → computed const → effects → handlers → render.
 - **Handlers:** one arrow function per handler (e.g. `const handleClick = () => { ... }`); avoid factories that return handlers. If an arrow function handler is only depending on pure typescript it can be externalized into `component-name.utils.ts` next to the component.
 - **Early returns in render** — Keep the main path flat: `if (isLoading) return <Spinner />; if (error) return <ErrorMessage />; ...` One condition per line; avoid nested ternary operators (“ternary hell”).
-- **Boolean in JSX** — Use explicit boolean (e.g. `const hasItems = items.length > 0; { hasItems && <List /> }`) so `0` is not rendered.
+- **Boolean in JSX** — Use explicit computed boolean (e.g. `const hasItems = items.length > 0; { hasItems && <List /> }`) so `0` is not rendered.
 - **Static data** — Constants and pure functions that don't depend on props or state → **outside the component** (relocate into `component-name.utils.ts`) to avoid new references every render.
 
 ### React-specific
 
 - **Selected items** — Store selection by **ID** in state; **derive** the full item from the list (e.g. `selectedItem = items.find(i => i.id === selectedId)`). Avoids stale references when the list updates.
-- **useMemo / useCallback — only when necessary** — Default: do not use. They add complexity and recent React compilers already optimize renders. Avoid for trivial cases (e.g. `useMemo(() => count * 2, [count])`, `useCallback(() => setOpen(true), [])`). Use only when: **profiling** shows a real performance problem.
+- **useMemo / useCallback — only when absolutely necessary** — Default: do not use. Re-renders are often an acceptable tradeoff to promote readability. These hooks add complexity and recent React compilers already optimize renders. Avoid for trivial cases (e.g. `useMemo(() => count * 2, [count])`, `useCallback(() => setOpen(true), [])`). Use only when: **profiling** shows a real performance problem.
 - **Data fetching** — Prefer **TanStack Query** (`useQuery` / `useMutation`) instead of manual `useState` + `useEffect` — reduces boilerplate and keeps the component simpler.
 
 ---
