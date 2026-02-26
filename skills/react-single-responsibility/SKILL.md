@@ -113,7 +113,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### Parameters
 
-- **Long parameter list (>1 param)** — Use a single **params object** with destructuring; extract the interface above the function signature (e.g. `interface CreateUserArgs`). Avoids wrong order and unclear meaning at the call site. The interface name matches the method name but starts with a capital letter and ends with `Args` (e.g. for `getThisMethod`, use `interface GetThisMethodArgs`).
+- **Long parameter list (>1 param)** — **As soon as a function or method has more than one parameter** (2+ arguments), use a single **params object** with destructuring and extract the parameter interface **immediately above** the function signature (e.g. `interface CreateUserArgs`). Avoids wrong order and unclear meaning at the call site. The interface name matches the method name but starts with a capital letter and ends with `Args` (e.g. for `getThisMethod`, use `interface GetThisMethodArgs`). This rule is also enforced as a coding standard (see react-coding-standards, common-coding-patterns); during normalization, apply it to every such function.
 - **Interface used only for one method** — When an interface exists solely to type a single method’s signature, **place it immediately above that method** (colocation). This self-documents the signature that follows and keeps the type next to its only consumer.
 - **Boolean flag parameter** — Avoid `fn(data, true)`. Use an **options object** with a named flag (e.g. `{ userId, includeArchived }: CreateUserArgs`) or **separate functions** when behavior diverges.
 - **Conventions** — Destructuring for multiple params; extract parameters into named interfaces; optional as `param?: Type`; defaults in destructuring (e.g. `{ page = 1, size = 10 }`).
@@ -145,7 +145,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 ### Quick checklist
 
 - [ ] Does it do more than one thing? → if yes: extract pure utilities, hooks, or sub-components (component) or smaller named functions (method).
-- [ ] More than 1 parameter? → use a single options object, an extracted parameter interface above the signature, and destructuring.
+- [ ] More than 1 parameter? → **always** use a single options object, an extracted parameter interface **immediately above** the signature, and destructuring (applies to every function with 2+ args; see also react-coding-standards).
 - [ ] Copy-pasted code? → extract and parameterize.
 - [ ] Control flow deeply nested? → use early returns and intermediate variables.
 - [ ] Comments explaining _what_? → rename for self-documenting code; keep comments for _why_ only.

@@ -16,8 +16,8 @@
     - [❌ Avoid Using Multiple Comparisons in Conditional Statements](#-avoid-using-multiple-comparisons-in-conditional-statements)
     - [✅ Prefer Using `Array.includes()` for Multiple Comparisons](#-prefer-using-arrayincludes-for-multiple-comparisons)
     - [ℹ️ Explanation](#ℹ️-explanation-3)
-  - [Prefer Object Destructuring Over Multiple Positional Parameters](#prefer-object-destructuring-over-multiple-positional-parameters)
-    - [❌ Avoid Using Multiple Positional Parameters in Function Arguments](#-avoid-using-multiple-positional-parameters-in-function-arguments)
+  - [Prefer Object Destructuring Over Positional Parameters](#prefer-object-destructuring-over-positional-parameters)
+    - [❌ Avoid Using Positional Parameters in Function Arguments](#-avoid-using-positional-parameters-in-function-arguments)
     - [✅ Prefer Object Destructuring for Function Arguments](#-prefer-object-destructuring-for-function-arguments)
     - [ℹ️ Explanation](#ℹ️-explanation-4)
   - [Prefer `Array.some()` Over Checking `Array.find()` for Undefined](#prefer-arraysome-over-checking-arrayfind-for-undefined)
@@ -86,10 +86,11 @@
 # Typescript coding guidelines
 
 This section list coding patterns promoted in the project. `React` and pure `Typescript` patterns like:
-  - apply the do not repeat yourself rule (DRY)
-  - divide to conquer rule a.k.a. promote small responsibility functions
-  - promote reusability
-  - encourage long term maintainable code
+
+- apply the do not repeat yourself rule (DRY)
+- divide to conquer rule a.k.a. promote small responsibility functions
+- promote reusability
+- encourage long term maintainable code
 
 ## Prefer Type and Interface over usage of `any`
 
@@ -100,21 +101,21 @@ Using `any` in TypeScript can be problematic for several reasons. Here are some 
 ```ts
 // This code uses `any` for type definitions, which defeats the purpose of TypeScript
 const fetchUser = async (): Promise<any> => {
-  return await fetch('https://api.users.com/1122').then(response => response.json())
-}
+  return await fetch("https://api.users.com/1122").then((response) => response.json());
+};
 
 const processData = (data: any) => {
-  console.log(data.name) // No type checking
-  console.log(data.age) // No type checking
+  console.log(data.name); // No type checking
+  console.log(data.age); // No type checking
   // No intellisense support, high chance of runtime errors
-}
+};
 
-const result: any = await fetchUser()
-processData(result)
+const result: any = await fetchUser();
+processData(result);
 
 // Unclear structure of objects and functions
-const user: any = { name: 'Alice', age: 30 }
-console.log(user.address) // No type checking, may cause runtime error
+const user: any = { name: "Alice", age: 30 };
+console.log(user.address); // No type checking, may cause runtime error
 ```
 
 ### ✅ Prefer Using Type or Interface for Type Definitions
@@ -124,42 +125,42 @@ console.log(user.address) // No type checking, may cause runtime error
 
 // Prefer interface for object shapes
 interface User {
-  name: string
-  age: number
-  address?: string // Optional property
+  name: string;
+  age: number;
+  address?: string; // Optional property
 }
 
 // Use type for generic wrappers or complex aliases (e.g. Record, unions, literal types)
 interface ApiResponse<T> {
-  data: T
-  status: number
-  error?: string // Optional property
+  data: T;
+  status: number;
+  error?: string; // Optional property
 }
 
 const fetchUser = async (): Promise<ApiResponse<User>> => {
-  const response = await fetch('https://api.example.com/data')
-  const data: User = await response.json()
-  return { data, status: response.status }
-}
+  const response = await fetch("https://api.example.com/data");
+  const data: User = await response.json();
+  return { data, status: response.status };
+};
 
 const processData = (response: ApiResponse<User>) => {
   if (response.error) {
-    console.error(response.error)
-    return
+    console.error(response.error);
+    return;
   }
-  
-  const data = response.data
-  console.log(data.name) // Type checking
-  console.log(data.age) // Type checking
-  // Intellisense support, reducing the chance of runtime errors
-}
 
-const result: ApiResponse<User> = await fetchUser()
-processData(result)
+  const data = response.data;
+  console.log(data.name); // Type checking
+  console.log(data.age); // Type checking
+  // Intellisense support, reducing the chance of runtime errors
+};
+
+const result: ApiResponse<User> = await fetchUser();
+processData(result);
 
 // Clear structure of objects and functions
-const user: User = { name: 'Alice', age: 30 }
-console.log(user.address) // Type checking, avoids runtime errors
+const user: User = { name: "Alice", age: 30 };
+console.log(user.address); // Type checking, avoids runtime errors
 ```
 
 ### ℹ️ Explanation
@@ -176,6 +177,7 @@ console.log(user.address) // Type checking, avoids runtime errors
 ### Additional Resources
 
 For more detailed information on why you should avoid using `any` in TypeScript and how to use more specific types instead, you can refer to these resources:
+
 - [The Problem with Using 'Any' in TypeScript and What to Use Instead](https://upmostly.com/typescript/the-problem-with-using-any-in-typescript-and-what-to-use-instead)
 - [Why You Should Avoid Using 'any' in TypeScript and How to Do It](https://dev.to/yatinchoudhary/why-you-should-avoid-using-any-in-typescript-and-how-to-do-it-3b5)
 - [TypeScript: Avoid the Type Any](https://www.codiga.io/blog/typescript-avoid-type-any/)
@@ -195,17 +197,17 @@ enum Status {
 
 const getStatusMessage = (status: Status): string => {
   return status === Status.Loading
-    ? 'Loading'
+    ? "Loading"
     : status === Status.Error
-    ? 'Error'
-    : status === Status.NoData
-    ? 'No Data'
-    : 'Data Loaded'
-}
+      ? "Error"
+      : status === Status.NoData
+        ? "No Data"
+        : "Data Loaded";
+};
 
 // Usage
-const statusMessage = getStatusMessage(Status.Loading)
-console.log(statusMessage) // Output: Loading
+const statusMessage = getStatusMessage(Status.Loading);
+console.log(statusMessage); // Output: Loading
 ```
 
 ### ✅ Prefer Using Early Returns for Multiple Conditions
@@ -221,23 +223,23 @@ enum Status {
 
 const getStatusMessage = (status: Status): string => {
   if (status === Status.Loading) {
-    return 'Loading'
+    return "Loading";
   }
   if (status === Status.Error) {
-    return 'Error'
+    return "Error";
   }
   if (status === Status.NoData) {
-    return 'No Data'
+    return "No Data";
   }
   if (status === Status.DataLoaded) {
-    return 'Data Loaded'
+    return "Data Loaded";
   }
-  return 'Unknown Status'
-}
+  return "Unknown Status";
+};
 
 // Usage
-const statusMessage = getStatusMessage(Status.Loading)
-console.log(statusMessage) // Output: Loading
+const statusMessage = getStatusMessage(Status.Loading);
+console.log(statusMessage); // Output: Loading
 ```
 
 ### ℹ️ Explanation
@@ -246,50 +248,49 @@ console.log(statusMessage) // Output: Loading
 - **Improved Readability:** Using early returns makes the logic clearer and easier to follow, especially when dealing with more than two conditions.
 - **Maintainability:** Clear and readable code is easier to maintain and debug.
 
-
 ## Prefer `const` Over `let` for Variable Declarations
 
 ### ❌ Avoid Using `let` When `const` Can Be Used
 
 ```tsx
 // This code uses `let` even though the variable is never reassigned
-let total = 0
-const numbers = [1, 2, 3, 4, 5]
+let total = 0;
+const numbers = [1, 2, 3, 4, 5];
 
 for (let i = 0; i < numbers.length; i++) {
-  total += numbers[i]
+  total += numbers[i];
 }
 
-const isAuthenticated = true
-let greeting
+const isAuthenticated = true;
+let greeting;
 
 if (isAuthenticated) {
-  greeting = 'Welcome back!'
+  greeting = "Welcome back!";
 } else {
-  greeting = 'Hello, guest!'
+  greeting = "Hello, guest!";
 }
 
-console.log(greeting) // Output: Welcome back!
-console.log(total) // Output: 15
+console.log(greeting); // Output: Welcome back!
+console.log(total); // Output: 15
 ```
 
 ### ✅ Prefer Using `const` To Promote Values That Do Not Change
 
 ```tsx
 // This code correctly uses `const` and the reduce() method for immutability and readability
-const numbers = [1, 2, 3, 4, 5]
-const total = numbers.reduce((acc, num) => acc + num, 0)
+const numbers = [1, 2, 3, 4, 5];
+const total = numbers.reduce((acc, num) => acc + num, 0);
 
 // This code uses a pure function to avoid the use of `let`
 const getGreeting = (isAuthenticated: boolean): string => {
-  return isAuthenticated ? 'Welcome back!' : 'Hello, guest!'
-}
+  return isAuthenticated ? "Welcome back!" : "Hello, guest!";
+};
 
-const isAuthenticated = true
-const greeting = getGreeting(isAuthenticated)
+const isAuthenticated = true;
+const greeting = getGreeting(isAuthenticated);
 
-console.log(greeting) // Output: Welcome back!
-console.log(total) // Output: 15
+console.log(greeting); // Output: Welcome back!
+console.log(total); // Output: 15
 ```
 
 ### ℹ️ Explanation
@@ -305,12 +306,12 @@ console.log(total) // Output: 15
 
 ```tsx
 // This code uses multiple comparisons in a single if statement
-const value = 'b'
+const value = "b";
 
-if (value === 'a' || value === 'b' || value === 'c') {
-  console.log('Value is a, b, or c')
+if (value === "a" || value === "b" || value === "c") {
+  console.log("Value is a, b, or c");
 } else {
-  console.log('Value is something else')
+  console.log("Value is something else");
 }
 ```
 
@@ -318,13 +319,13 @@ if (value === 'a' || value === 'b' || value === 'c') {
 
 ```tsx
 // This code uses Array.includes() for a cleaner conditional statement
-const value = 'b'
-const VALID_VALUES = ['a', 'b', 'c']
+const value = "b";
+const VALID_VALUES = ["a", "b", "c"];
 
 if (VALID_VALUES.includes(value)) {
-  console.log('Value is a, b, or c')
+  console.log("Value is a, b, or c");
 } else {
-  console.log('Value is something else')
+  console.log("Value is something else");
 }
 ```
 
@@ -334,19 +335,28 @@ if (VALID_VALUES.includes(value)) {
 - **Use `Array.includes()`:** The `Array.includes()` method provides a cleaner and more readable way to check if a value is present in an array.
 - **Readability and Maintainability:** Using `Array.includes()` enhances code readability and makes it easier to add or remove values from the condition, improving maintainability.
 
-## Prefer Object Destructuring Over Multiple Positional Parameters
+## Prefer Object Destructuring Over Positional Parameters
 
-### ❌ Avoid Using Multiple Positional Parameters in Function Arguments
+**When to apply:** For **any function or method that has more than one parameter** (i.e. 2 or more arguments), use the pattern below: a single parameter object, an interface defining it placed **immediately above** the function, and destructuring in the signature. During normalization or code review, treat every such function as a violation until refactored.
+
+### ❌ Avoid Using Positional Parameters in Function Arguments
+
+Avoid **any** function or method that takes **more than one parameter** as positional arguments. This includes two-parameter functions (e.g. `fn(a, b)`) as well as longer lists.
 
 ```tsx
 // This code uses multiple positional parameters, including an optional one, making it less readable
 const createUser = (firstName: string, middleName: string, lastName: string, age: number, email: string) => {
   // do something here to create the user...
-}
+};
 
 // Usage
-const user = createUser('John', undefined, 'Doe', 30, 'john.doe@example.com')
-console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, email: 'john.doe@example.com' }
+const user = createUser("John", undefined, "Doe", 30, "john.doe@example.com");
+console.log(user); // Output: { firstName: 'John', lastName: 'Doe', age: 30, email: 'john.doe@example.com' }
+```
+
+```tsx
+// Also avoid: even two positional parameters are a violation
+const formatRange = (start: number, end: number) => `${start}-${end}`;
 ```
 
 ### ✅ Prefer Object Destructuring for Function Arguments
@@ -354,24 +364,35 @@ console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, emai
 ```tsx
 // This code uses object destructuring for better readability and flexibility
 interface CreateUserArgs {
-  firstName: string
-  lastName: string
-  age: number
-  email: string
-  middleName?: string // Optional parameter
+  firstName: string;
+  lastName: string;
+  age: number;
+  email: string;
+  middleName?: string; // Optional parameter
 }
 
 const createUser = ({ firstName, middleName, lastName, age, email }: CreateUserArgs) => {
   // do something here to create the user...
-}
+};
 
 // Usage
-const user = createUser({ firstName: 'John', lastName: 'Doe', age: 30, email: 'john.doe@example.com' })
-console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, email: 'john.doe@example.com' }
+const user = createUser({ firstName: "John", lastName: "Doe", age: 30, email: "john.doe@example.com" });
+console.log(user); // Output: { firstName: 'John', lastName: 'Doe', age: 30, email: 'john.doe@example.com' }
+```
+
+For a function with only two parameters, use the same pattern — interface above, single param, destructuring:
+
+```tsx
+interface FormatRangeArgs {
+  start: number;
+  end: number;
+}
+const formatRange = ({ start, end }: FormatRangeArgs) => `${start}-${end}`;
 ```
 
 ### ℹ️ Explanation
 
+- **When to apply this rule:** Apply the Prefer pattern for **every** function or method that has **more than one parameter** (2+ arguments). One positional parameter is acceptable; two or more must use the single-argument object with an interface above and destructuring in the signature.
 - **Avoid Multiple Positional Parameters:** Using multiple positional parameters, especially with optional ones, can make the function call less readable and more error-prone. You may need to pass `undefined` explicitly to skip the optional parameter, which is not intuitive.
 - **Use Object Destructuring:** Using object destructuring for function parameters improves readability by clearly naming each parameter. This makes the function call more intuitive and less prone to errors.
 - **Readability and Flexibility:** Destructuring enhances readability and allows for more flexibility in function calls, especially when dealing with optional parameters. It also makes the code easier to maintain and extend.
@@ -383,12 +404,12 @@ console.log(user) // Output: { firstName: 'John', lastName: 'Doe', age: 30, emai
 
 ```tsx
 const items = [
-  { id: 1, name: 'Alice', isActive: false },
-  { id: 2, name: 'Bob', isActive: false },
-  { id: 3, name: 'Charlie', isActive: true }
-]
+  { id: 1, name: "Alice", isActive: false },
+  { id: 2, name: "Bob", isActive: false },
+  { id: 3, name: "Charlie", isActive: true },
+];
 
-const activeItems = items.find(item => item.isActive) !== undefined
+const activeItems = items.find((item) => item.isActive) !== undefined;
 ```
 
 ### ✅ Prefer Using `Array.some()` for Better Readability
@@ -396,12 +417,12 @@ const activeItems = items.find(item => item.isActive) !== undefined
 ```tsx
 // Usage
 const items = [
-  { id: 1, name: 'Alice', isActive: false },
-  { id: 2, name: 'Bob', isActive: false },
-  { id: 3, name: 'Charlie', isActive: true }
-]
+  { id: 1, name: "Alice", isActive: false },
+  { id: 2, name: "Bob", isActive: false },
+  { id: 3, name: "Charlie", isActive: true },
+];
 // This code uses Array.some() for a more readable and concise solution
-export const hasActiveItems = (items) => items.some(item => item.isActive)
+export const hasActiveItems = (items) => items.some((item) => item.isActive);
 ```
 
 ### ℹ️ Explanation
@@ -417,12 +438,12 @@ export const hasActiveItems = (items) => items.some(item => item.isActive)
 ```tsx
 // This code catches errors but does nothing with them, making debugging difficult
 const storeDataSync = (data: string) => {
-    try {
-      mySuperLocalApi(data)
-    } catch (error: unknown) {
-      // Error is silently caught
-    }
-}
+  try {
+    mySuperLocalApi(data);
+  } catch (error: unknown) {
+    // Error is silently caught
+  }
+};
 ```
 
 ### ✅ Prefer Logging Errors in `try-catch` Blocks
@@ -430,14 +451,14 @@ const storeDataSync = (data: string) => {
 ```tsx
 // This code logs errors to the console and can be easily extended to log to external services like Sentry
 const storeDataSync = (data: string) => {
-    try {
-      mySuperLocalApi(data)
-    } catch (error: unknown) {
-      console.error('Error storing data', error)
-      // Optionally, log the error to an external service like Sentry
-      // Sentry.captureException(error)
-    }
-}
+  try {
+    mySuperLocalApi(data);
+  } catch (error: unknown) {
+    console.error("Error storing data", error);
+    // Optionally, log the error to an external service like Sentry
+    // Sentry.captureException(error)
+  }
+};
 ```
 
 ### ℹ️ Explanation
@@ -456,21 +477,21 @@ const processData = (data: string) => {
   try {
     try {
       if (!data) {
-        throw new Error('Data is required')
+        throw new Error("Data is required");
       }
       // Process data...
     } catch (innerError) {
-      console.error('Inner error:', innerError)
+      console.error("Inner error:", innerError);
       // Handle inner error...
     }
   } catch (outerError) {
-    console.error('Outer error:', outerError)
+    console.error("Outer error:", outerError);
     // Handle outer error...
   }
-}
+};
 
 // Usage
-processData('')
+processData("");
 ```
 
 ### ✅ Prefer Flattening `try-catch` Blocks
@@ -480,17 +501,17 @@ processData('')
 const processData = (data: string) => {
   try {
     if (!data) {
-      throw new Error('Data is required')
+      throw new Error("Data is required");
     }
     // Process data...
   } catch (error) {
-    console.error('Error:', error)
+    console.error("Error:", error);
     // Handle error...
   }
-}
+};
 
 // Usage
-processData('')
+processData("");
 ```
 
 ### ℹ️ Explanation
@@ -505,25 +526,25 @@ processData('')
 
 ```ts
 const internalDataProcessing = (data?: string) => {
-    if (!data) {
-      throw new Error('Data is required')
-    }
-}
+  if (!data) {
+    throw new Error("Data is required");
+  }
+};
 
 // This code catches an exception only to re-throw it, which is redundant
 const processData = (data?: string) => {
   try {
-    internalDataProcessing(data)
+    internalDataProcessing(data);
   } catch (error) {
-    throw error // Re-throwing the same exception
+    throw error; // Re-throwing the same exception
   }
-}
+};
 
 // Usage
 try {
-  processData('')
+  processData("");
 } catch (error) {
-  console.error('Caught error:', error)
+  console.error("Caught error:", error);
 }
 ```
 
@@ -531,44 +552,44 @@ try {
 
 ```ts
 const internalDataProcessing = (data?: string) => {
-    if (!data) {
-      throw new Error('Data is required')
-    }
-}
+  if (!data) {
+    throw new Error("Data is required");
+  }
+};
 
 // This code handles the exception by logging it
 const processData = (data: string) => {
   try {
-    internalDataProcessing(data)
+    internalDataProcessing(data);
   } catch (error) {
-    console.error('Error processing data:', error)
+    console.error("Error processing data:", error);
     // Handle the error appropriately, e.g., return a default value, clean up resources or call external system like Sentry
   }
-}
+};
 
 // Usage
-processData('')
+processData("");
 ```
 
 ### ✅ Prefer Letting the Exception Propagate Naturally
 
 ```ts
 const internalDataProcessing = (data?: string) => {
-    if (!data) {
-      throw new Error('Data is required')
-    }
-}
+  if (!data) {
+    throw new Error("Data is required");
+  }
+};
 
 // This code lets the exception propagate naturally without catching it
 const processData = (data: string) => {
-    internalDataProcessing(data)
-}
+  internalDataProcessing(data);
+};
 
 // Usage
 try {
-  processData('')
+  processData("");
 } catch (error) {
-  console.error('Caught error:', error)
+  console.error("Caught error:", error);
 }
 ```
 
@@ -586,14 +607,14 @@ try {
 ```ts
 // This code uses || which can incorrectly handle falsy values like 0 or ''
 const getDefault = (value?: number | string | null) => {
-  return value || 'default'
-}
+  return value || "default";
+};
 
 // Usage
-console.log(getDefault(null)) // Output: 'default'
-console.log(getDefault(undefined)) // Output: 'default'
-console.log(getDefault(0)) // Output: 'default' (unintended)
-console.log(getDefault('')) // Output: 'default' (unintended)
+console.log(getDefault(null)); // Output: 'default'
+console.log(getDefault(undefined)); // Output: 'default'
+console.log(getDefault(0)); // Output: 'default' (unintended)
+console.log(getDefault("")); // Output: 'default' (unintended)
 ```
 
 ### ✅ Prefer Using `??` to Handle `null` and `undefined`
@@ -601,14 +622,14 @@ console.log(getDefault('')) // Output: 'default' (unintended)
 ```ts
 // This code uses ?? which correctly handles only null or undefined
 const getDefault = (value?: number | string | null) => {
-  return value ?? 'default'
-}
+  return value ?? "default";
+};
 
 // Usage
-console.log(getDefault(null)) // Output: 'default'
-console.log(getDefault(undefined)) // Output: 'default'
-console.log(getDefault(0)) // Output: 0 (intended)
-console.log(getDefault('')) // Output: '' (intended)
+console.log(getDefault(null)); // Output: 'default'
+console.log(getDefault(undefined)); // Output: 'default'
+console.log(getDefault(0)); // Output: 0 (intended)
+console.log(getDefault("")); // Output: '' (intended)
 ```
 
 ### ℹ️ Explanation
@@ -624,16 +645,16 @@ console.log(getDefault('')) // Output: '' (intended)
 
 ```ts
 // This code uses != (loose inequality), which applies type coercion and can lead to surprising results
-const value = 0
+const value = 0;
 
 if (value != null) {
-  console.log('Value is not null or undefined')
+  console.log("Value is not null or undefined");
 }
 
 // Loose inequality can treat different types as equal (e.g. 0 != '' is false, 0 !== '' is true)
-const count = 0
-if (count != '') {
-  console.log('Count is set')
+const count = 0;
+if (count != "") {
+  console.log("Count is set");
 }
 ```
 
@@ -641,16 +662,16 @@ if (count != '') {
 
 ```ts
 // This code uses !== (strict inequality), which compares both value and type without coercion
-const value = 0
+const value = 0;
 
 if (value !== null && value !== undefined) {
-  console.log('Value is not null or undefined')
+  console.log("Value is not null or undefined");
 }
 
 // Strict inequality compares type and value: 0 !== '' is true, so intent is clear
-const count = 0
-if (count !== '' && count !== undefined) {
-  console.log('Count is set')
+const count = 0;
+if (count !== "" && count !== undefined) {
+  console.log("Count is set");
 }
 ```
 
@@ -667,13 +688,13 @@ if (count !== '' && count !== undefined) {
 ```ts
 // This code uses param: Type | undefined, making it less readable and more verbose
 const greet = (name: string | undefined) => {
-  const greeting = name !== undefined ? `Hello, ${name}!` : 'Hello!'
-  return greeting
-}
+  const greeting = name !== undefined ? `Hello, ${name}!` : "Hello!";
+  return greeting;
+};
 
 // Usage
-console.log(greet(undefined)) // Output: 'Hello!'
-console.log(greet('Alice')) // Output: 'Hello, Alice!'
+console.log(greet(undefined)); // Output: 'Hello!'
+console.log(greet("Alice")); // Output: 'Hello, Alice!'
 ```
 
 ### ✅ Prefer Using Optional Parameters with `param?: Type`
@@ -681,13 +702,13 @@ console.log(greet('Alice')) // Output: 'Hello, Alice!'
 ```ts
 // This code uses param?: Type for a more concise and readable approach
 const greet = (name?: string) => {
-  const greeting = name ? `Hello, ${name}!` : 'Hello!'
-  return greeting
-}
+  const greeting = name ? `Hello, ${name}!` : "Hello!";
+  return greeting;
+};
 
 // Usage
-console.log(greet()) // Output: 'Hello!'
-console.log(greet('Alice')) // Output: 'Hello, Alice!'
+console.log(greet()); // Output: 'Hello!'
+console.log(greet("Alice")); // Output: 'Hello, Alice!'
 ```
 
 ### ℹ️ Explanation
@@ -704,26 +725,26 @@ console.log(greet('Alice')) // Output: 'Hello, Alice!'
 ```ts
 // This code uses enums with implicit ordinal values
 enum UserRole {
-  Admin,  // 0
-  User,   // 1
-  Guest   // 2
+  Admin, // 0
+  User, // 1
+  Guest, // 2
 }
 
 const getUserRole = (role: UserRole): string => {
   switch (role) {
     case UserRole.Admin:
-      return 'Admin'
+      return "Admin";
     case UserRole.User:
-      return 'User'
+      return "User";
     case UserRole.Guest:
-      return 'Guest'
+      return "Guest";
     default:
-      return 'Unknown'
+      return "Unknown";
   }
-}
+};
 
 // Usage
-console.log(getUserRole(UserRole.Admin)) // Output: 'Admin'
+console.log(getUserRole(UserRole.Admin)); // Output: 'Admin'
 ```
 
 ### ✅ Prefer Using Explicit Numeric Values for Enums
@@ -733,24 +754,24 @@ console.log(getUserRole(UserRole.Admin)) // Output: 'Admin'
 enum UserRole {
   Admin = 1,
   User = 2,
-  Guest = 3
+  Guest = 3,
 }
 
 const getUserRole = (role: UserRole): string => {
   switch (role) {
     case UserRole.Admin:
-      return 'Admin'
+      return "Admin";
     case UserRole.User:
-      return 'User'
+      return "User";
     case UserRole.Guest:
-      return 'Guest'
+      return "Guest";
     default:
-      return 'Unknown'
+      return "Unknown";
   }
-}
+};
 
 // Usage
-console.log(getUserRole(UserRole.Admin)) // Output: 'Admin'
+console.log(getUserRole(UserRole.Admin)); // Output: 'Admin'
 ```
 
 ### ℹ️ Explanation
@@ -760,75 +781,74 @@ console.log(getUserRole(UserRole.Admin)) // Output: 'Admin'
 - **Serialization and Deserialization:** Explicit numeric values are more robust for serialization and deserialization. They remain consistent even if the enum is extended or modified over time, preventing potential data corruption or misinterpretation.
 - **Readability and Maintainability:** Explicit values make the code more readable and maintainable by clearly indicating the intended value of each enum member. This reduces confusion and enhances code clarity.
 
-
 ## Prefer Using `useWindowDimensions` Hook Over `Dimensions.get` in React Native
 
 ### ❌ Avoid Using `Dimensions.get` for Getting Window Dimensions
 
 ```tsx
 // this code uses Dimensions.get to get window dimensions, which can lead to issues with updates and readability
-import React from 'react'
-import { View, Text, StyleSheet, Dimensions } from 'react-native'
+import React from "react";
+import { View, Text, StyleSheet, Dimensions } from "react-native";
 
 export const DimensionInfoPanel = () => {
-  const { width } = Dimensions.get('window') // width retrieved using Dimensions.get
+  const { width } = Dimensions.get("window"); // width retrieved using Dimensions.get
 
   return (
     <View style={[styles.container, { width }]}>
       <Text>Width: {width}</Text>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: Dimensions.get('window').width, // width set using Dimensions.get
+    justifyContent: "center",
+    alignItems: "center",
+    width: Dimensions.get("window").width, // width set using Dimensions.get
   },
-})
+});
 ```
 
 ### ✅ Prefer Using `useWindowDimensions` Hook for Getting Window Dimensions
 
 ```tsx
 // this code uses the useWindowDimensions hook for getting window dimensions, making it more responsive and readable
-import React from 'react'
-import { View, Text, StyleSheet, useWindowDimensions } from 'react-native'
+import React from "react";
+import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 
 export const DimensionInfoPanel = () => {
-  const styles = useStyles()
-  const { width } = useWindowDimensions()
+  const styles = useStyles();
+  const { width } = useWindowDimensions();
 
   return (
     <View style={styles.container}>
       <Text>Width: {width}</Text>
     </View>
-  )
-}
+  );
+};
 
 const useStyles = () => {
-  const { width } = useWindowDimensions()
+  const { width } = useWindowDimensions();
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       width, // width set using dynamic values from useWindowDimensions
     },
-  })
-}
+  });
+};
 ```
 
 ### ℹ️ Explanation
 
-- **Avoid Using `Dimensions.get`:** 
+- **Avoid Using `Dimensions.get`:**
   - **Static Values:** `Dimensions.get` provides static values that are not updated automatically when the screen orientation changes or when the window is resized. This can lead to issues where the component does not re-render with the correct dimensions.
   - **Readability:** Using `Dimensions.get` can make the code less readable and maintainable, as the dimensions are obtained outside of the component's render method and used globally.
 
-- **Use `useWindowDimensions` Hook:** 
+- **Use `useWindowDimensions` Hook:**
   - **Dynamic Updates:** The `useWindowDimensions` hook provides updated dimensions dynamically. This means that whenever the window dimensions change (e.g., due to screen rotation), the component will re-render with the correct dimensions.
   - **Readability and Maintainability:** Using the hook makes the code cleaner and more maintainable. The dimensions are directly obtained within the component's render method, making it clear where they are being used.
   - **Recommended by React Native:** React Native recommends using the `useWindowDimensions` hook for handling responsive layouts, as it provides a more seamless and reactive way to manage dimension changes.
@@ -843,25 +863,25 @@ By following these best practices and using the `useWindowDimensions` hook, you 
 // This code uses multiple nested if-then-else statements, making it harder to read and maintain
 const updateUser = async (userId: string) => {
   if (userId) {
-    const user = await getUserById(userId)
+    const user = await getUserById(userId);
     if (user) {
       if (user.isActive) {
         if (user.hasPermissions) {
-          user.lastUpdated = new Date()
-          await saveUser(user)
+          user.lastUpdated = new Date();
+          await saveUser(user);
         } else {
-          console.log('User does not have permissions')
+          console.log("User does not have permissions");
         }
       } else {
-        console.log('User is not active')
+        console.log("User is not active");
       }
     } else {
-      console.log('User not found')
+      console.log("User not found");
     }
   } else {
-    console.log('Invalid user ID')
+    console.log("Invalid user ID");
   }
-}
+};
 ```
 
 ### ✅ Prefer Using Early Returns for Improved Readability and Maintainability
@@ -870,29 +890,29 @@ const updateUser = async (userId: string) => {
 // This code uses early returns, making it more readable and easier to maintain
 const updateUser = async (userId: string) => {
   if (!userId) {
-    console.log('Invalid user ID')
-    return
+    console.log("Invalid user ID");
+    return;
   }
 
-  const user = await getUserById(userId)
+  const user = await getUserById(userId);
   if (!user) {
-    console.log('User not found')
-    return
+    console.log("User not found");
+    return;
   }
 
   if (!user.isActive) {
-    console.log('User is not active')
-    return
+    console.log("User is not active");
+    return;
   }
 
   if (!user.hasPermissions) {
-    console.log('User does not have permissions')
-    return
+    console.log("User does not have permissions");
+    return;
   }
 
-  user.lastUpdated = new Date()
-  await saveUser(user)
-}
+  user.lastUpdated = new Date();
+  await saveUser(user);
+};
 ```
 
 ### ℹ️ Explanation
@@ -920,56 +940,56 @@ By following these best practices and using early returns, you can create code t
 ```ts
 // this code uses complex interpolation without destructuring, making it harder to read
 interface AddArgs {
-  a: number
-  b: number
+  a: number;
+  b: number;
 }
-const add = ({ a, b }: AddArgs) => a + b
-const double = (n: number) => n * 2
+const add = ({ a, b }: AddArgs) => a + b;
+const double = (n: number) => n * 2;
 
 const obj = {
   level1: {
     level2: {
       level3: {
-        value: null
-      }
-    }
-  }
+        value: null,
+      },
+    },
+  },
 };
 
-const a = 5
-const b = 10
+const a = 5;
+const b = 10;
 
-const badInterpolationExample = `The sum of ${a} and ${b} is ${add({ a, b })}, the double of the sum is ${double(add({ a, b }))}, and the deep object value is ${obj?.level1?.level2?.level3?.value ?? 'NA'}.`
+const badInterpolationExample = `The sum of ${a} and ${b} is ${add({ a, b })}, the double of the sum is ${double(add({ a, b }))}, and the deep object value is ${obj?.level1?.level2?.level3?.value ?? "NA"}.`;
 ```
 
 ### ✅ Prefer Using Object Destructuring for Clarity
 
 ```ts
 interface AddArgs {
-  a: number
-  b: number
+  a: number;
+  b: number;
 }
-const add = ({ a, b }: AddArgs) => a + b
-const double = (n: number) => n * 2
+const add = ({ a, b }: AddArgs) => a + b;
+const double = (n: number) => n * 2;
 
 const obj = {
   level1: {
     level2: {
       level3: {
-        value: null
-      }
-    }
-  }
+        value: null,
+      },
+    },
+  },
 };
 
-const a = 5
-const b = 10
+const a = 5;
+const b = 10;
 
-const sum = add({ a, b })
-const doubledSum = double(sum)
-const deepObjectValue = obj?.level1?.level2?.level3?.value ?? 'NA'
+const sum = add({ a, b });
+const doubledSum = double(sum);
+const deepObjectValue = obj?.level1?.level2?.level3?.value ?? "NA";
 
-const goodInterpolationExample = `The sum of ${a} and ${b} is ${sum}, the double of the sum is ${doubledSum}, and the deep object value is ${deepObjectValue}.`
+const goodInterpolationExample = `The sum of ${a} and ${b} is ${sum}, the double of the sum is ${doubledSum}, and the deep object value is ${deepObjectValue}.`;
 ```
 
 ### ℹ️ Explanation
@@ -997,13 +1017,13 @@ export const logBookViewItem = ({
   origin,
   lastViewDate,
 }: {
-  viewedItem: StateBook | null
-  isOnline: boolean
-  origin?: BooksOrigin | null
-  lastViewDate?: Date
+  viewedItem: StateBook | null;
+  isOnline: boolean;
+  origin?: BooksOrigin | null;
+  lastViewDate?: Date;
 }) => {
   // ...
-}
+};
 ```
 
 ### ✅ Prefer Extracting and Exporting Types for Reusability and Maintainability
@@ -1012,20 +1032,15 @@ export const logBookViewItem = ({
 // This code extracts types into reusable and exportable interfaces (or types for unions/literals), improving readability, reusability, and maintainability.
 
 export interface BookViewItemInfos {
-  viewedItem: StateBook | null
-  isOnline: boolean
-  origin?: BooksOrigin | null
-  lastViewDate?: Date
+  viewedItem: StateBook | null;
+  isOnline: boolean;
+  origin?: BooksOrigin | null;
+  lastViewDate?: Date;
 }
 
-export const logBookViewItem = ({
-  viewedItem,
-  isOnline,
-  origin,
-  lastViewDate,
-}: BookViewItemInfos) => {
+export const logBookViewItem = ({ viewedItem, isOnline, origin, lastViewDate }: BookViewItemInfos) => {
   // ...
-}
+};
 ```
 
 ### ℹ️ Explanation
@@ -1050,8 +1065,8 @@ By following these practices, you ensure that your TypeScript code is more maint
 // This code defines an object type with a custom index signature, making it less concise and clear.
 
 export type ViewedItems = {
-  [key: string]: Date
-}
+  [key: string]: Date;
+};
 ```
 
 ### ✅ Prefer Using TypeScript `Record` Utility Type for Simplicity and Clarity
@@ -1059,7 +1074,7 @@ export type ViewedItems = {
 ```tsx
 // This code uses TypeScript's `Record` utility type, improving conciseness and clarity.
 
-export type ViewedItems = Record<string, Date>
+export type ViewedItems = Record<string, Date>;
 ```
 
 ### ℹ️ Explanation
@@ -1067,35 +1082,36 @@ export type ViewedItems = Record<string, Date>
 When you use TypeScript's `Record` utility type, you gain several additional advantages over custom index signatures like `[key: string]: T`:
 
 - **Strongly Typed Keys:**
-   - **Record:** The `Record` utility type allows you to define keys with a specific type, not just `string`. For example, you can specify an `enum`, a union of string literals, or any other custom type as the keys.
-     ```typescript
-     type Status = 'pending' | 'completed' | 'failed';
-     export type TaskStatuses = Record<Status, Date>;
-     ```
-     In this example, `TaskStatuses` ensures that only `'pending'`, `'completed'`, or `'failed'` can be used as keys, providing stronger type safety.
+  - **Record:** The `Record` utility type allows you to define keys with a specific type, not just `string`. For example, you can specify an `enum`, a union of string literals, or any other custom type as the keys.
 
-   - **Custom Index Signature:** When using a custom index signature like `[key: string]: Date`, you are limited to using `string` or `number` as the key type. You can't easily enforce a specific set of keys.
+    ```typescript
+    type Status = "pending" | "completed" | "failed";
+    export type TaskStatuses = Record<Status, Date>;
+    ```
+
+    In this example, `TaskStatuses` ensures that only `'pending'`, `'completed'`, or `'failed'` can be used as keys, providing stronger type safety.
+
+  - **Custom Index Signature:** When using a custom index signature like `[key: string]: Date`, you are limited to using `string` or `number` as the key type. You can't easily enforce a specific set of keys.
 
 - **Type Inference and Autocompletion:**
-   - **Record:** When using `Record`, TypeScript provides better type inference and autocompletion in your IDE, which makes development faster and reduces the likelihood of errors. For instance, with `Record<Status, Date>`, your IDE will automatically suggest the valid keys (`'pending'`, `'completed'`, `'failed'`) as you type.
-   
-   - **Custom Index Signature:** With a custom index signature, you lose the ability to leverage TypeScript’s powerful autocompletion and inference for specific keys because the key is only typed as `string`.
+  - **Record:** When using `Record`, TypeScript provides better type inference and autocompletion in your IDE, which makes development faster and reduces the likelihood of errors. For instance, with `Record<Status, Date>`, your IDE will automatically suggest the valid keys (`'pending'`, `'completed'`, `'failed'`) as you type.
+  - **Custom Index Signature:** With a custom index signature, you lose the ability to leverage TypeScript’s powerful autocompletion and inference for specific keys because the key is only typed as `string`.
 
 - **Type Safety for Value Types:**
-   - **Record:** The `Record` utility type ensures that all keys map to the same type of value. If you need to change the value type later, you only need to update it in one place, and TypeScript will enforce this type across all occurrences.
-     ```typescript
-     export type ViewedItems = Record<string, Date>;
-     // Later, if you need to change Date to another type, like Date | null:
-     export type ViewedItems = Record<string, Date | null>;
-     ```
-   - **Custom Index Signature:** While you can achieve similar results with a custom index signature, it's not as straightforward or expressive as using `Record`.
+  - **Record:** The `Record` utility type ensures that all keys map to the same type of value. If you need to change the value type later, you only need to update it in one place, and TypeScript will enforce this type across all occurrences.
+    ```typescript
+    export type ViewedItems = Record<string, Date>;
+    // Later, if you need to change Date to another type, like Date | null:
+    export type ViewedItems = Record<string, Date | null>;
+    ```
+  - **Custom Index Signature:** While you can achieve similar results with a custom index signature, it's not as straightforward or expressive as using `Record`.
 
 - **Reusability and Composition:**
-   - **Record:** The `Record` type can be easily composed with other utility types, such as `Partial`, `Pick`, or `Omit`, to create more complex types that are still type-safe and easy to manage.
-     ```typescript
-     export type PartialViewedItems = Partial<Record<string, Date>>;
-     ```
-   - **Custom Index Signature:** Custom index signatures are more limited in this regard and may require more manual work to compose types.
+  - **Record:** The `Record` type can be easily composed with other utility types, such as `Partial`, `Pick`, or `Omit`, to create more complex types that are still type-safe and easy to manage.
+    ```typescript
+    export type PartialViewedItems = Partial<Record<string, Date>>;
+    ```
+  - **Custom Index Signature:** Custom index signatures are more limited in this regard and may require more manual work to compose types.
 
 Using `Record` over a custom index signature provides you with stronger type safety, better IDE support, and more flexibility in defining key-value pairs in your TypeScript code. This makes `Record` not only a more concise but also a more powerful and expressive way to handle object types in TypeScript.
 By following these practices, you ensure that your TypeScript code is more maintainable, readable, and less prone to errors, leading to a more scalable and efficient codebase.
@@ -1107,24 +1123,20 @@ By following these practices, you ensure that your TypeScript code is more maint
 ```tsx
 // This code uses a TODO comment without referencing a ticket, making it harder to track the task's progress and follow up.
 
-export const logBookViewItem = ({
-  viewedItem,
-  isOnline,
-  origin,
-}: LogBookViewItemParams) => {
+export const logBookViewItem = ({ viewedItem, isOnline, origin }: LogBookViewItemParams) => {
   if (!origin || !viewedItem || !viewedItem.id) {
-    return
+    return;
   }
 
-  const contentType = '' // TODO
+  const contentType = ""; // TODO
 
   logViewItem<BooksViewItemAnalytics>({
     item_id: viewedItem.id,
     item_name: viewedItem.title,
     content_type: contentType,
     origin,
-  })
-}
+  });
+};
 ```
 
 ### ✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability
@@ -1132,24 +1144,20 @@ export const logBookViewItem = ({
 ```tsx
 // This code adds a project management software ticket number to the TODO comment, improving traceability and making it easier to track the task's progress.
 
-export const logBookViewItem = ({
-  viewedItem,
-  isOnline,
-  origin,
-}: LogBookViewItemParams) => {
+export const logBookViewItem = ({ viewedItem, isOnline, origin }: LogBookViewItemParams) => {
   if (!origin || !viewedItem || !viewedItem.id) {
-    return
+    return;
   }
 
-  const contentType = '' // TODO: JIRA-1234 - Determine the appropriate content type
+  const contentType = ""; // TODO: JIRA-1234 - Determine the appropriate content type
 
   logViewItem<BooksViewItemAnalytics>({
     item_id: viewedItem.id,
     item_name: viewedItem.title,
     content_type: contentType,
     origin,
-  })
-}
+  });
+};
 ```
 
 ### ℹ️ Explanation
@@ -1175,24 +1183,24 @@ Using arrow functions assigned to `const` keeps the codebase consistent, avoids 
 // Top-level or module-scoped logic using function declarations; less consistent with the rest of the codebase and can introduce this-binding surprises when passed as callbacks.
 
 function formatUserName(firstName: string, lastName: string): string {
-  return `${firstName} ${lastName}`.trim()
+  return `${firstName} ${lastName}`.trim();
 }
 
 export function getDisplayStatus(status: Status): string {
   switch (status) {
     case Status.Active:
-      return 'Active'
+      return "Active";
     case Status.Pending:
-      return 'Pending'
+      return "Pending";
     default:
-      return 'Unknown'
+      return "Unknown";
   }
 }
 
 const handleClick = () => {
-  const label = formatUserName('Jane', 'Doe') // mixing styles
-  console.log(getDisplayStatus(Status.Active))
-}
+  const label = formatUserName("Jane", "Doe"); // mixing styles
+  console.log(getDisplayStatus(Status.Active));
+};
 ```
 
 ### ✅ Prefer Arrow Functions Assigned to `const` for Consistency and Lexical `this`
@@ -1201,24 +1209,24 @@ const handleClick = () => {
 // Arrow functions assigned to const; consistent style and no this-binding issues when passed as callbacks.
 
 const formatUserName = (firstName: string, lastName: string): string => {
-  return `${firstName} ${lastName}`.trim()
-}
+  return `${firstName} ${lastName}`.trim();
+};
 
 export const getDisplayStatus = (status: Status): string => {
   switch (status) {
     case Status.Active:
-      return 'Active'
+      return "Active";
     case Status.Pending:
-      return 'Pending'
+      return "Pending";
     default:
-      return 'Unknown'
+      return "Unknown";
   }
-}
+};
 
 const handleClick = () => {
-  const label = formatUserName('Jane', 'Doe')
-  console.log(getDisplayStatus(Status.Active))
-}
+  const label = formatUserName("Jane", "Doe");
+  console.log(getDisplayStatus(Status.Active));
+};
 ```
 
 ### ℹ️ Explanation
@@ -1233,4 +1241,3 @@ const handleClick = () => {
   - **Scoping:** Assigning to `const` makes it clear the reference is not reassigned and keeps the temporal dead zone predictable.
 
 - **Exceptions:** Use a `function` declaration when you need the function to be hoisted (e.g. a recursive helper that calls itself before its definition in the same block), or when a tool or style guide explicitly requires it. In React components, prefer arrow function components or `function` only when hoisting is necessary.
-
