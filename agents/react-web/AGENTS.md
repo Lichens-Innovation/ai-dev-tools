@@ -28,13 +28,13 @@ If the user asks to **normalize** the code (e.g. "normalize", "normalize this co
 
 Execute all steps in order; do not summarize the workflow.
 
-1. **Resolve scope** — Determine which files are in scope (selected files, git staged files, branch, selected lines, directory, or glob).
+1. **Resolve scope** — Determine the initial set of files in scope (selected files, git staged files, branch, selected lines, directory, or glob). Maintain a **current scope** for the whole run: start with this initial set, and **add to it any file created** in step 2 or step 4 (e.g. renamed paths, new sub-components). Steps 2, 3, and 4 always run on the **current scope** so that new files get the same treatment on the next iteration.
 
-2. **Run react-files-structure-standards** — Read [skills/react-files-structure-standards/SKILL.md](skills/react-files-structure-standards/SKILL.md) and the reference file it specifies. Execute the skill's full two-phase workflow (Phase 1: collect file/folder violations, Phase 2: rename and update imports) on all paths in scope. Do not summarize the skill's workflow in this rule; follow the skill as written.
+2. **Run react-files-structure-standards** — Read [skills/react-files-structure-standards/SKILL.md](skills/react-files-structure-standards/SKILL.md) and the reference file it specifies. Execute the skill's full two-phase workflow (Phase 1: collect file/folder violations, Phase 2: rename and update imports) on all paths in the **current scope**. After the skill creates or renames files, add those paths to the current scope. Do not summarize the skill's workflow in this rule; follow the skill as written.
 
-3. **Run react-coding-standards** — Read [skills/react-coding-standards/SKILL.md](skills/react-coding-standards/SKILL.md) and the reference files it specifies. Execute the skill's full two-phase workflow (Phase 1: collect violations, Phase 2: apply corrections) on all files in scope. Do not summarize the skill's workflow in this rule; follow the skill as written.
+3. **Run react-coding-standards** — Read [skills/react-coding-standards/SKILL.md](skills/react-coding-standards/SKILL.md) and the reference files it specifies. Execute the skill's full two-phase workflow (Phase 1: collect violations, Phase 2: apply corrections) on all files in the **current scope**. Do not summarize the skill's workflow in this rule; follow the skill as written.
 
-4. **Run react-single-responsibility** — Read [skills/react-single-responsibility/SKILL.md](skills/react-single-responsibility/SKILL.md). Execute the skill's simplification strategies on all files in scope. Let the skill define decomposition order, structure, and rules; do not repeat them here.
+4. **Run react-single-responsibility** — Read [skills/react-single-responsibility/SKILL.md](skills/react-single-responsibility/SKILL.md). Execute the skill's simplification strategies on all files in the **current scope**. After the skill creates new files (e.g. sub-components), add those files to the current scope. Let the skill define decomposition order, structure, and rules; do not repeat them here.
 
 5. **Re-validate coding standards** — Re-run **Phase 1 only** of react-coding-standards (violation collection) on all files modified in previous steps. This checks in-code violations only; file and folder structure is not re-audited here.
    - If any violations are found → log them, then go back to step 3 (new iteration).
