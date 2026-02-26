@@ -124,6 +124,8 @@ Two built-in skills help you create skills from scratch. Summary:
 
 ## Agents
 
+See [agents.md](https://agents.md/) for the format.
+
 TBD
 
 ## MCP
