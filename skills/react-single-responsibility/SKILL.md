@@ -2,9 +2,10 @@
 name: react-single-responsibility
 description: |
   Strategies to simplify components, hooks, and methods: decomposition order (utilities, hooks, sub-components),
-  early returns, control flow, parameter design, and code smell fixes. Use when refactoring a large
-  component, hook, or function, reducing complexity, applying single responsibility, or when the user asks
-  how to simplify a component, hook, or method.
+  early returns, control flow, parameter design, and code smell fixes. Use when the user says: ungodify
+  this method/function/component, simplify this method/function/component, make this method/function/component
+  less complex; or when refactoring a large component, hook, or function, reducing complexity, applying
+  single responsibility, or asking how to simplify a component, hook, or method.
 metadata:
   version: "1.0.0"
   last-updated: "2026-02-25"
