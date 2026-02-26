@@ -3,14 +3,19 @@
 Lichens Innovation repository for **AI-assisted development tools** — a single place for rules, agents, skills, MCP (Model Context Protocol) servers, and any other artifacts that enhance coding with AI (Cursor, GitHub Copilot, Claude Code, etc.). This repo started with Agent Skills and has grown to cover the full spectrum of configurable AI dev tooling. For the skills timeline and ecosystem evolution, see [skills history](./SKILLS-HISTORY.md).
 
 - [Artificial Intelligence Lichens Tools](#artificial-intelligence-lichens-tools)
-  - [Installation](#installation)
-  - [Frequent CLI commands](#frequent-cli-commands)
-  - [Validating skills](#validating-skills)
-  - [How a skill becomes active (Cursor, Copilot, Claude Code)](#how-a-skill-becomes-active-cursor-copilot-claude-code)
-  - [Popular skill repositories](#popular-skill-repositories)
-  - [Skills for creating skills (comparison)](#skills-for-creating-skills-comparison)
+  - [Skills](#skills)
+    - [Installation](#installation)
+    - [Frequent CLI commands](#frequent-cli-commands)
+    - [Validating skills](#validating-skills)
+    - [How a skill becomes active (Cursor, Copilot, Claude Code)](#how-a-skill-becomes-active-cursor-copilot-claude-code)
+    - [Popular skill repositories](#popular-skill-repositories)
+    - [Skills for creating skills (comparison)](#skills-for-creating-skills-comparison)
+  - [Agents](#agents)
+  - [MCP](#mcp)
 
-## Installation
+## Skills
+
+### Installation
 
 From a project or any directory:
 
@@ -31,7 +36,7 @@ npx skills add Lichens-Innovation/skills
 - **Target agents**: `npx skills add Lichens-Innovation/skills -a cursor -a github-copilot -a claude-code`.
 - **List skills** without installing: `npx skills add Lichens-Innovation/skills --list`.
 
-## Frequent CLI commands
+### Frequent CLI commands
 
 | Task                                 | Command                                                              |
 | ------------------------------------ | -------------------------------------------------------------------- |
@@ -48,7 +53,7 @@ npx skills add Lichens-Innovation/skills
 | Remove from specific agents only     | `npx skills remove hello-world --agent cursor --agent claude-code`   |
 | List installed skills                | `npx skills list`                                                    |
 
-## Validating skills
+### Validating skills
 
 You can validate that a skill’s `SKILL.md` frontmatter and structure follow the [Agent Skills specification](https://agentskills.io/specification) using [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref). From the root of this repository:
 
@@ -62,7 +67,7 @@ skills-ref validate ./skills
 
 Install `skills-ref` according to the [agentskills repo](https://github.com/agentskills/agentskills). This checks that `name`, `description`, and optional fields comply with the spec and that the skill directory structure is valid.
 
-## How a skill becomes active (Cursor, Copilot, Claude Code)
+### How a skill becomes active (Cursor, Copilot, Claude Code)
 
 1. **Installation**  
    The `npx skills add` command uses the [open agent skills CLI](https://github.com/vercel-labs/skills). It fetches this repo and copies each skill (folder containing a `SKILL.md` and its files) into the directories expected by each tool:
@@ -78,7 +83,7 @@ Install `skills-ref` according to the [agentskills repo](https://github.com/agen
 
 In short: **install** → **files in the right place** → **the agent reads and applies the skill when relevant**.
 
-## Popular skill repositories
+### Popular skill repositories
 
 Other well-known places to discover and install agent skills:
 
@@ -98,7 +103,7 @@ Examples:
 - `npx skills add github/awesome-copilot/skills --list`
 - `npx skills add Lichens-Innovation/skills --list`
 
-## Skills for creating skills (comparison)
+### Skills for creating skills (comparison)
 
 Two built-in skills help you create skills from scratch. Summary:
 
@@ -110,3 +115,11 @@ Two built-in skills help you create skills from scratch. Summary:
 | Resources      | scripts / references / assets clearly defined            | scripts/ and optional files (reference.md, examples.md)  |
 | Packaging      | Yes → distributable `.skill` file                        | No, skills created in place                              |
 | Best practices | Structure, progressive disclosure, "what not to include" | Descriptions, anti-patterns, writing patterns, checklist |
+
+## Agents
+
+TBD
+
+## MCP
+
+TBD
