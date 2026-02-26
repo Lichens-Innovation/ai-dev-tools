@@ -124,10 +124,12 @@ Two built-in skills help you create skills from scratch. Summary:
 
 ## Agents
 
-See [agents.md](https://agents.md/) for the format.
+See [AGENTS.md](https://agents.md) for the format.
 
 TBD
 
 ## MCP
+
+See [Model Context Protocol](https://modelcontextprotocol.io)
 
 TBD
