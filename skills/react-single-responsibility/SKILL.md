@@ -82,12 +82,12 @@ Rules that apply when reducing complexity of a **custom React hook**. Apply sing
 ### File and naming
 
 - **One hook per file** when the hook is non-trivial; file name: `use-<name>.ts` (e.g. `use-market-filters.ts`, `use-pagination.ts`). Reusable hooks → `src/hooks/`; feature-specific → feature’s `hooks/` subdirectory.
-- **Co-locate utilities** — `<hook-name>.utils.ts` next to the hook for helpers used only by that hook; shared logic → `src/utils/` or domain-specific utils module.
+- **Co-locate utilities** — `<hook-name>.utils.ts` next to the hook for helpers used only by that hook; `<main-component-name>.utils.ts` next to the main component for helpers used by main component and its sub-components; shared logic → `src/utils/` or domain-specific utils module.
 
 ### Quick checklist (hooks)
 
-- [ ] Does the hook contain logic with no React dependency? → extract to pure functions in `.utils.ts`.
-- [ ] Does the hook do more than one thing? → consider enriching the project’s state manager (Zustand, MobX, etc.) first; otherwise split into smaller hooks (e.g. fetch vs filter vs pagination) and compose.
+- [ ] Does the hook contain logic with no React dependency? → extract to pure arrow functions in `.utils.ts` using destructuring within the signature.
+- [ ] Does the hook do more than one thing? → consider enriching the project’s state manager (Zustand, MobX, etc.) first; otherwise split into smaller pure JS utilities, or specialized hooks (e.g. fetch vs filter vs pagination) and compose.
 - [ ] Could this be a plain function? → if it doesn’t need state/effects/context, use a utility instead of a hook.
 - [ ] Is the return type a large, mixed bag? → consider splitting the hook or returning a smaller, focused API.
 
@@ -100,7 +100,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 ### Long function (>40 lines)
 
 - **Signal:** Scrolling to understand a single function.
-- **Fix:** Extract into smaller, **named** functions. Apply **single responsibility**: each new method must stay **simple and focused on one task only** (e.g. validate → fetch → persist → notify). Each step should be testable in isolation.
+- **Fix:** Extract into smaller, **named** arrow functions. Apply **single responsibility**: each new method must stay **simple and focused on one task only** (e.g. validate → fetch → persist → notify). Each step should be testable in isolation.
 
 ### Control flow
 
@@ -110,7 +110,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### Parameters
 
-- **Long parameter list (>1 param)** — Use a single **params object** with destructuring; extract type (e.g. `interface CreateUserArgs`). Avoids wrong order and unclear meaning at the call site. The interface name matches the method name but starts with a capital letter and ends with `Args` (e.g. for `getThisMethod`, use `interface GetThisMethodArgs`).
+- **Long parameter list (>1 param)** — Use a single **params object** with destructuring; extract the interface above the function signature (e.g. `interface CreateUserArgs`). Avoids wrong order and unclear meaning at the call site. The interface name matches the method name but starts with a capital letter and ends with `Args` (e.g. for `getThisMethod`, use `interface GetThisMethodArgs`).
 - **Interface used only for one method** — When an interface exists solely to type a single method’s signature, **place it immediately above that method** (colocation). This self-documents the signature that follows and keeps the type next to its only consumer.
 - **Boolean flag parameter** — Avoid `fn(data, true)`. Use an **options object** with a named flag (e.g. `{ userId, includeArchived }: CreateUserArgs`) or **separate functions** when behavior diverges.
 - **Conventions** — Destructuring for multiple params; extract parameters into named interfaces; optional as `param?: Type`; defaults in destructuring (e.g. `{ page = 1, size = 10 }`).
@@ -118,7 +118,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 ### Duplication (DRY)
 
 - **Signal:** Copy-paste with minor variations.
-- **Fix:** Extract a **parameterized function** (e.g. single `getMarketsForUser({ userId, status }: GetMarketsForUserArgs)` instead of `getActiveMarketsForUser` and `getClosedMarketsForUser`).
+- **Fix:** Extract a **parameterized arrow function** (e.g. single `getMarketsForUser({ userId, status }: GetMarketsForUserArgs)` instead of `getActiveMarketsForUser` and `getClosedMarketsForUser`).
 
 ---
 
@@ -126,7 +126,7 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### Object destructuring
 
-- Use **object destructuring** when reading or passing object attributes so that attribute names are explicit and the code stays readable. Applies to: **component props** (e.g. `const { isLoading, error, data } = props` or in the signature), **function parameters** (e.g. `const fn = ({ a, b }: FnArgs) => ...`), and **local objects** when you use several properties (e.g. `const { name, status } = item`). Prefer destructuring when it clarifies usage; avoid when a single property is used once.
+- Use **object destructuring** when reading or passing object attributes so that attribute names are explicit and the code stays readable. Applies to: **component props** (e.g. `const { isLoading, error, data } = props` or in the signature), **function parameters** (e.g. `const fn = ({ a, b }: FnArgs) => ...`), and **local objects** when you use several properties (e.g. `const { name, status } = item`). Prefer destructuring when it clarifies usage and improves readability; avoid when a single property is used once.
 
 ### Coupling (shotgun surgery)
 
@@ -135,15 +135,14 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### File and size guidelines
 
-- **200–400 lines** typical per file; **800 lines** absolute maximum.
+- **200–400 lines** typical per file; **1000 lines** absolute maximum.
 - **One responsibility per file** (high cohesion, low coupling).
 - File names: **kebab-case**. Examples: `market-list-item.tsx`, `use-market-filters.ts`, `<name>.utils.ts`, (e.g. `market-list.utils.ts`).
 
 ### Quick checklist
 
-- [ ] Can I understand this in ~30 seconds? → if no: too complex; split or rename.
 - [ ] Does it do more than one thing? → if yes: extract pure utilities, hooks, or sub-components (component) or smaller named functions (method).
-- [ ] More than 2 parameters? → use a single options object, an extracted parameter interface above the signature, and destructuring.
+- [ ] More than 1 parameter? → use a single options object, an extracted parameter interface above the signature, and destructuring.
 - [ ] Copy-pasted code? → extract and parameterize.
 - [ ] Control flow deeply nested? → use early returns and intermediate variables.
 - [ ] Comments explaining _what_? → rename for self-documenting code; keep comments for _why_ only.
