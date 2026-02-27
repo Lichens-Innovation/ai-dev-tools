@@ -12,8 +12,13 @@ const runClipboardCommand = (command, args, content) => {
     child.on("error", () => reject(new Error(`command not found: ${command}`)));
     child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`exit ${code}`))));
     child.stdin.write(content, "utf-8", (err) => {
-      if (err) reject(err);
-      else child.stdin.end(resolve);
+      if (err) {
+        reject(err);
+        return;
+      }
+      child.stdin.end((endErr) => {
+        if (endErr) reject(endErr);
+      });
     });
   });
 };
@@ -30,17 +35,22 @@ const copyToClipboard = async (content) => {
 };
 
 const main = async () => {
-  try {
-    const filePath = process.argv[2];
-    if (!filePath) {
-      console.error("Usage: node copy-to-clipboard.mjs <full-path-to-file>");
-      process.exit(1);
-    }
+  const filePath = process.argv[2];
+  if (!filePath) {
+    console.error("Usage: node copy-to-clipboard.mjs <full-path-to-file>");
+    process.exit(1);
+  }
 
+  try {
     const text = readFileSync(filePath, "utf-8");
     await copyToClipboard(text);
   } catch (e) {
-    console.error("Failed to copy to clipboard", e);
+    if (e.code === "ENOENT") {
+      console.error(`File not found: ${filePath}`);
+      console.error("Create pr-description.md at the PR project root first, then run this script.");
+    } else {
+      console.error("Failed to copy to clipboard:", e.message);
+    }
     process.exit(1);
   }
 };
