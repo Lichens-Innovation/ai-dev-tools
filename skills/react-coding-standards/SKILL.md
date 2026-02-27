@@ -16,7 +16,7 @@ Standards are defined in the `references/` folder. Load these files when you nee
 | Category            | File                                                                         | Scope                                                                |
 | ------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | **Coding patterns** | [references/common-coding-patterns.md](references/common-coding-patterns.md) | TypeScript (types, control flow, errors, enums, destructuring, etc.) |
-| **Naming patterns** | [references/common-naming-patterns.md](references/common-naming-patterns.md) | In-code naming (boolean prefixes, descriptive names)                  |
+| **Naming patterns** | [references/common-naming-patterns.md](references/common-naming-patterns.md) | In-code naming (boolean prefixes, descriptive names)                 |
 | **React patterns**  | [references/common-react-patterns.md](references/common-react-patterns.md)   | Hooks, components, JSX, state, styling, fragments                    |
 | **Unit testing**    | [references/common-unit-testing.md](references/common-unit-testing.md)       | Jest, React Testing Library, AAA, mocks, selectors                   |
 
@@ -30,7 +30,7 @@ When the skill is invoked on code (selected files, git staged files, branch):
 2. **Collect** every reported rule violation (rule id/name, file, line, message).
 3. For **each** violation:
    - If the rule is **auto-fixable** (e.g. `--fix` / `eslint --fix`), run the fix (e.g. `yarn lint --fix` or `npm run lint --fix`) and consider the violation resolved.
-   - If the fix is **not automatic**, open the corresponding reference in `references/*.md` (coding → common-coding-patterns, naming → common-naming-patterns, React → common-react-patterns, tests → common-unit-testing) and apply the **Prefer** correction described for that rule.
+   - If the fix is **not automatic**, do your best to find a solution with the help of coding guidelines in `references/*.md` (coding → common-coding-patterns, naming → common-naming-patterns, React → common-react-patterns, tests → common-unit-testing) and apply the **Prefer** correction described for that rule.
 4. Re-run the linter after fixes; repeat until lint passes or only violations that need manual interpretation remain.
 
 ### Phase 1 — Collect violations
