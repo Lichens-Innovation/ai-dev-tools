@@ -1,6 +1,6 @@
 ---
 name: generate-pr-description
-description: Generate pull request descriptions by comparing current branch with parent branch. Creates semantic commit-style PR titles and fills PR templates. Use when the user asks to generate PR description, prepare pull request, or create merge request description.
+description: "Generate pull request descriptions by comparing current branch with parent branch. Creates semantic commit-style PR titles and fills PR templates. Use when the user asks to generate PR description, prepare pull request, or create merge request description. The user may include ticket IDs in the request (e.g. tickets: NN-123, TB-456) from the company tracking system; treat those as the related issue IDs for the PR."
 ---
 
 # Generate PR Description
@@ -54,9 +54,10 @@ Generate a concise pull request description by analyzing git changes and using t
      - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories used by mainstream test runners (do not assume a specific framework such as Jest or Vitest).
    - **Related Issue(s)** – see step 6 below. Leave "Screen capture(s)" as 🚫 if not applicable
 
-6. **Related tickets (interactive)**
-   - **Ask the user:** “Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none.”
-   - If the user provides one or more IDs:
+6. **Related tickets**
+   - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456" or "PR description with NN-123, TB-456"). Treat any such IDs as the company tracking system ticket numbers for this PR. If none were given, **ask the user:** “Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none.”
+   - **Parsing:** From the user message, accept ticket IDs in forms like: `tickets: NN-123, TB-456`; `tickets NN-123, TB-456`; or inline project-key numbers (e.g. `NN-123`, `TB-456`). Normalize to a list of trimmed IDs (comma/semicolon/space separated).
+   - If one or more IDs are available (from the request or from the user's answer):
      - **Tasks manager base URL:** Run from the **project root** (repo where the PR is created): `node <skill-dir>/scripts/tasks-system.mjs`. The script loads `skills-configs.json` at project root (creates it if missing), prompts for any missing known keys, and outputs the full config as JSON (key/value). Use `configs.tasksManagerSystemBaseUrl` for the base URL of ticket links.
      - For each ticket ID (trimmed), build the link: `{baseUrl}/{ID}`
      - **Description:** If you can get the issue summary (e.g. API or user pastes descriptions), use it as the link text; otherwise use the ticket ID.
