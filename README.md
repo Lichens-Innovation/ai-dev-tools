@@ -61,17 +61,27 @@ npx skills add Lichens-Innovation/ai-dev-tools
 
 ### Validating skills
 
-You can validate that a skill’s `SKILL.md` frontmatter and structure follow the [Agent Skills specification](https://agentskills.io/specification) using [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref). From the root of this repository:
+You can validate that a skill’s `SKILL.md` frontmatter and structure follow the [Agent Skills specification](https://agentskills.io/specification) in two ways:
 
-```bash
-# Validate a specific skill (e.g. react-ts-guidelines)
-skills-ref validate ./skills/react-ts-guidelines
+1. **Use a skill dedicated to validation**  
+   Install the `validate-skills` skill from a repo that provides it, then trigger it in your agent (e.g. via `/validate-skills` or by asking to validate skills):
 
-# Validate all skills in the repo (if you have multiple skills)
-skills-ref validate ./skills
-```
+   ```bash
+   npx skills add https://github.com/callstackincubator/agent-skills --skill validate-skills
+   ```
 
-Install `skills-ref` according to the [agentskills repo](https://github.com/agentskills/agentskills). This checks that `name`, `description`, and optional fields comply with the spec and that the skill directory structure is valid.
+2. **Use the `skills-ref` CLI**  
+   From the root of this repository, run [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref):
+
+   ```bash
+   # Validate a specific skill (e.g. react-ts-guidelines)
+   skills-ref validate ./skills/react-ts-guidelines
+
+   # Validate all skills in the repo (if you have multiple skills)
+   skills-ref validate ./skills
+   ```
+
+   Install `skills-ref` according to the [agentskills repo](https://github.com/agentskills/agentskills). This checks that `name`, `description`, and optional fields comply with the spec and that the skill directory structure is valid.
 
 ### How a skill becomes active (Cursor, Copilot, Claude Code)
 

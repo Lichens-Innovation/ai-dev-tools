@@ -1,6 +1,6 @@
 ---
 name: react-linter-setup
-description: "Setup ESLint for React and TypeScript projects aligned with company standards. Use when installing or configuring the project linter, adding devDependencies, custom ESLint rules, package.json scripts, or when the user asks to set up or migrate to the company React/TypeScript ESLint stack."
+description: "Sets up ESLint for React and TypeScript projects aligned with company standards. Use when installing or configuring the project linter, adding devDependencies, custom ESLint rules, package.json scripts, or when the user asks to set up or migrate to the company React/TypeScript ESLint stack."
 metadata:
   keywords: "eslint, setup, install, react, typescript, lint config, package.json, devDependencies, custom rules"
 ---

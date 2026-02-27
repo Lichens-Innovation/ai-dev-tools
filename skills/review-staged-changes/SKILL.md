@@ -13,7 +13,7 @@ When reviewing staged changes:
 
 1. **Get the staged diff**: `git diff --cached` or `git diff --staged`
 2. **Analyze each change** against the four criteria below
-3. **Provide structured feedback** using the template in this skill: `templates/review-summary.md` (relative to the skill directory)
+3. **Provide structured feedback** using the template in this skill: [templates/review-summary.md](templates/review-summary.md) (relative to the skill directory)
 
 ## Review Criteria
 
