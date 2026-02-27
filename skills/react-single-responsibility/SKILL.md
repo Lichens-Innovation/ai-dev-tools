@@ -8,7 +8,7 @@ description: |
   single responsibility, or asking how to simplify a component, hook, or method.
 metadata:
   version: "1.0.0"
-  last-updated: "2026-02-25"
+  last-updated: "2026-02-26"
   source: "Extracted from react-ts-guidelines"
 allowed-tools: Read, Write, Edit, Grep, Glob
 ---
@@ -31,6 +31,12 @@ Apply these strategies to keep components, hooks, and methods focused, testable,
 
 ---
 
+## Which rules apply
+
+Use the **file** where the function lives: **`*.tsx`** → components ("Simplifying a component"); **`use*.ts`** → hooks ("Simplifying a hook"); **`*.ts`** → plain functions ("Simplifying a method"). Plain TypeScript functions are always in `*.ts`, never in `*.tsx`.
+
+---
+
 ## Simplifying a component (filename pattern \*.tsx)
 
 Rules that apply when reducing complexity of a **React component**.
@@ -45,7 +51,7 @@ Apply in this order:
 
 3. **Extract logic into hooks** — State, effects, derived logic → hooks (`use-xyz.ts`). Reusable → `src/hooks/`; feature-specific → feature's `hooks/` subdirectory. Prefer a **plain arrow function** over a custom hook when you don't need React primitives.
 
-4. **Split the visual layer into sub-components** — If render/TSX exceeds roughly **40 lines**, extract sub-components with clear props and a single responsibility. **Avoid internal `renderXyz()` methods**: turn each into a **regular component** (own file, own props). Each sub-component **must live in its own file**; use **parent file name as prefix**: `parent-name-<sub-component-name>.tsx` (e.g. `market-list-item.tsx`, `market-list-filters.tsx` for parent `market-list.tsx`). Large component (~150+ lines) → split into list container, list item, filters, pure functions and hook(s) as necessary for data logic.
+4. **Split the visual layer into sub-components** — If render/TSX exceeds roughly **40 lines**, extract sub-components with clear props and a single responsibility. **Avoid internal `renderXyz()` methods**: turn each into a **regular component** (own file, own props). Each sub-component **must live in its own file**; use **parent file name as prefix**: `parent-name-<sub-component-name>.tsx` (e.g. `market-list-item.tsx`, `market-list-filters.tsx` for parent `market-list.tsx`). Large component (>150 lines) → split into list container, list item, filters, pure functions and hook(s) as necessary for data logic.
 
 ### Structure and readability
 
@@ -100,7 +106,9 @@ Rules that apply when reducing complexity of a **custom React hook**. Apply sing
 
 Rules that apply when reducing complexity of a **function or method** (non-component).
 
-### Long function (>150 lines for components _.tsx, >40 for plain _.ts methods)
+### Long function (>40 in \*.ts)
+
+Only apply in **`*.ts`** (plain functions) → threshold **40 lines**.
 
 - **Signal:** Scrolling to understand a single function.
 - **Fix:** Extract into smaller, **named** arrow functions. Apply **single responsibility**: each new method must stay **simple and focused on one task only** (e.g. validate → fetch → persist → notify). Each step should be testable in isolation.
@@ -138,8 +146,8 @@ Rules that apply when reducing complexity of a **function or method** (non-compo
 
 ### File and size guidelines
 
-- **`*.tsx` (components)** — Must not exceed **150 lines**. Beyond that, the file is considered complex and requires decomposition (extract utilities, sub-components or hooks).
-- **`*.ts` (pure TypeScript)** — **200–400 lines** typical per file; **2000 lines** absolute maximum.
+- **`*.tsx` (components)** — Must not exceed **150 lines**. Plain functions live in `*.ts`, not in `*.tsx`.
+- **`*.ts` (pure TypeScript)** — **200–400 lines** typical per file; **2000 lines** absolute maximum. Plain functions (methods) use the **40-line** per-function threshold above.
 - File names: **kebab-case**. Examples: `market-list-item.tsx`, `use-market-filters.ts`, `<name>.utils.ts`, (e.g. `market-list.utils.ts`).
 
 ### Quick checklist
