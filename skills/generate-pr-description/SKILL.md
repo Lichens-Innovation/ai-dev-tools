@@ -107,18 +107,9 @@ Provide ready-to-copy markdown in this format:
 **Output:**
 
 ```markdown
-## PR Title
+## Changes Description
 
 feat(auth): implement user authentication
-
-## PR Description
-
-## Summary
-
-- Authentication: login component and auth service.
-- Tests: auth-related tests added.
-
-## Changes Description
 
 - **Auth:** login component and auth service.
   - Login component added.
