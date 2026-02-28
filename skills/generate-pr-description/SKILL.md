@@ -75,7 +75,7 @@ Generate a concise pull request description by analyzing git changes and using t
      4. Condense bullet points
 
 8. **Write file, copy to clipboard, remove file**
-   - At **PR project root**, create or overwrite `pr-description.md` with the full PR output (complete markdown from "## PR Title" through the end of the description).
+   - At **PR project root**, create or overwrite `pr-description.md` with the full PR output (complete markdown from "## PR Description" through the end of the description).
    - Call the copy script with the full path to the file: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"` (e.g. `$(pwd)/pr-description.md` when run from the PR project).
    - **On success:** remove the file (`rm pr-description.md`) and tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."**
    - **On error:** leave `pr-description.md` in place and tell the user they can open it or copy manually.
@@ -85,11 +85,9 @@ Generate a concise pull request description by analyzing git changes and using t
 Provide ready-to-copy markdown in this format:
 
 ```markdown
-## PR Title
+## PR Description
 
 <semantic-commit-style-title>
-
-## PR Description
 
 <filled-template-markdown including Summary then Changes Description with level-1 bullets (themes) and optional level-2 sub-bullets (sub-changes)>
 ```
