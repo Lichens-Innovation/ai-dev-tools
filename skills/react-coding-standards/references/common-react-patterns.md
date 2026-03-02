@@ -14,9 +14,9 @@
     - [✅ prefer divide to conquer rule through small sub-components](#-prefer-divide-to-conquer-rule-through-small-sub-components-1)
     - [ℹ️ Explanation](#ℹ️-explanation-1)
     - [📚 References](#-references-2)
-  - [Single arrow function event handler](#single-arrow-function-event-handler)
-    - [❌ avoid double arrows functions](#-avoid-double-arrows-functions)
-    - [✅ prefer single arrow functions (or inline arrow functions if they are 1 liner)](#-prefer-single-arrow-functions-or-inline-arrow-functions-if-they-are-1-liner)
+  - [Event handlers — where to put them](#event-handlers--where-to-put-them)
+    - [❌ avoid](#-avoid)
+    - [✅ prefer](#-prefer)
     - [ℹ️ Explanation](#ℹ️-explanation-2)
   - [Promote pure typescript functions](#promote-pure-typescript-functions)
     - [❌ avoid inline unsharable code](#-avoid-inline-unsharable-code)
@@ -275,53 +275,91 @@ Creating small dumb components:
 
 - [3 React Mistakes, 1 App Killer](https://youtube.com/watch?v=QuLfCUh-iwI&si=JofynxnU-J58sA53)
 
-## Single arrow function event handler
+## Event handlers — where to put them
 
-### ❌ avoid double arrows functions
+- **Pure TypeScript only** → move to `component-name.utils.ts` next to the component.
+- **Very simple (e.g. one line)** → keep inline in the event prop: `onPress={() => doSomething(id)}`.
+- **More complex or involves state** → one arrow per handler in the component: `const handleClick = () => { ... }`.
+- **Always avoid** factories that return handlers (double arrow functions).
+
+### ❌ avoid
 
 ```tsx
-// Note the double arrow functions (a.k.a. function factories)
-// those are "function returning a function"
-const onEditPress = (id: string) => () => {
-  // many lines...
-};
-const onSharePress = (id: string) => () => {
-  shareProduct(id); // 1 liner
-};
+const ProductCard = ({ id, name, onSelect }: ProductCardProps) => {
+  const [loading, setLoading] = useState(false);
 
-//...
+  // ❌ Pure TS logic in component: no state/hooks → belongs in utils
+  const shareProduct = (id: string) => {
+    const url = buildShareUrl(id);
+    if (navigator.share) navigator.share({ url });
+    else navigator.clipboard.writeText(url);
+  };
 
-return (
-  <>
-    <View onPress={onEditPress(id)}>{/** ... */}</View>
-    <View onPress={onSharePress(id)}>{/** ... */}</View>
-  </>
-);
+  // ❌ Double arrow (factory): returns a function — confusing, avoid
+  const handleShare = (id: string) => () => shareProduct(id);
+
+  // ❌ Useless for 1 liner
+  const onSelectPress = () => onSelect(id);
+
+  return (
+    <View>
+      <Text>{name}</Text>
+      {/* ❌ Factory call at render: handleShare(id) returns the handler */}
+      <Button onPress={handleShare(id)} title="Share" />
+      {/* ❌ Complex logic inline: multi-step + state → use a named handler */}
+      <Button
+        onPress={() => {
+          setLoading(true);
+          updateProduct(id, formData).then(() => setLoading(false));
+        }}
+        title="Save"
+      />
+      {/* ❌ Useless for 1 liner */}
+      <Button onPress={onSelectPress} title="Select" />
+    </View>
+  );
+};
 ```
 
-### ✅ prefer single arrow functions (or inline arrow functions if they are 1 liner)
+### ✅ prefer
 
 ```tsx
-const onEditPress = (id: string) => {
-  // many lines...
+// product-card.utils.ts — pure TS, no state/hooks
+export const shareProduct = (id: string) => {
+  const url = buildShareUrl(id);
+  if (navigator.share) navigator.share({ url });
+  else navigator.clipboard.writeText(url);
 };
 
-// ...
+const ProductCard = ({ id, name, onSelect }: ProductCardProps) => {
+  const [loading, setLoading] = useState(false);
 
-return (
-  <>
-    <View onPress={() => onEditPress(id)}>{/** ... */}</View>
-    <View onPress={() => shareProduct(id)}>{/** ... */}</View>
-  </>
-);
+  // ✅ Complex / state: one named handler
+  const handleSave = () => {
+    setLoading(true);
+    updateProduct(id, formData).then(() => setLoading(false));
+  };
+
+  return (
+    <View>
+      <Text>{name}</Text>
+      {/* ✅ Pure TS from utils: simple inline call */}
+      <Button onPress={() => shareProduct(id)} title="Share" />
+      {/* ✅ Complex: named handler */}
+      <Button onPress={handleSave} disabled={loading} title="Save" />
+      {/* ✅ Simple one-liner: inline is fine */}
+      <Button onPress={() => onSelect(id)} title="Select" />
+    </View>
+  );
+};
 ```
 
 ### ℹ️ Explanation
 
-- No need to declare an arrow function when the handler is very simple (e.g. a single existing utility function call)
-- Naming the handler `onNameOfEventPress` clearly indicates when the event is triggered.
-- Passing a function factory (a function that returns another function) to `onPress` can be confusing because it’s not immediately clear that a factory is being passed instead of the actual event handler.
-- Using a factory pattern makes the code harder to read and maintain, adding unnecessary complexity.
+- **Pure TypeScript handlers** (no React state, no hooks) belong in `component-name.utils.ts` for reuse and testability.
+- **Very simple handlers** (e.g. one existing function call) can stay inline in the event prop — no need for a named handler.
+- **Complex or state-involving handlers** should be one arrow per handler (e.g. `const handleClick = () => { ... }`); naming like `handleEditPress` makes it clear when the event fires.
+- **Avoid function factories** (double arrows): a function that returns another function passed to `onPress` is confusing and adds unnecessary complexity.
 
 ## Promote pure typescript functions
 
