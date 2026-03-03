@@ -85,8 +85,8 @@ export default [
       "todo-plz/ticket-ref": [
         "warn",
         {
-          pattern: "([A-Z]+-\\d+)",
-          comment: "TODO must include a ticket reference (e.g. TODO: JIRA-1234 - description)",
+          pattern: "([A-Z0-9]+-\\d+)",
+          comment: "TODO must include a ticket reference (e.g. TODO: JIRA-1234, TODO: https://…/browse/TBDT2-173)",
         },
       ],
     },

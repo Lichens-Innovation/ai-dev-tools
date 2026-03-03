@@ -26,8 +26,7 @@ const ticketRefRule = {
       missingTicket: "{{ term }} comment doesn't reference a ticket number. Ticket pattern: {{ pattern }}",
       missingTicketWithCommentPattern:
         "{{ term }} comment doesn't reference a ticket number. Comment pattern: {{ commentPattern }}",
-      missingTicketWithDescription:
-        "{{ term }} comment doesn't reference a ticket number. {{ description }}",
+      missingTicketWithDescription: "{{ term }} comment doesn't reference a ticket number. {{ description }}",
     },
   },
   create(context) {
@@ -40,11 +39,11 @@ const ticketRefRule = {
     const sourceCode = context.sourceCode;
     const comments = sourceCode.getAllComments();
 
+    // Ticket pattern: valid if it appears anywhere in the comment (e.g. "TODO: TBDT2-173", "TODO: https://.../browse/TBDT2-173")
+    const ticketRegex = new RegExp(pattern, "i");
     const termSearchPatterns = {};
     for (const term of terms) {
-      termSearchPatterns[term] = commentPattern
-        ? new RegExp(commentPattern, "i")
-        : new RegExp(`${term}\\s?\\((${pattern}[,\\s]*)+\\)`, "i");
+      termSearchPatterns[term] = commentPattern ? new RegExp(commentPattern, "i") : ticketRegex;
     }
 
     function getMessageId() {
