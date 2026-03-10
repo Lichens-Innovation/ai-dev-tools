@@ -2,12 +2,20 @@
 name: react-coding-standards
 description: "Enforces internal React and TypeScript coding standards using avoid/prefer rules. Use when reviewing or refactoring React/TS code, applying company standards, or when the user asks to align code with coding standards."
 metadata:
-  keywords: "avoid, prefer, React, TypeScript, naming, patterns, tests, lint"
+  keywords: "avoid, prefer, React, TypeScript, naming, patterns, tests, lint, Vitest, ESLint, interface, type guards, isNullish, isBlank, useToggle, named exports"
 ---
 
 # React & TypeScript coding standards
 
 This skill applies company coding standards expressed as **Avoid** (anti-patterns) and **Prefer** (recommended patterns) to **in-code** patterns only. For file and folder naming and structure, use [react-files-structure-standards](../react-files-structure-standards/SKILL.md).
+
+## Source of truth (priority order)
+
+When resolving standards, use this order:
+
+1. **Project tooling**: ESLint config (`eslint.config.js` / `.eslintrc*`), TypeScript config (`tsconfig.json`, `tsconfig.app.json`). Run `yarn lint` or `npm run lint`; fix auto-fixable issues first.
+2. **Reference files** in `references/` (see table below) for Avoid/Prefer rules and examples.
+3. **Reference codebase** (if provided): e.g. a frontend app under the same org — use it to infer naming, structure, and patterns (hooks returning data only, `FunctionComponent` + destructured props, `*.utils.ts` / `*.store.ts`, test style with Vitest or Jest).
 
 ## Reference categories
 
@@ -18,7 +26,8 @@ Standards are defined in the `references/` folder. Load these files when you nee
 | **Coding patterns** | [references/common-coding-patterns.md](references/common-coding-patterns.md) | TypeScript (types, control flow, errors, enums, destructuring, etc.) |
 | **Naming patterns** | [references/common-naming-patterns.md](references/common-naming-patterns.md) | In-code naming (boolean prefixes, descriptive names)                 |
 | **React patterns**  | [references/common-react-patterns.md](references/common-react-patterns.md)   | Hooks, components, JSX, state, styling, fragments                    |
-| **Unit testing**    | [references/common-unit-testing.md](references/common-unit-testing.md)       | Jest, React Testing Library, AAA, mocks, selectors                   |
+| **Unit testing**    | [references/common-unit-testing.md](references/common-unit-testing.md)       | Jest / Vitest, React Testing Library, AAA, mocks, selectors        |
+| **Codebase summary**| [references/reference-codebase-summary.md](references/reference-codebase-summary.md) | Concrete patterns from reference frontend (optional)        |
 
 ## Three-phase workflow
 
@@ -62,6 +71,7 @@ When the skill is invoked on code (selected files, git staged files, branch):
 ## Quick reference
 
 - **Lint first**: Run `yarn lint` or `npm run lint`; fix auto-fixable issues, then resolve remaining ones using `references/*.md`.
+- **Tests**: Project may use **Jest** or **Vitest**; same patterns apply (AAA, `screen`, `it.each`, mock factories). Use `vi` (Vitest) or `jest` (Jest) for spies/mocks.
 - **Collect next**: Complete the full list of Avoid violations (manual analysis) before making edits.
 - **Then redress**: Apply each Prefer in turn, using the reference file as the source of truth.
 - **File/folder naming**: Use react-files-structure-standards for normalizing file and folder names and structure.

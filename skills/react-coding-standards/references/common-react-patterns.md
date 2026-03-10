@@ -30,31 +30,35 @@
     - [❌ Avoid Simple Assignment for State Updates Dependent on Current State](#-avoid-simple-assignment-for-state-updates-dependent-on-current-state)
     - [✅ Prefer Using Setter Function for State Updates Dependent on Current State](#-prefer-using-setter-function-for-state-updates-dependent-on-current-state)
     - [ℹ️ Explanation](#ℹ️-explanation-5)
+  - [Prefer useToggle from @uidotdev/usehooks for Boolean Toggle State](#prefer-usetoggle-from-uidotdevusehooks-for-boolean-toggle-state)
+    - [❌ Avoid useState for Simple Open/Close or Show/Hide Toggles](#-avoid-usestate-for-simple-openclose-or-showhide-toggles)
+    - [✅ Prefer useToggle When @uidotdev/usehooks Is Present](#-prefer-usetoggle-when-uidotdevusehooks-is-present)
+    - [ℹ️ Explanation](#ℹ️-explanation-6)
   - [Prefer External Filters and Sorters Over Inline Logic in Rendering](#prefer-external-filters-and-sorters-over-inline-logic-in-rendering)
     - [❌ Avoid Using Inline Logic for Filtering and Sorting in the Rendering Template](#-avoid-using-inline-logic-for-filtering-and-sorting-in-the-rendering-template)
     - [✅ Prefer Using External Filters and Sorters for Better Readability](#-prefer-using-external-filters-and-sorters-for-better-readability)
-    - [ℹ️ Explanation](#ℹ️-explanation-6)
+    - [ℹ️ Explanation](#ℹ️-explanation-7)
   - [Prefer External Utility Functions Over Complex Logic in the Rendering Template](#prefer-external-utility-functions-over-complex-logic-in-the-rendering-template)
     - [❌ Avoid Complex Logic in the Rendering Template](#-avoid-complex-logic-in-the-rendering-template)
     - [✅ Prefer Using External Utility Functions for Better Readability](#-prefer-using-external-utility-functions-for-better-readability)
-    - [ℹ️ Explanation](#ℹ️-explanation-7)
+    - [ℹ️ Explanation](#ℹ️-explanation-8)
   - [Prefer Using Hooks for Business Logic Over Returning React Components](#prefer-using-hooks-for-business-logic-over-returning-react-components)
     - [❌ Avoid Using Hooks to Return React Components](#-avoid-using-hooks-to-return-react-components)
     - [✅ Prefer Using Hooks for Business Logic and Keep Rendering Separate](#-prefer-using-hooks-for-business-logic-and-keep-rendering-separate)
-    - [ℹ️ Explanation](#ℹ️-explanation-8)
+    - [ℹ️ Explanation](#ℹ️-explanation-9)
   - [Prefer Using `gap`, `rowGap`, and `columnGap` Over `margin` or `padding` in React Native](#prefer-using-gap-rowgap-and-columngap-over-margin-or-padding-in-react-native)
     - [❌ Avoid Using `margin` or `padding` for Spacing Between Elements](#-avoid-using-margin-or-padding-for-spacing-between-elements)
     - [✅ Prefer Using `gap`, `rowGap`, and `columnGap` for Spacing Between Elements](#-prefer-using-gap-rowgap-and-columngap-for-spacing-between-elements)
-    - [ℹ️ Explanation](#ℹ️-explanation-9)
+    - [ℹ️ Explanation](#ℹ️-explanation-10)
   - [Prefer Using Early Returns for Simplified Rendering in React Components](#prefer-using-early-returns-for-simplified-rendering-in-react-components)
     - [❌ Avoid Complex Conditional Rendering with Nested Ternaries](#-avoid-complex-conditional-rendering-with-nested-ternaries)
     - [✅ Prefer Using Early Returns for Improved Readability and Maintainability](#-prefer-using-early-returns-for-improved-readability-and-maintainability)
-    - [ℹ️ Explanation](#ℹ️-explanation-10)
+    - [ℹ️ Explanation](#ℹ️-explanation-11)
     - [📚 Additional Resources](#-additional-resources)
   - [Prefer Breaking Down `<GodComponents />` into Subcomponents](#prefer-breaking-down-godcomponents--into-subcomponents)
     - [❌ Avoid Complex Components with Excessive Responsibilities](#-avoid-complex-components-with-excessive-responsibilities)
     - [✅ Prefer Breaking Down God Components into Smaller Subcomponents](#-prefer-breaking-down-god-components-into-smaller-subcomponents)
-    - [ℹ️ Explanation](#ℹ️-explanation-11)
+    - [ℹ️ Explanation](#ℹ️-explanation-12)
     - [📚 Additional Resources](#-additional-resources-1)
   - [Avoid Numeric Index for the Key Value of a React Element](#avoid-numeric-index-for-the-key-value-of-a-react-element)
     - [❌ Avoid direct index usage as key](#-avoid-direct-index-usage-as-key)
@@ -95,35 +99,35 @@
   - [Store the Selected Item by ID](#store-the-selected-item-by-id)
     - [❌ Avoid storing the entire item](#-avoid-storing-the-entire-item)
     - [✅ Prefer storing the item ID](#-prefer-storing-the-item-id)
-    - [ℹ️ Explanation](#ℹ️-explanation-12)
+    - [ℹ️ Explanation](#ℹ️-explanation-13)
   - [Clarify the Distinction Between Initial State and Current State](#clarify-the-distinction-between-initial-state-and-current-state)
     - [❌ Avoid unclear naming for state variables](#-avoid-unclear-naming-for-state-variables)
     - [✅ Prefer clear naming to differentiate initial state and current state](#-prefer-clear-naming-to-differentiate-initial-state-and-current-state)
-    - [ℹ️ Explanation](#ℹ️-explanation-13)
+    - [ℹ️ Explanation](#ℹ️-explanation-14)
   - [Always Clean Up in Your `useEffect` Hooks](#always-clean-up-in-your-useeffect-hooks)
     - [❌ Avoid forgetting to clean up side effects](#-avoid-forgetting-to-clean-up-side-effects)
     - [✅ Prefer cleaning up side effects with a cleanup function](#-prefer-cleaning-up-side-effects-with-a-cleanup-function)
-    - [ℹ️ Explanation](#ℹ️-explanation-14)
+    - [ℹ️ Explanation](#ℹ️-explanation-15)
   - [Prefer Functions Over Custom Hooks](#prefer-functions-over-custom-hooks)
     - [❌ Avoid creating unnecessary custom hooks](#-avoid-creating-unnecessary-custom-hooks)
     - [✅ Prefer using plain functions instead](#-prefer-using-plain-functions-instead)
-    - [ℹ️ Explanation](#ℹ️-explanation-15)
+    - [ℹ️ Explanation](#ℹ️-explanation-16)
   - [Use `ReactNode` instead of `JSX.Element | null | undefined`](#use-reactnode-instead-of-jsxelement--null--undefined)
     - [❌ Avoid typing props with JSX.Element | null | undefined](#-avoid-typing-props-with-jsxelement--null--undefined)
     - [✅ Prefer using `ReactNode` for more compact code](#-prefer-using-reactnode-for-more-compact-code)
-    - [ℹ️ Explanation](#ℹ️-explanation-16)
+    - [ℹ️ Explanation](#ℹ️-explanation-17)
   - [Simplify Typing of Components Expecting Children Props](#simplify-typing-of-components-expecting-children-props)
     - [❌ Avoid manually typing the children prop](#-avoid-manually-typing-the-children-prop)
     - [✅ Prefer using PropsWithChildren for typing children props](#-prefer-using-propswithchildren-for-typing-children-props)
-    - [ℹ️ Explanation](#ℹ️-explanation-17)
+    - [ℹ️ Explanation](#ℹ️-explanation-18)
   - [Specify Types Explicitly in useState, useRef, etc.](#specify-types-explicitly-in-usestate-useref-etc)
     - [❌ Avoid omitting types when they can't be inferred](#-avoid-omitting-types-when-they-cant-be-inferred)
     - [✅ Prefer specifying types explicitly when they can't be inferred](#-prefer-specifying-types-explicitly-when-they-cant-be-inferred)
-    - [ℹ️ Explanation](#ℹ️-explanation-18)
+    - [ℹ️ Explanation](#ℹ️-explanation-19)
   - [Use ElementRef Type Helper for Typing Refs](#use-elementref-type-helper-for-typing-refs)
     - [❌ Avoid typing refs directly with element type names](#-avoid-typing-refs-directly-with-element-type-names)
     - [✅ Prefer using the ElementRef type helper for typing refs](#-prefer-using-the-elementref-type-helper-for-typing-refs)
-    - [ℹ️ Explanation](#ℹ️-explanation-19)
+    - [ℹ️ Explanation](#ℹ️-explanation-20)
 
 # Project React coding standards
 
@@ -205,7 +209,7 @@ return (
       isSensitiveTextVisible={isSecuredTextEntryEnabled} />
     {/** ... */}
   </View>
-)```
+)
 ```
 
 ### ℹ️ Explanation
@@ -260,7 +264,7 @@ return (
       isSensitiveTextVisible={isSecuredTextEntryEnabled} />
     {/** ... */}
   </View>
-)```
+)
 ```
 
 ### ℹ️ Explanation
@@ -548,6 +552,38 @@ const Component = () => {
 - **Use Setter Function:** Using the setter function (`setNumbers((currentNumbers) => [...currentNumbers, currentNumbers.length + 1])`) ensures that the update is based on the latest state. This approach prevents potential bugs related to state being updated concurrently.
 - **Correctness:** Using the setter function makes sure that the new state is computed correctly, even when multiple updates occur at the same time.
 - **Maintainability:** This pattern is more robust and easier to understand, making the codebase more maintainable.
+
+## Prefer useToggle from @uidotdev/usehooks for Boolean Toggle State
+
+For visual toggles (e.g. dialog open/close, modal visibility, accordion expanded state), prefer `useToggle` from `@uidotdev/usehooks` when the library is present in the project. It provides a clear API (`value`, `toggle`, `setTrue`, `setFalse`) and avoids manual boolean state for simple on/off cases.
+
+### ❌ Avoid useState for Simple Open/Close or Show/Hide Toggles
+
+```tsx
+const [isDialogOpen, setIsDialogOpen] = useState(false);
+// ...
+<Button onClick={() => setIsDialogOpen(true)}>Open</Button>
+<Dialog open={isDialogOpen} onClose={() => setIsDialogOpen(false)} />
+```
+
+### ✅ Prefer useToggle When @uidotdev/usehooks Is Present
+
+```tsx
+import { useToggle } from "@uidotdev/usehooks";
+
+const [isDialogOpen, { setTrue: openDialog, setFalse: closeDialog }] = useToggle(false);
+// ...
+<Button onClick={openDialog}>Open</Button>
+<Dialog open={isDialogOpen} onClose={closeDialog} />
+```
+
+Apply this rule only when `@uidotdev/usehooks` is a dependency; otherwise, `useState(false)` with explicit setters remains acceptable.
+
+### ℹ️ Explanation
+
+- **Readability:** `useToggle` exposes intent (open/close, show/hide) via `setTrue`/`setFalse` or a single `toggle`, making call sites clearer.
+- **Consistency:** When the project already uses `@uidotdev/usehooks`, using `useToggle` for boolean UI state keeps patterns consistent.
+- **Optional:** If the library is not in the project, do not add it solely for this; use `useState` for toggles.
 
 ## Prefer External Filters and Sorters Over Inline Logic in Rendering
 

@@ -41,47 +41,63 @@
     - [❌ Avoid Using `||` to Handle `null` and `undefined` Exclusively](#-avoid-using--to-handle-null-and-undefined-exclusively)
     - [✅ Prefer Using `??` to Handle `null` and `undefined`](#-prefer-using--to-handle-null-and-undefined)
     - [ℹ️ Explanation](#ℹ️-explanation-9)
+  - [Prefer Type Guards isNullish, isBlank from @lichens-innovation/ts-common](#prefer-type-guards-isnullish-isblank-from-lichens-innovationts-common)
+    - [❌ Avoid Verbose null/undefined/Empty-String Checks](#-avoid-verbose-nullundefinedempty-string-checks)
+    - [✅ Prefer isNullish, isBlank and Their Negations for Readable Conditions](#-prefer-isnullish-isblank-and-their-negations-for-readable-conditions)
+    - [ℹ️ Explanation](#ℹ️-explanation-10)
+  - [Prefer Explicit Time Periods (PeriodsInMS) from @lichens-innovation/ts-common](#prefer-explicit-time-periods-periodsinms-from-lichens-innovationts-common)
+    - [❌ Avoid Magic Numbers for Durations in Milliseconds](#-avoid-magic-numbers-for-durations-in-milliseconds)
+    - [✅ Prefer PeriodsInMS for Readable Time Periods](#-prefer-periodsinms-for-readable-time-periods)
+    - [ℹ️ Explanation](#ℹ️-explanation-11)
   - [Prefer Strict Inequality `!==` Over Loose Inequality `!=`](#prefer-strict-inequality--over-loose-inequality-)
     - [❌ Avoid Using `!=` for Inequality Comparisons](#-avoid-using--for-inequality-comparisons)
     - [✅ Prefer Using `!==` for Strict Inequality](#-prefer-using--for-strict-inequality)
-    - [ℹ️ Explanation](#ℹ️-explanation-10)
+    - [ℹ️ Explanation](#ℹ️-explanation-12)
   - [Prefer Using Optional Parameters Over `Type | undefined`](#prefer-using-optional-parameters-over-type--undefined)
     - [❌ Avoid Using `param: Type | undefined` for Optional Parameters](#-avoid-using-param-type--undefined-for-optional-parameters)
     - [✅ Prefer Using Optional Parameters with `param?: Type`](#-prefer-using-optional-parameters-with-param-type)
-    - [ℹ️ Explanation](#ℹ️-explanation-11)
+    - [ℹ️ Explanation](#ℹ️-explanation-13)
   - [Prefer Using Explicit Numeric Values for TypeScript Enums](#prefer-using-explicit-numeric-values-for-typescript-enums)
     - [❌ Avoid Using Implicit Ordinal Values for Enums](#-avoid-using-implicit-ordinal-values-for-enums)
     - [✅ Prefer Using Explicit Numeric Values for Enums](#-prefer-using-explicit-numeric-values-for-enums)
-    - [ℹ️ Explanation](#ℹ️-explanation-12)
+    - [ℹ️ Explanation](#ℹ️-explanation-14)
   - [Prefer Using `useWindowDimensions` Hook Over `Dimensions.get` in React Native](#prefer-using-usewindowdimensions-hook-over-dimensionsget-in-react-native)
     - [❌ Avoid Using `Dimensions.get` for Getting Window Dimensions](#-avoid-using-dimensionsget-for-getting-window-dimensions)
     - [✅ Prefer Using `useWindowDimensions` Hook for Getting Window Dimensions](#-prefer-using-usewindowdimensions-hook-for-getting-window-dimensions)
-    - [ℹ️ Explanation](#ℹ️-explanation-13)
+    - [ℹ️ Explanation](#ℹ️-explanation-15)
   - [Prefer Using Early Returns Over Multiple Nested If-Then-Else](#prefer-using-early-returns-over-multiple-nested-if-then-else)
     - [❌ Avoid Multiple Nested If-Then-Else Statements](#-avoid-multiple-nested-if-then-else-statements)
     - [✅ Prefer Using Early Returns for Improved Readability and Maintainability](#-prefer-using-early-returns-for-improved-readability-and-maintainability)
-    - [ℹ️ Explanation](#ℹ️-explanation-14)
+    - [ℹ️ Explanation](#ℹ️-explanation-16)
     - [📚 References:](#references)
   - [Prefer Using Object Destructuring for readability and clarity](#prefer-using-object-destructuring-for-readability-and-clarity)
     - [❌ Avoid Complex Interpolation Without Destructuring](#-avoid-complex-interpolation-without-destructuring)
     - [✅ Prefer Using Object Destructuring for Clarity](#-prefer-using-object-destructuring-for-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-15)
+    - [ℹ️ Explanation](#ℹ️-explanation-17)
   - [Prefer Extracting and Exporting Types over Inline Typing](#prefer-extracting-and-exporting-types-over-inline-typing)
     - [❌ Avoid Using Inline Typing for Function Parameters](#-avoid-using-inline-typing-for-function-parameters)
     - [✅ Prefer Extracting and Exporting Types for Reusability and Maintainability](#-prefer-extracting-and-exporting-types-for-reusability-and-maintainability)
-    - [ℹ️ Explanation](#ℹ️-explanation-16)
+    - [ℹ️ Explanation](#ℹ️-explanation-18)
   - [Prefer Using TypeScript `Record` Utility Type over Custom Index Signatures](#prefer-using-typescript-record-utility-type-over-custom-index-signatures)
     - [❌ Avoid Custom Index Signatures for Object Types](#-avoid-custom-index-signatures-for-object-types)
     - [✅ Prefer Using TypeScript `Record` Utility Type for Simplicity and Clarity](#-prefer-using-typescript-record-utility-type-for-simplicity-and-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-17)
+    - [ℹ️ Explanation](#ℹ️-explanation-19)
   - [Prefer Adding a Task Ticket ID to `TODO` Comments for Better Tracking](#prefer-adding-a-task-ticket-id-to-todo-comments-for-better-tracking)
     - [❌ Avoid Using `TODO` Comments Without a Ticket Reference](#-avoid-using-todo-comments-without-a-ticket-reference)
     - [✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability](#-prefer-adding-a-task-management-ticket-id-to-todo-comments-for-better-traceability)
-    - [ℹ️ Explanation](#ℹ️-explanation-18)
+    - [ℹ️ Explanation](#ℹ️-explanation-20)
   - [Prefer Arrow Functions Over Function Declarations](#prefer-arrow-functions-over-function-declarations)
     - [❌ Avoid Using `function` Declarations for Top-Level or Module-Scoped Logic](#-avoid-using-function-declarations-for-top-level-or-module-scoped-logic)
     - [✅ Prefer Arrow Functions Assigned to `const` for Consistency and Lexical `this`](#-prefer-arrow-functions-assigned-to-const-for-consistency-and-lexical-this)
-    - [ℹ️ Explanation](#ℹ️-explanation-19)
+    - [ℹ️ Explanation](#ℹ️-explanation-21)
+  - [Prefer Interfaces Over Types for Object Shapes](#prefer-interfaces-over-types-for-object-shapes)
+    - [❌ Avoid Using `type` for Object Shapes When `interface` Fits](#-avoid-using-type-for-object-shapes-when-interface-fits)
+    - [✅ Prefer `interface`; Use `type` Only When It Simplifies Syntax](#-prefer-interface-use-type-only-when-it-simplifies-syntax)
+    - [ℹ️ Explanation](#ℹ️-explanation-22)
+  - [Prefer Named Exports Over Default Exports](#prefer-named-exports-over-default-exports)
+    - [❌ Avoid `export default` Unless Required](#-avoid-export-default-unless-required)
+    - [✅ Prefer Explicit Named Exports](#-prefer-explicit-named-exports)
+    - [ℹ️ Explanation](#ℹ️-explanation-23)
 
 # Typescript coding guidelines
 
@@ -638,6 +654,71 @@ console.log(getDefault("")); // Output: '' (intended)
 - **Use `??` for Nullish Coalescing:** The `??` operator (nullish coalescing) is designed to handle only `null` and `undefined` values, providing a more precise and intended behavior.
 - **Correctness:** `??` ensures that only `null` and `undefined` are treated as needing a default value, whereas `||` would incorrectly replace valid falsy values.
 - **Readability and Intent:** Using `??` makes the code more readable and clearly conveys the intent to handle only `null` and `undefined`, leading to fewer bugs and more maintainable code.
+
+## Prefer Type Guards isNullish, isBlank from @lichens-innovation/ts-common
+
+Use the type guards from `@lichens-innovation/ts-common` for null, undefined, and empty-string checks so conditions read naturally.
+
+### ❌ Avoid Verbose null/undefined/Empty-String Checks
+
+```ts
+// Verbose and repetitive; intent is less obvious
+if (value !== null && value !== undefined) {
+  process(value);
+}
+if (input === null || input === undefined || input === "") {
+  return fallback;
+}
+const label = name != null && name.trim() !== "" ? name : "Unknown";
+```
+
+### ✅ Prefer isNullish, isBlank and Their Negations for Readable Conditions
+
+```ts
+import { isNullish, isBlank, isNotBlank } from "@lichens-innovation/ts-common";
+
+// Natural reading: "if value is not nullish"
+if (!isNullish(value)) {
+  process(value);
+}
+// Natural reading: "if input is blank (null, undefined, or empty/whitespace string)"
+if (isBlank(input)) {
+  return fallback;
+}
+const label = isNotBlank(name) ? name : "Unknown";
+```
+
+Use `isNullish(value)` for `value === null || value === undefined`; use `!isNullish(value)` for the opposite. Use `isBlank(value)` for null, undefined, or empty/whitespace-only string; use `isNotBlank(value)` when the value is present and has non-whitespace content (or `!isBlank(value)` if the package does not export `isNotBlank`).
+
+### ℹ️ Explanation
+
+- **Readability:** Type guards like `isNullish`, `isBlank`, and `isNotBlank` make conditions self-explanatory and reduce repetition.
+- **Consistency:** Using them for these checks keeps the codebase consistent and easier to maintain.
+
+## Prefer Explicit Time Periods (PeriodsInMS) from @lichens-innovation/ts-common
+
+Use `PeriodsInMS` from `@lichens-innovation/ts-common` for durations in milliseconds instead of raw magic numbers (e.g. `5 * 60 * 1000`). This makes the intent (e.g. "5 minutes", "30 minutes") obvious at a glance.
+
+### ❌ Avoid Magic Numbers for Durations in Milliseconds
+
+```ts
+staleTime: 5 * 60 * 1000,   // 5 minutes
+gcTime: 30 * 60 * 1000,     // 30 minutes
+```
+
+### ✅ Prefer PeriodsInMS for Readable Time Periods
+
+```ts
+import { PeriodsInMS } from "@lichens-innovation/ts-common";
+
+staleTime: 5 * PeriodsInMS.oneMinute,
+gcTime: 30 * PeriodsInMS.oneMinute,
+```
+
+### ℹ️ Explanation
+
+- **Readability:** `5 * PeriodsInMS.oneMinute` reads as "5 minutes" without decoding `60 * 1000`. Same for hours, seconds, etc.
+- **Consistency:** Using the shared constant avoids typos and keeps duration definitions aligned across the codebase.
 
 ## Prefer Strict Inequality `!==` Over Loose Inequality `!=`
 
@@ -1241,3 +1322,82 @@ const handleClick = () => {
   - **Scoping:** Assigning to `const` makes it clear the reference is not reassigned and keeps the temporal dead zone predictable.
 
 - **Exceptions:** Use a `function` declaration when you need the function to be hoisted (e.g. a recursive helper that calls itself before its definition in the same block), or when a tool or style guide explicitly requires it. In React components, prefer arrow function components or `function` only when hoisting is necessary.
+
+## Prefer Interfaces Over Types for Object Shapes
+
+Prefer `interface` for object shapes (props, API responses, state). Use `type` only when it simplifies syntax or reduces complexity (unions, literal types, mapped types, `Record<K, V>`, etc.).
+
+### ❌ Avoid Using `type` for Object Shapes When `interface` Fits
+
+```ts
+type UserProps = {
+  id: string;
+  name: string;
+  onSave: (user: User) => void;
+};
+
+type ApiResponse = {
+  data: User;
+  status: number;
+  error?: string;
+};
+```
+
+### ✅ Prefer `interface`; Use `type` Only When It Simplifies Syntax
+
+```ts
+interface UserProps {
+  id: string;
+  name: string;
+  onSave: (user: User) => void;
+}
+
+interface ApiResponse {
+  data: User;
+  status: number;
+  error?: string;
+}
+
+// Use type for unions, literals, or aliases that are clearer as type
+type Status = "pending" | "success" | "error";
+type UserMap = Record<string, User>;
+```
+
+### ℹ️ Explanation
+
+- **Interfaces for object shapes:** `interface` is the conventional and often more ergonomic choice for describing object shapes; it supports declaration merging and is widely used in React props and API contracts.
+- **Types when they help:** Use `type` for unions, string/number literal unions, mapped types, `Record<K, V>`, or when the alias makes the code simpler. Do not force an object shape into a `type` when an `interface` is equally clear.
+
+## Prefer Named Exports Over Default Exports
+
+Prefer explicit named exports so that imports are consistent and refactoring is easier. Use `export default` only when required (e.g. framework entry points like Next.js pages, or when a library or tool expects a default export).
+
+### ❌ Avoid `export default` Unless Required
+
+```ts
+// Component file
+const MyComponent = () => <div>Hello</div>;
+export default MyComponent;
+
+// Another file — default import can be renamed arbitrarily, harder to search/grep
+import MyComponent from "./MyComponent";
+import SomethingElse from "./MyComponent"; // same export, different name
+```
+
+### ✅ Prefer Explicit Named Exports
+
+```ts
+// Component file
+export const MyComponent = () => <div>Hello</div>;
+
+// Another file — explicit name, consistent across the codebase
+import { MyComponent } from "./MyComponent";
+```
+
+Use `export default` only when necessary (e.g. React lazy + default, or a framework convention). For components, hooks, utils, and types, prefer `export const` / `export interface` / `export type`.
+
+### ℹ️ Explanation
+
+- **Consistency and refactoring:** Named exports keep import names aligned with export names, making search and renames more predictable.
+- **Explicit intent:** Named exports make it clear what a module exposes and avoid arbitrary default import names.
+- **Exceptions:** Keep `export default` where the ecosystem requires it (e.g. some router or bundler entry points).
