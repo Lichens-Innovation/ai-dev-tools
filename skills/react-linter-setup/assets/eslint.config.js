@@ -55,6 +55,7 @@ const baseConfig = tseslint.config(
     rules: {
       "prefer-const": "error",
       eqeqeq: ["error", "always"],
+      "no-console": "warn",
       "no-nested-ternary": "error",
       "no-empty": ["error", { allowEmptyCatch: false }],
       "no-useless-catch": "error",
