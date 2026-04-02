@@ -40,88 +40,121 @@ Generate a concise pull request description by analyzing git changes and using t
    - If still not found, use the template in this skill: `templates/pull_request_template.md` (relative to the skill directory)
    - Read the template file
 
-5. **Fill template concisely**
-   - Before filling the template, group all changes by theme/area (e.g. auth, API, UI, tests, docs)
-   - Do not repeat the same subject: one entry per theme, even if multiple files or commits touch it
-   - Extract key changes from git diff and commits, already grouped by theme as above
-   - Fill "Changes Description" using the template’s two-level structure:
-     - **Level 1 (category):** one top-level bullet per theme/area (`{level1_changes_description_category}`)
-     - **Level 2 (sub-details):** one or more sub-bullets under each category for distinct sub-changes (`{level2_change_detail_for_that_category}`); omit sub-bullets when a category has only one simple change
-   - Keep each bullet point brief (one line when possible)
-   - Use emojis sparingly (🚧 for WIP, ✅ for done, etc.)
+5. **Build the change hierarchy — follow these rules strictly**
+
+   **Step A — Extract raw changes**
+   List every meaningful change from the diff and commit log (files modified, features added, bugs fixed, etc.). Do not group yet.
+
+   **Step B — Group into themes**
+   Assign each raw change to a theme. A theme maps to a functional area or concern, for example: `Auth`, `API`, `UI`, `Tests`, `Config`, `Docs`, `DB`, `CI`. One change belongs to exactly one theme. Use at most 6 themes; merge minor themes into the closest major one.
+
+   **Step C — Decide the hierarchy level for each theme**
+   Apply the rule below to each theme independently:
+
+   | Number of distinct sub-changes in the theme | Structure to use |
+   |---|---|
+   | 1 (single, simple change) | Level-1 bullet only — no sub-bullets |
+   | 2 or more distinct sub-changes | Level-1 bullet (theme label) + one Level-2 sub-bullet per distinct sub-change |
+
+   A "distinct sub-change" is a change that affects a different component, file group, or behavior within the same theme. Two commits that both touch the same component count as **one** sub-change.
+
+   **Step D — Write the bullets**
+   - Level-1: `- **ThemeLabel:** one-line summary of what changed in this theme.`
+   - Level-2 (when applicable): `  - Sub-change description (one line).`
+   - Never nest deeper than Level-2.
+   - Never duplicate information between a Level-1 line and its Level-2 children: the Level-1 line states the theme + overall impact; Level-2 lines state the individual sub-changes.
+
+   **Step E — Validate before writing**
+   Re-read your draft and check:
+   - [ ] No theme appears more than once at Level-1.
+   - [ ] Every Level-2 bullet belongs to a different component/behavior within its theme.
+   - [ ] No sub-change is repeated across different themes.
+   - [ ] Themes with only one sub-change have no Level-2 bullets.
+
+6. **Fill template**
+   - Use the hierarchy built in step 5 for the "Changes Description" section.
+   - Keep each bullet point brief (one line when possible).
+   - Use emojis sparingly (🚧 for WIP, ✅ for done, etc.).
    - Mark checklist items appropriately:
      - **Documentation:** check the box if the PR introduces documentation (JSDoc in changed files, or markdown files `.md` detected in the diff).
-     - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories used by mainstream test runners (do not assume a specific framework such as Jest or Vitest).
-   - **Related Issue(s)** – see step 6 below. Leave "Screen capture(s)" as 🚫 if not applicable
+     - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories.
+   - Leave "Screen capture(s)" as 🚫 if not applicable.
 
-6. **Related tickets**
-   - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456" or "PR description with NN-123, TB-456"). Treat any such IDs as the company tracking system ticket numbers for this PR. If none were given, **ask the user:** “Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none.”
-   - **Parsing:** From the user message, accept ticket IDs in forms like: `tickets: NN-123, TB-456`; `tickets NN-123, TB-456`; or inline project-key numbers (e.g. `NN-123`, `TB-456`). Normalize to a list of trimmed IDs (comma/semicolon/space separated).
-   - If one or more IDs are available (from the request or from the user's answer):
-     - **Tasks manager base URL:** Run from the **project root** (repo where the PR is created): `node <skill-dir>/scripts/tasks-system.mjs`. The script loads `skills-configs.json` at project root (creates it if missing), prompts for any missing known keys, and outputs the full config as JSON (key/value). Use `configs.tasksManagerSystemBaseUrl` for the base URL of ticket links.
-     - For each ticket ID (trimmed), build the link: `{baseUrl}/{ID}`
-     - **Description:** If you can get the issue summary (e.g. API or user pastes descriptions), use it as the link text; otherwise use the ticket ID.
-     - Fill "Related Issue(s)" with a markdown list, one line per ticket:
-       - `- [Description or ID]({baseUrl}/{ID})`
-       - Example: `- [Add login screen](https://company.atlassian.net/browse/PROJ-123)` or `- [PROJ-123](https://company.atlassian.net/browse/PROJ-123)`
-   - If the user leaves the list empty or says “none”, keep "Related Issue(s)" as `- 🚫`.
+7. **Related tickets**
+   - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask the user:** "Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none."
+   - **Parsing:** Accept ticket IDs in forms like `tickets: NN-123, TB-456` or inline (e.g. `NN-123`, `TB-456`). Normalize to a trimmed list.
+   - If one or more IDs are available:
+     - **Tasks manager base URL:** Run from the **project root**: `node <skill-dir>/scripts/tasks-system.mjs`. Use `configs.tasksManagerSystemBaseUrl` for the base URL.
+     - Build each link: `{baseUrl}/{ID}`
+     - Fill "Related Issue(s)" with: `- [Description or ID]({baseUrl}/{ID})`
+   - If none, keep "Related Issue(s)" as `- 🚫`.
 
-7. **Enforce 1000 character limit**
-   - Count total characters including markdown syntax
-   - If over limit, prioritize:
-     1. Keep the title
-     2. Keep essential change descriptions
-     3. Shorten or remove less critical sections
-     4. Condense bullet points
+8. **Enforce 1000 character limit**
+   - Count total characters including markdown syntax.
+   - If over limit, apply in order:
+     1. Keep the title.
+     2. Keep all Level-1 theme bullets.
+     3. Shorten or remove Level-2 sub-bullets starting from the least critical theme.
+     4. Condense remaining lines.
 
-8. **Write file, copy to clipboard, remove file**
-   - At **PR project root**, create or overwrite `pr-description.md` with the full PR output (complete markdown from "## PR Description" through the end of the description).
-   - Call the copy script with the full path to the file: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"` (e.g. `$(pwd)/pr-description.md` when run from the PR project).
-   - **On success:** remove the file (`rm pr-description.md`) and tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."**
+9. **Write file, copy to clipboard, remove file**
+   - At **PR project root**, create or overwrite `pr-description.md` with the full PR output.
+   - Call: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"`
+   - **On success:** remove the file and tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."**
    - **On error:** leave `pr-description.md` in place and tell the user they can open it or copy manually.
 
 ## Output Format
-
-Provide ready-to-copy markdown in this format:
 
 ```markdown
 ## PR Description
 
 <semantic-commit-style-title>
 
-<filled-template-markdown including Summary then Changes Description with level-1 bullets (themes) and optional level-2 sub-bullets (sub-changes)>
+<filled-template-markdown>
 ```
 
-**Grouping rule:** Never list the same subject twice. If several commits or files relate to the same theme (e.g. "auth", "tests", "docs"), merge them into a single level-1 bullet in the summary and in Changes Description; use level-2 sub-bullets only for distinct sub-changes within that theme.
+## Extended Example
 
-## Example
+**Scenario:** Branch `feature/checkout-flow` — changes span payment service, cart UI, discount API, tests, and docs.
 
-**Input analysis:**
+**Raw changes identified (Step A):**
+- `PaymentService`: added Stripe integration
+- `PaymentService`: added retry logic on failure
+- `CartSummary` component: shows discount badge
+- `CartSummary` component: fixed item count bug
+- `DiscountAPI`: new `/apply` endpoint
+- `auth.test.ts`: added login edge-case tests
+- `checkout.test.ts`: added checkout flow tests
+- `README.md`: updated setup instructions
 
-- Branch: `feature/add-user-auth`
-- Changes: Added login component, updated auth service, added tests
-- 3 commits: "feat: add login component", "feat: update auth service", "test: add auth tests"
+**Themes after grouping (Step B):**
+- **Payment** → Stripe integration + retry logic (2 sub-changes → Level-2)
+- **Cart UI** → discount badge + item count fix (2 sub-changes → Level-2)
+- **API** → `/apply` endpoint (1 sub-change → Level-1 only)
+- **Tests** → auth + checkout test files (2 sub-changes → Level-2)
+- **Docs** → README update (1 sub-change → Level-1 only)
 
 **Output:**
 
 ```markdown
 ## Changes Description
 
-feat(auth): implement user authentication
+feat(checkout): implement checkout flow with Stripe and discounts
 
-- **Auth:** login component and auth service.
-  - Login component added.
-  - Auth service updated.
-- **Tests:** auth tests added.
+- **Payment:** Stripe integration with fault tolerance.
+  - Stripe payment provider added.
+  - Retry logic on failed transactions.
+- **Cart UI:** visual and functional improvements.
+  - Discount badge displayed in cart summary.
+  - Fixed incorrect item count display.
+- **API:** `/apply` discount endpoint added.
+- **Tests:** coverage for auth and checkout flows.
+  - Login edge-case tests (`auth.test.ts`).
+  - End-to-end checkout flow tests (`checkout.test.ts`).
+- **Docs:** README setup instructions updated.
 
 ## Checklist
 
-(other checklist items...)
+- [x] Tests added or updated
+- [x] Documentation updated
 ```
-
-## Character Count Tips
-
-- Use abbreviations when appropriate (e.g., "auth" instead of "authentication")
-- Combine related changes into single level-1 bullets; use level-2 sub-bullets only when a category has several distinct sub-changes (grouping avoids repetition)
-- Remove template placeholders if not needed
-- Prioritize Summary and "Changes Description" over other sections
