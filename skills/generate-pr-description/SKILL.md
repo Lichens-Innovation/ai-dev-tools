@@ -115,46 +115,4 @@ Generate a concise pull request description by analyzing git changes and using t
 
 ## Extended Example
 
-**Scenario:** Branch `feature/checkout-flow` — changes span payment service, cart UI, discount API, tests, and docs.
-
-**Raw changes identified (Step A):**
-- `PaymentService`: added Stripe integration
-- `PaymentService`: added retry logic on failure
-- `CartSummary` component: shows discount badge
-- `CartSummary` component: fixed item count bug
-- `DiscountAPI`: new `/apply` endpoint
-- `auth.test.ts`: added login edge-case tests
-- `checkout.test.ts`: added checkout flow tests
-- `README.md`: updated setup instructions
-
-**Themes after grouping (Step B):**
-- **Payment** → Stripe integration + retry logic (2 sub-changes → Level-2)
-- **Cart UI** → discount badge + item count fix (2 sub-changes → Level-2)
-- **API** → `/apply` endpoint (1 sub-change → Level-1 only)
-- **Tests** → auth + checkout test files (2 sub-changes → Level-2)
-- **Docs** → README update (1 sub-change → Level-1 only)
-
-**Output:**
-
-```markdown
-## Changes Description
-
-feat(checkout): implement checkout flow with Stripe and discounts
-
-- **Payment:** Stripe integration with fault tolerance.
-  - Stripe payment provider added.
-  - Retry logic on failed transactions.
-- **Cart UI:** visual and functional improvements.
-  - Discount badge displayed in cart summary.
-  - Fixed incorrect item count display.
-- **API:** `/apply` discount endpoint added.
-- **Tests:** coverage for auth and checkout flows.
-  - Login edge-case tests (`auth.test.ts`).
-  - End-to-end checkout flow tests (`checkout.test.ts`).
-- **Docs:** README setup instructions updated.
-
-## Checklist
-
-- [x] Tests added or updated
-- [x] Documentation updated
-```
+See `examples/checkout-flow.md` (relative to this skill directory) for a fully worked example covering Steps A–E with a realistic multi-theme PR.
