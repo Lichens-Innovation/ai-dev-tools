@@ -83,10 +83,13 @@ Generate a concise pull request description by analyzing git changes and using t
 7. **Related tickets**
    - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask the user:** "Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none."
    - **Parsing:** Accept ticket IDs in forms like `tickets: NN-123, TB-456` or inline (e.g. `NN-123`, `TB-456`). Normalize to a trimmed list.
-   - If one or more IDs are available:
-     - **Tasks manager base URL:** Run from the **project root**: `node <skill-dir>/scripts/tasks-system.mjs`. Use `configs.tasksManagerSystemBaseUrl` for the base URL.
-     - Build each link: `{baseUrl}/{ID}`
-     - Fill "Related Issue(s)" with: `- [Description or ID]({baseUrl}/{ID})`
+   - **Jira MCP availability:** Before filling related issues, determine whether a **Jira-capable Atlassian MCP server** is enabled (e.g. tools such as `getJiraIssue` in the workspace MCP descriptors). If it is **not** available, **tell the user explicitly** that the Atlassian/Jira MCP is not connected and they should **install and enable it** if they want ticket rows with fetched summaries and correct Jira URLs. Still proceed with the rest of the PR; for "Related Issue(s)" use plain text keys only (e.g. `- PROJ-123`) or `- 🚫` if they confirm there are no tickets.
+   - If one or more IDs are available **and** the Jira MCP is available:
+     - For **each** ticket key, use the MCP to load the issue (e.g. `getJiraIssue` with the appropriate `cloudId` and `issueIdOrKey`; resolve `cloudId` via MCP resources or tools such as `getAccessibleAtlassianResources` when needed, following each tool’s schema in the MCP folder).
+     - Derive **`fullTicketUrl`** from the MCP response or the known Jira browse URL pattern for that site (must be a complete URL, not shortened).
+     - Derive the **link label** from MCP issue fields: prefer the **description** (trimmed to a single short line or first sentence if long). If the description is empty, use **summary**. If both are missing, use the issue key as `{label}`.
+     - Fill "Related Issue(s)" with one bullet per ticket: `- [{label}]({fullTicketUrl})`.
+   - If one or more IDs are available **without** Jira MCP (user notified as above): list keys as plain bullets, e.g. `- PROJ-123`, or a single line listing keys—do not invent browse URLs.
    - If none, keep "Related Issue(s)" as `- 🚫`.
 
 8. **Enforce 1000 character limit**
