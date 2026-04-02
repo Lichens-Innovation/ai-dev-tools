@@ -87,8 +87,10 @@ Generate a concise pull request description by analyzing git changes and using t
    - If one or more IDs are available **and** the Jira MCP is available:
      - For **each** ticket key, use the MCP to load the issue (e.g. `getJiraIssue` with the appropriate `cloudId` and `issueIdOrKey`; resolve `cloudId` via MCP resources or tools such as `getAccessibleAtlassianResources` when needed, following each tool’s schema in the MCP folder).
      - Derive **`fullTicketUrl`** from the MCP response or the known Jira browse URL pattern for that site (must be a complete URL, not shortened).
-     - Derive the **link label** from MCP issue fields: prefer the **description** (trimmed to a single short line or first sentence if long). If the description is empty, use **summary**. If both are missing, use the issue key as `{label}`.
-     - Fill "Related Issue(s)" with one bullet per ticket: `- [{label}]({fullTicketUrl})`.
+     - Derive the **link label** from MCP issue fields: use the **summary** field (the issue title — always a plain string). If the summary is empty or missing, fall back to the issue key as `{label}`.
+     - **Translate the label to English** if it is in another language — the entire PR must be in English.
+     - Fill "Related Issue(s)" with one bullet per ticket using a Markdown link: `- [summary](fullTicketUrl)`.
+     - **Important:** the output must always be a Markdown hyperlink in the form `[label](url)`, never a bare URL or plain key.
    - If one or more IDs are available **without** Jira MCP (user notified as above): list keys as plain bullets, e.g. `- PROJ-123`, or a single line listing keys—do not invent browse URLs.
    - If none, keep "Related Issue(s)" as `- 🚫`.
 
