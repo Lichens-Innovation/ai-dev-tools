@@ -1,9 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import { APP_VERSION_INFO } from "./constants.js";
 import { listLocalGitProjects, listLocalGitProjectsInputSchema } from "./git-projects.utils.js";
-import { buildMcpTextResponse } from "./mcp-server.utils.js";
 
 const server = new McpServer({
   title: "Lichens Code Crawler",
@@ -12,21 +10,6 @@ const server = new McpServer({
   description: APP_VERSION_INFO.DESCRIPTION,
   websiteUrl: APP_VERSION_INFO.REPOSITORY,
 });
-
-server.registerTool(
-  "echo",
-  {
-    title: "Echo a message",
-    description: "Echo a message",
-    inputSchema: z.object({
-      message: z.string().describe("The message to echo"),
-    }),
-  },
-  async ({ message }) => {
-    const msg = `You said: ${message}. Here the version of the server: ${APP_VERSION_INFO.VERSION}`;
-    return buildMcpTextResponse(msg);
-  }
-);
 
 server.registerTool(
   "list-local-git-projects",
