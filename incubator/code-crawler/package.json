@@ -1,16 +1,16 @@
 {
   "name": "code-crawler",
-  "description": "A tool to crawl code repositories and extract information about the codebase.",
+  "description": "A MCP server to crawl code repositories and extract information about the codebase.",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "bin": {
-    "code-crawler": "./dist/cli.js"
+    "code-crawler": "./dist/mcp-server.js"
   },
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
-    "start": "node dist/cli.js",
+    "start": "node dist/mcp-server.js",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

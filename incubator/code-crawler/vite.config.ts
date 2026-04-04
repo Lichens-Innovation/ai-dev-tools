@@ -13,9 +13,9 @@ export default defineConfig({
     target: 'node20',
     minify: false,
     lib: {
-      entry: 'src/cli.ts',
+      entry: 'src/mcp-server.ts',
       name: 'codeCrawler',
-      fileName: () => 'cli.js',
+      fileName: () => 'mcp-server.js',
       formats: ['es'],
     },
     rollupOptions: {
