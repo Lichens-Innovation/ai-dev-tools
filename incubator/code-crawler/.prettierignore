@@ -1,0 +1,5 @@
+dist/
+**/build/
+src/generated/
+assets/
+**/node_modules/

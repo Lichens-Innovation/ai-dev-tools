@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+# Exit immediately if any command fails
+set -e
+
+cd "$(dirname "$0")/.." || exit 1
+
+echo "Running typecheck..."
+yarn typecheck
+echo "  -->  ✅ Typecheck completed"

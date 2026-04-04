@@ -2,23 +2,43 @@
   "name": "code-crawler",
   "description": "A MCP server to crawl code repositories and extract information about the codebase.",
   "version": "0.0.1",
+  "author": "Lichens Innovation",
+  "repository": "https://github.com/lichens-innovation/ai-dev-tools",
   "private": true,
   "type": "module",
   "bin": {
     "code-crawler": "./dist/mcp-server.js"
   },
   "scripts": {
+    "prepare": "node ./scripts/husky-install.mjs",
+    "lint": "eslint . && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
+    "format:fix": "prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "build": "vite build",
-    "dev": "vite build --watch",
-    "start": "node dist/mcp-server.js",
+    "build:watch": "vite build --watch",
+    "server:dev": "node dist/mcp-server.js",
+    "server:inspect": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector npm run server:dev",
+    "generate:version": "node scripts/generate-version.mjs",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.3.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@commitlint/config-conventional": "^20.4.3",
+    "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/inspector": "^0.21.1",
     "@types/node": "^25.5.2",
+    "commitlint": "^20.4.3",
+    "eslint": "^10.0.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.0",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.56.1",
     "vite": "^8.0.3"
   }
 }
