@@ -8,3 +8,7 @@ cd "$(dirname "$0")/.." || exit 1
 echo "Running typecheck..."
 yarn typecheck
 echo "  -->  ✅ Typecheck completed"
+
+echo "Running format:fix..."
+yarn format:fix
+echo "  -->  ✅ Format:fix completed"

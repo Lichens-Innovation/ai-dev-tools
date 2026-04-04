@@ -5,41 +5,55 @@
   "author": "Lichens Innovation",
   "repository": "https://github.com/lichens-innovation/ai-dev-tools",
   "private": true,
-  "type": "module",
   "bin": {
-    "code-crawler": "./dist/mcp-server.js"
+    "code-crawler": "./dist/main.js"
   },
   "scripts": {
     "prepare": "node ./scripts/husky-install.mjs",
+    "start": "CODE_CRAWLER_ROOT=\"$HOME/git/lichens\" nest start --watch",
+    "start:prod": "node dist/main.js",
+    "inspector": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3333/mcp",
+    "generate:version": "tsx ./scripts/generate-version.ts",
+    "build": "nest build",
     "lint": "eslint . && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format:fix": "prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
-    "build": "vite build",
-    "build:watch": "vite build --watch",
-    "server:dev": "node dist/mcp-server.js",
-    "server:inspect": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector npm run server:dev",
-    "generate:version": "node scripts/generate-version.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "@inquirer/prompts": "^8.3.2",
+    "@inquirer/prompts": "^8.4.1",
     "@lichens-innovation/ts-common": "^1.15.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
+    "@nestjs/platform-express": "^11",
+    "@xenova/transformers": "^2.17.2",
+    "better-sqlite3": "^12.8.0",
+    "http-status-codes": "^2.3.0",
+    "pino": "^10.3.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "sqlite-vec": "^0.1.9",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@commitlint/config-conventional": "^20.4.3",
+    "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/inspector": "^0.21.1",
+    "@nestjs/cli": "^11",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5",
     "@types/node": "^25.5.2",
-    "commitlint": "^20.4.3",
-    "eslint": "^10.0.2",
+    "commander": "^14.0.3",
+    "commitlint": "^20.5.0",
+    "eslint": "^10.2.0",
     "husky": "^9.1.7",
-    "prettier": "^3.8.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.56.1",
-    "vite": "^8.0.3"
+    "typescript-eslint": "^8.58.1"
   }
 }
