@@ -451,6 +451,13 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
+"@lichens-innovation/ts-common@^1.15.4":
+  version "1.15.4"
+  resolved "https://registry.yarnpkg.com/@lichens-innovation/ts-common/-/ts-common-1.15.4.tgz#9e96c90e5f1ae629f18cf56f013e1cdfacaf90e0"
+  integrity sha512-mOxN3CCdbMP9sSSCRqSkrnRTGyrurS/WBPCW6kvCE+tHOs58/ptwutKn4QtbVA9arEptyQuSZro/7vDDzU82SQ==
+  dependencies:
+    date-fns "^4.1.0"
+
 "@mcp-ui/client@^6.0.0":
   version "6.1.1"
   resolved "https://registry.yarnpkg.com/@mcp-ui/client/-/client-6.1.1.tgz#74e2234c6d9718887c476aeb41a512ba2e7fb77d"
@@ -1536,6 +1543,11 @@ data-uri-to-buffer@^4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz#d8feb2b2881e6a4f58c2e08acfd0e2834e26222e"
   integrity sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==
+
+date-fns@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/date-fns/-/date-fns-4.1.0.tgz#64b3d83fff5aa80438f5b1a633c2e83b8a1c2d14"
+  integrity sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==
 
 debug@^4.3.1, debug@^4.3.2, debug@^4.3.7, debug@^4.4.0, debug@^4.4.3:
   version "4.4.3"

@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { APP_VERSION_INFO } from "./constants.js";
+import { listGitRepoRootsUnderParent } from "./git-projects.utils.js";
+import { buildMcpErrorResponse, buildMcpTextResponse } from "./mcp-server.utils.js";
 
 const server = new McpServer({
   title: "Lichens Code Crawler",
@@ -22,22 +24,37 @@ server.registerTool(
   },
   async ({ message }) => {
     const msg = `You said: ${message}. Here the version of the server: ${APP_VERSION_INFO.VERSION}`;
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: msg,
-        },
-      ],
-    };
+    return buildMcpTextResponse(msg);
   }
 );
 
-async function main() {
+server.registerTool(
+  "list-local-git-projects",
+  {
+    title: "List local Git projects",
+    description:
+      "Recursively finds Git repository roots under a given parent directory (stops at each .git root; skips node_modules).",
+    inputSchema: z.object({
+      parentDirectory: z
+        .string()
+        .min(1)
+        .describe("Absolute or relative path to the parent folder to scan (e.g. /Users/me/src or ~/Projects)"),
+    }),
+  },
+  async ({ parentDirectory }) => {
+    const { repos, error } = await listGitRepoRootsUnderParent(parentDirectory);
+    if (error) {
+      return buildMcpErrorResponse(error);
+    }
+
+    return buildMcpTextResponse(repos.join("\n"));
+  }
+);
+
+const main = async (): Promise<void> => {
   const transport = new StdioServerTransport();
   console.info("code-crawler MCP server is running...");
   await server.connect(transport);
-}
+};
 
-main();
+void main();
