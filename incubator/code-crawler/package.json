@@ -1,0 +1,24 @@
+{
+  "name": "code-crawler",
+  "description": "A tool to crawl code repositories and extract information about the codebase.",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "code-crawler": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.3"
+  }
+}
