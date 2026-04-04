@@ -2,8 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { APP_VERSION_INFO } from "./constants.js";
-import { listGitRepoRootsUnderParent } from "./git-projects.utils.js";
-import { buildMcpErrorResponse, buildMcpTextResponse } from "./mcp-server.utils.js";
+import { listLocalGitProjects, listLocalGitProjectsInputSchema } from "./git-projects.utils.js";
+import { buildMcpTextResponse } from "./mcp-server.utils.js";
 
 const server = new McpServer({
   title: "Lichens Code Crawler",
@@ -34,21 +34,9 @@ server.registerTool(
     title: "List local Git projects",
     description:
       "Recursively finds Git repository roots under a given parent directory (stops at each .git root; skips node_modules).",
-    inputSchema: z.object({
-      parentDirectory: z
-        .string()
-        .min(1)
-        .describe("Absolute or relative path to the parent folder to scan (e.g. /Users/me/src or ~/Projects)"),
-    }),
+    inputSchema: listLocalGitProjectsInputSchema,
   },
-  async ({ parentDirectory }) => {
-    const { repos, error } = await listGitRepoRootsUnderParent(parentDirectory);
-    if (error) {
-      return buildMcpErrorResponse(error);
-    }
-
-    return buildMcpTextResponse(repos.join("\n"));
-  }
+  listLocalGitProjects
 );
 
 const main = async (): Promise<void> => {
