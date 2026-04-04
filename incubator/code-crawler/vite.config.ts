@@ -1,27 +1,24 @@
-import { builtinModules } from 'node:module';
-import { defineConfig } from 'vite';
+import { builtinModules } from "node:module";
+import { defineConfig } from "vite";
 
-const nodeBuiltins = new Set([
-  ...builtinModules,
-  ...builtinModules.map((m) => `node:${m}`),
-]);
+const nodeBuiltins = new Set([...builtinModules, ...builtinModules.map((m) => `node:${m}`)]);
 
 export default defineConfig({
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
-    target: 'node20',
+    target: "node20",
     minify: false,
     lib: {
-      entry: 'src/mcp-server.ts',
-      name: 'codeCrawler',
-      fileName: () => 'mcp-server.js',
-      formats: ['es'],
+      entry: "src/mcp-server.ts",
+      name: "codeCrawler",
+      fileName: () => "mcp-server.js",
+      formats: ["es"],
     },
     rollupOptions: {
-      external: (id) => nodeBuiltins.has(id) || id.startsWith('node:'),
+      external: (id) => nodeBuiltins.has(id) || id.startsWith("node:"),
       output: {
-        banner: '#!/usr/bin/env node',
+        banner: "#!/usr/bin/env node",
       },
     },
   },
