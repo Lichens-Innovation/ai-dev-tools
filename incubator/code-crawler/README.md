@@ -71,6 +71,10 @@ Run these commands from **`incubator/code-crawler`** (this package’s `package.
 
 **`MCP Inspector PORT IS IN USE` (3333):** Another inspector (or app) is still bound to the default UI port. Close that terminal or tab, or stop the process (on macOS: `lsof -nP -iTCP:3333 -sTCP:LISTEN` then `kill <pid>`). You can also use alternate ports: `CLIENT_PORT=3334 SERVER_PORT=6278 yarn server:inspect`.
 
+## Embeddings creation
+
+Look for method: `runRepositoryIndexingFlow` (could be called for a single repo or inside a loop of repos)
+
 ## Security
 
 The server has **no authentication**. Binding to `127.0.0.1` limits exposure to the local machine. Do not expose the port on untrusted networks without adding your own auth and TLS.
