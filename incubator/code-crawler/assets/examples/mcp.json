@@ -4,16 +4,7 @@
       "url": "https://mcp.context7.com/mcp"
     },
     "code-crawler": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/incubator/code-crawler/dist/mcp-server.js"],
-      "cwd": "${workspaceFolder}/incubator/code-crawler",
-      "dev": {
-        "watch": "dist/**/*.js",
-        "debug": {
-          "type": "node"
-        }
-      }
+      "url": "http://127.0.0.1:3333/mcp"
     }
   }
 }

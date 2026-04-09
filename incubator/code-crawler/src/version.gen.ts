@@ -7,8 +7,8 @@ export const APP_VERSION_INFO = Object.freeze({
   REPOSITORY: "https://github.com/lichens-innovation/ai-dev-tools",
   AUTHOR: "Lichens Innovation",
   VERSION: "0.0.1",
-  VERSION_DATE: "2026-04-04",
-  VERSION_DATE_ISO: "2026-04-04T18:23:00.048Z",
+  VERSION_DATE: "2026-04-08",
+  VERSION_DATE_ISO: "2026-04-08T14:56:42.655Z",
 });
 
-export const LONG_VERSION_DATE = "0.0.1 (2026-04-04)";
+export const LONG_VERSION_DATE = "0.0.1 (2026-04-08)";
