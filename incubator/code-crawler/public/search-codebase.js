@@ -211,8 +211,7 @@ const renderDetailForMatch = ({ match, index }) => {
   document.getElementById("detail-path").textContent = pathRelative || "—";
   document.getElementById("detail-path").title = fullPath.length > 0 ? fullPath : pathRelative;
 
-  const linesLabel =
-    startLine !== null && endLine !== null ? `lines ${startLine}–${endLine}` : "";
+  const linesLabel = startLine !== null && endLine !== null ? `lines ${startLine}–${endLine}` : "";
   document.getElementById("detail-lines").textContent = linesLabel;
 
   document.getElementById("detail-score").textContent = formatDistanceLabel({ distance: match.distance });

@@ -2,8 +2,10 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 const browserPublicGlobals = {
+  console: "readonly",
   document: "readonly",
   fetch: "readonly",
+  navigator: "readonly",
   window: "readonly",
 };
 
