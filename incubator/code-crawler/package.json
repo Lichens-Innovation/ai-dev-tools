@@ -10,10 +10,11 @@
   },
   "scripts": {
     "prepare": "node ./scripts/husky-install.mjs",
-    "start": "CODE_CRAWLER_ROOT=\"$HOME/git/lichens\" nest start --watch",
+    "start": "CODE_CRAWLER_ROOT=\"$HOME/git/lichens\" CODE_CRAWLER_EMBEDDING_MODEL=\"jinaai/jina-embeddings-v2-base-code\" nest start --watch",
     "start:prod": "node dist/main.js",
     "inspector": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3333/mcp",
     "generate:version": "tsx ./scripts/generate-version.ts",
+    "download:models": "tsx ./scripts/models-download.ts jinaai/jina-embeddings-v2-base-code",
     "build": "nest build",
     "lint": "eslint . && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format:fix": "prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^10.0.1",
+    "@huggingface/hub": "^2.11.0",
     "@modelcontextprotocol/inspector": "^0.21.1",
     "@nestjs/cli": "^11",
     "@types/better-sqlite3": "^7.6.13",

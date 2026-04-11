@@ -446,10 +446,24 @@
   resolved "https://registry.yarnpkg.com/@hono/node-server/-/node-server-1.19.12.tgz#dae075247959b6d7d2dba4c8bdc8c452ca0c7b40"
   integrity sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw==
 
+"@huggingface/hub@^2.11.0":
+  version "2.11.0"
+  resolved "https://registry.yarnpkg.com/@huggingface/hub/-/hub-2.11.0.tgz#ed5a512337d9664c30993aaebdc55c342915417e"
+  integrity sha512-WS6QGaXYeBVFlaB4SOn6z4LGUpLB5kRZNL08uUni4izX353KxiwwZMK5+/AWX86MJh8SMZNa/JFcvFCcQsbszQ==
+  dependencies:
+    "@huggingface/tasks" "^0.19.90"
+  optionalDependencies:
+    cli-progress "^3.12.0"
+
 "@huggingface/jinja@^0.2.2":
   version "0.2.2"
   resolved "https://registry.yarnpkg.com/@huggingface/jinja/-/jinja-0.2.2.tgz#faeb205a9d6995089bef52655ddd8245d3190627"
   integrity sha512-/KPde26khDUIPkTGU82jdtTW9UAuvUTumCAbFs/7giR0SxsvZC4hru51PBvpijH6BVkHcROcvZM/lpy5h1jRRA==
+
+"@huggingface/tasks@^0.19.90":
+  version "0.19.90"
+  resolved "https://registry.yarnpkg.com/@huggingface/tasks/-/tasks-0.19.90.tgz#0f449ae2d5239dcb138e47f2446201dd6b512c2d"
+  integrity sha512-nfV9luJbvwGQ/5oKXkKhCV9h4X7mwh1YaGG3ORd6UMLDSwr1OFSSatcBX0O9OtBtmNK19aGSjbLFqqgcIR6+IA==
 
 "@humanfs/core@^0.19.1":
   version "0.19.1"
@@ -2214,6 +2228,13 @@ cli-cursor@^3.1.0:
   integrity sha512-I/zHAwsKf9FqGoXM4WWRACob9+SNukZTd94DWF57E4toouRulbCxcUh6RKUEOQlYTHJnzkPMySvPNaaSLNfLZw==
   dependencies:
     restore-cursor "^3.1.0"
+
+cli-progress@^3.12.0:
+  version "3.12.0"
+  resolved "https://registry.yarnpkg.com/cli-progress/-/cli-progress-3.12.0.tgz#807ee14b66bcc086258e444ad0f19e7d42577942"
+  integrity sha512-tRkV3HJ1ASwm19THiiLIXLO7Im7wlTuKnvkYaTkyoAPefqjNg7W7DHKUlGRxy9vxDvbyCYQkQozvptuMkGCg8A==
+  dependencies:
+    string-width "^4.2.3"
 
 cli-spinners@^2.5.0:
   version "2.9.2"

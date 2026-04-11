@@ -2,7 +2,7 @@ import { isBlank, isNotBlank } from "@lichens-innovation/ts-common";
 import { homedir } from "node:os";
 import path from "node:path";
 
-const DEFAULT_EMBEDDING_DIMENSIONS = 384;
+const DEFAULT_EMBEDDING_DIMENSIONS = 768;
 
 const ENV_SEMANTIC_INDEX_DB = "CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH";
 const ENV_EMBEDDING_DIM = "CODE_CRAWLER_EMBEDDING_DIM";
