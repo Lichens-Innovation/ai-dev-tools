@@ -261,8 +261,7 @@ const showDetailPlaceholder = () => {
 
 const buildLineGutterText = ({ codeText, startLine }) => {
   const lines = codeText.split("\n");
-  const baseLine =
-    typeof startLine === "number" && Number.isFinite(startLine) ? Math.trunc(startLine) : 1;
+  const baseLine = typeof startLine === "number" && Number.isFinite(startLine) ? Math.trunc(startLine) : 1;
   const numbers = lines.map((_, i) => baseLine + i);
   const padWidth = String(numbers[numbers.length - 1] ?? baseLine).length;
   return numbers.map((n) => String(n).padStart(padWidth, " ")).join("\n");
