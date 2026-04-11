@@ -148,7 +148,7 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
 
 export type SemanticSearchWorkspaceFilesInput = z.infer<typeof semanticSearchWorkspaceFilesInputSchema>;
 
-export const clearWorkspaceSemanticSearchIndexInputSchema = z.object({});
+export const clearWorkspaceSemanticSearchIndexInputSchema = z.object({}).default({});
 
 export type ClearWorkspaceSemanticSearchIndexInput = z.infer<typeof clearWorkspaceSemanticSearchIndexInputSchema>;
 
