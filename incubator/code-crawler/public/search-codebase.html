@@ -42,72 +42,9 @@
 
     <div class="row-actions">
       <span>Results</span>
-      <button type="button" class="clear-results-button" id="clear-results">Clear</button>
     </div>
     <div id="result"></div>
 
-    <script>
-      const MAX_NB_RESULTS = 50;
-
-      const displayResult = (data, isError = false) => {
-        const resultDiv = document.getElementById("result");
-        const timestamp = new Date().toLocaleTimeString("en-US");
-        const prefix = isError ? "❌" : "✅";
-        const text = typeof data === "object" ? JSON.stringify(data, null, 2) : String(data);
-        resultDiv.innerHTML += `\n[${timestamp}] ${prefix}\n${text}\n`;
-        resultDiv.scrollTop = resultDiv.scrollHeight;
-      };
-
-      const runSearch = async () => {
-        const queryText = document.getElementById("query-text").value.trim();
-        if (queryText.length === 0) {
-          displayResult("Enter a query in the text field.", true);
-          return;
-        }
-        const nbRaw = Number.parseInt(document.getElementById("nb-results").value, 10);
-        if (!Number.isFinite(nbRaw) || nbRaw < 1 || nbRaw > MAX_NB_RESULTS) {
-          displayResult(`Invalid number of results (integer between 1 and ${MAX_NB_RESULTS}).`, true);
-          return;
-        }
-        const repository = document.getElementById("repository-filter").value.trim();
-        const body = { queryText, nbResults: nbRaw };
-        if (repository.length > 0) {
-          body.repository = repository;
-        }
-        const button = document.getElementById("search-button");
-        button.disabled = true;
-        try {
-          const response = await fetch("/api/semantic-search-workspace-files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify(body),
-          });
-          const ct = response.headers.get("content-type") ?? "";
-          const bodyText = await response.text();
-          let payload = bodyText;
-          if (ct.includes("application/json") && bodyText.length > 0) {
-            try {
-              payload = JSON.parse(bodyText);
-            } catch {
-              payload = bodyText;
-            }
-          }
-          if (!response.ok) {
-            displayResult({ status: response.status, statusText: response.statusText, body: payload }, true);
-            return;
-          }
-          displayResult(payload);
-        } catch (error) {
-          displayResult(error instanceof Error ? error.message : String(error), true);
-        } finally {
-          button.disabled = false;
-        }
-      };
-
-      document.getElementById("search-button").addEventListener("click", runSearch);
-      document.getElementById("clear-results").addEventListener("click", () => {
-        document.getElementById("result").innerHTML = "";
-      });
-    </script>
+    <script src="/search-codebase.js"></script>
   </body>
 </html>

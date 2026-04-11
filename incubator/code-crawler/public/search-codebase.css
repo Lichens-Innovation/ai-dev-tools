@@ -1,7 +1,6 @@
 body {
   font-family: Arial, sans-serif;
-  max-width: 1100px;
-  margin: 0 auto;
+  margin: 0;
   padding: 20px;
   background-color: #1a1a1a;
   color: #e0e0e0;
@@ -99,20 +98,6 @@ body {
 
 .api-item .semantic-search-options__hint {
   margin: 0;
-}
-
-.clear-results-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.clear-results-button:hover {
-  background: #c82333;
 }
 
 .field-row {
