@@ -32,6 +32,14 @@ body {
   margin: 0;
 }
 
+/* GET /api/workspace-repositories: full first row, centered, alone */
+.actions-grid > .api-item--get-workspace-repositories {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .test-button {
   background: #007acc;
   color: white;
@@ -50,6 +58,10 @@ body {
   margin: 0;
 }
 
+.input-group--with-send {
+  position: relative;
+}
+
 .input-group textarea {
   display: block;
   width: 100%;
@@ -62,6 +74,29 @@ body {
   border-radius: 4px;
   font-family: ui-monospace, monospace;
   font-size: 13px;
+}
+
+.input-group--with-send textarea {
+  padding-top: 10px;
+  padding-right: 5.5rem;
+}
+
+.test-button--textarea-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 6px 14px;
+  font-size: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.endpoint-title {
+  margin-bottom: 10px;
+}
+
+.endpoint-title strong {
+  font-size: 14px;
 }
 
 #result {

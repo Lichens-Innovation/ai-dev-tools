@@ -12,59 +12,59 @@
     <p class="hint">This page is served as static files at <code>/</code>; <code>fetch(&quot;/api/…&quot;)</code> targets the REST API on the same origin.</p>
 
     <div class="actions-grid">
-      <div class="api-item">
+      <div class="api-item api-item--get-workspace-repositories">
         <button class="test-button" type="button" onclick="testGetWorkspaceRepositories()">GET /api/workspace-repositories</button>
       </div>
 
       <div class="api-item">
-        <div class="row-actions">
+        <div class="endpoint-title">
           <strong>POST /api/prepare-repository-for-semantic-search</strong>
-          <button class="test-button" type="button" onclick="testPrepareRepository()">Send</button>
         </div>
         <p class="hint">Optional <code>rootDir</code>: parent folder of Git repos (~ allowed). Omit to use <code>CODE_CRAWLER_ROOT</code>.</p>
-        <div class="input-group">
+        <div class="input-group input-group--with-send">
           <textarea id="body-prepare-repo" spellcheck="false" aria-label="Request JSON body">
 {
   "repository": "ai-dev-tools"
 }
           </textarea>
+          <button class="test-button test-button--textarea-overlay" type="button" onclick="testPrepareRepository()">Send</button>
         </div>
       </div>
 
       <div class="api-item">
-        <div class="row-actions">
+        <div class="endpoint-title">
           <strong>POST /api/prepare-workspace-repositories-for-semantic-search</strong>
-          <button class="test-button" type="button" onclick="testPrepareWorkspace()">Send</button>
         </div>
         <p class="hint">Optional <code>rootDir</code> only; empty object uses default root.</p>
-        <div class="input-group">
+        <div class="input-group input-group--with-send">
           <textarea id="body-prepare-ws" spellcheck="false" aria-label="Request JSON body">{}</textarea>
+          <button class="test-button test-button--textarea-overlay" type="button" onclick="testPrepareWorkspace()">Send</button>
         </div>
       </div>
 
       <div class="api-item">
-        <div class="row-actions">
+        <div class="endpoint-title">
           <strong>POST /api/semantic-search-workspace-files</strong>
-          <button class="test-button" type="button" onclick="testSemanticSearch()">Send</button>
         </div>
         <p class="hint"><code>nbResults</code> default 10, max 50. Optional <code>repository</code> basename to filter.</p>
-        <div class="input-group">
+        <div class="input-group input-group--with-send">
           <textarea id="body-semantic" spellcheck="false" aria-label="Request JSON body">
 {
   "queryText": "Where is the REST API controller defined?",
   "nbResults": 10
 }
           </textarea>
+          <button class="test-button test-button--textarea-overlay" type="button" onclick="testSemanticSearch()">Send</button>
         </div>
       </div>
 
       <div class="api-item">
-        <div class="row-actions">
+        <div class="endpoint-title">
           <strong>POST /api/clear-workspace-semantic-index</strong>
-          <button class="test-button" type="button" onclick="testClearIndex()">Send</button>
         </div>
-        <div class="input-group">
+        <div class="input-group input-group--with-send">
           <textarea id="body-clear" spellcheck="false" aria-label="Request JSON body">{}</textarea>
+          <button class="test-button test-button--textarea-overlay" type="button" onclick="testClearIndex()">Send</button>
         </div>
       </div>
     </div>
@@ -183,6 +183,12 @@
       };
 
       const testClearIndex = () => {
+        const confirmed = window.confirm(
+          "Clear the workspace semantic index? This removes embedded search data until you prepare repositories again.",
+        );
+        if (!confirmed) {
+          return;
+        }
         let body;
         try {
           body = readJsonFromTextarea("body-clear");
