@@ -2,8 +2,7 @@ const JSON_REQUEST_HEADERS = { "Content-Type": "application/json", Accept: "appl
 
 const getResultPanel = () => document.getElementById("result");
 
-const formatPayloadForDisplay = (data) =>
-  typeof data === "object" ? JSON.stringify(data, null, 2) : String(data);
+const formatPayloadForDisplay = (data) => (typeof data === "object" ? JSON.stringify(data, null, 2) : String(data));
 
 const scrollPanelToEnd = ({ element }) => {
   element.scrollTop = element.scrollHeight;
@@ -59,8 +58,7 @@ const showResponse = async ({ response }) => {
   displayResult({ data: payload });
 };
 
-const formatThrownValue = ({ error }) =>
-  error instanceof Error ? error.message : String(error);
+const formatThrownValue = ({ error }) => (error instanceof Error ? error.message : String(error));
 
 const tryReadJsonFromTextarea = ({ textareaId }) => {
   try {

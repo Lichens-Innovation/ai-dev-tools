@@ -2,8 +2,7 @@ const MAX_NB_RESULTS = 50;
 
 const getResultPanel = () => document.getElementById("result");
 
-const formatPayloadForDisplay = (data) =>
-  typeof data === "object" ? JSON.stringify(data, null, 2) : String(data);
+const formatPayloadForDisplay = (data) => (typeof data === "object" ? JSON.stringify(data, null, 2) : String(data));
 
 const scrollPanelToEnd = ({ element }) => {
   element.scrollTop = element.scrollHeight;
@@ -24,8 +23,7 @@ const notifyEmptyQuery = () => {
   displayResult({ data: "Enter a query in the text field.", isError: true });
 };
 
-const getNbResultsInputValue = () =>
-  Number.parseInt(document.getElementById("nb-results").value, 10);
+const getNbResultsInputValue = () => Number.parseInt(document.getElementById("nb-results").value, 10);
 
 const notifyInvalidNbResults = () => {
   displayResult({
@@ -34,11 +32,9 @@ const notifyInvalidNbResults = () => {
   });
 };
 
-const isNbResultsValid = ({ value }) =>
-  Number.isFinite(value) && value >= 1 && value <= MAX_NB_RESULTS;
+const isNbResultsValid = ({ value }) => Number.isFinite(value) && value >= 1 && value <= MAX_NB_RESULTS;
 
-const getTrimmedRepositoryFilter = () =>
-  document.getElementById("repository-filter").value.trim();
+const getTrimmedRepositoryFilter = () => document.getElementById("repository-filter").value.trim();
 
 const buildSemanticSearchBody = ({ queryText, nbResults, repository }) => {
   const body = { queryText, nbResults };
@@ -82,8 +78,7 @@ const postSemanticSearch = async ({ body }) => {
   displayResult({ data: payload });
 };
 
-const formatThrownValue = ({ error }) =>
-  error instanceof Error ? error.message : String(error);
+const formatThrownValue = ({ error }) => (error instanceof Error ? error.message : String(error));
 
 const setSearchButtonDisabled = ({ disabled }) => {
   document.getElementById("search-button").disabled = disabled;
