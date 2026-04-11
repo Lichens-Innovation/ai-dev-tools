@@ -1,4 +1,4 @@
-import { getErrorMessage, isBlank, isNotBlank, isNullish } from "@lichens-innovation/ts-common";
+import { getErrorMessage, isNotBlank, isNullish } from "@lichens-innovation/ts-common";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { createHash } from "node:crypto";
 import type { Dirent, Stats } from "node:fs";
@@ -7,6 +7,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 import { buildMcpErrorResponse, buildMcpTextResponse } from "../mcp/mcp-server.utils";
 import { toString } from "../utils/arrays.utils";
+import { getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
@@ -22,20 +23,6 @@ import {
 } from "./git-projects.utils";
 
 const WORKSPACE_REPOSITORIES_FILES_COLLECTION = "workspace-repositories-files";
-
-/** Default cap (1 MiB) when `CODE_CRAWLER_MAX_INDEX_FILE_BYTES` is unset or invalid. */
-const DEFAULT_MAX_INDEX_FILE_BYTES = 1 * 1024 * 1024;
-
-const parseMaxIndexFileBytes = (): number => {
-  const raw = process.env.CODE_CRAWLER_MAX_INDEX_FILE_BYTES?.trim();
-  if (isBlank(raw)) {
-    return DEFAULT_MAX_INDEX_FILE_BYTES;
-  }
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_INDEX_FILE_BYTES;
-};
-
-const MAX_INDEX_FILE_BYTES = parseMaxIndexFileBytes();
 const EMBED_BATCH_SIZE = 64;
 
 const EXAMPLE_QUERY_TEXT = "tanstack query returning a list of items with an infinite staleTime";
@@ -196,7 +183,7 @@ const loadIndexableFileContent = async (fullPath: string): Promise<IndexableFile
   console.info(`\t ${fullPath}`);
 
   const st = await statFileOrNull(fullPath);
-  if (!st || !st.isFile() || st.size > MAX_INDEX_FILE_BYTES) {
+  if (!st || !st.isFile() || st.size > getCodeCrawlerMaxIndexFileBytes()) {
     return null;
   }
 

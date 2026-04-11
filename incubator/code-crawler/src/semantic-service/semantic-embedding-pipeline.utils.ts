@@ -1,9 +1,6 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
 import { l2NormalizeInPlace } from "../utils/embeddings.utils";
-
-const DEFAULT_EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
-
-const getEmbeddingModelId = (): string => process.env.CODE_CRAWLER_EMBEDDING_MODEL?.trim() || DEFAULT_EMBEDDING_MODEL;
+import { getCodeCrawlerEmbeddingModel } from "../utils/env.utils";
 
 type FeaturePipeline = {
   (
@@ -17,7 +14,7 @@ type FeaturePipeline = {
 
 const loadFeatureExtractionPipeline = async (): Promise<FeaturePipeline> => {
   const mod = await import("@xenova/transformers");
-  const model = getEmbeddingModelId();
+  const model = getCodeCrawlerEmbeddingModel();
   console.info(`[semantic-embedding] Loading model "${model}" (first run may download assets)…`);
   const extractor = await mod.pipeline("feature-extraction", model);
   console.info(`[semantic-embedding] Model ready: "${model}"`);

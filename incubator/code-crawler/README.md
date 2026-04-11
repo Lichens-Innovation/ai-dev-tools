@@ -1,30 +1,33 @@
 # code-crawler
 
-MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using **Transformers.js** (default: `Xenova/all-MiniLM-L6-v2`) in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport).
+MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using **Transformers.js** in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport).
 
-The semantic index is **in memory only** (v1): restarting the server clears it; run `prepare-repository-for-semantic-search` again (or `yarn index:all-local-repositories`) to rebuild.
+The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `sqlite-semantic-index.store.ts`).
 
 ## Prerequisites
 
 - Node.js 22+
 - First embedding use may **download model weights** (cached by Transformers.js / Hugging Face conventions).
 
+## Configuration
+
+Environment variables are documented in [`.env.example`](.env.example) (defaults and behavior live in [`src/utils/env.utils.ts`](src/utils/env.utils.ts)).
+
+From this package directory:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` (at minimum set `CODE_CRAWLER_ROOT` to the parent folder of your Git repositories if you use the default workspace layout).
+
 ## Install and run
 
 ```bash
 yarn install
 yarn build
-CODE_CRAWLER_ROOT="$HOME/git/your-workspace" yarn start:prod
+yarn start:prod
 ```
-
-Defaults:
-
-- Listen address: `127.0.0.1` (override with `CODE_CRAWLER_HOST`, e.g. `0.0.0.0` in containers)
-- Port: `3333` (override with `CODE_CRAWLER_PORT` or `PORT`)
-
-Optional:
-
-- `CODE_CRAWLER_EMBEDDING_MODEL` — override the embedding model id (default `Xenova/all-MiniLM-L6-v2`).
 
 Development with reload:
 
@@ -32,7 +35,7 @@ Development with reload:
 yarn start
 ```
 
-MCP endpoint: `http://<host>:<port>/mcp`
+MCP endpoint: `http://<host>:<port>/mcp` (default bind `127.0.0.1:3333` unless overridden in `.env` — see `.env.example`).
 
 ## Extending persistence
 
@@ -56,7 +59,7 @@ Edit your MCP config (e.g. project `.cursor/mcp.json` or user-level MCP settings
 }
 ```
 
-Start the server separately with the right environment (especially `CODE_CRAWLER_ROOT`). Client config does not replace server env vars.
+Start the server separately with the right environment (see `.env` / `.env.example`, especially `CODE_CRAWLER_ROOT`). Client config does not replace server env vars.
 
 ### Claude Code
 

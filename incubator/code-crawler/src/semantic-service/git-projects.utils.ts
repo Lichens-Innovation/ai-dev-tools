@@ -3,6 +3,7 @@ import { access, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import { toStringLf } from "../utils/arrays.utils";
+import { EnvNames, getCodeCrawlerRoot } from "../utils/env.utils";
 
 const SKIP_DIR_NAMES = new Set(["node_modules", ".git"]);
 
@@ -102,10 +103,6 @@ export type RepositoriesParentResult = {
   repositories: string[];
 };
 
-const CODE_CRAWLER_ROOT_ENV = "CODE_CRAWLER_ROOT";
-
-const getCodeCrawlerRoot = (): string | undefined => process.env[CODE_CRAWLER_ROOT_ENV];
-
 /**
  * Absolute path to the directory set in `CODE_CRAWLER_ROOT` (after `~` expansion), or `undefined` if unset/blank.
  */
@@ -119,12 +116,12 @@ export const resolveCodeCrawlerParentPath = (): string | undefined => {
 };
 
 export const CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE = toStringLf([
-  `${CODE_CRAWLER_ROOT_ENV} is not set. It must be an absolute path to the directory that contains your Git`,
+  `${EnvNames.root} is not set. It must be an absolute path to the directory that contains your Git`,
   "repositories (the folder the code crawler should treat as the repositories parent).",
   "",
   "Define it for example:",
-  `- Shell: export ${CODE_CRAWLER_ROOT_ENV}=/path/to/your/repos`,
-  `- Cursor / VS Code MCP: add to the server entry "env": { "${CODE_CRAWLER_ROOT_ENV}": "/path/to/your/repos" }`,
+  `- Shell: export ${EnvNames.root}=/path/to/your/repos`,
+  `- Cursor / VS Code MCP: add to the server entry "env": { "${EnvNames.root}": "/path/to/your/repos" }`,
   "(when your client supports env for Streamable HTTP servers).",
 ]);
 
@@ -189,7 +186,7 @@ const buildRepoMultipleMatches = ({
 }: BuildRepoMultipleMatchesArgs): ErrorResult => {
   const hint = trimmedRoot
     ? "Rename one of the folders or use a narrower rootDir so only one match exists."
-    : "Rename one of the folders or narrow CODE_CRAWLER_ROOT so only one match exists.";
+    : `Rename one of the folders or narrow ${EnvNames.root} so only one match exists.`;
   return {
     error: [
       `Multiple Git repositories named "${repository}" exist under ${parentDirectory}:`,

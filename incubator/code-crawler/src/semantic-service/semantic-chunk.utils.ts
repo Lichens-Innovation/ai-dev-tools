@@ -1,4 +1,8 @@
-import { isBlank } from "@lichens-innovation/ts-common";
+import {
+  getCodeCrawlerChunkMaxChars,
+  getCodeCrawlerChunkMaxLines,
+  getCodeCrawlerChunkOverlapLines,
+} from "../utils/env.utils";
 
 /**
  * Line-based splitting of file content for semantic indexing (one embedding per chunk).
@@ -10,23 +14,14 @@ export type SemanticLineChunk = {
   startLine: number;
 };
 
-const parsePositiveInt = (raw?: string): number | null => {
-  const trimmed = raw?.trim();
-  if (isBlank(trimmed)) {
-    return null;
-  }
-  const n = Number.parseInt(trimmed, 10);
-  return Number.isFinite(n) && n > 0 ? n : null;
-};
-
 const getSemanticChunkParams = (): {
   maxCharsPerChunk: number; // "chars" here means UTF-8 bytes.
   maxLinesPerChunk: number;
   overlapLines: number;
 } => ({
-  maxCharsPerChunk: parsePositiveInt(process.env.CODE_CRAWLER_CHUNK_MAX_CHARS) ?? 1280,
-  maxLinesPerChunk: parsePositiveInt(process.env.CODE_CRAWLER_CHUNK_MAX_LINES) ?? 48,
-  overlapLines: parsePositiveInt(process.env.CODE_CRAWLER_CHUNK_OVERLAP_LINES) ?? 10,
+  maxCharsPerChunk: getCodeCrawlerChunkMaxChars(),
+  maxLinesPerChunk: getCodeCrawlerChunkMaxLines(),
+  overlapLines: getCodeCrawlerChunkOverlapLines(),
 });
 
 const normalizeSourceNewlines = (content: string): string => content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -34,7 +29,7 @@ const normalizeSourceNewlines = (content: string): string => content.replace(/\r
 /**
  * Splits normalized content into overlapping line windows,
  * capped by UTF-8 length per chunk (line boundaries only).
- * Limits come from CODE_CRAWLER_CHUNK_* environment variables.
+ * Limits come from `getCodeCrawlerChunk*` in `env.utils.ts`.
  */
 export const buildSemanticLineChunks = (content: string): SemanticLineChunk[] => {
   const { maxCharsPerChunk, maxLinesPerChunk, overlapLines: overlapFromEnv } = getSemanticChunkParams();

@@ -1,31 +1,9 @@
 #!/usr/bin/env node
-import { isBlank } from "@lichens-innovation/ts-common";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import "reflect-metadata";
 import { AppModule } from "./app.module";
-
-interface ParsePortArgs {
-  fallback: number;
-  raw: string | undefined;
-}
-
-const DefValues = {
-  port: 3333,
-  host: "127.0.0.1",
-} as const;
-
-const parsePort = ({ raw, fallback }: ParsePortArgs): number => {
-  if (isBlank(raw)) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 65_535) {
-    return fallback;
-  }
-  return parsed;
-};
+import { getCodeCrawlerCorsOrigin, getCodeCrawlerHost, getCodeCrawlerPort } from "./utils/env.utils";
 
 const main = async (): Promise<void> => {
   const logger = new Logger("[code-crawler main]");
@@ -35,14 +13,14 @@ const main = async (): Promise<void> => {
 
   // Local SPA dev: reflect browser Origin. Tighten with CODE_CRAWLER_CORS_ORIGIN in production if needed.
   app.enableCors({
-    origin: process.env.CODE_CRAWLER_CORS_ORIGIN?.trim() || true,
+    origin: getCodeCrawlerCorsOrigin(),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
     credentials: false,
   });
 
-  const host = process.env.CODE_CRAWLER_HOST ?? DefValues.host;
-  const port = parsePort({ raw: process.env.CODE_CRAWLER_PORT, fallback: DefValues.port });
+  const host = getCodeCrawlerHost();
+  const port = getCodeCrawlerPort();
 
   await app.listen(port, host);
   logger.log(`Lichens Code Crawler MCP (Streamable HTTP) at http://${host}:${port}/mcp`);

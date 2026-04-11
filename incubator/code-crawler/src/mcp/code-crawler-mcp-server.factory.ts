@@ -13,6 +13,7 @@ import {
   semanticSearchWorkspaceFiles,
   semanticSearchWorkspaceFilesInputSchema,
 } from "../semantic-service/repo-embeddings.utils";
+import { EnvNames } from "../utils/env.utils";
 import { APP_VERSION_INFO } from "../version.gen";
 
 /** Hints for MCP clients (Cursor, Claude Code, etc.): confirmation UI and tool grouping. Untrusted per spec. */
@@ -52,8 +53,8 @@ const registerCodeCrawlerTools = (mcpServer: McpServer): void => {
       description: toString([
         "Use first when you need codebase-wide natural-language search over this MCP host:",
         "embeds one repository’s source into the local semantic index so `semantic-search-workspace-files` can find relevant line ranges.",
-        "Pass `repository` as the folder basename under the parent (see resource `code-crawler://workspace-repositories` or env CODE_CRAWLER_ROOT); optional `rootDir` overrides that parent.",
-        "Indexes text-like files only (.ts, .tsx, .js, .py, .c, .cpp, .cs), skips build/vendor dirs, max ~3 MiB per file unless CODE_CRAWLER_MAX_INDEX_FILE_BYTES is set.",
+        `Pass \`repository\` as the folder basename under the parent (see resource \`code-crawler://workspace-repositories\` or env ${EnvNames.root}); optional \`rootDir\` overrides that parent.`,
+        `Indexes text-like files only (.ts, .tsx, .js, .py, .c, .cpp, .cs), skips build/vendor dirs, max ~3 MiB per file unless ${EnvNames.maxIndexFileBytes} is set.`,
         "Chunk = overlapping line windows with path prefix.",
         "Response includes indexedFileCount, indexedChunkCount, and a small example search.",
       ]),
@@ -69,7 +70,7 @@ const registerCodeCrawlerTools = (mcpServer: McpServer): void => {
       title: "Index all Git repos under a root (semantic)",
       description: toString([
         "Batch version of `prepare-repository-for-semantic-search`:",
-        "finds every Git root under optional `rootDir` (default CODE_CRAWLER_ROOT) and indexes each with the same rules.",
+        `finds every Git root under optional \`rootDir\` (default ${EnvNames.root}) and indexes each with the same rules.`,
         "Prefer this when the user’s question spans multiple sibling repositories.",
         "Repository keys in the index are POSIX paths relative to `rootDir` (nested repos stay distinct).",
         "Returns per-repo counts, totals, and one workspace-wide example query.",
@@ -119,8 +120,7 @@ const registerCodeCrawlerResources = (mcpServer: McpServer): void => {
     "code-crawler://workspace-repositories",
     {
       title: "Discover Git repos (for indexing)",
-      description:
-        "JSON list of Git repository roots under CODE_CRAWLER_ROOT (or configured parent). Use the names/paths to pick `repository` when calling `prepare-repository-for-semantic-search` or to interpret `repository` filters in `semantic-search-workspace-files`.",
+      description: `JSON list of Git repository roots under ${EnvNames.root} (or configured parent). Use the names/paths to pick \`repository\` when calling \`prepare-repository-for-semantic-search\` or to interpret \`repository\` filters in \`semantic-search-workspace-files\`.`,
       mimeType: "application/json",
     },
     async (uri): Promise<ReadResourceResult> => {
@@ -152,7 +152,7 @@ export const createCodeCrawlerMcpServer = (): McpServer => {
         "(2) prepare-repository-for-semantic-search OR prepare-workspace-repositories-for-semantic-search to build/update the index.",
         "(3) semantic-search-workspace-files with a natural-language query.",
         "(4) clear-workspace-semantic-index only if a full reset is required, then re-index.",
-        "Environment: CODE_CRAWLER_ROOT is the default parent of Git repos; CODE_CRAWLER_MAX_INDEX_FILE_BYTES caps per-file size.",
+        `Environment: ${EnvNames.root} is the default parent of Git repos; ${EnvNames.maxIndexFileBytes} caps per-file size.`,
       ].join("\n"),
     }
   );

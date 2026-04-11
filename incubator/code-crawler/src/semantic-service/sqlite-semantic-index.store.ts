@@ -4,7 +4,7 @@ import { Buffer } from "node:buffer";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import * as sqliteVec from "sqlite-vec";
-import { getEmbeddingDimensions, resolveSemanticIndexDbPath } from "./semantic-index-sqlite-path.utils";
+import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../utils/env.utils";
 import {
   FILE_INDEX_CHUNK_VEC_NAME,
   META_KEY_EMBEDDING_DIM,
@@ -207,7 +207,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     if (hasVectorTable) {
       if (!isNullish(storedDim) && storedDim !== dim) {
         throw new Error(
-          `[Store] stored ${META_KEY_EMBEDDING_DIM}=${storedDim} conflicts with configured ${dim}; use a new DB file or matching ${"CODE_CRAWLER_EMBEDDING_DIM"}.`
+          `[Store] stored ${META_KEY_EMBEDDING_DIM}=${storedDim} conflicts with configured ${dim}; use a new DB file or matching ${EnvNames.embeddingDim}.`
         );
       }
 

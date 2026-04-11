@@ -10,7 +10,7 @@
   },
   "scripts": {
     "prepare": "node ./scripts/husky-install.mjs",
-    "start": "CODE_CRAWLER_ROOT=\"$HOME/git/lichens\" CODE_CRAWLER_EMBEDDING_MODEL=\"jinaai/jina-embeddings-v2-base-code\" nest start --watch",
+    "start": "CODE_CRAWLER_ROOT=\"$HOME/git/lichens\" nest start --watch",
     "start:prod": "node dist/main.js",
     "inspector": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3333/mcp",
     "generate:version": "tsx ./scripts/generate-version.ts",
@@ -29,6 +29,7 @@
     "@lichens-innovation/ts-common": "^1.15.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/common": "^11",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11",
     "@nestjs/platform-express": "^11",
     "@nestjs/serve-static": "^5.0.5",
