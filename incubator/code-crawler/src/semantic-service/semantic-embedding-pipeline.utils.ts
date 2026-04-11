@@ -1,6 +1,12 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
+import path from "node:path";
 import { l2NormalizeInPlace } from "../utils/embeddings.utils";
-import { EnvNames, getCodeCrawlerEmbeddingModel, getEmbeddingDimensions } from "../utils/env.utils";
+import {
+  EnvNames,
+  getCodeCrawlerEmbeddingModel,
+  getCodeCrawlerTransformersModelsPath,
+  getEmbeddingDimensions,
+} from "../utils/env.utils";
 
 type FeaturePipeline = {
   (
@@ -12,11 +18,18 @@ type FeaturePipeline = {
   }>;
 };
 
+const TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
+
 const loadFeatureExtractionPipeline = async (): Promise<FeaturePipeline> => {
-  const mod = await import("@xenova/transformers");
+  const { env, pipeline } = await import("@huggingface/transformers");
+  const modelsRoot = getCodeCrawlerTransformersModelsPath();
+  env.localModelPath = modelsRoot.endsWith(path.sep) ? modelsRoot : `${modelsRoot}${path.sep}`;
+  env.cacheDir = path.join(modelsRoot, TRANSFORMERS_FS_CACHE_DIR);
   const model = getCodeCrawlerEmbeddingModel();
-  console.info(`[semantic-embedding] Loading model "${model}" (first run may download assets)…`);
-  const extractor = await mod.pipeline("feature-extraction", model);
+  console.info(
+    `[semantic-embedding] Loading model "${model}" (local: "${env.localModelPath}", cache: "${env.cacheDir}"; first run may download assets)…`
+  );
+  const extractor = await pipeline("feature-extraction", model);
   console.info(`[semantic-embedding] Model ready: "${model}"`);
   return extractor as FeaturePipeline;
 };
@@ -30,12 +43,16 @@ const getFeatureExtractionPipeline = (): Promise<FeaturePipeline> => {
   return pipelinePromise;
 };
 
+const asFloat32Data = (data: ArrayLike<number>): Float32Array =>
+  data instanceof Float32Array ? data : Float32Array.from(data);
+
 /**
  * Converts a feature-extraction tensor (float32) into one row per
  * batch item. Copies each row into its own Float32Array.
  */
-const tensorToRowVectors = (tensor: { data: Float32Array; dims: number[] }): Float32Array[] => {
-  const { data, dims } = tensor;
+const tensorToRowVectors = (tensor: { data: ArrayLike<number>; dims: number[] }): Float32Array[] => {
+  const data = asFloat32Data(tensor.data);
+  const { dims } = tensor;
   if (dims.length === 1) {
     return [Float32Array.from(data)];
   }

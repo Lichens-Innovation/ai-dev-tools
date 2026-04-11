@@ -9,6 +9,7 @@ export const EnvNames = {
   corsOrigin: "CODE_CRAWLER_CORS_ORIGIN",
   embeddingModel: "CODE_CRAWLER_EMBEDDING_MODEL",
   embeddingDim: "CODE_CRAWLER_EMBEDDING_DIM",
+  transformersModelsPath: "CODE_CRAWLER_TRANSFORMERS_MODELS_PATH",
   semanticIndexDbPath: "CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH",
   maxIndexFileBytes: "CODE_CRAWLER_MAX_INDEX_FILE_BYTES",
   chunkMaxChars: "CODE_CRAWLER_CHUNK_MAX_CHARS",
@@ -24,6 +25,7 @@ export type CodeCrawlerEnv = {
   corsOrigin: string | boolean;
   embeddingModel: string;
   embeddingDim: number;
+  transformersModelsPath: string;
   semanticIndexDbPath: string;
   maxIndexFileBytes: number;
   chunkMaxChars: number;
@@ -83,6 +85,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const root = requireNonBlankEnvVar(EnvNames.root);
   const embeddingModel = requireNonBlankEnvVar(EnvNames.embeddingModel);
   const embeddingDim = requirePositiveIntEnvVar(EnvNames.embeddingDim);
+  const transformersModelsRaw = requireNonBlankEnvVar(EnvNames.transformersModelsPath);
   const semanticIndexRaw = requireNonBlankEnvVar(EnvNames.semanticIndexDbPath);
   const maxIndexFileBytes = requirePositiveIntEnvVar(EnvNames.maxIndexFileBytes);
   const chunkMaxChars = requirePositiveIntEnvVar(EnvNames.chunkMaxChars);
@@ -97,6 +100,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     root,
     embeddingModel,
     embeddingDim,
+    transformersModelsPath: path.resolve(expandUserDirectory(transformersModelsRaw)),
     semanticIndexDbPath: path.resolve(expandUserDirectory(semanticIndexRaw)),
     maxIndexFileBytes,
     chunkMaxChars,
@@ -126,6 +130,8 @@ export const getCodeCrawlerCorsOrigin = (): string | boolean => getCodeCrawlerEn
 export const getCodeCrawlerRoot = (): string => getCodeCrawlerEnv().root;
 
 export const getCodeCrawlerEmbeddingModel = (): string => getCodeCrawlerEnv().embeddingModel;
+
+export const getCodeCrawlerTransformersModelsPath = (): string => getCodeCrawlerEnv().transformersModelsPath;
 
 export const resolveSemanticIndexDbPath = (): string => getCodeCrawlerEnv().semanticIndexDbPath;
 

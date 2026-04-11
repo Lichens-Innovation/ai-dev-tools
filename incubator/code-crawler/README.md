@@ -23,7 +23,9 @@ Edit `.env` and set all required keys (e.g. `CODE_CRAWLER_ROOT`, `CODE_CRAWLER_S
 
 ### Embeddings and models
 
-`.env.example` uses **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM). **MiniLM** (`Xenova/all-MiniLM-L6-v2`) is lighter (384-dim) if you change the model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
+`.env.example` uses **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM). **MiniLM** (`Xenova/all-MiniLM-L6-v2` or `onnx-community/all-MiniLM-L6-v2-ONNX`) is lighter (384-dim) if you change the model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
+
+Upgrading the Transformers.js dependency can change floating-point embeddings for the same model id; if search quality degrades after an upgrade, **rebuild the semantic index** (new `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH` or delete the existing DB and re-index).
 
 ## Install and run
 

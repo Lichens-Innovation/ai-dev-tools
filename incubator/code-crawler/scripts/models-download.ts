@@ -1,15 +1,14 @@
+import "dotenv/config";
 import { downloadFile, ListFileEntry, listFiles } from "@huggingface/hub";
 import { getErrorMessage } from "@lichens-innovation/ts-common";
 import { createWriteStream, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-const APP_HOME_SUBDIR = "code-crawler";
-const MODELS_SUBDIR = "models";
+import { EnvNames, expandUserDirectory, requireNonBlankEnvVar } from "../src/utils/env.utils";
 
-const MODELS_ROOT = join(homedir(), APP_HOME_SUBDIR, MODELS_SUBDIR);
+const MODELS_ROOT = resolve(expandUserDirectory(requireNonBlankEnvVar(EnvNames.transformersModelsPath)));
 
 interface StreamBlobToFileArgs {
   blob: Blob;
