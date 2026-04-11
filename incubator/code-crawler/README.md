@@ -11,7 +11,7 @@ The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `sqlit
 
 ## Configuration
 
-Environment variables are documented in [`.env.example`](.env.example) (defaults and behavior live in [`src/utils/env.utils.ts`](src/utils/env.utils.ts)).
+Environment variables are documented in [`.env.example`](.env.example); all are **required** except `CODE_CRAWLER_CORS_ORIGIN`, which may be left blank (see [`src/utils/env.utils.ts`](src/utils/env.utils.ts)).
 
 From this package directory:
 
@@ -19,11 +19,11 @@ From this package directory:
 cp .env.example .env
 ```
 
-Edit `.env` (at minimum set `CODE_CRAWLER_ROOT` to the parent folder of your Git repositories if you use the default workspace layout).
+Edit `.env` and set all required keys (e.g. `CODE_CRAWLER_ROOT`, `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH`). Leave `CODE_CRAWLER_CORS_ORIGIN` unset or blank to mirror the browser Origin; set it to a URL for a fixed CORS origin.
 
 ### Embeddings and models
 
-Default in code is **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM) versus **MiniLM** (`Xenova/all-MiniLM-L6-v2`, 384-dim, lighter). If you change `CODE_CRAWLER_EMBEDDING_MODEL`, either set `CODE_CRAWLER_EMBEDDING_DIM` to the model’s output width or use a [preset id](src/utils/env.utils.ts) so the dimension matches automatically. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
+`.env.example` uses **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM). **MiniLM** (`Xenova/all-MiniLM-L6-v2`) is lighter (384-dim) if you change the model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
 
 ## Install and run
 

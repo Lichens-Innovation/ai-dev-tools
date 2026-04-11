@@ -1,8 +1,7 @@
-import { isBlank, isNotBlank } from "@lichens-innovation/ts-common";
+import { isBlank, isNullish } from "@lichens-innovation/ts-common";
 import { homedir } from "node:os";
 import path from "node:path";
 
-/** Env var names (single source for code, MCP copy, and `.env.example`). */
 export const EnvNames = {
   root: "CODE_CRAWLER_ROOT",
   host: "CODE_CRAWLER_HOST",
@@ -18,67 +17,24 @@ export const EnvNames = {
   embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
 } as const;
 
-/** Hub model id → output width when {@link EnvNames.embeddingDim} is unset (exact id match). */
-export const EMBEDDING_MODEL_DIMENSIONS_PRESET: Readonly<Record<string, number>> = {
-  "jinaai/jina-embeddings-v2-base-code": 768,
-  "Xenova/all-MiniLM-L6-v2": 384,
-  "sentence-transformers/all-MiniLM-L6-v2": 384,
+export type CodeCrawlerEnv = {
+  root: string;
+  host: string;
+  port: number;
+  corsOrigin: string | boolean;
+  embeddingModel: string;
+  embeddingDim: number;
+  semanticIndexDbPath: string;
+  maxIndexFileBytes: number;
+  chunkMaxChars: number;
+  chunkMaxLines: number;
+  chunkOverlapLines: number;
+  embedBatchSize: number;
 };
 
-export const DefaultValues = {
-  host: "127.0.0.1",
-  port: 3333,
-  embeddingModel: "jinaai/jina-embeddings-v2-base-code",
-  /**
-   * Fallback vector length when {@link EnvNames.embeddingDim} is unset and the resolved model id
-   * is not in {@link EMBEDDING_MODEL_DIMENSIONS_PRESET}. Must match the default model output.
-   */
-  embeddingDim: 768,
-  semanticIndexDbBasename: "code-crawler-db",
-  maxIndexFileBytes: 1 * 1024 * 1024,
-  chunkMaxChars: 1280,
-  chunkMaxLines: 48,
-  chunkOverlapLines: 10,
-  /** Max texts passed to the embedding pipeline per forward pass (memory vs throughput). */
-  embedBatchSize: 64,
-} as const;
+let cached: CodeCrawlerEnv | null = null;
 
-const parsePortInRange = (raw: string | undefined, fallback: number): number => {
-  if (isBlank(raw)) {
-    return fallback;
-  }
-
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 65_535) {
-    return fallback;
-  }
-
-  return parsed;
-};
-
-export const getCodeCrawlerHost = (): string => {
-  const raw = process.env[EnvNames.host]?.trim();
-  return isBlank(raw) ? DefaultValues.host : raw;
-};
-
-/**
- * HTTP listen port: {@link EnvNames.port} if set and valid, else default.
- */
-export const getCodeCrawlerPort = (): number =>
-  parsePortInRange(process.env[EnvNames.port]?.trim(), DefaultValues.port);
-
-/**
- * CORS `origin`: returns `true` (reflect request Origin) when unset/blank; otherwise the trimmed string.
- */
-export const getCodeCrawlerCorsOrigin = (): string | boolean => {
-  const raw = process.env[EnvNames.corsOrigin]?.trim();
-  return isBlank(raw) ? true : raw;
-};
-
-/**
- * Expands a leading `~` or `~/` to {@link homedir}. Other paths are returned trimmed unchanged.
- * Shells expand `~` in `.env`; Node and MCP often do not — use this before `path.resolve`.
- */
+// `~` in env values is often not expanded outside a shell; normalize before `path.resolve`.
 export const expandUserDirectory = (input: string): string => {
   const trimmed = input.trim();
   if (trimmed === "~") {
@@ -92,92 +48,95 @@ export const expandUserDirectory = (input: string): string => {
   return trimmed;
 };
 
-export const getCodeCrawlerRoot = (): string | undefined => {
-  const raw = process.env[EnvNames.root];
-  if (isBlank(raw?.trim())) {
-    return undefined;
-  }
+export const readOptionalTrimmedEnvVar = (name: string): string => process.env[name]?.trim() ?? "";
 
-  return raw;
-};
-
-export const getCodeCrawlerEmbeddingModel = (): string => {
-  const raw = process.env[EnvNames.embeddingModel]?.trim();
-  return isBlank(raw) ? DefaultValues.embeddingModel : raw;
-};
-
-/**
- * Absolute path to the semantic index SQLite file.
- * When {@link EnvNames.semanticIndexDbPath} is unset/blank: `<homedir>/code-crawler/<DefaultValues.semanticIndexDbBasename>`.
- * When set: resolved after {@link expandUserDirectory} (so `~/...` in `.env` works).
- */
-export const resolveSemanticIndexDbPath = (): string => {
-  const fromEnv = process.env[EnvNames.semanticIndexDbPath]?.trim();
-
-  if (isNotBlank(fromEnv)) {
-    return path.resolve(expandUserDirectory(fromEnv));
-  }
-
-  return path.join(homedir(), "code-crawler", DefaultValues.semanticIndexDbBasename);
-};
-
-/**
- * Embedding vector length for sqlite-vec. Must match the loaded model.
- * When {@link EnvNames.embeddingDim} is unset: uses {@link EMBEDDING_MODEL_DIMENSIONS_PRESET} for the
- * resolved {@link getCodeCrawlerEmbeddingModel} id, else {@link DefaultValues.embeddingDim}.
- * Throws if {@link EnvNames.embeddingDim} is set but not a positive integer.
- */
-export const getEmbeddingDimensions = (): number => {
-  const raw = process.env[EnvNames.embeddingDim]?.trim();
-
-  if (isNotBlank(raw)) {
-    const n = Number.parseInt(raw, 10);
-    if (!Number.isFinite(n) || n < 1) {
-      throw new Error(`[getEmbeddingDimensions] invalid ${EnvNames.embeddingDim}=${raw}`);
-    }
-    return n;
-  }
-
-  const modelId = getCodeCrawlerEmbeddingModel();
-  const fromPreset = EMBEDDING_MODEL_DIMENSIONS_PRESET[modelId];
-  if (fromPreset !== undefined) {
-    return fromPreset;
-  }
-
-  return DefaultValues.embeddingDim;
-};
-
-export const getCodeCrawlerMaxIndexFileBytes = (): number => {
-  const raw = process.env[EnvNames.maxIndexFileBytes]?.trim();
-  if (isBlank(raw)) {
-    return DefaultValues.maxIndexFileBytes;
-  }
-
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : DefaultValues.maxIndexFileBytes;
-};
-
-const parsePositiveIntFromEnv = (raw: string | undefined): number | null => {
-  const trimmed = raw?.trim();
+export const requireNonBlankEnvVar = (name: string): string => {
+  const trimmed = readOptionalTrimmedEnvVar(name);
   if (isBlank(trimmed)) {
-    return null;
+    throw new Error(`[env] ${name} is required (non-empty)`);
   }
-
-  const n = Number.parseInt(trimmed, 10);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  return trimmed;
 };
 
-export const getCodeCrawlerChunkMaxChars = (): number =>
-  parsePositiveIntFromEnv(process.env[EnvNames.chunkMaxChars]) ?? DefaultValues.chunkMaxChars;
+export const requirePositiveIntEnvVar = (name: string): number => {
+  const raw = requireNonBlankEnvVar(name);
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) {
+    throw new Error(`[env] ${name} must be a positive integer (got: ${raw})`);
+  }
+  return n;
+};
 
-export const getCodeCrawlerChunkMaxLines = (): number =>
-  parsePositiveIntFromEnv(process.env[EnvNames.chunkMaxLines]) ?? DefaultValues.chunkMaxLines;
+export const requirePortEnvVar = (name: string): number => {
+  const raw = requireNonBlankEnvVar(name);
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 65_535) {
+    throw new Error(`[env] ${name} must be an integer from 1 to 65535 (got: ${raw})`);
+  }
+  return n;
+};
 
-export const getCodeCrawlerChunkOverlapLines = (): number =>
-  parsePositiveIntFromEnv(process.env[EnvNames.chunkOverlapLines]) ?? DefaultValues.chunkOverlapLines;
+const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
+  const host = requireNonBlankEnvVar(EnvNames.host);
+  const port = requirePortEnvVar(EnvNames.port);
+  const corsRaw = readOptionalTrimmedEnvVar(EnvNames.corsOrigin);
+  const root = requireNonBlankEnvVar(EnvNames.root);
+  const embeddingModel = requireNonBlankEnvVar(EnvNames.embeddingModel);
+  const embeddingDim = requirePositiveIntEnvVar(EnvNames.embeddingDim);
+  const semanticIndexRaw = requireNonBlankEnvVar(EnvNames.semanticIndexDbPath);
+  const maxIndexFileBytes = requirePositiveIntEnvVar(EnvNames.maxIndexFileBytes);
+  const chunkMaxChars = requirePositiveIntEnvVar(EnvNames.chunkMaxChars);
+  const chunkMaxLines = requirePositiveIntEnvVar(EnvNames.chunkMaxLines);
+  const chunkOverlapLines = requirePositiveIntEnvVar(EnvNames.chunkOverlapLines);
+  const embedBatchSize = requirePositiveIntEnvVar(EnvNames.embedBatchSize);
 
-/**
- * Batch size for embedding many chunk texts in one pipeline call.
- */
-export const getCodeCrawlerEmbedBatchSize = (): number =>
-  parsePositiveIntFromEnv(process.env[EnvNames.embedBatchSize]) ?? DefaultValues.embedBatchSize;
+  return {
+    host,
+    port,
+    corsOrigin: isBlank(corsRaw) ? true : corsRaw,
+    root,
+    embeddingModel,
+    embeddingDim,
+    semanticIndexDbPath: path.resolve(expandUserDirectory(semanticIndexRaw)),
+    maxIndexFileBytes,
+    chunkMaxChars,
+    chunkMaxLines,
+    chunkOverlapLines,
+    embedBatchSize,
+  };
+};
+
+/** Parses and caches env; throws on the first invalid or missing required variable. */
+export const loadCodeCrawlerEnv = (): CodeCrawlerEnv => {
+  if (!isNullish(cached)) {
+    return cached;
+  }
+  cached = buildCodeCrawlerEnv();
+  return cached;
+};
+
+export const getCodeCrawlerEnv = (): Readonly<CodeCrawlerEnv> => loadCodeCrawlerEnv();
+
+export const getCodeCrawlerHost = (): string => getCodeCrawlerEnv().host;
+
+export const getCodeCrawlerPort = (): number => getCodeCrawlerEnv().port;
+
+export const getCodeCrawlerCorsOrigin = (): string | boolean => getCodeCrawlerEnv().corsOrigin;
+
+export const getCodeCrawlerRoot = (): string => getCodeCrawlerEnv().root;
+
+export const getCodeCrawlerEmbeddingModel = (): string => getCodeCrawlerEnv().embeddingModel;
+
+export const resolveSemanticIndexDbPath = (): string => getCodeCrawlerEnv().semanticIndexDbPath;
+
+export const getEmbeddingDimensions = (): number => getCodeCrawlerEnv().embeddingDim;
+
+export const getCodeCrawlerMaxIndexFileBytes = (): number => getCodeCrawlerEnv().maxIndexFileBytes;
+
+export const getCodeCrawlerChunkMaxChars = (): number => getCodeCrawlerEnv().chunkMaxChars;
+
+export const getCodeCrawlerChunkMaxLines = (): number => getCodeCrawlerEnv().chunkMaxLines;
+
+export const getCodeCrawlerChunkOverlapLines = (): number => getCodeCrawlerEnv().chunkOverlapLines;
+
+export const getCodeCrawlerEmbedBatchSize = (): number => getCodeCrawlerEnv().embedBatchSize;

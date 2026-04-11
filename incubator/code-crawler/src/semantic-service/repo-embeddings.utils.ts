@@ -15,7 +15,6 @@ import type { FileIndexMetadata, FileIndexRecord, QueryOutcome } from "./semanti
 import { workspaceSemanticIndexStore } from "./sqlite-semantic-index.store";
 
 import {
-  CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE,
   listGitRepoRootsUnderParent,
   resolveCodeCrawlerParentPath,
   resolveRepositoryUnderCodeCrawlerRoot,
@@ -681,12 +680,7 @@ const resolveParentDirectoryForSemanticWorkspace = async (
     }
   }
 
-  const parentDirectory = resolveCodeCrawlerParentPath();
-  if (!parentDirectory) {
-    return { error: CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE };
-  }
-
-  return { parentDirectory };
+  return { parentDirectory: resolveCodeCrawlerParentPath() };
 };
 
 const textFromCallToolResult = (result: CallToolResult): string => {

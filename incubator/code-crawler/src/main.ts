@@ -1,17 +1,20 @@
 #!/usr/bin/env node
+import "dotenv/config";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import "reflect-metadata";
 import { AppModule } from "./app.module";
-import { getCodeCrawlerCorsOrigin, getCodeCrawlerHost, getCodeCrawlerPort } from "./utils/env.utils";
+import { getCodeCrawlerCorsOrigin, getCodeCrawlerEnv, getCodeCrawlerHost, getCodeCrawlerPort } from "./utils/env.utils";
 
 const main = async (): Promise<void> => {
   const logger = new Logger("[code-crawler main]");
 
+  getCodeCrawlerEnv();
+
   const app = await NestFactory.create(AppModule, { bodyParser: true });
   app.enableShutdownHooks();
 
-  // Local SPA dev: reflect browser Origin. Tighten with CODE_CRAWLER_CORS_ORIGIN in production if needed.
+  // Blank `CODE_CRAWLER_CORS_ORIGIN` mirrors the request Origin; otherwise it is a fixed origin string.
   app.enableCors({
     origin: getCodeCrawlerCorsOrigin(),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

@@ -1,7 +1,6 @@
-import { getErrorMessage, isBlank } from "@lichens-innovation/ts-common";
+import { getErrorMessage } from "@lichens-innovation/ts-common";
 import { access, readdir, stat } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
-import { toStringLf } from "../utils/arrays.utils";
 import { EnvNames, expandUserDirectory, getCodeCrawlerRoot } from "../utils/env.utils";
 
 const SKIP_DIR_NAMES = new Set(["node_modules", ".git"]);
@@ -89,27 +88,8 @@ export type RepositoriesParentResult = {
   repositories: string[];
 };
 
-/**
- * Absolute path to the directory set in `CODE_CRAWLER_ROOT` (after `~` expansion), or `undefined` if unset/blank.
- */
-export const resolveCodeCrawlerParentPath = (): string | undefined => {
-  const raw = getCodeCrawlerRoot();
-  if (isBlank(raw)) {
-    return undefined;
-  }
-
-  return resolve(expandUserDirectory(raw));
-};
-
-export const CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE = toStringLf([
-  `${EnvNames.root} is not set. It must be an absolute path to the directory that contains your Git`,
-  "repositories (the folder the code crawler should treat as the repositories parent).",
-  "",
-  "Define it for example:",
-  `- Shell: export ${EnvNames.root}=/path/to/your/repos`,
-  `- Cursor / VS Code MCP: add to the server entry "env": { "${EnvNames.root}": "/path/to/your/repos" }`,
-  "(when your client supports env for Streamable HTTP servers).",
-]);
+/** Absolute path to the directory set in {@link EnvNames.root} (after `~` expansion). */
+export const resolveCodeCrawlerParentPath = (): string => resolve(expandUserDirectory(getCodeCrawlerRoot()));
 
 type GetRepositoriesParentResourceType = { payload: RepositoriesParentResult } | ErrorResult;
 
@@ -118,9 +98,6 @@ type GetRepositoriesParentResourceType = { payload: RepositoriesParentResult } |
  */
 export const getRepositoriesInfos = async (): Promise<GetRepositoriesParentResourceType> => {
   const parentDirectory = resolveCodeCrawlerParentPath();
-  if (!parentDirectory) {
-    return { error: CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE };
-  }
 
   const { repos, error } = await listGitRepoRootsUnderParent(parentDirectory);
   if (error) {
@@ -184,7 +161,7 @@ const buildRepoMultipleMatches = ({
 
 /**
  * Resolves a Git repository folder name under a parent directory (basename match).
- * When `rootDir` is omitted or blank, uses `CODE_CRAWLER_ROOT` (must be set).
+ * When `rootDir` is omitted or blank, uses {@link EnvNames.root}.
  * Fails if the parent cannot be resolved, if no repo matches, or if several repos share the same basename.
  */
 export const resolveRepositoryUnderCodeCrawlerRoot = async (
@@ -208,9 +185,6 @@ export const resolveRepositoryUnderCodeCrawlerRoot = async (
     }
   } else {
     parentDirectory = resolveCodeCrawlerParentPath();
-    if (!parentDirectory) {
-      return { error: CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE };
-    }
   }
 
   const { repos, error } = await listGitRepoRootsUnderParent(parentDirectory);

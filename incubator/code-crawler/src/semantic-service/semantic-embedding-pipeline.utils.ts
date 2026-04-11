@@ -80,13 +80,12 @@ export const embedTextsWithLanguageModel = async (texts: string[]): Promise<Embe
 
     const expectedDim = getEmbeddingDimensions();
     const firstLen = rows[0]?.length;
-    if (firstLen !== undefined && firstLen !== expectedDim) {
+    if (!isNullish(firstLen) && firstLen !== expectedDim) {
       return {
         embeddings: [],
         errorMessage: [
           `Embedding vector length ${firstLen} does not match configured ${expectedDim}`,
-          `(${getCodeCrawlerEmbeddingModel()}). Set ${EnvNames.embeddingDim} to the model output width`,
-          "or use a preset model id (see EMBEDDING_MODEL_DIMENSIONS_PRESET in env.utils).",
+          `(${getCodeCrawlerEmbeddingModel()}). Set ${EnvNames.embeddingDim} to the model output width.`,
         ].join(" "),
       };
     }

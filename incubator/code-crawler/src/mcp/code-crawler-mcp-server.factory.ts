@@ -54,7 +54,7 @@ const registerCodeCrawlerTools = (mcpServer: McpServer): void => {
         "Use first when you need codebase-wide natural-language search over this MCP host:",
         "embeds one repository’s source into the local semantic index so `semantic-search-workspace-files` can find relevant line ranges.",
         `Pass \`repository\` as the folder basename under the parent (see resource \`code-crawler://workspace-repositories\` or env ${EnvNames.root}); optional \`rootDir\` overrides that parent.`,
-        `Indexes text-like files only (.ts, .tsx, .js, .py, .c, .cpp, .cs), skips build/vendor dirs, max ~3 MiB per file unless ${EnvNames.maxIndexFileBytes} is set.`,
+        `Indexes text-like files only (.ts, .tsx, .js, .py, .c, .cpp, .cs), skips build/vendor dirs; per-file size is capped by ${EnvNames.maxIndexFileBytes}.`,
         "Chunk = overlapping line windows with path prefix.",
         "Response includes indexedFileCount, indexedChunkCount, and a small example search.",
       ]),
@@ -70,7 +70,7 @@ const registerCodeCrawlerTools = (mcpServer: McpServer): void => {
       title: "Index all Git repos under a root (semantic)",
       description: toString([
         "Batch version of `prepare-repository-for-semantic-search`:",
-        `finds every Git root under optional \`rootDir\` (default ${EnvNames.root}) and indexes each with the same rules.`,
+        `finds every Git root under optional \`rootDir\` (defaults to the directory from ${EnvNames.root}) and indexes each with the same rules.`,
         "Prefer this when the user’s question spans multiple sibling repositories.",
         "Repository keys in the index are POSIX paths relative to `rootDir` (nested repos stay distinct).",
         "Returns per-repo counts, totals, and one workspace-wide example query.",
@@ -152,7 +152,7 @@ export const createCodeCrawlerMcpServer = (): McpServer => {
         "(2) prepare-repository-for-semantic-search OR prepare-workspace-repositories-for-semantic-search to build/update the index.",
         "(3) semantic-search-workspace-files with a natural-language query.",
         "(4) clear-workspace-semantic-index only if a full reset is required, then re-index.",
-        `Environment: ${EnvNames.root} is the default parent of Git repos; ${EnvNames.maxIndexFileBytes} caps per-file size.`,
+        `Environment: ${EnvNames.root} is the default parent of Git repos; ${EnvNames.maxIndexFileBytes} is the per-file size cap.`,
       ].join("\n"),
     }
   );

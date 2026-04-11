@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
+import { isNullish } from "@lichens-innovation/ts-common";
 import { StatusCodes } from "http-status-codes";
 
 export type CallToolResultToRestOutcome = {
@@ -15,7 +16,7 @@ const extractText = (result: CallToolResult): string => {
 };
 
 const isJsonObjectOrArray = (value: unknown): value is Record<string, unknown> | unknown[] =>
-  value !== null && (Array.isArray(value) || typeof value === "object");
+  !isNullish(value) && (Array.isArray(value) || typeof value === "object");
 
 export const callToolResultToRestBody = ({ result }: { result: CallToolResult }): CallToolResultToRestOutcome => {
   if (result.isError) {
