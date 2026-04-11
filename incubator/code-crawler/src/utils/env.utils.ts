@@ -7,8 +7,6 @@ export const EnvNames = {
   root: "CODE_CRAWLER_ROOT",
   host: "CODE_CRAWLER_HOST",
   port: "CODE_CRAWLER_PORT",
-  /** Generic `PORT` when {@link EnvNames.port} is unset. */
-  listenPort: "PORT",
   corsOrigin: "CODE_CRAWLER_CORS_ORIGIN",
   embeddingModel: "CODE_CRAWLER_EMBEDDING_MODEL",
   embeddingDim: "CODE_CRAWLER_EMBEDDING_DIM",
@@ -51,17 +49,10 @@ export const getCodeCrawlerHost = (): string => {
 };
 
 /**
- * HTTP listen port: {@link EnvNames.port} if set and valid, else generic {@link EnvNames.listenPort}, else default.
+ * HTTP listen port: {@link EnvNames.port} if set and valid, else default.
  */
-export const getCodeCrawlerPort = (): number => {
-  const fromCodeCrawler = process.env[EnvNames.port]?.trim();
-  if (isNotBlank(fromCodeCrawler)) {
-    return parsePortInRange(fromCodeCrawler, DefaultValues.port);
-  }
-
-  const fromPort = process.env[EnvNames.listenPort]?.trim();
-  return parsePortInRange(fromPort, DefaultValues.port);
-};
+export const getCodeCrawlerPort = (): number =>
+  parsePortInRange(process.env[EnvNames.port]?.trim(), DefaultValues.port);
 
 /**
  * CORS `origin`: returns `true` (reflect request Origin) when unset/blank; otherwise the trimmed string.
