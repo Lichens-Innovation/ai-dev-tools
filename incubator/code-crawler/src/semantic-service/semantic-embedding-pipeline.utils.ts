@@ -1,6 +1,6 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
 import { l2NormalizeInPlace } from "../utils/embeddings.utils";
-import { getCodeCrawlerEmbeddingModel } from "../utils/env.utils";
+import { EnvNames, getCodeCrawlerEmbeddingModel, getEmbeddingDimensions } from "../utils/env.utils";
 
 type FeaturePipeline = {
   (
@@ -75,6 +75,19 @@ export const embedTextsWithLanguageModel = async (texts: string[]): Promise<Embe
       return {
         embeddings: [],
         errorMessage: `Embedding batch size mismatch: expected ${texts.length}, got ${rows.length}`,
+      };
+    }
+
+    const expectedDim = getEmbeddingDimensions();
+    const firstLen = rows[0]?.length;
+    if (firstLen !== undefined && firstLen !== expectedDim) {
+      return {
+        embeddings: [],
+        errorMessage: [
+          `Embedding vector length ${firstLen} does not match configured ${expectedDim}`,
+          `(${getCodeCrawlerEmbeddingModel()}). Set ${EnvNames.embeddingDim} to the model output width`,
+          "or use a preset model id (see EMBEDDING_MODEL_DIMENSIONS_PRESET in env.utils).",
+        ].join(" "),
       };
     }
 

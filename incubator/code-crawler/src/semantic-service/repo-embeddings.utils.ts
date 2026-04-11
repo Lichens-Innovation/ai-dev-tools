@@ -7,7 +7,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 import { buildMcpErrorResponse, buildMcpTextResponse } from "../mcp/mcp-server.utils";
 import { toString } from "../utils/arrays.utils";
-import { expandUserDirectory, getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
+import { expandUserDirectory, getCodeCrawlerEmbedBatchSize, getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
@@ -22,7 +22,6 @@ import {
 } from "./git-projects.utils";
 
 const WORKSPACE_REPOSITORIES_FILES_COLLECTION = "workspace-repositories-files";
-const EMBED_BATCH_SIZE = 64;
 
 const EXAMPLE_QUERY_TEXT = "tanstack query returning a list of items with an infinite staleTime";
 
@@ -438,9 +437,10 @@ const embedPendingIntoFileChunkBuckets = async ({
   repository,
 }: EmbedPendingIntoFileChunkBucketsArgs): Promise<EmbedPendingIntoFileChunkBucketsOutcome> => {
   let upsertBatchOrdinal = 0;
+  const embedBatchSize = getCodeCrawlerEmbedBatchSize();
 
-  for (let i = 0; i < pendingChunks.length; i += EMBED_BATCH_SIZE) {
-    const slice = pendingChunks.slice(i, i + EMBED_BATCH_SIZE);
+  for (let i = 0; i < pendingChunks.length; i += embedBatchSize) {
+    const slice = pendingChunks.slice(i, i + embedBatchSize);
     const texts = slice.map((p) => p.embedText);
     const { embeddings, errorMessage } = await embedTextsWithLanguageModel(texts);
     if (isNotBlank(errorMessage)) {
@@ -510,10 +510,11 @@ const logSemanticIndexUpsertStart = ({
     return;
   }
 
+  const embedBatchSize = getCodeCrawlerEmbedBatchSize();
   console.info(
     toString([
       `[${repository}] semantic index: ${fileCount} file(s) → ${chunkCount} chunk(s);`,
-      `embedding batches of up to ${EMBED_BATCH_SIZE}…`,
+      `embedding batches of up to ${embedBatchSize}…`,
     ])
   );
 };

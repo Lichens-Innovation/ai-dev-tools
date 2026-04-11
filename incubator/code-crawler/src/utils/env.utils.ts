@@ -15,19 +15,32 @@ export const EnvNames = {
   chunkMaxChars: "CODE_CRAWLER_CHUNK_MAX_CHARS",
   chunkMaxLines: "CODE_CRAWLER_CHUNK_MAX_LINES",
   chunkOverlapLines: "CODE_CRAWLER_CHUNK_OVERLAP_LINES",
+  embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
 } as const;
+
+/** Hub model id → output width when {@link EnvNames.embeddingDim} is unset (exact id match). */
+export const EMBEDDING_MODEL_DIMENSIONS_PRESET: Readonly<Record<string, number>> = {
+  "jinaai/jina-embeddings-v2-base-code": 768,
+  "Xenova/all-MiniLM-L6-v2": 384,
+  "sentence-transformers/all-MiniLM-L6-v2": 384,
+};
 
 export const DefaultValues = {
   host: "127.0.0.1",
   port: 3333,
   embeddingModel: "jinaai/jina-embeddings-v2-base-code",
-  /** Default vector length when `CODE_CRAWLER_EMBEDDING_DIM` is unset; must match the default model output. */
+  /**
+   * Fallback vector length when {@link EnvNames.embeddingDim} is unset and the resolved model id
+   * is not in {@link EMBEDDING_MODEL_DIMENSIONS_PRESET}. Must match the default model output.
+   */
   embeddingDim: 768,
   semanticIndexDbBasename: "code-crawler-db",
   maxIndexFileBytes: 1 * 1024 * 1024,
   chunkMaxChars: 1280,
   chunkMaxLines: 48,
   chunkOverlapLines: 10,
+  /** Max texts passed to the embedding pipeline per forward pass (memory vs throughput). */
+  embedBatchSize: 64,
 } as const;
 
 const parsePortInRange = (raw: string | undefined, fallback: number): number => {
@@ -110,21 +123,28 @@ export const resolveSemanticIndexDbPath = (): string => {
 
 /**
  * Embedding vector length for sqlite-vec. Must match the loaded model.
+ * When {@link EnvNames.embeddingDim} is unset: uses {@link EMBEDDING_MODEL_DIMENSIONS_PRESET} for the
+ * resolved {@link getCodeCrawlerEmbeddingModel} id, else {@link DefaultValues.embeddingDim}.
  * Throws if {@link EnvNames.embeddingDim} is set but not a positive integer.
  */
 export const getEmbeddingDimensions = (): number => {
   const raw = process.env[EnvNames.embeddingDim]?.trim();
 
-  if (isBlank(raw)) {
-    return DefaultValues.embeddingDim;
+  if (isNotBlank(raw)) {
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      throw new Error(`[getEmbeddingDimensions] invalid ${EnvNames.embeddingDim}=${raw}`);
+    }
+    return n;
   }
 
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 1) {
-    throw new Error(`[getEmbeddingDimensions] invalid ${EnvNames.embeddingDim}=${raw}`);
+  const modelId = getCodeCrawlerEmbeddingModel();
+  const fromPreset = EMBEDDING_MODEL_DIMENSIONS_PRESET[modelId];
+  if (fromPreset !== undefined) {
+    return fromPreset;
   }
 
-  return n;
+  return DefaultValues.embeddingDim;
 };
 
 export const getCodeCrawlerMaxIndexFileBytes = (): number => {
@@ -155,3 +175,9 @@ export const getCodeCrawlerChunkMaxLines = (): number =>
 
 export const getCodeCrawlerChunkOverlapLines = (): number =>
   parsePositiveIntFromEnv(process.env[EnvNames.chunkOverlapLines]) ?? DefaultValues.chunkOverlapLines;
+
+/**
+ * Batch size for embedding many chunk texts in one pipeline call.
+ */
+export const getCodeCrawlerEmbedBatchSize = (): number =>
+  parsePositiveIntFromEnv(process.env[EnvNames.embedBatchSize]) ?? DefaultValues.embedBatchSize;

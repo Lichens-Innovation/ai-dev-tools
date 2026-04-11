@@ -21,6 +21,10 @@ cp .env.example .env
 
 Edit `.env` (at minimum set `CODE_CRAWLER_ROOT` to the parent folder of your Git repositories if you use the default workspace layout).
 
+### Embeddings and models
+
+Default in code is **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM) versus **MiniLM** (`Xenova/all-MiniLM-L6-v2`, 384-dim, lighter). If you change `CODE_CRAWLER_EMBEDDING_MODEL`, either set `CODE_CRAWLER_EMBEDDING_DIM` to the model’s output width or use a [preset id](src/utils/env.utils.ts) so the dimension matches automatically. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
+
 ## Install and run
 
 ```bash
