@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Code Crawler — semantic search</title>
     <link rel="stylesheet" href="/search-codebase.css" />
+    <link rel="stylesheet" href="/highlight-github-dark.min.css" />
   </head>
   <body>
     <div class="api-item">
@@ -40,11 +41,39 @@
       </div>
     </div>
 
-    <div class="row-actions">
-      <span>Results</span>
-    </div>
-    <div id="result"></div>
+    <div class="search-results-shell api-item" aria-live="polite">
+      <div class="search-status-bar" id="search-status" role="status"></div>
+      <div class="search-error" id="search-error" role="alert" hidden></div>
 
+      <div class="search-master-detail" id="search-master-detail">
+        <div class="search-results-column">
+          <div class="row-actions search-results-column__header">
+            <span class="search-results-column__title">Matches</span>
+          </div>
+          <ul class="search-results-list" id="search-results-list"></ul>
+        </div>
+
+        <aside class="search-detail-panel" id="search-detail-panel" aria-label="Selected match code">
+          <div class="search-detail-panel__placeholder" id="search-detail-placeholder">
+            Select a match to view the indexed chunk.
+          </div>
+          <div class="search-detail-panel__content" id="search-detail-content" hidden>
+            <header class="search-detail-panel__header">
+              <div class="search-detail-panel__meta">
+                <span class="search-detail-panel__badge" id="detail-repo"></span>
+                <span class="search-detail-panel__path" id="detail-path"></span>
+                <span class="search-detail-panel__lines" id="detail-lines"></span>
+                <span class="search-detail-panel__score" id="detail-score" title="Cosine-style distance from the index; lower is closer"></span>
+              </div>
+              <button type="button" class="test-button test-button--small" id="detail-copy-path">Copy full path</button>
+            </header>
+            <pre class="search-detail-panel__pre"><code class="hljs" id="detail-code"></code></pre>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" crossorigin="anonymous"></script>
     <script src="/search-codebase.js"></script>
   </body>
 </html>
