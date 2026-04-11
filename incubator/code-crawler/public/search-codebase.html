@@ -12,16 +12,15 @@
       <div class="semantic-search-layout">
         <div class="semantic-search-query">
           <div class="field-row semantic-search-query__field">
-            <label class="field-label" for="query-text">Semantic code search</label>
             <div class="input-group semantic-search-query__input input-group--search-overlay">
-              <textarea id="query-text" spellcheck="true" rows="5" aria-label="Natural language query" placeholder="e.g. Where is the REST API controller defined?"></textarea>
+              <textarea id="query-text" spellcheck="true" aria-label="Natural language query" placeholder="e.g. tanstack query returning a list of items with an infinite staleTime"></textarea>
               <button class="test-button test-button--textarea-overlay-bottom" type="button" id="search-button">Search</button>
             </div>
           </div>
         </div>
 
         <aside class="semantic-search-options" aria-label="Search options">
-          <div class="field-row">
+          <div class="field-row field-row--inline">
             <label class="field-label" for="nb-results">Number of results (1–50)</label>
             <input id="nb-results" type="number" min="1" max="50" value="10" class="field-input-number" />
           </div>
@@ -36,7 +35,6 @@
               autocomplete="off"
             />
           </div>
-          <p class="hint semantic-search-options__hint">Leave Repository empty to search across all indexed repositories.</p>
         </aside>
       </div>
     </div>
@@ -60,7 +58,6 @@
           <div class="search-detail-panel__content" id="search-detail-content" hidden>
             <header class="search-detail-panel__header">
               <div class="search-detail-panel__meta">
-                <span class="search-detail-panel__badge" id="detail-repo"></span>
                 <span class="search-detail-panel__path" id="detail-path"></span>
               </div>
               <button type="button" class="test-button test-button--small" id="detail-copy-path">Copy full path</button>

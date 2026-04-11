@@ -51,8 +51,27 @@ const getDetailPlaceholderEl = () => document.getElementById("search-detail-plac
 const getDetailContentEl = () => document.getElementById("search-detail-content");
 const getDetailCodeEl = () => document.getElementById("detail-code");
 const getDetailLineGutterEl = () => document.getElementById("detail-line-gutter");
-const getDetailRepoEl = () => document.getElementById("detail-repo");
 const getDetailPathEl = () => document.getElementById("detail-path");
+
+/** Single header line: `repository/path` without duplicating the repo if path already includes it. */
+const formatDetailHeaderPath = ({ repository, pathRelative }) => {
+  const repo = typeof repository === "string" ? repository.trim() : "";
+  const rel = typeof pathRelative === "string" ? pathRelative.trim() : "";
+  const normRepo = repo.replace(/\\/g, "/");
+  let normPath = rel.replace(/\\/g, "/");
+
+  if (normRepo.length > 0 && (normPath === normRepo || normPath.startsWith(`${normRepo}/`))) {
+    normPath = normPath === normRepo ? "" : normPath.slice(normRepo.length + 1);
+  }
+
+  if (normRepo.length === 0) {
+    return normPath.length > 0 ? normPath : "—";
+  }
+  if (normPath.length === 0) {
+    return normRepo;
+  }
+  return `${normRepo}/${normPath}`;
+};
 
 const setSearchStatus = ({ html, isBusy = false }) => {
   const el = getSearchStatusEl();
@@ -301,10 +320,10 @@ const renderDetailForMatch = ({ match, index }) => {
 
   lastDetailFullPath = m.fullPath;
 
-  getDetailRepoEl().textContent = m.repository || "—";
+  const headerPath = formatDetailHeaderPath({ repository: m.repository, pathRelative: m.pathRelative });
   const pathEl = getDetailPathEl();
-  pathEl.textContent = m.pathRelative || "—";
-  pathEl.title = m.fullPath.length > 0 ? m.fullPath : m.pathRelative;
+  pathEl.textContent = headerPath;
+  pathEl.title = m.fullPath.length > 0 ? m.fullPath : headerPath;
 
   const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
   const language = resolveHljsLanguage({ pathRelative: m.pathRelative });
