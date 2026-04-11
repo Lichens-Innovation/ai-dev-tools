@@ -32,7 +32,6 @@ body {
   margin: 0;
 }
 
-/* GET /api/workspace-repositories: full first row, centered, alone */
 .actions-grid > .api-item--get-workspace-repositories {
   grid-column: 1 / -1;
   display: flex;

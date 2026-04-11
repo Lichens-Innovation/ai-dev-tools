@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Crawler — semantic search</title>
+    <link rel="stylesheet" href="/search-codebase.css" />
+  </head>
+  <body>
+    <div class="api-item">
+      <div class="semantic-search-layout">
+        <div class="semantic-search-query">
+          <div class="field-row semantic-search-query__field">
+            <label class="field-label" for="query-text">Semantic code search</label>
+            <div class="input-group semantic-search-query__input input-group--search-overlay">
+              <textarea id="query-text" spellcheck="true" rows="5" aria-label="Natural language query" placeholder="e.g. Where is the REST API controller defined?"></textarea>
+              <button class="test-button test-button--textarea-overlay-bottom" type="button" id="search-button">Search</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="semantic-search-options" aria-label="Search options">
+          <div class="field-row">
+            <label class="field-label" for="nb-results">Number of results (1–50)</label>
+            <input id="nb-results" type="number" min="1" max="50" value="10" class="field-input-number" />
+          </div>
+          <div class="field-row">
+            <label class="field-label" for="repository-filter">Repository (optional)</label>
+            <input
+              id="repository-filter"
+              type="text"
+              class="field-input-text semantic-search-options__repo-input"
+              placeholder="Repository folder name, e.g. ai-dev-tools"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </div>
+          <p class="hint semantic-search-options__hint">Leave Repository empty to search across all indexed repositories.</p>
+        </aside>
+      </div>
+    </div>
+
+    <div class="row-actions">
+      <span>Results</span>
+      <button type="button" class="clear-results-button" id="clear-results">Clear</button>
+    </div>
+    <div id="result"></div>
+
+    <script>
+      const MAX_NB_RESULTS = 50;
+
+      const displayResult = (data, isError = false) => {
+        const resultDiv = document.getElementById("result");
+        const timestamp = new Date().toLocaleTimeString("en-US");
+        const prefix = isError ? "❌" : "✅";
+        const text = typeof data === "object" ? JSON.stringify(data, null, 2) : String(data);
+        resultDiv.innerHTML += `\n[${timestamp}] ${prefix}\n${text}\n`;
+        resultDiv.scrollTop = resultDiv.scrollHeight;
+      };
+
+      const runSearch = async () => {
+        const queryText = document.getElementById("query-text").value.trim();
+        if (queryText.length === 0) {
+          displayResult("Enter a query in the text field.", true);
+          return;
+        }
+        const nbRaw = Number.parseInt(document.getElementById("nb-results").value, 10);
+        if (!Number.isFinite(nbRaw) || nbRaw < 1 || nbRaw > MAX_NB_RESULTS) {
+          displayResult(`Invalid number of results (integer between 1 and ${MAX_NB_RESULTS}).`, true);
+          return;
+        }
+        const repository = document.getElementById("repository-filter").value.trim();
+        const body = { queryText, nbResults: nbRaw };
+        if (repository.length > 0) {
+          body.repository = repository;
+        }
+        const button = document.getElementById("search-button");
+        button.disabled = true;
+        try {
+          const response = await fetch("/api/semantic-search-workspace-files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(body),
+          });
+          const ct = response.headers.get("content-type") ?? "";
+          const bodyText = await response.text();
+          let payload = bodyText;
+          if (ct.includes("application/json") && bodyText.length > 0) {
+            try {
+              payload = JSON.parse(bodyText);
+            } catch {
+              payload = bodyText;
+            }
+          }
+          if (!response.ok) {
+            displayResult({ status: response.status, statusText: response.statusText, body: payload }, true);
+            return;
+          }
+          displayResult(payload);
+        } catch (error) {
+          displayResult(error instanceof Error ? error.message : String(error), true);
+        } finally {
+          button.disabled = false;
+        }
+      };
+
+      document.getElementById("search-button").addEventListener("click", runSearch);
+      document.getElementById("clear-results").addEventListener("click", () => {
+        document.getElementById("result").innerHTML = "";
+      });
+    </script>
+  </body>
+</html>

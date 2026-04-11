@@ -47,7 +47,7 @@ const main = async (): Promise<void> => {
   await app.listen(port, host);
   logger.log(`Lichens Code Crawler MCP (Streamable HTTP) at http://${host}:${port}/mcp`);
   logger.log(`Lichens Code Crawler REST API at http://${host}:${port}/api`);
-  logger.log(`REST API test page at http://${host}:${port}/`);
+  logger.log(`Static UI (hub) at http://${host}:${port}/`);
 };
 
 void main().catch((error: unknown) => {
