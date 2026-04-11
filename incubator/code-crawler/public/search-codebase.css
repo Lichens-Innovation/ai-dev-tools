@@ -420,13 +420,6 @@ body {
   word-break: break-all;
 }
 
-.search-detail-panel__lines,
-.search-detail-panel__score {
-  font-size: 12px;
-  color: #aaa;
-  font-family: ui-monospace, monospace;
-}
-
 .search-detail-panel__pre {
   margin: 0;
   padding: 12px;
@@ -435,6 +428,28 @@ body {
   font-size: 13px;
   line-height: 1.45;
   background: #0d1117;
+}
+
+.search-detail-panel__pre--lined {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+}
+
+.search-detail-line-gutter {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border-right: 1px solid #30363d;
+  padding-right: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre;
+  text-align: right;
+  color: #6e7681;
+  user-select: none;
 }
 
 .search-detail-panel__pre code.hljs {

@@ -50,6 +50,9 @@ const getResultsListEl = () => document.getElementById("search-results-list");
 const getDetailPlaceholderEl = () => document.getElementById("search-detail-placeholder");
 const getDetailContentEl = () => document.getElementById("search-detail-content");
 const getDetailCodeEl = () => document.getElementById("detail-code");
+const getDetailLineGutterEl = () => document.getElementById("detail-line-gutter");
+const getDetailRepoEl = () => document.getElementById("detail-repo");
+const getDetailPathEl = () => document.getElementById("detail-path");
 
 const setSearchStatus = ({ html, isBusy = false }) => {
   const el = getSearchStatusEl();
@@ -91,6 +94,7 @@ const parsePayloadFromResponseParts = ({ contentType, bodyText }) => {
   if (!contentType.includes("application/json") || bodyText.length === 0) {
     return bodyText;
   }
+
   try {
     return JSON.parse(bodyText);
   } catch {
@@ -102,9 +106,11 @@ const extractBodyFromDocumentPreview = ({ documentPreview }) => {
   if (typeof documentPreview !== "string") {
     return "";
   }
+
   if (EMBED_PREVIEW_PREFIX.test(documentPreview)) {
     return documentPreview.replace(EMBED_PREVIEW_PREFIX, "");
   }
+
   return documentPreview;
 };
 
@@ -114,6 +120,7 @@ const getFileExtension = ({ pathRelative }) => {
   if (dot <= 0 || dot === last.length - 1) {
     return "";
   }
+
   return last.slice(dot + 1).toLowerCase();
 };
 
@@ -122,6 +129,7 @@ const resolveHljsLanguage = ({ pathRelative }) => {
   if (ext.length === 0) {
     return "plaintext";
   }
+
   return extensionToHljsLanguage[ext] ?? "plaintext";
 };
 
@@ -130,6 +138,7 @@ const truncateOneLine = ({ text, maxLen }) => {
   if (line.length <= maxLen) {
     return line;
   }
+
   return `${line.slice(0, maxLen - 1)}…`;
 };
 
@@ -137,7 +146,78 @@ const formatDistanceLabel = ({ distance }) => {
   if (typeof distance !== "number" || !Number.isFinite(distance)) {
     return "";
   }
+
   return `distance ${distance.toFixed(4)}`;
+};
+
+const normalizeSearchMatch = ({ match }) => {
+  const meta = match?.metadata ?? {};
+  return {
+    pathRelative: typeof meta.pathRelative === "string" ? meta.pathRelative : "",
+    repository: typeof meta.repository === "string" ? meta.repository : "",
+    fullPath: typeof meta.fullPath === "string" ? meta.fullPath : "",
+    startLine: typeof match.startLine === "number" ? match.startLine : null,
+    endLine: typeof match.endLine === "number" ? match.endLine : null,
+    documentPreview: typeof match.documentPreview === "string" ? match.documentPreview : "",
+    distance: match.distance,
+  };
+};
+
+const formatMatchCardLinesShort = ({ startLine, endLine }) =>
+  startLine !== null && endLine !== null ? `L${startLine}–${endLine}` : "";
+
+const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLabel, previewLine }) => `
+    <span class="search-match-card__row">
+      <span class="search-match-card__badge">${escapeHtml(repository || "—")}</span>
+      <span class="search-match-card__path">${escapeHtml(pathRelative || "(no path)")}</span>
+    </span>
+    <span class="search-match-card__row search-match-card__row--meta">
+      <span class="search-match-card__lines">${escapeHtml(linesShort)}</span>
+      <span class="search-match-card__distance">${escapeHtml(distanceLabel)}</span>
+    </span>
+    <span class="search-match-card__preview">${escapeHtml(previewLine)}</span>
+  `;
+
+const formatMatchCountStatusHtml = ({ count }) =>
+  `${count} match${count === 1 ? "" : "es"} <span class="search-status-bar__hint">(lower distance is closer)</span>`;
+
+const rejectInvalidSuccessPayload = () => {
+  setSearchError({ message: "Unexpected response shape." });
+  clearResultsUi();
+};
+
+const rejectUnexpectedOutcomeShape = () => {
+  setSearchError({ message: "Unexpected outcome in response (expected a list of matches or an error object)." });
+  clearResultsUi();
+};
+
+const showSemanticSearchOutcomeError = ({ outcome }) => {
+  getResultsListEl().innerHTML = "";
+  setSearchError({ message: outcome.error });
+  setSearchStatus({ html: "Search finished with an error.", isBusy: false });
+  showDetailPlaceholder();
+};
+
+const renderMatchOutcomeList = ({ outcome }) => {
+  const listEl = getResultsListEl();
+  listEl.innerHTML = "";
+
+  if (outcome.length === 0) {
+    setSearchStatus({ html: "No matches.", isBusy: false });
+    showDetailPlaceholder();
+    return;
+  }
+
+  setSearchStatus({
+    html: formatMatchCountStatusHtml({ count: outcome.length }),
+    isBusy: false,
+  });
+
+  outcome.forEach((match, index) => {
+    listEl.appendChild(buildMatchCardButton({ match, index }));
+  });
+
+  showDetailPlaceholder();
 };
 
 const isOutcomeError = ({ outcome }) =>
@@ -153,6 +233,13 @@ const escapeHtml = (raw) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
+const deselectAllMatchCards = () => {
+  document.querySelectorAll(".search-match-card--selected").forEach((card) => {
+    card.classList.remove("search-match-card--selected");
+    card.setAttribute("aria-selected", "false");
+  });
+};
+
 const clearResultsUi = () => {
   lastDetailFullPath = "";
   getResultsListEl().innerHTML = "";
@@ -165,10 +252,20 @@ const showDetailPlaceholder = () => {
   const codeEl = getDetailCodeEl();
   codeEl.textContent = "";
   codeEl.className = "hljs";
-  document.querySelectorAll(".search-match-card--selected").forEach((el) => {
-    el.classList.remove("search-match-card--selected");
-    el.setAttribute("aria-selected", "false");
-  });
+  const gutterEl = getDetailLineGutterEl();
+  if (gutterEl) {
+    gutterEl.textContent = "";
+  }
+  deselectAllMatchCards();
+};
+
+const buildLineGutterText = ({ codeText, startLine }) => {
+  const lines = codeText.split("\n");
+  const baseLine =
+    typeof startLine === "number" && Number.isFinite(startLine) ? Math.trunc(startLine) : 1;
+  const numbers = lines.map((_, i) => baseLine + i);
+  const padWidth = String(numbers[numbers.length - 1] ?? baseLine).length;
+  return numbers.map((n) => String(n).padStart(padWidth, " ")).join("\n");
 };
 
 const applySyntaxHighlight = ({ codeEl, language, codeText }) => {
@@ -178,71 +275,65 @@ const applySyntaxHighlight = ({ codeEl, language, codeText }) => {
     codeEl.textContent = codeText;
     return;
   }
-  const tryLanguage = hljs.getLanguage?.(language) != null ? language : null;
-  if (tryLanguage != null) {
+
+  const hasRegisteredLanguage = typeof hljs.getLanguage === "function" && hljs.getLanguage(language) !== undefined;
+  const resolvedLanguage = hasRegisteredLanguage ? language : null;
+  if (resolvedLanguage !== null) {
     try {
-      const { value } = hljs.highlight(codeText, { language: tryLanguage });
+      const { value } = hljs.highlight(codeText, { language: resolvedLanguage });
       codeEl.innerHTML = value;
       return;
     } catch (error) {
       console.error("[search-codebase] highlight failed:", error);
     }
   }
+
   if (typeof hljs.highlightAuto === "function") {
     const { value } = hljs.highlightAuto(codeText);
     codeEl.innerHTML = value;
     return;
   }
+
   codeEl.textContent = codeText;
 };
 
 const renderDetailForMatch = ({ match, index }) => {
-  const meta = match?.metadata ?? {};
-  const pathRelative = typeof meta.pathRelative === "string" ? meta.pathRelative : "";
-  const repository = typeof meta.repository === "string" ? meta.repository : "";
-  const fullPath = typeof meta.fullPath === "string" ? meta.fullPath : "";
-  const startLine = typeof match.startLine === "number" ? match.startLine : null;
-  const endLine = typeof match.endLine === "number" ? match.endLine : null;
-  const documentPreview = typeof match.documentPreview === "string" ? match.documentPreview : "";
+  const m = normalizeSearchMatch({ match });
 
-  lastDetailFullPath = fullPath;
+  lastDetailFullPath = m.fullPath;
 
-  document.getElementById("detail-repo").textContent = repository || "—";
-  document.getElementById("detail-path").textContent = pathRelative || "—";
-  document.getElementById("detail-path").title = fullPath.length > 0 ? fullPath : pathRelative;
+  getDetailRepoEl().textContent = m.repository || "—";
+  const pathEl = getDetailPathEl();
+  pathEl.textContent = m.pathRelative || "—";
+  pathEl.title = m.fullPath.length > 0 ? m.fullPath : m.pathRelative;
 
-  const linesLabel = startLine !== null && endLine !== null ? `lines ${startLine}–${endLine}` : "";
-  document.getElementById("detail-lines").textContent = linesLabel;
-
-  document.getElementById("detail-score").textContent = formatDistanceLabel({ distance: match.distance });
-
-  const body = extractBodyFromDocumentPreview({ documentPreview });
-  const language = resolveHljsLanguage({ pathRelative });
+  const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
+  const language = resolveHljsLanguage({ pathRelative: m.pathRelative });
 
   getDetailPlaceholderEl().hidden = true;
   getDetailContentEl().hidden = false;
 
   const codeEl = getDetailCodeEl();
+  const gutterEl = getDetailLineGutterEl();
+  if (gutterEl) {
+    gutterEl.textContent = buildLineGutterText({ codeText: body, startLine: m.startLine });
+  }
   applySyntaxHighlight({ codeEl, language, codeText: body });
 
-  document.querySelectorAll(".search-match-card--selected").forEach((el) => {
-    el.classList.remove("search-match-card--selected");
-    el.setAttribute("aria-selected", "false");
-  });
-  const active = document.querySelector(`[data-match-index="${index}"]`);
-  if (active) {
-    active.classList.add("search-match-card--selected");
-    active.setAttribute("aria-selected", "true");
+  deselectAllMatchCards();
+  const selectedCard = document.querySelector(`[data-match-index="${index}"]`);
+  if (selectedCard) {
+    selectedCard.classList.add("search-match-card--selected");
+    selectedCard.setAttribute("aria-selected", "true");
   }
 };
 
 const buildMatchCardButton = ({ match, index }) => {
-  const meta = match?.metadata ?? {};
-  const pathRelative = typeof meta.pathRelative === "string" ? meta.pathRelative : "";
-  const repository = typeof meta.repository === "string" ? meta.repository : "";
-  const documentPreview = typeof match.documentPreview === "string" ? match.documentPreview : "";
-  const body = extractBodyFromDocumentPreview({ documentPreview });
+  const m = normalizeSearchMatch({ match });
+  const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
   const previewLine = truncateOneLine({ text: body, maxLen: 96 });
+  const distanceLabel = formatDistanceLabel({ distance: m.distance });
+  const linesShort = formatMatchCardLinesShort({ startLine: m.startLine, endLine: m.endLine });
 
   const li = document.createElement("li");
   li.className = "search-results-list__item";
@@ -252,23 +343,14 @@ const buildMatchCardButton = ({ match, index }) => {
   btn.className = "search-match-card";
   btn.dataset.matchIndex = String(index);
   btn.setAttribute("aria-selected", "false");
-  btn.title = `${pathRelative} (${formatDistanceLabel({ distance: match.distance })})`;
-
-  const startLine = typeof match.startLine === "number" ? match.startLine : "";
-  const endLine = typeof match.endLine === "number" ? match.endLine : "";
-  const lines = startLine !== "" && endLine !== "" ? `L${startLine}–${endLine}` : "";
-
-  btn.innerHTML = `
-    <span class="search-match-card__row">
-      <span class="search-match-card__badge">${escapeHtml(repository || "—")}</span>
-      <span class="search-match-card__path">${escapeHtml(pathRelative || "(no path)")}</span>
-    </span>
-    <span class="search-match-card__row search-match-card__row--meta">
-      <span class="search-match-card__lines">${escapeHtml(lines)}</span>
-      <span class="search-match-card__distance">${escapeHtml(formatDistanceLabel({ distance: match.distance }))}</span>
-    </span>
-    <span class="search-match-card__preview">${escapeHtml(previewLine)}</span>
-  `;
+  btn.title = `${m.pathRelative} (${distanceLabel})`;
+  btn.innerHTML = buildMatchCardMarkup({
+    repository: m.repository,
+    pathRelative: m.pathRelative,
+    linesShort,
+    distanceLabel,
+    previewLine,
+  });
 
   btn.addEventListener("click", () => {
     renderDetailForMatch({ match, index });
@@ -282,46 +364,23 @@ const renderSuccessPayload = ({ payload }) => {
   clearSearchError();
 
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    setSearchError({ message: "Unexpected response shape." });
-    clearResultsUi();
+    rejectInvalidSuccessPayload();
     return;
   }
 
-  const outcome = payload.outcome;
+  const { outcome } = payload;
 
   if (isOutcomeError({ outcome })) {
-    getResultsListEl().innerHTML = "";
-    setSearchError({ message: outcome.error });
-    setSearchStatus({ html: "Search finished with an error.", isBusy: false });
-    showDetailPlaceholder();
+    showSemanticSearchOutcomeError({ outcome });
     return;
   }
 
   if (!isMatchArray({ outcome })) {
-    setSearchError({ message: "Unexpected outcome in response (expected a list of matches or an error object)." });
-    clearResultsUi();
+    rejectUnexpectedOutcomeShape();
     return;
   }
 
-  const listEl = getResultsListEl();
-  listEl.innerHTML = "";
-
-  if (outcome.length === 0) {
-    setSearchStatus({ html: "No matches.", isBusy: false });
-    showDetailPlaceholder();
-    return;
-  }
-
-  setSearchStatus({
-    html: `${outcome.length} match${outcome.length === 1 ? "" : "es"} <span class="search-status-bar__hint">(lower distance is closer)</span>`,
-    isBusy: false,
-  });
-
-  outcome.forEach((match, index) => {
-    listEl.appendChild(buildMatchCardButton({ match, index }));
-  });
-
-  showDetailPlaceholder();
+  renderMatchOutcomeList({ outcome });
 };
 
 const displayHttpError = ({ status, statusText, payload }) => {
@@ -347,6 +406,7 @@ const postSemanticSearch = async ({ body }) => {
     displayHttpError({ status: response.status, statusText: response.statusText, payload });
     return;
   }
+
   renderSuccessPayload({ payload });
 };
 
@@ -363,12 +423,14 @@ const readSearchFormOrNotify = () => {
     setSearchStatus({ html: "", isBusy: false });
     return null;
   }
+
   const nbResults = getNbResultsInputValue();
   if (!isNbResultsValid({ value: nbResults })) {
     setSearchError({ message: `Invalid number of results (integer between 1 and ${MAX_NB_RESULTS}).` });
     setSearchStatus({ html: "", isBusy: false });
     return null;
   }
+
   const repository = getTrimmedRepositoryFilter();
   return buildSemanticSearchBody({ queryText, nbResults, repository });
 };
@@ -378,6 +440,7 @@ const runSearch = async () => {
   if (body === null) {
     return;
   }
+
   setSearchButtonDisabled({ disabled: true });
   try {
     await postSemanticSearch({ body });
@@ -397,6 +460,7 @@ document.getElementById("detail-copy-path").addEventListener("click", async () =
   if (lastDetailFullPath.length === 0) {
     return;
   }
+
   try {
     await navigator.clipboard.writeText(lastDetailFullPath);
     setSearchStatus({ html: "Full path copied to clipboard.", isBusy: false });
