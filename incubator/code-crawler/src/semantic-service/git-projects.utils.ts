@@ -1,9 +1,8 @@
 import { getErrorMessage, isBlank } from "@lichens-innovation/ts-common";
 import { access, readdir, stat } from "node:fs/promises";
-import { homedir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 import { toStringLf } from "../utils/arrays.utils";
-import { EnvNames, getCodeCrawlerRoot } from "../utils/env.utils";
+import { EnvNames, expandUserDirectory, getCodeCrawlerRoot } from "../utils/env.utils";
 
 const SKIP_DIR_NAMES = new Set(["node_modules", ".git"]);
 
@@ -21,19 +20,6 @@ const listGitRepoRootsFailure = (error: string): ListGitRepoRootsResult => ({
   repos: [],
   error,
 });
-
-export const expandUserDirectory = (input: string): string => {
-  const trimmed = input.trim();
-  if (trimmed === "~") {
-    return homedir();
-  }
-
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return join(homedir(), trimmed.slice(2));
-  }
-
-  return trimmed;
-};
 
 const hasGitDirectory = async (dir: string): Promise<boolean> => {
   try {

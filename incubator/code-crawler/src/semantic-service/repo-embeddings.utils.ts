@@ -7,7 +7,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 import { buildMcpErrorResponse, buildMcpTextResponse } from "../mcp/mcp-server.utils";
 import { toString } from "../utils/arrays.utils";
-import { getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
+import { expandUserDirectory, getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
@@ -16,7 +16,6 @@ import { workspaceSemanticIndexStore } from "./sqlite-semantic-index.store";
 
 import {
   CODE_CRAWLER_ROOT_CONFIGURATION_ERROR_MESSAGE,
-  expandUserDirectory,
   listGitRepoRootsUnderParent,
   resolveCodeCrawlerParentPath,
   resolveRepositoryUnderCodeCrawlerRoot,

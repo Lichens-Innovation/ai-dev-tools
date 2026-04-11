@@ -62,6 +62,23 @@ export const getCodeCrawlerCorsOrigin = (): string | boolean => {
   return isBlank(raw) ? true : raw;
 };
 
+/**
+ * Expands a leading `~` or `~/` to {@link homedir}. Other paths are returned trimmed unchanged.
+ * Shells expand `~` in `.env`; Node and MCP often do not — use this before `path.resolve`.
+ */
+export const expandUserDirectory = (input: string): string => {
+  const trimmed = input.trim();
+  if (trimmed === "~") {
+    return homedir();
+  }
+
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path.join(homedir(), trimmed.slice(2));
+  }
+
+  return trimmed;
+};
+
 export const getCodeCrawlerRoot = (): string | undefined => {
   const raw = process.env[EnvNames.root];
   if (isBlank(raw?.trim())) {
@@ -78,13 +95,14 @@ export const getCodeCrawlerEmbeddingModel = (): string => {
 
 /**
  * Absolute path to the semantic index SQLite file.
- * When {@link EnvNames.semanticIndexDbPath} is unset/blank: `~/code-crawler/<DefaultValues.semanticIndexDbBasename>`.
+ * When {@link EnvNames.semanticIndexDbPath} is unset/blank: `<homedir>/code-crawler/<DefaultValues.semanticIndexDbBasename>`.
+ * When set: resolved after {@link expandUserDirectory} (so `~/...` in `.env` works).
  */
 export const resolveSemanticIndexDbPath = (): string => {
   const fromEnv = process.env[EnvNames.semanticIndexDbPath]?.trim();
 
   if (isNotBlank(fromEnv)) {
-    return path.resolve(fromEnv);
+    return path.resolve(expandUserDirectory(fromEnv));
   }
 
   return path.join(homedir(), "code-crawler", DefaultValues.semanticIndexDbBasename);
