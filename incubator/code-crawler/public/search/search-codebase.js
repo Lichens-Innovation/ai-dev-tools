@@ -630,6 +630,100 @@ const runSearch = async () => {
   }
 };
 
+const SEARCH_RESULTS_PCT_MIN = 18;
+const SEARCH_RESULTS_PCT_MAX = 82;
+const SEARCH_RESULTS_PCT_DEFAULT = 40;
+const SEARCH_RESULTS_PCT_KEYBOARD_STEP = 5;
+
+/** @type {{ startClientX: number; startPct: number; shellWidth: number } | null} */
+let searchMasterDetailSplitterDrag = null;
+
+const initSearchMasterDetailSplitter = () => {
+  const shell = document.getElementById("search-master-detail");
+  const splitter = document.getElementById("search-master-detail-splitter");
+  if (!(shell instanceof HTMLElement) || !(splitter instanceof HTMLElement)) {
+    return;
+  }
+
+  const clampResultsPct = (pct) =>
+    Math.min(SEARCH_RESULTS_PCT_MAX, Math.max(SEARCH_RESULTS_PCT_MIN, pct));
+
+  const readResultsPct = () => {
+    const raw = getComputedStyle(shell).getPropertyValue("--search-results-pct").trim();
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : SEARCH_RESULTS_PCT_DEFAULT;
+  };
+
+  const setResultsPct = (pct) => {
+    const rounded = Math.round(clampResultsPct(pct) * 10) / 10;
+    shell.style.setProperty("--search-results-pct", String(rounded));
+  };
+
+  const endSplitterDrag = () => {
+    searchMasterDetailSplitterDrag = null;
+    document.body.style.removeProperty("cursor");
+    document.body.style.removeProperty("user-select");
+  };
+
+  splitter.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    const rect = shell.getBoundingClientRect();
+    searchMasterDetailSplitterDrag = {
+      startClientX: event.clientX,
+      startPct: readResultsPct(),
+      shellWidth: rect.width,
+    };
+    splitter.setPointerCapture(event.pointerId);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  });
+
+  splitter.addEventListener("pointermove", (event) => {
+    if (searchMasterDetailSplitterDrag === null) {
+      return;
+    }
+    const { startClientX, startPct, shellWidth } = searchMasterDetailSplitterDrag;
+    if (shellWidth <= 0) {
+      return;
+    }
+    const deltaPct = ((event.clientX - startClientX) / shellWidth) * 100;
+    setResultsPct(startPct + deltaPct);
+  });
+
+  const onSplitterPointerEnd = (event) => {
+    if (searchMasterDetailSplitterDrag === null) {
+      return;
+    }
+    try {
+      splitter.releasePointerCapture(event.pointerId);
+    } catch {
+      /* pointer was not captured */
+    }
+    endSplitterDrag();
+  };
+
+  splitter.addEventListener("pointerup", onSplitterPointerEnd);
+  splitter.addEventListener("pointercancel", onSplitterPointerEnd);
+
+  splitter.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      return;
+    }
+    event.preventDefault();
+    const current = readResultsPct();
+    const next =
+      event.key === "ArrowRight"
+        ? current + SEARCH_RESULTS_PCT_KEYBOARD_STEP
+        : current - SEARCH_RESULTS_PCT_KEYBOARD_STEP;
+    setResultsPct(next);
+  });
+};
+
+initSearchMasterDetailSplitter();
+
 document.getElementById("search-button").addEventListener("click", runSearch);
 
 document.getElementById("detail-copy-path").addEventListener("click", async () => {
