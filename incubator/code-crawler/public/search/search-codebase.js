@@ -641,15 +641,14 @@ let searchMasterDetailSplitterDrag = null;
 const initSearchMasterDetailSplitter = () => {
   const shell = document.getElementById("search-master-detail");
   const splitter = document.getElementById("search-master-detail-splitter");
-  if (!(shell instanceof HTMLElement) || !(splitter instanceof HTMLElement)) {
+  if (!(shell instanceof window.HTMLElement) || !(splitter instanceof window.HTMLElement)) {
     return;
   }
 
-  const clampResultsPct = (pct) =>
-    Math.min(SEARCH_RESULTS_PCT_MAX, Math.max(SEARCH_RESULTS_PCT_MIN, pct));
+  const clampResultsPct = (pct) => Math.min(SEARCH_RESULTS_PCT_MAX, Math.max(SEARCH_RESULTS_PCT_MIN, pct));
 
   const readResultsPct = () => {
-    const raw = getComputedStyle(shell).getPropertyValue("--search-results-pct").trim();
+    const raw = window.getComputedStyle(shell).getPropertyValue("--search-results-pct").trim();
     const parsed = Number.parseFloat(raw);
     return Number.isFinite(parsed) ? parsed : SEARCH_RESULTS_PCT_DEFAULT;
   };
