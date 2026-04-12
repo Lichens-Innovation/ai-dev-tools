@@ -102,6 +102,11 @@ const getNbResultsInputValue = () => Number.parseInt(document.getElementById("nb
 
 const isNbResultsValid = ({ value }) => Number.isFinite(value) && value >= 1 && value <= MAX_NB_RESULTS;
 
+const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
+
+const hasMultipleRelatedChunks = (relatedChunkCount) =>
+  relatedChunkCount !== null && relatedChunkCount > 1;
+
 const getTrimmedRepositoryFilter = () => document.getElementById("repository-filter").value.trim();
 
 const buildSemanticSearchBody = ({ queryText, nbResults, repository }) => {
@@ -187,6 +192,7 @@ const normalizeSearchMatch = ({ match }) => {
     endLine: typeof match.endLine === "number" ? match.endLine : null,
     documentPreview: typeof match.documentPreview === "string" ? match.documentPreview : "",
     distance: match.distance,
+    relatedChunkCount: isFiniteNumber(match.relatedChunkCount) ? match.relatedChunkCount : null,
   };
 };
 
@@ -206,7 +212,7 @@ const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLa
   `;
 
 const formatMatchCountStatusHtml = ({ count }) =>
-  `${count} match${count === 1 ? "" : "es"} <span class="search-status-bar__hint">(lower distance is closer)</span>`;
+  `${count} file${count === 1 ? "" : "s"} <span class="search-status-bar__hint">(lower distance is closer)</span>`;
 
 const rejectInvalidSuccessPayload = () => {
   setSearchError({ message: "Unexpected response shape." });
@@ -508,7 +514,11 @@ const buildMatchCardButton = ({ match, index }) => {
   const m = normalizeSearchMatch({ match });
   const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
   const previewLine = truncateOneLine({ text: body, maxLen: 96 });
-  const distanceLabel = formatDistanceLabel({ distance: m.distance });
+  const baseDistanceLabel = formatDistanceLabel({ distance: m.distance });
+  const multiChunkHint = hasMultipleRelatedChunks(m.relatedChunkCount)
+    ? ` · ${m.relatedChunkCount} chunks`
+    : "";
+  const distanceLabel = `${baseDistanceLabel}${multiChunkHint}`;
   const linesShort = formatMatchCardLinesShort({ startLine: m.startLine, endLine: m.endLine });
 
   const li = document.createElement("li");

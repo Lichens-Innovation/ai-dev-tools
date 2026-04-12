@@ -12,6 +12,10 @@ import { expandUserDirectory, getCodeCrawlerEmbedBatchSize, getCodeCrawlerMaxInd
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
+import {
+  consolidateSemanticQueryMatchesByFile,
+  resolveChunkFetchCountForFileConsolidation,
+} from "./semantic-search-match-consolidation.utils";
 import type { FileIndexMetadata, FileIndexRecord, QueryOutcome } from "./semantic-search.types";
 import { workspaceSemanticIndexStore } from "./sqlite-semantic-index.store";
 
@@ -114,8 +118,9 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
     .default(10)
     .describe(
       toString([
-        `Maximum number of chunk matches to return (default 10, max ${MAX_SEMANTIC_SEARCH_NB_RESULTS});`,
-        "each row is one indexed source chunk, not a whole file.",
+        `Maximum number of distinct files to return (default 10, max ${MAX_SEMANTIC_SEARCH_NB_RESULTS});`,
+        "each row is one file with the strongest matching chunk as preview;",
+        "multi-chunk agreement boosts ranking (lower effective distance).",
       ])
     ),
   repository: z
@@ -392,10 +397,16 @@ const runWorkspaceSemanticQuery = async ({
   }
 
   try {
-    return workspaceSemanticIndexStore.queryNearest({
-      nResults,
+    const chunkFetchCount = resolveChunkFetchCountForFileConsolidation({ maxFiles: nResults });
+    const rawMatches = workspaceSemanticIndexStore.queryNearest({
+      nResults: chunkFetchCount,
       queryEmbedding,
       repository,
+    });
+
+    return consolidateSemanticQueryMatchesByFile({
+      matches: rawMatches,
+      targetFileCount: nResults,
     });
   } catch (e: unknown) {
     const queryError = getErrorMessage(e);

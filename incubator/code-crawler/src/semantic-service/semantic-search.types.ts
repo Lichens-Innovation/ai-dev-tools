@@ -31,6 +31,8 @@ export interface QueryMatchSummary {
   metadata: FileIndexMetadata;
   endLine: number;
   startLine: number;
+  /** When consolidating by file: how many chunk hits from the raw KNN list contributed to this row. */
+  relatedChunkCount?: number;
 }
 
 export type QueryOutcome = QueryMatchSummary[] | { error: string };
