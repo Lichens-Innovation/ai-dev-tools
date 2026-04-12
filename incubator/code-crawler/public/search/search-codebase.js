@@ -104,8 +104,7 @@ const isNbResultsValid = ({ value }) => Number.isFinite(value) && value >= 1 && 
 
 const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(value);
 
-const hasMultipleRelatedChunks = (relatedChunkCount) =>
-  relatedChunkCount !== null && relatedChunkCount > 1;
+const hasMultipleRelatedChunks = (relatedChunkCount) => relatedChunkCount !== null && relatedChunkCount > 1;
 
 const getTrimmedRepositoryFilter = () => document.getElementById("repository-filter").value.trim();
 
@@ -515,9 +514,7 @@ const buildMatchCardButton = ({ match, index }) => {
   const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
   const previewLine = truncateOneLine({ text: body, maxLen: 96 });
   const baseDistanceLabel = formatDistanceLabel({ distance: m.distance });
-  const multiChunkHint = hasMultipleRelatedChunks(m.relatedChunkCount)
-    ? ` · ${m.relatedChunkCount} chunks`
-    : "";
+  const multiChunkHint = hasMultipleRelatedChunks(m.relatedChunkCount) ? ` · ${m.relatedChunkCount} chunks` : "";
   const distanceLabel = `${baseDistanceLabel}${multiChunkHint}`;
   const linesShort = formatMatchCardLinesShort({ startLine: m.startLine, endLine: m.endLine });
 
