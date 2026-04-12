@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Logger, Post, Res } from "@nestjs/common";
+import { Body, Controller, Get, Logger, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { StatusCodes } from "http-status-codes";
 import { getRepositoriesInfos } from "../semantic-service/git-projects.utils";
 import {
   clearWorkspaceSemanticSearchIndex,
+  getIndexedFileContentByFileId,
   prepareRepositoryForSemanticSearch,
   prepareWorkspaceRepositoriesForSemanticSearch,
   semanticSearchWorkspaceFiles,
@@ -11,6 +12,7 @@ import {
 import { callToolResultToRestBody } from "./api-call-tool-result.utils";
 import {
   ClearWorkspaceSemanticSearchIndexDto,
+  GetIndexedFileContentQueryDto,
   PrepareRepositoryForSemanticSearchDto,
   PrepareWorkspaceRepositoriesForSemanticSearchDto,
   SemanticSearchWorkspaceFilesDto,
@@ -19,6 +21,26 @@ import {
 @Controller("api")
 export class ApiController {
   private readonly logger = new Logger(ApiController.name);
+
+  @Get("indexed-file-content")
+  async getIndexedFileContent(
+    @Query() query: GetIndexedFileContentQueryDto,
+    @Res({ passthrough: false }) res: Response
+  ): Promise<void> {
+    try {
+      const outcome = await getIndexedFileContentByFileId(query.fileId);
+      if (!outcome.ok) {
+        res.status(outcome.httpStatus).json({ error: outcome.error });
+        return;
+      }
+      res.status(StatusCodes.OK).json(outcome.payload);
+    } catch (error) {
+      this.logger.error("GET /api/indexed-file-content failed", error);
+      if (!res.headersSent) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
+      }
+    }
+  }
 
   @Get("workspace-repositories")
   async getWorkspaceRepositories(@Res({ passthrough: false }) res: Response): Promise<void> {

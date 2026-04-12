@@ -1,6 +1,7 @@
 import { createZodDto } from "nestjs-zod";
 import {
   clearWorkspaceSemanticSearchIndexInputSchema,
+  getIndexedFileContentByFileIdQuerySchema,
   prepareRepositoryForSemanticSearchInputSchema,
   prepareWorkspaceRepositoriesForSemanticSearchInputSchema,
   semanticSearchWorkspaceFilesInputSchema,
@@ -17,3 +18,5 @@ export class PrepareWorkspaceRepositoriesForSemanticSearchDto extends createZodD
 export class SemanticSearchWorkspaceFilesDto extends createZodDto(semanticSearchWorkspaceFilesInputSchema) {}
 
 export class ClearWorkspaceSemanticSearchIndexDto extends createZodDto(clearWorkspaceSemanticSearchIndexInputSchema) {}
+
+export class GetIndexedFileContentQueryDto extends createZodDto(getIndexedFileContentByFileIdQuerySchema) {}

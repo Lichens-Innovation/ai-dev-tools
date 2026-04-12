@@ -2,6 +2,7 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 const browserPublicGlobals = {
+  AbortController: "readonly",
   console: "readonly",
   document: "readonly",
   fetch: "readonly",

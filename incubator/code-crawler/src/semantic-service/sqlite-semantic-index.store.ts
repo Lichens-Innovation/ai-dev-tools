@@ -17,9 +17,10 @@ import {
   SQL_TABLE_NAME_FILE_INDEX_STORE_META,
   buildFileIndexChunkVecDdl,
   type DbFileIndexKnnRow,
+  type DbFileIndexMetadataRow,
 } from "./semantic-index-sqlite.types";
 import type { ReplaceIndexedFilePayload, SemanticIndexStore } from "./semantic-index-store.types";
-import type { QueryMatchSummary } from "./semantic-search.types";
+import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.types";
 
 interface QueryNearestArgs {
   nResults: number;
@@ -103,6 +104,17 @@ const countSemanticChunks = (db: Database.Database): number => {
   return row?.n ?? 0;
 };
 
+const dbMetadataRowToFileIndexMetadata = (row: DbFileIndexMetadataRow): FileIndexMetadata => ({
+  contentSha256: row.CONTENT_SHA256,
+  fileId: row.FILE_ID,
+  filename: row.FILENAME,
+  fullPath: row.FULL_PATH,
+  lastModifiedAtISO: row.LAST_MODIFIED_AT_ISO,
+  pathRelative: row.PATH_RELATIVE,
+  repository: row.REPOSITORY,
+  sizeBytes: row.SIZE_BYTES,
+});
+
 export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly db: Database.Database;
   private readonly embeddingDimensions: number;
@@ -124,6 +136,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly stmtDeleteAllVec: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllChunks: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllFiles: Database.Statement<[], unknown>;
+  private readonly stmtSelectFileMetadataByFileId: Database.Statement<[string], DbFileIndexMetadataRow>;
 
   constructor(dbPath: string, embeddingDimensions: number) {
     ensureDbParentDirectory(dbPath);
@@ -196,6 +209,11 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.stmtDeleteAllVec = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME}`);
     this.stmtDeleteAllChunks = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}`);
     this.stmtDeleteAllFiles = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}`);
+    this.stmtSelectFileMetadataByFileId = this.db.prepare(
+      `SELECT FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES
+       FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}
+       WHERE FILE_ID = ?`
+    );
   }
 
   private ensureVecSchema(): void {
@@ -297,6 +315,14 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.db.transaction(run)();
   }
 
+  getFileMetadataByFileId(fileId: string): FileIndexMetadata | null {
+    const row = this.stmtSelectFileMetadataByFileId.get(fileId) as DbFileIndexMetadataRow | undefined;
+    if (isNullish(row)) {
+      return null;
+    }
+    return dbMetadataRowToFileIndexMetadata(row);
+  }
+
   queryNearest(params: QueryNearestArgs): QueryMatchSummary[] {
     const { nResults, queryEmbedding, repository } = params;
     if (nResults < 1) {
@@ -320,16 +346,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         id: row.CHUNK_ID,
         startLine: row.START_LINE,
         endLine: row.END_LINE,
-        metadata: {
-          contentSha256: row.CONTENT_SHA256,
-          fileId: row.FILE_ID,
-          filename: row.FILENAME,
-          fullPath: row.FULL_PATH,
-          lastModifiedAtISO: row.LAST_MODIFIED_AT_ISO,
-          pathRelative: row.PATH_RELATIVE,
-          repository: row.REPOSITORY,
-          sizeBytes: row.SIZE_BYTES,
-        },
+        metadata: dbMetadataRowToFileIndexMetadata(row),
       })
     );
   }
@@ -358,6 +375,7 @@ const createLazyWorkspaceSemanticIndexStore = (): SemanticIndexStore => {
 
   return {
     clear: () => get().clear(),
+    getFileMetadataByFileId: (fileId) => get().getFileMetadataByFileId(fileId),
     queryNearest: (params) => get().queryNearest(params),
     replaceIndexedFile: (payload) => get().replaceIndexedFile(payload),
   };

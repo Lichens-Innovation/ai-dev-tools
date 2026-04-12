@@ -3,6 +3,9 @@ const MAX_NB_RESULTS = 50;
 /** @type {string} */
 let lastDetailFullPath = "";
 
+/** @type {AbortController | null} */
+let activeDetailFileFetchAbortController = null;
+
 const EMBED_PREVIEW_PREFIX = /^File:[^\n]*\nRepo:[^\n]*\n\n/;
 
 const extensionToHljsLanguage = {
@@ -171,10 +174,15 @@ const formatDistanceLabel = ({ distance }) => {
 
 const normalizeSearchMatch = ({ match }) => {
   const meta = match?.metadata ?? {};
+  const fileIdFromMeta = typeof meta.fileId === "string" ? meta.fileId : "";
+  const fileIdFromMatch = typeof match?.fileId === "string" ? match.fileId : "";
+  const fileId = fileIdFromMeta.length > 0 ? fileIdFromMeta : fileIdFromMatch;
+
   return {
     pathRelative: typeof meta.pathRelative === "string" ? meta.pathRelative : "",
     repository: typeof meta.repository === "string" ? meta.repository : "",
     fullPath: typeof meta.fullPath === "string" ? meta.fullPath : "",
+    fileId,
     startLine: typeof match.startLine === "number" ? match.startLine : null,
     endLine: typeof match.endLine === "number" ? match.endLine : null,
     documentPreview: typeof match.documentPreview === "string" ? match.documentPreview : "",
@@ -266,6 +274,7 @@ const clearResultsUi = () => {
 };
 
 const showDetailPlaceholder = () => {
+  cancelPendingDetailFileFetch();
   getDetailPlaceholderEl().hidden = false;
   getDetailContentEl().hidden = true;
   const codeEl = getDetailCodeEl();
@@ -315,34 +324,183 @@ const applySyntaxHighlight = ({ codeEl, language, codeText }) => {
   codeEl.textContent = codeText;
 };
 
-const renderDetailForMatch = ({ match, index }) => {
-  const m = normalizeSearchMatch({ match });
-
-  lastDetailFullPath = m.fullPath;
-
-  const headerPath = formatDetailHeaderPath({ repository: m.repository, pathRelative: m.pathRelative });
-  const pathEl = getDetailPathEl();
-  pathEl.textContent = headerPath;
-  pathEl.title = m.fullPath.length > 0 ? m.fullPath : headerPath;
-
-  const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
-  const language = resolveHljsLanguage({ pathRelative: m.pathRelative });
-
-  getDetailPlaceholderEl().hidden = true;
-  getDetailContentEl().hidden = false;
-
-  const codeEl = getDetailCodeEl();
-  const gutterEl = getDetailLineGutterEl();
-  if (gutterEl) {
-    gutterEl.textContent = buildLineGutterText({ codeText: body, startLine: m.startLine });
+const cancelPendingDetailFileFetch = () => {
+  if (activeDetailFileFetchAbortController !== null) {
+    activeDetailFileFetchAbortController.abort();
+    activeDetailFileFetchAbortController = null;
   }
-  applySyntaxHighlight({ codeEl, language, codeText: body });
+};
 
+const setSelectedMatchCardIndex = ({ index }) => {
   deselectAllMatchCards();
   const selectedCard = document.querySelector(`[data-match-index="${index}"]`);
   if (selectedCard) {
     selectedCard.classList.add("search-match-card--selected");
     selectedCard.setAttribute("aria-selected", "true");
+  }
+};
+
+const openDetailContentPanel = () => {
+  getDetailPlaceholderEl().hidden = true;
+  getDetailContentEl().hidden = false;
+};
+
+const applyDetailHeaderFromNormalizedMatch = ({ normalizedMatch }) => {
+  const headerPath = formatDetailHeaderPath({
+    repository: normalizedMatch.repository,
+    pathRelative: normalizedMatch.pathRelative,
+  });
+  const pathEl = getDetailPathEl();
+  pathEl.textContent = headerPath;
+  const titlePath = normalizedMatch.fullPath.length > 0 ? normalizedMatch.fullPath : headerPath;
+  pathEl.title = titlePath;
+};
+
+const setDetailPanelPlainTextBody = ({ message }) => {
+  const codeEl = getDetailCodeEl();
+  codeEl.textContent = message;
+  codeEl.className = "hljs";
+  const gutterEl = getDetailLineGutterEl();
+  if (gutterEl) {
+    gutterEl.textContent = "";
+  }
+};
+
+const showDetailPanelLoadingState = ({ message }) => {
+  openDetailContentPanel();
+  setDetailPanelPlainTextBody({ message });
+};
+
+const renderDetailPanelFetchError = ({ message }) => {
+  console.error("[search-codebase] indexed file content failed:", message);
+  setDetailPanelPlainTextBody({ message });
+};
+
+const renderDetailFromChunkPreview = ({ normalizedMatch }) => {
+  lastDetailFullPath = normalizedMatch.fullPath;
+  applyDetailHeaderFromNormalizedMatch({ normalizedMatch });
+  openDetailContentPanel();
+
+  const body = extractBodyFromDocumentPreview({
+    documentPreview: normalizedMatch.documentPreview,
+  });
+  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const codeEl = getDetailCodeEl();
+  const gutterEl = getDetailLineGutterEl();
+  if (gutterEl) {
+    gutterEl.textContent = buildLineGutterText({
+      codeText: body,
+      startLine: normalizedMatch.startLine,
+    });
+  }
+  applySyntaxHighlight({ codeEl, language, codeText: body });
+};
+
+const renderDetailFromFullFilePayload = ({ normalizedMatch, payload }) => {
+  lastDetailFullPath = payload.fullPath;
+  applyDetailHeaderFromNormalizedMatch({ normalizedMatch });
+  const pathEl = getDetailPathEl();
+  if (payload.fullPath.length > 0) {
+    pathEl.title = payload.fullPath;
+  }
+
+  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const codeEl = getDetailCodeEl();
+  const gutterEl = getDetailLineGutterEl();
+  if (gutterEl) {
+    gutterEl.textContent = buildLineGutterText({
+      codeText: payload.content,
+      startLine: 1,
+    });
+  }
+  applySyntaxHighlight({ codeEl, language, codeText: payload.content });
+};
+
+const parseIndexedFileContentResponse = ({ response, contentType, bodyText }) => {
+  const parsed = parsePayloadFromResponseParts({ contentType, bodyText });
+
+  if (!response.ok) {
+    const isErrorBodyObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+    const hasServerErrorMessage = isErrorBodyObject && typeof parsed.error === "string";
+    const fallbackMessage = `HTTP ${response.status} ${response.statusText}`;
+    const errorMessage = hasServerErrorMessage ? parsed.error : fallbackMessage;
+    return { ok: false, errorMessage };
+  }
+
+  const isSuccessPayloadObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+  const hasStringContent = isSuccessPayloadObject && typeof parsed.content === "string";
+  const hasStringFullPath = isSuccessPayloadObject && typeof parsed.fullPath === "string";
+  const hasStringFileId = isSuccessPayloadObject && typeof parsed.fileId === "string";
+  const hasExpectedPayloadShape = hasStringContent && hasStringFullPath && hasStringFileId;
+
+  if (!hasExpectedPayloadShape) {
+    return { ok: false, errorMessage: "Unexpected response shape for indexed file content." };
+  }
+
+  const { content, fileId, fullPath } = parsed;
+  return {
+    ok: true,
+    payload: { content, fileId, fullPath },
+  };
+};
+
+const fetchIndexedFileContentByFileId = async ({ fileId, signal }) => {
+  const url = `/api/indexed-file-content?fileId=${encodeURIComponent(fileId)}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  const contentType = response.headers.get("content-type") ?? "";
+  const bodyText = await response.text();
+  return parseIndexedFileContentResponse({ response, contentType, bodyText });
+};
+
+const loadAndRenderDetailForMatch = async ({ match, index }) => {
+  const normalizedMatch = normalizeSearchMatch({ match });
+  setSelectedMatchCardIndex({ index });
+
+  if (normalizedMatch.fileId.length === 0) {
+    cancelPendingDetailFileFetch();
+    renderDetailFromChunkPreview({ normalizedMatch });
+    return;
+  }
+
+  cancelPendingDetailFileFetch();
+  activeDetailFileFetchAbortController = new AbortController();
+  const { signal } = activeDetailFileFetchAbortController;
+
+  applyDetailHeaderFromNormalizedMatch({ normalizedMatch });
+  showDetailPanelLoadingState({ message: "Loading full file…" });
+
+  try {
+    const outcome = await fetchIndexedFileContentByFileId({
+      fileId: normalizedMatch.fileId,
+      signal,
+    });
+
+    if (signal.aborted) {
+      return;
+    }
+
+    if (!outcome.ok) {
+      renderDetailPanelFetchError({ message: outcome.errorMessage });
+      return;
+    }
+
+    renderDetailFromFullFilePayload({ normalizedMatch, payload: outcome.payload });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return;
+    }
+    console.error("[search-codebase] indexed file content request threw:", error);
+    if (!signal.aborted) {
+      renderDetailPanelFetchError({ message: formatThrownValue({ error }) });
+    }
+  } finally {
+    if (activeDetailFileFetchAbortController?.signal === signal) {
+      activeDetailFileFetchAbortController = null;
+    }
   }
 };
 
@@ -371,7 +529,7 @@ const buildMatchCardButton = ({ match, index }) => {
   });
 
   btn.addEventListener("click", () => {
-    renderDetailForMatch({ match, index });
+    void loadAndRenderDetailForMatch({ match, index });
   });
 
   li.appendChild(btn);

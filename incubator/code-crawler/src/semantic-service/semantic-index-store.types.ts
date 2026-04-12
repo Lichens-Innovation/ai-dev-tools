@@ -4,7 +4,8 @@ import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.typ
  * All reads/writes of the semantic search index should go through {@link SemanticIndexStore}.
  *
  * **Persistence:** `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `sqlite-semantic-index.store.ts` (SQLite + sqlite-vec).
- * CRUD: {@link SemanticIndexStore.clear}, {@link SemanticIndexStore.replaceIndexedFile}, {@link SemanticIndexStore.queryNearest}.
+ * CRUD: {@link SemanticIndexStore.clear}, {@link SemanticIndexStore.replaceIndexedFile}, {@link SemanticIndexStore.queryNearest},
+ * {@link SemanticIndexStore.getFileMetadataByFileId}.
  */
 export type SemanticIndexChunkRow = {
   chunkByteLength: number;
@@ -23,6 +24,8 @@ export type ReplaceIndexedFilePayload = {
 
 export interface SemanticIndexStore {
   clear(): void;
+
+  getFileMetadataByFileId(fileId: string): FileIndexMetadata | null;
 
   queryNearest(params: { nResults: number; queryEmbedding: Float32Array; repository?: string }): QueryMatchSummary[];
 
