@@ -16,6 +16,7 @@ export const EnvNames = {
   chunkMaxLines: "CODE_CRAWLER_CHUNK_MAX_LINES",
   chunkOverlapLines: "CODE_CRAWLER_CHUNK_OVERLAP_LINES",
   embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
+  ragTextModel: "CODE_CRAWLER_RAG_TEXT_MODEL",
 } as const;
 
 export type CodeCrawlerEnv = {
@@ -32,6 +33,7 @@ export type CodeCrawlerEnv = {
   chunkMaxLines: number;
   chunkOverlapLines: number;
   embedBatchSize: number;
+  ragTextModel: string;
 };
 
 let cached: CodeCrawlerEnv | null = null;
@@ -92,6 +94,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const chunkMaxLines = requirePositiveIntEnvVar(EnvNames.chunkMaxLines);
   const chunkOverlapLines = requirePositiveIntEnvVar(EnvNames.chunkOverlapLines);
   const embedBatchSize = requirePositiveIntEnvVar(EnvNames.embedBatchSize);
+  const ragTextModel = requireNonBlankEnvVar(EnvNames.ragTextModel);
 
   return {
     host,
@@ -107,6 +110,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     chunkMaxLines,
     chunkOverlapLines,
     embedBatchSize,
+    ragTextModel,
   };
 };
 
@@ -146,3 +150,19 @@ export const getCodeCrawlerChunkMaxLines = (): number => getCodeCrawlerEnv().chu
 export const getCodeCrawlerChunkOverlapLines = (): number => getCodeCrawlerEnv().chunkOverlapLines;
 
 export const getCodeCrawlerEmbedBatchSize = (): number => getCodeCrawlerEnv().embedBatchSize;
+
+export const getCodeCrawlerRagTextModel = (): string => getCodeCrawlerEnv().ragTextModel;
+
+export const CODE_CRAWLER_TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
+
+export const getCodeCrawlerTransformersFsEnvValues = (): { localModelPath: string; cacheDir: string } => {
+  const modelsRoot = getCodeCrawlerTransformersModelsPath();
+
+  const localModelPath = modelsRoot.endsWith(path.sep) ? modelsRoot : `${modelsRoot}${path.sep}`;
+  const cacheDir = path.join(modelsRoot, CODE_CRAWLER_TRANSFORMERS_FS_CACHE_DIR);
+
+  return {
+    localModelPath,
+    cacheDir,
+  };
+};

@@ -8,6 +8,7 @@ import {
   prepareRepositoryForSemanticSearch,
   prepareWorkspaceRepositoriesForSemanticSearch,
   semanticSearchWorkspaceFiles,
+  semanticSearchWorkspaceFilesWithRag,
 } from "../semantic-service/repo-embeddings.utils";
 import { callToolResultToRestBody } from "./api-call-tool-result.utils";
 import {
@@ -104,6 +105,23 @@ export class ApiController {
       res.status(httpStatus).json(payload);
     } catch (error) {
       this.logger.error("POST /api/semantic-search-workspace-files failed", error);
+      if (!res.headersSent) {
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
+      }
+    }
+  }
+
+  @Post("semantic-search-workspace-files-rag")
+  async postSemanticSearchWithRag(
+    @Body() body: SemanticSearchWorkspaceFilesDto,
+    @Res({ passthrough: false }) res: Response
+  ): Promise<void> {
+    try {
+      const result = await semanticSearchWorkspaceFilesWithRag(body);
+      const { httpStatus, body: payload } = callToolResultToRestBody({ result });
+      res.status(httpStatus).json(payload);
+    } catch (error) {
+      this.logger.error("POST /api/semantic-search-workspace-files-rag failed", error);
       if (!res.headersSent) {
         res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
       }

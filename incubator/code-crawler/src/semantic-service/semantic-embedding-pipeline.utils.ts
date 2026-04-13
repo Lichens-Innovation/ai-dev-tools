@@ -1,10 +1,9 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
-import path from "node:path";
 import { l2NormalizeInPlace } from "../utils/embeddings.utils";
 import {
   EnvNames,
   getCodeCrawlerEmbeddingModel,
-  getCodeCrawlerTransformersModelsPath,
+  getCodeCrawlerTransformersFsEnvValues,
   getEmbeddingDimensions,
 } from "../utils/env.utils";
 
@@ -18,16 +17,15 @@ type FeaturePipeline = {
   }>;
 };
 
-const TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
-
 const loadFeatureExtractionPipeline = async (): Promise<FeaturePipeline> => {
   const { env, pipeline } = await import("@huggingface/transformers");
-  const modelsRoot = getCodeCrawlerTransformersModelsPath();
-  env.localModelPath = modelsRoot.endsWith(path.sep) ? modelsRoot : `${modelsRoot}${path.sep}`;
-  env.cacheDir = path.join(modelsRoot, TRANSFORMERS_FS_CACHE_DIR);
+  const { localModelPath, cacheDir } = getCodeCrawlerTransformersFsEnvValues();
+  env.localModelPath = localModelPath;
+  env.cacheDir = cacheDir;
+
   const model = getCodeCrawlerEmbeddingModel();
   console.info(
-    `[semantic-embedding] Loading model "${model}" (local: "${env.localModelPath}", cache: "${env.cacheDir}"; first run may download assets)…`
+    `[semantic-embedding] Loading model "${model}" (local: "${env.localModelPath}" first run may download assets)…`
   );
   const extractor = await pipeline("feature-extraction", model);
   console.info(`[semantic-embedding] Model ready: "${model}"`);

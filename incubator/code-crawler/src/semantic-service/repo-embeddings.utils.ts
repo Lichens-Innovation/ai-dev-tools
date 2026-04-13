@@ -11,6 +11,7 @@ import { toString } from "../utils/arrays.utils";
 import { expandUserDirectory, getCodeCrawlerEmbedBatchSize, getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
+import { generateRagAnswerFromMatches } from "./semantic-rag-text-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
 import {
   consolidateSemanticQueryMatchesByFile,
@@ -854,6 +855,38 @@ export const semanticSearchWorkspaceFiles = async (
   const outcome = await runWorkspaceSemanticQuery({ nResults: nbResults, queryText, repository });
 
   return buildMcpTextResponse(JSON.stringify({ queryText, outcome }, null, 2));
+};
+
+interface RespondArgs {
+  queryText: string;
+  outcome: QueryOutcome;
+  ragResponse: string;
+}
+const respond = ({ queryText, outcome, ragResponse }: RespondArgs): CallToolResult =>
+  buildMcpTextResponse(JSON.stringify({ queryText, outcome, ragResponse }, null, 2));
+
+
+export const semanticSearchWorkspaceFilesWithRag = async (
+  input: SemanticSearchWorkspaceFilesInput
+): Promise<CallToolResult> => {
+  const { nbResults, queryText, repository } = input;
+
+  const outcome = await runWorkspaceSemanticQuery({ nResults: nbResults, queryText, repository });
+
+  if (!Array.isArray(outcome)) {
+    return respond({ queryText, outcome, ragResponse: "Semantic search failed; text generation was skipped." });
+  }
+  if (outcome.length === 0) {
+    return respond({ queryText, outcome, ragResponse: "No matching indexed chunks were found for this query." });
+  }
+
+  const { ragResponse: generated, errorMessage } = await generateRagAnswerFromMatches({
+    matches: outcome,
+    question: queryText,
+  });
+  const ragResponse = isNotBlank(errorMessage) ? `Text generation failed: ${errorMessage}` : generated;
+
+  return respond({ queryText, outcome, ragResponse });
 };
 
 export const clearWorkspaceSemanticSearchIndex = async (): Promise<CallToolResult> => {

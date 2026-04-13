@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { downloadFile, ListFileEntry, listFiles } from "@huggingface/hub";
 import { getErrorMessage } from "@lichens-innovation/ts-common";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -41,14 +41,20 @@ const downloadModel = async (repoId: string): Promise<void> => {
   const entries = await listAllRepoFileEntries(repoId);
   const filePaths = entries.filter((e) => e.type === "file").map((e) => e.path);
 
-  console.info(`[models-download][${repoId}] Downloading ${filePaths.length} file(s) to ${destRoot}`);
+  console.info(`[models-download][${repoId}] Syncing ${filePaths.length} file(s) to ${destRoot}`);
   for (const relativePath of filePaths) {
+    const localPath = join(destRoot, relativePath);
+    if (existsSync(localPath)) {
+      console.info(`  skip (already exists) ${relativePath}`);
+      continue;
+    }
+
+    console.info(`  … downloading "${relativePath}" …`);
     const blob = await downloadFile({ repo: repoId, path: relativePath });
     if (!blob) {
       throw new Error(`File not found on the Hub: ${repoId} @ ${relativePath}`);
     }
 
-    const localPath = join(destRoot, relativePath);
     await streamBlobToFile({ blob, destPath: localPath });
     console.info(`  ✓ ${relativePath}`);
   }
