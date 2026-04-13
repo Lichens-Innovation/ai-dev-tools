@@ -102,4 +102,5 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 * TODO-006: integrate **Tree-sitter** (e.g. `node-tree-sitter`) for language-aware parsing / chunking to improve semantic search quality over naive text splits
 * TODO-007: add a **reranker** after ANN retrieval to boost precision; `jinaai/jina-reranker-v1-tiny-en` is Transformers.js–compatible for a second-stage score on candidate chunks
 * TODO-008: document and plan beyond sqlite-vec limits: it is **not** an approximate ANN index and stays strong up to roughly **100k–1M** vectors; for larger corpora evaluate dedicated ANN / vector stores
+* TODO-009: skip re-embedding / re-indexing a file when the persisted **content SHA** used for its stored semantic vectors matches the **current file SHA** (unchanged source → reuse existing chunks and vectors)
 
