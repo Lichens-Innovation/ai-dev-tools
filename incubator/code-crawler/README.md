@@ -91,3 +91,12 @@ The server has **no authentication**. Binding to `127.0.0.1` limits exposure to 
 ## Example config
 
 See [`assets/examples/mcp.json`](assets/examples/mcp.json).
+
+## TODOs
+
+* TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively
+* TODO-002: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
+* TODO-003: let users filter searches by source-code / file types (e.g. checkboxes for extensions or language groups)
+* TODO-004: stop loading scripts or assets from `cdn.jsdelivr.net`; ship pinned versions locally and reference them from HTML (no CDN dependency for the search UI)
+* TODO-005: add SQLite FTS5 (native BM25 full-text search) alongside semantic search for hybrid retrieval and a combined hybrid score to surface stronger matches
+
