@@ -865,7 +865,6 @@ interface RespondArgs {
 const respond = ({ queryText, outcome, ragResponse }: RespondArgs): CallToolResult =>
   buildMcpTextResponse(JSON.stringify({ queryText, outcome, ragResponse }, null, 2));
 
-
 export const semanticSearchWorkspaceFilesWithRag = async (
   input: SemanticSearchWorkspaceFilesInput
 ): Promise<CallToolResult> => {
