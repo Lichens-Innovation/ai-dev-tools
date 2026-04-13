@@ -60,7 +60,7 @@ export interface GenerateRagAnswerArgs {
 /**
  * Runs causal LM generation over consolidated semantic hits. Call only when `matches` is non-empty
  * so the text pipeline is not loaded for empty search results.
- * 
+ *
  * TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively.
  */
 export const generateRagAnswerFromMatches = async ({
