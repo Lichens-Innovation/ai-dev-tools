@@ -92,6 +92,13 @@ The server has **no authentication**. Binding to `127.0.0.1` limits exposure to 
 
 See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
+## Queries examples:
+
+* run code-crawler MCP to find tanstack query usage of a data mutation (update)
+* using code-crawler MCP: find date ant time helpers for formatting dates
+* un code-crawler MCP to find REST API controller definitions
+* execute code-crawler MCP to find examples of form validations with schema and rules using zod 
+
 ## TODOs
 
 * TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively
