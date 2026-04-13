@@ -99,4 +99,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 * TODO-003: let users filter searches by source-code / file types (e.g. checkboxes for extensions or language groups)
 * TODO-004: stop loading scripts or assets from `cdn.jsdelivr.net`; ship pinned versions locally and reference them from HTML (no CDN dependency for the search UI)
 * TODO-005: add SQLite FTS5 (native BM25 full-text search) alongside semantic search for hybrid retrieval and a combined hybrid score to surface stronger matches
+* TODO-006: integrate **Tree-sitter** (e.g. `node-tree-sitter`) for language-aware parsing / chunking to improve semantic search quality over naive text splits
+* TODO-007: add a **reranker** after ANN retrieval to boost precision; `jinaai/jina-reranker-v1-tiny-en` is Transformers.js–compatible for a second-stage score on candidate chunks
+* TODO-008: document and plan beyond sqlite-vec limits: it is **not** an approximate ANN index and stays strong up to roughly **100k–1M** vectors; for larger corpora evaluate dedicated ANN / vector stores
 
