@@ -1,8 +1,12 @@
 # code-crawler
 
-MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using **Transformers.js** in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport).
+MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using [**@huggingface/transformers**](https://www.npmjs.com/package/@huggingface/transformers) (Transformers.js) in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport). The same process also serves a **REST API** under `/api` and static files (hub, demos, search UI) at `/`.
 
 The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `sqlite-semantic-index.store.ts`).
+
+## Database schema
+
+Tables, indexes, the sqlite-vec virtual table, and how chunk `ID` lines up with vector `rowid` are summarized in [docs/DATABASE.md](docs/DATABASE.md) (includes a Mermaid ER diagram).
 
 ## Prerequisites
 
@@ -19,13 +23,15 @@ From this package directory:
 cp .env.example .env
 ```
 
-Edit `.env` and set all required keys (e.g. `CODE_CRAWLER_ROOT`, `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH`). Leave `CODE_CRAWLER_CORS_ORIGIN` unset or blank to mirror the browser Origin; set it to a URL for a fixed CORS origin.
+Edit `.env` and set all required keys (e.g. `CODE_CRAWLER_ROOT`, `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH`, `CODE_CRAWLER_TRANSFORMERS_MODELS_PATH`, `CODE_CRAWLER_RAG_TEXT_MODEL`). Leave `CODE_CRAWLER_CORS_ORIGIN` unset or blank to mirror the browser Origin; set it to a URL for a fixed CORS origin.
 
-### Embeddings and models
+### Embeddings, RAG, and models
 
-`.env.example` uses **Jina** (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM). **MiniLM** (`Xenova/all-MiniLM-L6-v2` or `onnx-community/all-MiniLM-L6-v2-ONNX`) is lighter (384-dim) if you change the model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
+`.env.example` uses **Jina** for embeddings (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM) and **Qwen2.5 Coder** for RAG answers (`CODE_CRAWLER_RAG_TEXT_MODEL`, e.g. `onnx-community/Qwen2.5-Coder-1.5B-Instruct`). **MiniLM** (`Xenova/all-MiniLM-L6-v2` or `onnx-community/all-MiniLM-L6-v2-ONNX`) is lighter (384-dim) if you change the embedding model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
 
-Upgrading the Transformers.js dependency can change floating-point embeddings for the same model id; if search quality degrades after an upgrade, **rebuild the semantic index** (new `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH` or delete the existing DB and re-index).
+Models are loaded from `CODE_CRAWLER_TRANSFORMERS_MODELS_PATH` (Hub-style folders). To prefetch weights (useful offline or to avoid first-run downloads), from this package run `yarn download:models:embeddings` and/or `yarn download:models:rag` (see `package.json`).
+
+Upgrading the `@huggingface/transformers` dependency can change floating-point embeddings for the same model id; if search quality degrades after an upgrade, **rebuild the semantic index** (new `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH` or delete the existing DB and re-index).
 
 ## Install and run
 
@@ -41,7 +47,9 @@ Development with reload:
 yarn start
 ```
 
-MCP endpoint: `http://<host>:<port>/mcp` (default bind `127.0.0.1:3333` unless overridden in `.env` — see `.env.example`).
+The `yarn start` script runs Nest in watch mode and **sets `CODE_CRAWLER_ROOT` to `$HOME/git/lichens`** for that process (see `package.json`). Other variables still come from your environment / `.env`. To use a different crawl root without editing the script, prefer `yarn build` then `yarn start:prod` with `.env` only, or invoke `nest start --watch` yourself with the env you need.
+
+MCP endpoint: `http://<host>:<port>/mcp` (defaults from `.env.example`: `127.0.0.1:3333`). REST API base: `http://<host>:<port>/api`.
 
 ## Extending persistence
 
@@ -78,11 +86,17 @@ Run these commands from **`incubator/code-crawler`** (this package’s `package.
 1. Start the server in another terminal: `yarn start:prod` (or `yarn start`) so `http://127.0.0.1:3333/mcp` is listening.
 2. Run `yarn inspector`. It starts the inspector with **Streamable HTTP** and URL `http://127.0.0.1:3333/mcp` already set (via `--transport http --server-url …`).
 
-**`MCP Inspector PORT IS IN USE` (3333):** Another inspector (or app) is still bound to the default UI port. Close that terminal or tab, or stop the process (on macOS: `lsof -nP -iTCP:3333 -sTCP:LISTEN` then `kill <pid>`). You can also use alternate ports: `CLIENT_PORT=3334 SERVER_PORT=6278 yarn server:inspect`.
+**Port already in use:** The code-crawler HTTP port defaults to **3333** (`CODE_CRAWLER_PORT`). The MCP Inspector (started via `yarn inspector`) uses **its own** ports for the web UI and MCP proxy; the inspector reads **`CLIENT_PORT`** and **`SERVER_PORT`** from the environment if you need to avoid clashes. If either the app or the inspector fails to bind, stop the conflicting process (on macOS: `lsof -nP -iTCP:<port> -sTCP:LISTEN` then `kill <pid>`) or pick free ports, for example:
 
-## Embeddings creation
+```bash
+CLIENT_PORT=6280 SERVER_PORT=6281 yarn inspector
+```
 
-Look for method: `runRepositoryIndexingFlow` (could be called for a single repo or inside a loop of repos)
+Change `CODE_CRAWLER_PORT` in `.env` if **3333** is taken by something other than this server.
+
+## Indexing flow
+
+Repository indexing is implemented around `runRepositoryIndexingFlow` in [`src/semantic-service/repo-embeddings.utils.ts`](src/semantic-service/repo-embeddings.utils.ts) (used for a single repo or from workspace-wide preparation). It walks files, chunks text, embeds batches, and persists via `workspaceSemanticIndexStore`.
 
 ## Security
 
@@ -92,12 +106,12 @@ The server has **no authentication**. Binding to `127.0.0.1` limits exposure to 
 
 See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
-## Queries examples:
+## Example prompts (MCP)
 
-* run code-crawler MCP to find tanstack query usage of a data mutation (update)
-* using code-crawler MCP: find date ant time helpers for formatting dates
-* un code-crawler MCP to find REST API controller definitions
-* execute code-crawler MCP to find examples of form validations with schema and rules using zod 
+- Use code-crawler MCP to find TanStack Query usage for a data mutation (update).
+- Using code-crawler MCP: find date and time helpers for formatting dates.
+- Use code-crawler MCP to find REST API controller definitions.
+- Use code-crawler MCP to find form validation examples with a schema and rules (e.g. Zod).
 
 ## TODOs
 
