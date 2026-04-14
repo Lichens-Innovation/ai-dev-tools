@@ -1,6 +1,6 @@
 # Semantic index database (SQLite)
 
-This document describes the **semantic index** SQLite file used by `SqliteSemanticIndexStore` (`src/semantic-service/sqlite-semantic-index.store.ts`). The DDL lives in `src/semantic-service/semantic-index-sqlite.types.ts`.
+This document describes the **semantic index** SQLite file used by `SqliteSemanticIndexStore` (`src/semantic-service/sqlite-semantic-index.store.ts`). The DDL (Data Definition Language) lives in `src/semantic-service/semantic-index-sqlite.types.ts`.
 
 Pragmas applied at open: `journal_mode = WAL`, `foreign_keys = ON`.
 
