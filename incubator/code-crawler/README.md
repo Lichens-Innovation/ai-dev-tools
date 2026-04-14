@@ -109,6 +109,8 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 ## Example prompts (MCP)
 
 - Use code-crawler MCP to find TanStack Query usage for a data mutation (update).
+- caching data retrieved from an http api call for a specific period of time
+- use code-crawler mcp to find where http retry can be handled
 - Using code-crawler MCP: find date and time helpers for formatting dates.
 - Use code-crawler MCP to find REST API controller definitions.
 - Use code-crawler MCP to find form validation examples with a schema and rules (e.g. Zod).
