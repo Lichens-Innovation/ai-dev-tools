@@ -117,7 +117,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
 ## TODOs
 
-* TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively
+* TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively (usage of @microsoft/fetch-event-source on client side instead of SSE.js)
 * TODO-002: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
 * TODO-003: let users filter searches by source-code / file types (e.g. checkboxes for extensions or language groups)
 * TODO-004: stop loading scripts or assets from `cdn.jsdelivr.net`; ship pinned versions locally and reference them from HTML (no CDN dependency for the search UI)
