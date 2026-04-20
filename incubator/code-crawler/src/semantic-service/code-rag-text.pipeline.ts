@@ -1,19 +1,25 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
-import { getCodeCrawlerRagTextModel, getCodeCrawlerTransformersFsEnvValues } from "../utils/env.utils";
-import type { QueryMatchSummary } from "./semantic-search.types";
+import { getCodeCrawlerRagTextModel } from "../utils/env.utils";
+import { applyTransformersFilesystemEnv } from "../utils/ml/transformers-fs-env.utils";
+import type { QueryMatchSummary } from "./types/search.types";
 
-type TextGenOutputItem = { generated_text: string };
+interface TextGenOutputItem {
+  generated_text: string;
+}
+
+interface TextGenerationCallOptions {
+  max_new_tokens?: number;
+  return_full_text?: boolean;
+}
 
 type TextGenerator = (
   prompt: string,
-  options?: { max_new_tokens?: number; return_full_text?: boolean }
+  options?: TextGenerationCallOptions
 ) => Promise<TextGenOutputItem[] | TextGenOutputItem[][]>;
 
 const loadTextGenerationPipeline = async (): Promise<TextGenerator> => {
   const { env, pipeline } = await import("@huggingface/transformers");
-  const { localModelPath, cacheDir } = getCodeCrawlerTransformersFsEnvValues();
-  env.localModelPath = localModelPath;
-  env.cacheDir = cacheDir;
+  applyTransformersFilesystemEnv(env);
 
   const model = getCodeCrawlerRagTextModel();
   /** Default fp32 `model.onnx` + external data hits ORT shape-inference errors on some graphs; `q8` uses bundled `model_quantized.onnx`. */
@@ -38,7 +44,12 @@ const getTextGenerationPipeline = (): Promise<TextGenerator> => {
 export const buildRagContextFromMatches = (matches: QueryMatchSummary[]): string =>
   matches.map((r, index) => `### Code Snippet ${index + 1}:\n\`\`\`\n${r.documentPreview}\n\`\`\``).join("\n\n");
 
-const buildRagPrompt = ({ context, question }: { context: string; question: string }): string =>
+interface BuildRagPromptArgs {
+  context: string;
+  question: string;
+}
+
+const buildRagPrompt = ({ context, question }: BuildRagPromptArgs): string =>
   `You are a code assistant. Answer using only the context below.
 
 Context:

@@ -3,10 +3,10 @@ name: SSE RAG streaming API
 overview: "Ajouter `POST /api/semantic-search-workspace-files-rag-stream` qui renvoie du `text/event-stream` (SSE) : d’abord un événement `hits` (résultats de recherche) pour affichage immédiat côté client, puis le texte RAG en fragments via `TextStreamer`, puis un événement de fin."
 todos:
   - id: rag-stream-pipeline
-    content: Ajouter streamRagAnswerFromMatches avec TextStreamer + réutilisation prompt/contexte dans semantic-rag-text-pipeline.utils.ts
+    content: Ajouter streamRagAnswerFromMatches avec TextStreamer + réutilisation prompt/contexte dans code-rag-text.pipeline.ts
     status: pending
   - id: repo-orchestration
-    content: Exporter une fonction d’orchestration (recherche → événement hits, puis stream RAG / court-circuits) dans repo-embeddings.utils.ts
+    content: Exporter une fonction d’orchestration (recherche → événement hits, puis stream RAG / court-circuits) dans semantic-workspace.tools.ts (ou module dédié)
     status: pending
   - id: api-sse-route
     content: POST semantic-search-workspace-files-rag-stream + helpers SSE + gestion close/erreurs dans api.controller.ts (et api-sse.utils.ts si extrait)
@@ -21,19 +21,22 @@ isProject: false
 
 ## Contexte technique
 
-- L’endpoint existant [`semantic-search-workspace-files-rag`](incubator/code-crawler/src/api/api.controller.ts) appelle [`semanticSearchWorkspaceFilesWithRag`](incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts) qui enchaîne [`runWorkspaceSemanticQuery`](incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts) puis [`generateRagAnswerFromMatches`](incubator/code-crawler/src/semantic-service/semantic-rag-text-pipeline.utils.ts) (génération **non** streamée aujourd’hui ; le TODO-001 le mentionne déjà).
+- L’endpoint existant [`semantic-search-workspace-files-rag`](incubator/code-crawler/src/api/api.controller.ts) appelle [`semanticSearchWorkspaceFilesWithRag`](incubator/code-crawler/src/semantic-service/semantic-workspace.tools.ts) qui enchaîne [`runWorkspaceSemanticQuery`](incubator/code-crawler/src/semantic-service/search/workspace-semantic-query.service.ts) puis [`generateRagAnswerFromMatches`](incubator/code-crawler/src/semantic-service/code-rag-text.pipeline.ts) (génération **non** streamée aujourd’hui ; le TODO-001 le mentionne déjà).
 - Transformers.js v4 expose [`TextStreamer`](https://huggingface.co/docs/transformers.js/en/api/generation/streamers) avec `callback_function` / `token_callback_function` et `skip_prompt: true`, passé à l’appel du pipeline via l’option `streamer` (à valider au moment de l’implémentation sur l’objet retourné par `pipeline("text-generation", …)` — accès typique au tokenizer via la pipeline, ex. propriété `tokenizer`).
 
 ```mermaid
 sequenceDiagram
   participant Client
   participant Api as ApiController
-  participant Repo as repo-embeddings
-  participant Rag as semantic-rag-text-pipeline
+  participant Tools as semantic-workspace.tools
+  participant Query as workspace-semantic-query
+  participant Rag as code-rag-text.pipeline
 
   Client->>Api: POST body SemanticSearchWorkspaceFilesDto
-  Api->>Repo: runWorkspaceSemanticQuery
-  Repo-->>Api: outcome
+  Api->>Tools: semanticSearchWorkspaceFilesWithRag
+  Tools->>Query: runWorkspaceSemanticQuery
+  Query-->>Tools: outcome
+  Tools-->>Api: outcome
   Api-->>Client: SSE type hits queryText hits
   Api->>Rag: stream avec TextStreamer
   loop fragments
@@ -62,20 +65,20 @@ Champs optionnels sur l’événement `type: "hits"` : `skippedRagMessage?: stri
 
 Ordre nominal des événements : `hits` → zéro ou plusieurs `rag_delta` → `done`. En cas d’échec génération après des `rag_delta` partiels : `rag_error` puis `done` (ou seulement `done` si vous centralisez l’erreur — à rester cohérent dans l’implémentation).
 
-Cas limites alignés sur le comportement actuel de [`semanticSearchWorkspaceFilesWithRag`](incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts) :
+Cas limites alignés sur le comportement actuel de [`semanticSearchWorkspaceFilesWithRag`](incubator/code-crawler/src/semantic-service/semantic-workspace.tools.ts) :
 
 - `outcome` non tableau (erreur recherche) : **`hits`** avec ce `outcome`, puis **`done`** ; pas de `rag_delta` / pas de chargement du modèle texte (équivalent au message « Semantic search failed… » côté REST).
 - `outcome` tableau vide : **`hits`** (`outcome: []`, idéalement avec `skippedRagMessage` comme ci-dessus), puis **`done`** — pas de chargement du pipeline texte.
 
 ## Implémentation prévue
 
-1. **[`semantic-rag-text-pipeline.utils.ts`](incubator/code-crawler/src/semantic-service/semantic-rag-text-pipeline.utils.ts)**  
+1. **[`code-rag-text.pipeline.ts`](incubator/code-crawler/src/semantic-service/code-rag-text.pipeline.ts)**  
    - Importer dynamiquement `TextStreamer` depuis `@huggingface/transformers` (comme le reste du module).  
    - Nouvelle fonction exportée du style `streamRagAnswerFromMatches({ matches, question, onTextChunk })` qui réutilise `buildRagContextFromMatches` / `buildRagPrompt`, instancie `TextStreamer` avec `skip_prompt: true`, appelle le même `getTextGenerationPipeline()` avec `{ streamer, max_new_tokens: 512, return_full_text: false }`, propage les erreurs comme `generateRagAnswerFromMatches`.  
    - Garder `generateRagAnswerFromMatches` pour l’API MCP / REST non-stream (pas de régression).
 
-2. **[`repo-embeddings.utils.ts`](incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts)** (ou petit module dédié si vous voulez éviter d’alourdir le fichier)  
-   - Une fonction async exportée qui encapsule : `runWorkspaceSemanticQuery` → émission **`hits`** (toujours, dès que l’outcome est connu) → court-circuit erreur / liste vide selon les règles ci-dessus → sinon `streamRagAnswerFromMatches` avec callback qui ne connaît pas Express (découplage testable).
+2. **[`semantic-workspace.tools.ts`](incubator/code-crawler/src/semantic-service/semantic-workspace.tools.ts)** (ou petit module dédié si vous voulez éviter d’alourdir le fichier)  
+   - Une fonction async exportée qui encapsule : `runWorkspaceSemanticQuery` (via [`workspace-semantic-query.service.ts`](incubator/code-crawler/src/semantic-service/search/workspace-semantic-query.service.ts)) → émission **`hits`** (toujours, dès que l’outcome est connu) → court-circuit erreur / liste vide selon les règles ci-dessus → sinon `streamRagAnswerFromMatches` avec callback qui ne connaît pas Express (découplage testable).
 
 3. **[`api.controller.ts`](incubator/code-crawler/src/api/api.controller.ts)**  
    - `@Post("semantic-search-workspace-files-rag-stream")` avec `@Body() body: SemanticSearchWorkspaceFilesDto` et `@Res({ passthrough: false }) res`, et `@Req() req` pour `req.on("close", …)`.  
@@ -93,8 +96,8 @@ Cas limites alignés sur le comportement actuel de [`semanticSearchWorkspaceFile
 
 ## Fichiers touchés (résumé)
 
-- [`incubator/code-crawler/src/semantic-service/semantic-rag-text-pipeline.utils.ts`](incubator/code-crawler/src/semantic-service/semantic-rag-text-pipeline.utils.ts) — streaming HF.
-- [`incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts`](incubator/code-crawler/src/semantic-service/repo-embeddings.utils.ts) — orchestration recherche + callbacks événements.
+- [`incubator/code-crawler/src/semantic-service/code-rag-text.pipeline.ts`](incubator/code-crawler/src/semantic-service/code-rag-text.pipeline.ts) — streaming HF.
+- [`incubator/code-crawler/src/semantic-service/semantic-workspace.tools.ts`](incubator/code-crawler/src/semantic-service/semantic-workspace.tools.ts) — orchestration recherche + callbacks événements.
 - [`incubator/code-crawler/src/api/api.controller.ts`](incubator/code-crawler/src/api/api.controller.ts) — route SSE.
 - Optionnel : [`incubator/code-crawler/src/api/api-sse.utils.ts`](incubator/code-crawler/src/api/api-sse.utils.ts) — formatage SSE réutilisable.
 

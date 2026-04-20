@@ -1,7 +1,7 @@
 import { getErrorMessage } from "@lichens-innovation/ts-common";
 import { access, readdir, stat } from "node:fs/promises";
 import { basename, join, relative, resolve } from "node:path";
-import { EnvNames, expandUserDirectory, getCodeCrawlerRoot } from "../utils/env.utils";
+import { EnvNames, expandUserDirectory, getCodeCrawlerRoot } from "./env.utils";
 
 const SKIP_DIR_NAMES = new Set(["node_modules", ".git"]);
 
@@ -9,11 +9,11 @@ export interface ErrorResult {
   error: string;
 }
 
-export type ListGitRepoRootsResult = {
+export interface ListGitRepoRootsResult {
   parentPath?: string;
   repos: string[];
   error?: string;
-};
+}
 
 const listGitRepoRootsFailure = (error: string): ListGitRepoRootsResult => ({
   repos: [],
@@ -91,7 +91,11 @@ export type RepositoriesParentResult = {
 /** Absolute path to the directory set in {@link EnvNames.root} (after `~` expansion). */
 export const resolveCodeCrawlerParentPath = (): string => resolve(expandUserDirectory(getCodeCrawlerRoot()));
 
-type GetRepositoriesParentResourceType = { payload: RepositoriesParentResult } | ErrorResult;
+interface RepositoriesParentResourcePayload {
+  payload: RepositoriesParentResult;
+}
+
+type GetRepositoriesParentResourceType = RepositoriesParentResourcePayload | ErrorResult;
 
 /**
  * Uses `CODE_CRAWLER_ROOT`, then lists Git repository roots under that directory.
@@ -117,7 +121,12 @@ export const getRepositoriesInfos = async (): Promise<GetRepositoriesParentResou
   };
 };
 
-export type ResolveRepositoryUnderCodeCrawlerRootResult = { absolutePath: string; repository: string } | ErrorResult;
+export interface ResolvedRepositoryUnderParent {
+  absolutePath: string;
+  repository: string;
+}
+
+export type ResolveRepositoryUnderCodeCrawlerRootResult = ResolvedRepositoryUnderParent | ErrorResult;
 
 type BuildRepoNotFoundArgs = {
   trimmedRoot?: string;

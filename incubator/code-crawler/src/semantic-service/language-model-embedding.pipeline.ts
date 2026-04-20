@@ -1,27 +1,25 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
 import { l2NormalizeInPlace } from "../utils/embeddings.utils";
-import {
-  EnvNames,
-  getCodeCrawlerEmbeddingModel,
-  getCodeCrawlerTransformersFsEnvValues,
-  getEmbeddingDimensions,
-} from "../utils/env.utils";
+import { EnvNames, getCodeCrawlerEmbeddingModel, getEmbeddingDimensions } from "../utils/env.utils";
+import { applyTransformersFilesystemEnv } from "../utils/ml/transformers-fs-env.utils";
+
+interface FeatureExtractionCallOptions {
+  normalize?: boolean;
+  pooling?: "mean" | "none" | "cls";
+}
+
+interface FeatureExtractionTensor {
+  data: Float32Array;
+  dims: number[];
+}
 
 type FeaturePipeline = {
-  (
-    texts: string | string[],
-    options?: { normalize?: boolean; pooling?: "mean" | "none" | "cls" }
-  ): Promise<{
-    data: Float32Array;
-    dims: number[];
-  }>;
+  (texts: string | string[], options?: FeatureExtractionCallOptions): Promise<FeatureExtractionTensor>;
 };
 
 const loadFeatureExtractionPipeline = async (): Promise<FeaturePipeline> => {
   const { env, pipeline } = await import("@huggingface/transformers");
-  const { localModelPath, cacheDir } = getCodeCrawlerTransformersFsEnvValues();
-  env.localModelPath = localModelPath;
-  env.cacheDir = cacheDir;
+  applyTransformersFilesystemEnv(env);
 
   const model = getCodeCrawlerEmbeddingModel();
   console.info(
@@ -44,11 +42,16 @@ const getFeatureExtractionPipeline = (): Promise<FeaturePipeline> => {
 const asFloat32Data = (data: ArrayLike<number>): Float32Array =>
   data instanceof Float32Array ? data : Float32Array.from(data);
 
+interface TensorLikeRowSource {
+  data: ArrayLike<number>;
+  dims: number[];
+}
+
 /**
  * Converts a feature-extraction tensor (float32) into one row per
  * batch item. Copies each row into its own Float32Array.
  */
-const tensorToRowVectors = (tensor: { data: ArrayLike<number>; dims: number[] }): Float32Array[] => {
+const tensorToRowVectors = (tensor: TensorLikeRowSource): Float32Array[] => {
   const data = asFloat32Data(tensor.data);
   const { dims } = tensor;
   if (dims.length === 1) {

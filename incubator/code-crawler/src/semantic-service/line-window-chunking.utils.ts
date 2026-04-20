@@ -3,16 +3,17 @@ import {
   getCodeCrawlerChunkMaxLines,
   getCodeCrawlerChunkOverlapLines,
 } from "../utils/env.utils";
+import { normalizeSourceNewlines } from "../utils/text/newlines.utils";
 
 /**
  * Line-based splitting of file content for semantic indexing (one embedding per chunk).
  */
 
-export type SemanticLineChunk = {
+export interface LineWindowChunk {
   body: string;
   endLine: number;
   startLine: number;
-};
+}
 
 const getSemanticChunkParams = (): {
   maxCharsPerChunk: number; // "chars" here means UTF-8 bytes.
@@ -24,21 +25,19 @@ const getSemanticChunkParams = (): {
   overlapLines: getCodeCrawlerChunkOverlapLines(),
 });
 
-const normalizeSourceNewlines = (content: string): string => content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-
 /**
  * Splits normalized content into overlapping line windows,
  * capped by UTF-8 length per chunk (line boundaries only).
  * Limits come from `getCodeCrawlerChunk*` in `env.utils.ts`.
  */
-export const buildSemanticLineChunks = (content: string): SemanticLineChunk[] => {
+export const buildSemanticLineChunks = (content: string): LineWindowChunk[] => {
   const { maxCharsPerChunk, maxLinesPerChunk, overlapLines: overlapFromEnv } = getSemanticChunkParams();
   const overlapLines = Math.min(overlapFromEnv, maxLinesPerChunk - 1);
 
   const normalized = normalizeSourceNewlines(content);
   const lines = normalized.length === 0 ? [""] : normalized.split("\n");
 
-  const chunks: SemanticLineChunk[] = [];
+  const chunks: LineWindowChunk[] = [];
   let startIdx = 0;
 
   while (startIdx < lines.length) {

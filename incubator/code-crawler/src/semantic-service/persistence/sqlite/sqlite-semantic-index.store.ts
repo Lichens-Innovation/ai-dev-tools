@@ -4,7 +4,10 @@ import { Buffer } from "node:buffer";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import * as sqliteVec from "sqlite-vec";
-import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../utils/env.utils";
+import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../../../utils/env.utils";
+import type { FileIndexMetadata } from "../../types/index-domain.types";
+import type { QueryMatchSummary } from "../../types/search.types";
+import type { QueryNearestArgs, ReplaceIndexedFilePayload, SemanticIndexStore } from "../../types/store.types";
 import {
   FILE_INDEX_CHUNK_VEC_NAME,
   META_KEY_EMBEDDING_DIM,
@@ -18,9 +21,7 @@ import {
   buildFileIndexChunkVecDdl,
   type DbFileIndexKnnRow,
   type DbFileIndexMetadataRow,
-} from "./semantic-index-sqlite.types";
-import type { QueryNearestArgs, ReplaceIndexedFilePayload, SemanticIndexStore } from "./semantic-index-store.types";
-import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.types";
+} from "./semantic-index-sqlite.schema";
 
 /**
  * sqlite-vec KNN returns L2 distance for float embeddings. With L2-normalized model outputs,

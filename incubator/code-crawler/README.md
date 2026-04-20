@@ -2,7 +2,7 @@
 
 MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using [**@huggingface/transformers**](https://www.npmjs.com/package/@huggingface/transformers) (Transformers.js) in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport). The same process also serves a **REST API** under `/api` and static files (hub, demos, search UI) at `/`.
 
-The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `sqlite-semantic-index.store.ts`).
+The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`).
 
 ## Database schema
 
@@ -53,7 +53,7 @@ MCP endpoint: `http://<host>:<port>/mcp` (defaults from `.env.example`: `127.0.0
 
 ## Extending persistence
 
-All index **CRUD** goes through `SemanticIndexStore` (`semantic-index-store.types.ts`), implemented by `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `sqlite-semantic-index.store.ts` (SQLite + sqlite-vec).
+All index **CRUD** goes through `SemanticIndexStore` (`src/semantic-service/types/store.types.ts`), implemented by `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts` (SQLite + sqlite-vec).
 
 ## Consumers: Cursor and Claude Code
 
@@ -96,7 +96,7 @@ Change `CODE_CRAWLER_PORT` in `.env` if **3333** is taken by something other tha
 
 ## Indexing flow
 
-Repository indexing is implemented around `runRepositoryIndexingFlow` in [`src/semantic-service/repo-embeddings.utils.ts`](src/semantic-service/repo-embeddings.utils.ts) (used for a single repo or from workspace-wide preparation). It walks files, chunks text, embeds batches, and persists via `workspaceSemanticIndexStore`.
+Repository indexing centers on `runRepositoryIndexingFlow` in [`src/semantic-service/indexing/repository-indexing.flow.ts`](src/semantic-service/indexing/repository-indexing.flow.ts) (single repo or workspace-wide via [`runWorkspaceRepositoriesIndexing`](src/semantic-service/indexing/repository-indexing.flow.ts) from the same module). MCP/REST entry points live in [`src/semantic-service/semantic-workspace.tools.ts`](src/semantic-service/semantic-workspace.tools.ts). The flow walks files, chunks text, embeds batches, and persists via `workspaceSemanticIndexStore`.
 
 ## Security
 

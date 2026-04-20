@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Logger, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { StatusCodes } from "http-status-codes";
-import { getRepositoriesInfos } from "../semantic-service/git-projects.utils";
+import { getRepositoriesInfos } from "../utils/git-repositories.utils";
 import {
   clearWorkspaceSemanticSearchIndex,
   getIndexedFileContentByFileId,
@@ -9,7 +9,7 @@ import {
   prepareWorkspaceRepositoriesForSemanticSearch,
   semanticSearchWorkspaceFiles,
   semanticSearchWorkspaceFilesWithRag,
-} from "../semantic-service/repo-embeddings.utils";
+} from "../semantic-service/semantic-workspace.tools";
 import { callToolResultToRestBody } from "./api-call-tool-result.utils";
 import {
   ClearWorkspaceSemanticSearchIndexDto,

@@ -147,7 +147,7 @@ flowchart TB
 - Pipeline Hugging Face : tâche **`feature-extraction`** sur l’id de modèle configuré.
 - **Pooling `mean`**, **normalisation** — une ligne numérique de dimension fixe (ex. 768 selon `.env`).
 
-> <small>Capture 8–12 lignes de [`semantic-embedding-pipeline.utils.ts`](../src/semantic-service/semantic-embedding-pipeline.utils.ts) autour de `pipeline("feature-extraction", model)`.</small>
+> <small>Capture 8–12 lignes de [`language-model-embedding.pipeline.ts`](../src/semantic-service/language-model-embedding.pipeline.ts) autour de `pipeline("feature-extraction", model)`.</small>
 
 #### Poids du modèle (fichiers)
 
@@ -195,7 +195,7 @@ flowchart LR
 #### Découverte : que lit-on ?
 
 - Racine : `CODE_CRAWLER_ROOT` (ou `rootDir` passé aux outils).
-- Dossiers exclus : `.git`, `node_modules`, `dist`, etc. — constante `INDEX_SKIP_DIR_NAMES` dans [`repo-embeddings.utils.ts`](../src/semantic-service/repo-embeddings.utils.ts).
+- Dossiers exclus : `.git`, `node_modules`, `dist`, etc. — constante `INDEX_SKIP_DIR_NAMES` dans [`repository-file-records.utils.ts`](../src/semantic-service/indexing/repository-file-records.utils.ts).
 - **Aujourd’hui dans le code** : extensions indexées **`.ts` et `.tsx` uniquement** (à mentionner clairement pour ne pas sur-promettre).
 
 > <small>Capture des listes `INDEX_SKIP_DIR_NAMES` et `INDEX_ALLOWED_FILE_EXTENSIONS` dans le même fichier.</small>
@@ -233,7 +233,7 @@ flowchart TB
 - Découpage **par lignes** avec **recouvrement** (overlap) — évite de couper le contexte net.
 - Limites pilotées par l’environnement : `CODE_CRAWLER_CHUNK_MAX_CHARS`, `CODE_CRAWLER_CHUNK_MAX_LINES`, `CODE_CRAWLER_CHUNK_OVERLAP_LINES` (voir [`.env.example`](../.env.example)).
 
-> <small>Capture de l’en-tête et de `export const buildSemanticLineChunks` dans [`semantic-chunk.utils.ts`](../src/semantic-service/semantic-chunk.utils.ts).</small>
+> <small>Capture de l’en-tête et de `export const buildSemanticLineChunks` dans [`line-window-chunking.utils.ts`](../src/semantic-service/line-window-chunking.utils.ts).</small>
 
 #### Quoi embedder exactement ?
 
@@ -353,7 +353,7 @@ flowchart LR
 #### « Poids » des résultats (classement)
 
 - **Distance** entre vecteur requête et vecteurs indexés (plus petit = plus proche).
-- Si **plusieurs chunks** du **même fichier** ressortent : **boost** (distance effective divisée par `1 + 0,25 × (nombre de hits − 1)` — voir [`semantic-search-match-consolidation.utils.ts`](../src/semantic-service/semantic-search-match-consolidation.utils.ts)).
+- Si **plusieurs chunks** du **même fichier** ressortent : **boost** (distance effective divisée par `1 + 0,25 × (nombre de hits − 1)` — voir [`match-consolidation-by-file.utils.ts`](../src/semantic-service/search/match-consolidation-by-file.utils.ts)).
 
 > <small>Capture d’une ligne avec la constante `0.25` et le commentaire sur le diviseur.</small>
 
@@ -420,7 +420,7 @@ flowchart TD
 #### Ressources & Q/R
 
 - Documentation projet : [README.md](../README.md), schéma base : [DATABASE.md](./DATABASE.md).
-- Code d’entrée d’indexation : `runRepositoryIndexingFlow` dans [`repo-embeddings.utils.ts`](../src/semantic-service/repo-embeddings.utils.ts).
+- Code d’entrée d’indexation : `runRepositoryIndexingFlow` dans [`repository-indexing.flow.ts`](../src/semantic-service/indexing/repository-indexing.flow.ts) (outils MCP/REST : [`semantic-workspace.tools.ts`](../src/semantic-service/semantic-workspace.tools.ts)).
 
 > <small>QR ou liens complets vers le dépôt et les chemins de documentation.</small>
 
@@ -432,6 +432,6 @@ flowchart LR
   Tool --> Res[Fichiers retournés]
   R[README.md] --> P[Setup + docs]
   D[DATABASE.md] --> P
-  E[repo-embeddings.utils.ts<br/>runRepositoryIndexingFlow] --> P
+  E[repository-indexing.flow.ts<br/>runRepositoryIndexingFlow] --> P
   P --> Q[Questions — index + recherche sémantique]
 ```

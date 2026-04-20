@@ -1,6 +1,6 @@
 # Semantic index database (SQLite)
 
-This document describes the **semantic index** SQLite file used by `SqliteSemanticIndexStore` (`src/semantic-service/sqlite-semantic-index.store.ts`). The DDL (Data Definition Language) lives in `src/semantic-service/semantic-index-sqlite.types.ts`.
+This document describes the **semantic index** SQLite file used by `SqliteSemanticIndexStore` (`src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`). The DDL (Data Definition Language) lives in `src/semantic-service/persistence/sqlite/semantic-index-sqlite.schema.ts`.
 
 Pragmas applied at open: `journal_mode = WAL`, `foreign_keys = ON`.
 
@@ -56,7 +56,7 @@ erDiagram
 
 ## Chunk rows and vectors (application link)
 
-There is **no SQL foreign key** between `FILE_INDEX_CHUNK` and `FILE_INDEX_CHUNK_VEC`. The store **inserts the vector row first**, then inserts the chunk row with `ID` equal to the vector insert’s `lastInsertRowid` (the vec table **rowid**). Deletes remove vec rows by that same id (`DELETE FROM FILE_INDEX_CHUNK_VEC WHERE rowid = ?`). See `replaceIndexedFile` in `sqlite-semantic-index.store.ts`.
+There is **no SQL foreign key** between `FILE_INDEX_CHUNK` and `FILE_INDEX_CHUNK_VEC`. The store **inserts the vector row first**, then inserts the chunk row with `ID` equal to the vector insert’s `lastInsertRowid` (the vec table **rowid**). Deletes remove vec rows by that same id (`DELETE FROM FILE_INDEX_CHUNK_VEC WHERE rowid = ?`). See `replaceIndexedFile` in `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`.
 
 ## Configuration
 

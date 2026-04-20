@@ -1,4 +1,4 @@
-import type { QueryMatchSummary } from "./semantic-search.types";
+import type { QueryMatchSummary } from "../types/search.types";
 
 /** How many raw chunk neighbors to fetch per requested file (dedupe shrinks the list). */
 const FILE_CONSOLIDATION_CHUNK_FETCH_FACTOR = 4;

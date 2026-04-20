@@ -1,11 +1,10 @@
-import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.types";
+import type { FileIndexMetadata } from "./index-domain.types";
+import type { QueryMatchSummary } from "./search.types";
 
 /**
  * All reads/writes of the semantic search index should go through {@link SemanticIndexStore}.
  *
- * **Persistence:** `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `sqlite-semantic-index.store.ts` (SQLite + sqlite-vec).
- * CRUD: {@link SemanticIndexStore.clear}, {@link SemanticIndexStore.replaceIndexedFile}, {@link SemanticIndexStore.queryNearest},
- * {@link SemanticIndexStore.getFileMetadataByFileId}.
+ * **Persistence:** `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` (SQLite + sqlite-vec).
  */
 export interface SemanticIndexChunkRow {
   chunkByteLength: number;

@@ -1,9 +1,9 @@
 /**
- * SQLite schema for persistent {@link SemanticIndexStore} (file index metadata + chunk rows, sqlite-vec KNN).
+ * SQLite schema for persistent semantic index (file index metadata + chunk rows, sqlite-vec KNN).
  * Vector dimension in {@link FILE_INDEX_CHUNK_VEC_NAME} is set at creation via {@link buildFileIndexChunkVecDdl}.
  */
 
-/** Table of persisted {@link FileIndexMetadata} rows (one row per indexed file). */
+/** Table of persisted file index metadata rows (one row per indexed file). */
 export const SQL_TABLE_NAME_FILE_INDEX_METADATA = "FILE_INDEX_METADATA";
 
 /** Chunk text + line spans; embeddings live in {@link FILE_INDEX_CHUNK_VEC_NAME}. */
@@ -66,7 +66,7 @@ export const buildFileIndexChunkVecDdl = (embeddingDimensions: number): string =
   repository TEXT
 );`;
 
-/** Row from {@link SQL_TABLE_NAME_FILE_INDEX_METADATA} (columns match {@link FileIndexMetadata}). */
+/** Row from {@link SQL_TABLE_NAME_FILE_INDEX_METADATA} (columns align with app `FileIndexMetadata`). */
 export interface DbFileIndexMetadataRow {
   CONTENT_SHA256: string;
   FILE_ID: string;

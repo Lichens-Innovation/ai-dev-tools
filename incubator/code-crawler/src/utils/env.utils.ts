@@ -155,7 +155,12 @@ export const getCodeCrawlerRagTextModel = (): string => getCodeCrawlerEnv().ragT
 
 export const CODE_CRAWLER_TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
 
-export const getCodeCrawlerTransformersFsEnvValues = (): { localModelPath: string; cacheDir: string } => {
+export interface CodeCrawlerTransformersFsEnvValues {
+  localModelPath: string;
+  cacheDir: string;
+}
+
+export const getCodeCrawlerTransformersFsEnvValues = (): CodeCrawlerTransformersFsEnvValues => {
   const modelsRoot = getCodeCrawlerTransformersModelsPath();
 
   const localModelPath = modelsRoot.endsWith(path.sep) ? modelsRoot : `${modelsRoot}${path.sep}`;
