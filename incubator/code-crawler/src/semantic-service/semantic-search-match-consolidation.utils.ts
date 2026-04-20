@@ -9,7 +9,7 @@ const FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX = 250;
 /** Divides effective distance by `1 + weight * (hitCount - 1)` so multi-chunk files rank higher. */
 const FILE_CONSOLIDATION_MULTI_CHUNK_BOOST_WEIGHT = 0.25;
 
-export const resolveChunkFetchCountForFileConsolidation = ({ maxFiles }: { maxFiles: number }): number => {
+export const resolveChunkFetchCountForFileConsolidation = (maxFiles: number): number => {
   if (maxFiles < 1) {
     return 0;
   }
@@ -86,14 +86,14 @@ export const buildAggregatedQueryMatchFromFileChunks = (chunks: QueryMatchSummar
 
 interface ConsolidateSemanticQueryMatchesByFileArgs {
   matches: QueryMatchSummary[];
-  targetFileCount: number;
+  nResults: number;
 }
 
 export const consolidateSemanticQueryMatchesByFile = ({
   matches,
-  targetFileCount,
+  nResults,
 }: ConsolidateSemanticQueryMatchesByFileArgs): QueryMatchSummary[] => {
-  if (targetFileCount < 1 || matches.length === 0) {
+  if (nResults < 1 || matches.length === 0) {
     return [];
   }
 
@@ -107,5 +107,5 @@ export const consolidateSemanticQueryMatchesByFile = ({
   }
 
   aggregated.sort((a, b) => a.distance - b.distance);
-  return aggregated.slice(0, targetFileCount);
+  return aggregated.slice(0, nResults);
 };

@@ -19,14 +19,8 @@ import {
   type DbFileIndexKnnRow,
   type DbFileIndexMetadataRow,
 } from "./semantic-index-sqlite.types";
-import type { ReplaceIndexedFilePayload, SemanticIndexStore } from "./semantic-index-store.types";
+import type { QueryNearestArgs, ReplaceIndexedFilePayload, SemanticIndexStore } from "./semantic-index-store.types";
 import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.types";
-
-interface QueryNearestArgs {
-  nResults: number;
-  queryEmbedding: Float32Array;
-  repository?: string;
-}
 
 /**
  * sqlite-vec KNN returns L2 distance for float embeddings. With L2-normalized model outputs,

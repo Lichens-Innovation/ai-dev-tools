@@ -11,8 +11,8 @@ import { toString } from "../utils/arrays.utils";
 import { expandUserDirectory, getCodeCrawlerEmbedBatchSize, getCodeCrawlerMaxIndexFileBytes } from "../utils/env.utils";
 import { buildSemanticLineChunks as buildSemanticChunks } from "./semantic-chunk.utils";
 import { embedTextsWithLanguageModel } from "./semantic-embedding-pipeline.utils";
-import { generateRagAnswerFromMatches } from "./semantic-rag-text-pipeline.utils";
 import type { SemanticIndexChunkRow } from "./semantic-index-store.types";
+import { generateRagAnswerFromMatches } from "./semantic-rag-text-pipeline.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
   resolveChunkFetchCountForFileConsolidation,
@@ -398,17 +398,13 @@ const runWorkspaceSemanticQuery = async ({
   }
 
   try {
-    const chunkFetchCount = resolveChunkFetchCountForFileConsolidation({ maxFiles: nResults });
-    const rawMatches = workspaceSemanticIndexStore.queryNearest({
-      nResults: chunkFetchCount,
+    const matches = workspaceSemanticIndexStore.queryNearest({
+      nResults: resolveChunkFetchCountForFileConsolidation(nResults),
       queryEmbedding,
       repository,
     });
 
-    return consolidateSemanticQueryMatchesByFile({
-      matches: rawMatches,
-      targetFileCount: nResults,
-    });
+    return consolidateSemanticQueryMatchesByFile({ matches, nResults });
   } catch (e: unknown) {
     const queryError = getErrorMessage(e);
     console.error(`[runWorkspaceSemanticQuery]: query failed: ${queryError}`, e);

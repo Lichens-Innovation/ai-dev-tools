@@ -7,7 +7,7 @@ import type { FileIndexMetadata, QueryMatchSummary } from "./semantic-search.typ
  * CRUD: {@link SemanticIndexStore.clear}, {@link SemanticIndexStore.replaceIndexedFile}, {@link SemanticIndexStore.queryNearest},
  * {@link SemanticIndexStore.getFileMetadataByFileId}.
  */
-export type SemanticIndexChunkRow = {
+export interface SemanticIndexChunkRow {
   chunkByteLength: number;
   chunkId: string;
   chunkIndex: number;
@@ -15,19 +15,25 @@ export type SemanticIndexChunkRow = {
   embedding: Float32Array;
   endLine: number;
   startLine: number;
-};
+}
 
-export type ReplaceIndexedFilePayload = {
+export interface ReplaceIndexedFilePayload {
   chunks: SemanticIndexChunkRow[];
   file: FileIndexMetadata;
-};
+}
+
+export interface QueryNearestArgs {
+  nResults: number;
+  queryEmbedding: Float32Array;
+  repository?: string;
+}
 
 export interface SemanticIndexStore {
   clear(): void;
 
   getFileMetadataByFileId(fileId: string): FileIndexMetadata | null;
 
-  queryNearest(params: { nResults: number; queryEmbedding: Float32Array; repository?: string }): QueryMatchSummary[];
+  queryNearest(queryNearestArgs: QueryNearestArgs): QueryMatchSummary[];
 
   replaceIndexedFile(payload: ReplaceIndexedFilePayload): void;
 }
