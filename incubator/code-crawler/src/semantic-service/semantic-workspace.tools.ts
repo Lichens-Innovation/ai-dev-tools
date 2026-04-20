@@ -150,10 +150,8 @@ export const prepareRepositoryForSemanticSearch = async (
     return buildMcpErrorResponse(resolved.error);
   }
 
-  const { absolutePath: repoRoot } = resolved;
-
   const flowOutcome = await runRepositoryIndexingFlow({
-    repoRoot,
+    repoRoot: resolved.absolutePath,
     repository,
     store: workspaceSemanticIndexStore,
   });
@@ -161,10 +159,11 @@ export const prepareRepositoryForSemanticSearch = async (
     return flowOutcome.result;
   }
 
+  const { exampleMatches, indexedChunkCount, indexedFileCount } = flowOutcome;
   return buildPrepareRepositoryForSemanticSearchSuccessResponse({
-    exampleMatches: flowOutcome.exampleMatches,
-    indexedChunkCount: flowOutcome.indexedChunkCount,
-    indexedFileCount: flowOutcome.indexedFileCount,
+    exampleMatches,
+    indexedChunkCount,
+    indexedFileCount,
     repository,
   });
 };

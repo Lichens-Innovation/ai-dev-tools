@@ -1,13 +1,13 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { getErrorMessage, isNotBlank } from "@lichens-innovation/ts-common";
-import { resolve } from "node:path";
-import { listGitRepoRootsUnderParent, resolveCodeCrawlerParentPath } from "../../utils/git-repositories.utils";
-import { expandUserDirectory } from "../../utils/env.utils";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { stat } from "node:fs/promises";
+import { resolve } from "node:path";
+import { expandUserDirectory } from "../../utils/env.utils";
+import { listGitRepoRootsUnderParent, resolveCodeCrawlerParentPath } from "../../utils/git-repositories.utils";
+import { EXAMPLE_QUERY_TEXT, runWorkspaceSemanticQuery } from "../search/workspace-semantic-query.service";
 import type { FileIndexRecord } from "../types/index-domain.types";
 import type { QueryOutcome } from "../types/search.types";
 import type { SemanticIndexStore } from "../types/store.types";
-import { EXAMPLE_QUERY_TEXT, runWorkspaceSemanticQuery } from "../search/workspace-semantic-query.service";
 import { tryCollectFileRecords } from "./repository-file-records.utils";
 import { tryUpsertFileRecordsToSemanticIndex } from "./semantic-index-upsert.pipeline";
 
@@ -80,18 +80,19 @@ export const runRepositoryIndexingFlow = async ({
     return { ok: false, result: collected.result };
   }
 
-  if (collected.records.length === 0) {
+  const { records } = collected;
+  if (records.length === 0) {
     return { indexedChunkCount: 0, indexedFileCount: 0, ok: true, exampleMatches: [] };
   }
 
-  const indexed = await upsertRecordsAndRunExampleQuery({ records: collected.records, repository, store });
+  const indexed = await upsertRecordsAndRunExampleQuery({ records, repository, store });
   if (!indexed.ok) {
     return { ok: false, result: indexed.result };
   }
 
   return {
     indexedChunkCount: indexed.indexedChunkCount,
-    indexedFileCount: collected.records.length,
+    indexedFileCount: records.length,
     ok: true,
     exampleMatches: indexed.exampleMatches,
   };
