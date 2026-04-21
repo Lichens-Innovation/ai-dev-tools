@@ -39,7 +39,10 @@ const buildPendingChunksForRecords = (records: FileIndexRecord[]): PendingEmbedC
   return pending;
 };
 
-type FileChunksBucket = { chunks: SemanticIndexChunkRow[]; file: FileIndexMetadata };
+interface FileChunksBucket {
+  chunks: SemanticIndexChunkRow[];
+  file: FileIndexMetadata;
+}
 
 const buildEmptyFileChunksBuckets = (records: FileIndexRecord[]): Map<string, FileChunksBucket> => {
   const chunksByFile = new Map<string, FileChunksBucket>();
