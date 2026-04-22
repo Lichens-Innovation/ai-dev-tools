@@ -5,21 +5,32 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import * as sqliteVec from "sqlite-vec";
 import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../../../utils/env.utils";
+import { buildSafeFts5MatchQuery } from "../../search/fts5-query-sanitize.utils";
 import type { FileIndexMetadata } from "../../types/index-domain.types";
 import type { QueryMatchSummary } from "../../types/search.types";
-import type { QueryNearestArgs, ReplaceIndexedFilePayload, SemanticIndexStore } from "../../types/store.types";
+import type {
+  QueryLexicalChunksArgs,
+  QueryNearestArgs,
+  ReplaceIndexedFilePayload,
+  SemanticIndexStore,
+} from "../../types/store.types";
 import {
+  FILE_INDEX_CHUNK_FTS_NAME,
   FILE_INDEX_CHUNK_VEC_NAME,
   META_KEY_EMBEDDING_DIM,
+  SQL_FTS_CHUNK_REBUILD,
   SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX,
   SQL_TABLE_FILE_INDEX_CHUNK,
+  SQL_TABLE_FILE_INDEX_CHUNK_FTS,
   SQL_TABLE_FILE_INDEX_METADATA,
   SQL_TABLE_FILE_INDEX_STORE_META,
   SQL_TABLE_NAME_FILE_INDEX_CHUNK,
   SQL_TABLE_NAME_FILE_INDEX_METADATA,
   SQL_TABLE_NAME_FILE_INDEX_STORE_META,
+  SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS,
   buildFileIndexChunkVecDdl,
   type DbFileIndexKnnRow,
+  type DbFileIndexLexicalRow,
   type DbFileIndexMetadataRow,
 } from "./semantic-index-sqlite.schema";
 
@@ -99,6 +110,40 @@ const countSemanticChunks = (db: Database.Database): number => {
   return row?.n ?? 0;
 };
 
+const ftsChunkTableExists = (db: Database.Database): boolean => {
+  const row = db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(FILE_INDEX_CHUNK_FTS_NAME) as { name: string } | undefined;
+  return !isNullish(row);
+};
+
+const countFtsIndexedRows = (db: Database.Database): number => {
+  type DbCountRow = { n: number };
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${FILE_INDEX_CHUNK_FTS_NAME}`).get() as DbCountRow;
+  return row?.n ?? 0;
+};
+
+/**
+ * Creates FTS5 + triggers when missing; `rebuild` when chunks exist but the FTS index is empty
+ * (e.g. reused local DB file). Idempotent.
+ */
+const ensureFts5SchemaOnDb = (db: Database.Database): void => {
+  if (!ftsChunkTableExists(db)) {
+    db.exec(SQL_TABLE_FILE_INDEX_CHUNK_FTS);
+    db.exec(SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS);
+    if (countSemanticChunks(db) > 0) {
+      db.exec(SQL_FTS_CHUNK_REBUILD);
+    }
+    return;
+  }
+
+  db.exec(SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS);
+  const n = countSemanticChunks(db);
+  if (n > 0 && countFtsIndexedRows(db) === 0) {
+    db.exec(SQL_FTS_CHUNK_REBUILD);
+  }
+};
+
 const dbMetadataRowToFileIndexMetadata = (row: DbFileIndexMetadataRow): FileIndexMetadata => ({
   contentSha256: row.CONTENT_SHA256,
   fileId: row.FILE_ID,
@@ -132,6 +177,8 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly stmtDeleteAllChunks: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllFiles: Database.Statement<[], unknown>;
   private readonly stmtSelectFileMetadataByFileId: Database.Statement<[string], DbFileIndexMetadataRow>;
+  private readonly stmtLexicalAll: Database.Statement<[string, number], DbFileIndexLexicalRow>;
+  private readonly stmtLexicalByRepository: Database.Statement<[string, string, number], DbFileIndexLexicalRow>;
 
   constructor(dbPath: string, embeddingDimensions: number) {
     ensureDbParentDirectory(dbPath);
@@ -149,6 +196,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.db.exec(SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX);
 
     this.ensureVecSchema();
+    ensureFts5SchemaOnDb(this.db);
 
     this.stmtSelectChunkRowidsByFileId = this.db.prepare(
       `SELECT ID FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`
@@ -209,6 +257,42 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
        FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}
        WHERE FILE_ID = ?`
     );
+
+    const lexicalSelectBase = `
+      SELECT
+        c.ID,
+        c.FILE_ID,
+        c.CHUNK_INDEX,
+        c.CHUNK_ID,
+        c.DOCUMENT,
+        c.START_LINE,
+        c.END_LINE,
+        c.CHUNK_BYTE_LENGTH,
+        f.REPOSITORY,
+        f.PATH_RELATIVE,
+        f.FILENAME,
+        f.FULL_PATH,
+        f.CONTENT_SHA256,
+        f.LAST_MODIFIED_AT_ISO,
+        f.SIZE_BYTES,
+        bm25(${FILE_INDEX_CHUNK_FTS_NAME}) AS bm25_score
+      FROM ${FILE_INDEX_CHUNK_FTS_NAME}
+      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = ${FILE_INDEX_CHUNK_FTS_NAME}.rowid
+      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_METADATA} AS f ON f.FILE_ID = c.FILE_ID`;
+
+    this.stmtLexicalAll = this.db.prepare<[string, number], DbFileIndexLexicalRow>(`${lexicalSelectBase}
+      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
+      ORDER BY bm25_score ASC
+      LIMIT ?`);
+
+    this.stmtLexicalByRepository = this.db.prepare<
+      [string, string, number],
+      DbFileIndexLexicalRow
+    >(`${lexicalSelectBase}
+      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
+        AND f.REPOSITORY = ?
+      ORDER BY bm25_score ASC
+      LIMIT ?`);
   }
 
   private ensureVecSchema(): void {
@@ -318,6 +402,43 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     return dbMetadataRowToFileIndexMetadata(row);
   }
 
+  queryLexicalChunks({ queryText, nResults, repository }: QueryLexicalChunksArgs): QueryMatchSummary[] {
+    if (nResults < 1) {
+      return [];
+    }
+
+    const matchQuery = buildSafeFts5MatchQuery(queryText);
+    if (isBlank(matchQuery)) {
+      return [];
+    }
+
+    const rows: DbFileIndexLexicalRow[] = isBlank(repository)
+      ? this.stmtLexicalAll.all(matchQuery, nResults)
+      : this.stmtLexicalByRepository.all(matchQuery, repository, nResults);
+
+    return rows.map(
+      (row): QueryMatchSummary => ({
+        chunkIndex: row.CHUNK_INDEX,
+        distance: row.bm25_score,
+        documentPreview: row.DOCUMENT,
+        fileId: row.FILE_ID,
+        id: row.CHUNK_ID,
+        startLine: row.START_LINE,
+        endLine: row.END_LINE,
+        metadata: dbMetadataRowToFileIndexMetadata({
+          CONTENT_SHA256: row.CONTENT_SHA256,
+          FILE_ID: row.FILE_ID,
+          FILENAME: row.FILENAME,
+          FULL_PATH: row.FULL_PATH,
+          LAST_MODIFIED_AT_ISO: row.LAST_MODIFIED_AT_ISO,
+          PATH_RELATIVE: row.PATH_RELATIVE,
+          REPOSITORY: row.REPOSITORY,
+          SIZE_BYTES: row.SIZE_BYTES,
+        }),
+      })
+    );
+  }
+
   queryNearest(params: QueryNearestArgs): QueryMatchSummary[] {
     const { nResults, queryEmbedding, repository } = params;
     if (nResults < 1) {
@@ -371,6 +492,7 @@ const createLazyWorkspaceSemanticIndexStore = (): SemanticIndexStore => {
   return {
     clear: () => get().clear(),
     getFileMetadataByFileId: (fileId) => get().getFileMetadataByFileId(fileId),
+    queryLexicalChunks: (args) => get().queryLexicalChunks(args),
     queryNearest: (params) => get().queryNearest(params),
     replaceIndexedFile: (payload) => get().replaceIndexedFile(payload),
   };

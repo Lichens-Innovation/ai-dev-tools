@@ -27,10 +27,20 @@ export interface QueryNearestArgs {
   repository?: string;
 }
 
+/** Lexical full-text search over indexed chunk bodies (FTS5 BM25). */
+export interface QueryLexicalChunksArgs {
+  /** Raw user query; sanitized to an FTS5 `MATCH` string inside the store. */
+  queryText: string;
+  nResults: number;
+  repository?: string;
+}
+
 export interface SemanticIndexStore {
   clear(): void;
 
   getFileMetadataByFileId(fileId: string): FileIndexMetadata | null;
+
+  queryLexicalChunks(args: QueryLexicalChunksArgs): QueryMatchSummary[];
 
   queryNearest(queryNearestArgs: QueryNearestArgs): QueryMatchSummary[];
 

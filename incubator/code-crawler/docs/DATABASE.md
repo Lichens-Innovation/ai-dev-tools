@@ -10,6 +10,7 @@ Pragmas applied at open: `journal_mode = WAL`, `foreign_keys = ON`.
 erDiagram
   FILE_INDEX_METADATA ||--o{ FILE_INDEX_CHUNK : "FILE_ID"
   FILE_INDEX_CHUNK ||--|| FILE_INDEX_CHUNK_VEC : "CHUNK.ID = VEC.rowid"
+  FILE_INDEX_CHUNK ||..o{ FILE_INDEX_CHUNK_FTS : "FTS5 external content"
 
   FILE_INDEX_METADATA {
     text FILE_ID PK
@@ -42,6 +43,10 @@ erDiagram
     blob embedding
     text repository
   }
+
+  FILE_INDEX_CHUNK_FTS {
+    text DOCUMENT
+  }
 ```
 
 ## Tables and indexes
@@ -53,6 +58,11 @@ erDiagram
 | `IDX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX` | unique index | On `(FILE_ID, CHUNK_INDEX)`. |
 | `FILE_INDEX_STORE_META` | table | Store-level key/value (e.g. `EMBEDDING_DIM` = width used for vec0). |
 | `FILE_INDEX_CHUNK_VEC` | virtual (`vec0`) | sqlite-vec KNN; columns `embedding float[N]` and `repository`. |
+| `FILE_INDEX_CHUNK_FTS` | virtual (`fts5`) | Full-text index on chunk `DOCUMENT` (BM25). **External content** on `FILE_INDEX_CHUNK` (`content_rowid='ID'`). Maintained by triggers on `FILE_INDEX_CHUNK`. |
+
+Hybrid search combines sqlite-vec KNN with FTS5 `bm25()` scores (fixed **70 % / 30 %** blend in `fuseHybridChunkMatches` after per-query min–max normalization).
+
+**FTS lifecycle:** `SqliteSemanticIndexStore` creates the FTS virtual table and triggers on open when missing, and runs `rebuild` only if there are chunk rows but the FTS index is empty (handy for a reused local file). There is no separate production migration path for this dev-oriented SQLite index.
 
 ## Chunk rows and vectors (application link)
 
