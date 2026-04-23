@@ -128,11 +128,7 @@ const walkCSharpNode = ({ node, out }: WalkCSharpNodeArgs): void => {
     return;
   }
 
-  if (
-    node.type === "class_declaration" ||
-    node.type === "struct_declaration" ||
-    node.type === "interface_declaration"
-  ) {
+  if (["class_declaration", "struct_declaration", "interface_declaration"].includes(node.type)) {
     walkCSharpTypeDeclaration({ node, out });
     return;
   }

@@ -106,11 +106,7 @@ const tryPushRawChunk = ({ out, chunk }: TryPushRawChunkArgs): void => {
 };
 
 const findDeclaratorName = (declarator: SyntaxNode): string | null => {
-  if (
-    declarator.type === "identifier" ||
-    declarator.type === "field_identifier" ||
-    declarator.type === "destructor_name"
-  ) {
+  if (["identifier", "field_identifier", "destructor_name"].includes(declarator.type)) {
     return declarator.text;
   }
 
@@ -125,9 +121,7 @@ const findDeclaratorName = (declarator: SyntaxNode): string | null => {
 };
 
 const cppFunctionName = (node: SyntaxNode): string => {
-  const declarator = node.namedChildren.find(
-    (c) => c.type === "function_declarator" || c.type === "reference_declarator"
-  );
+  const declarator = node.namedChildren.find((c) => ["function_declarator", "reference_declarator"].includes(c.type));
   if (isNullish(declarator)) {
     return "(anonymous)";
   }
@@ -172,7 +166,7 @@ const walkCppNode = ({ node, out, className }: WalkCppNodeArgs): void => {
   }
 
   if (node.type === "class_specifier") {
-    const typeId = node.namedChildren.find((c) => c.type === "type_identifier" || c.type === "template_type");
+    const typeId = node.namedChildren.find((c) => ["type_identifier", "template_type"].includes(c.type));
     const cn = typeId?.text ?? "(anonymous class)";
     const fields = node.namedChildren.find((c) => c.type === "field_declaration_list");
     if (!isNullish(fields)) {
@@ -203,11 +197,7 @@ const walkCppNode = ({ node, out, className }: WalkCppNodeArgs): void => {
     return;
   }
 
-  if (
-    node.type === "declaration_list" ||
-    node.type === "field_declaration_list" ||
-    node.type === "compound_statement"
-  ) {
+  if (["declaration_list", "field_declaration_list", "compound_statement"].includes(node.type)) {
     for (const child of node.namedChildren) {
       walkCppNode({ node: child, out, className });
     }

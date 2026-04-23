@@ -118,7 +118,7 @@ interface WalkPythonStatementArgs {
 const walkPythonStatement = ({ stmt, out, classContext }: WalkPythonStatementArgs): void => {
   if (stmt.type === "decorated_definition") {
     for (const child of stmt.namedChildren) {
-      if (child.type === "function_definition" || child.type === "class_definition") {
+      if (["function_definition", "class_definition"].includes(child.type)) {
         walkPythonStatement({ stmt: child, out, classContext });
       }
     }

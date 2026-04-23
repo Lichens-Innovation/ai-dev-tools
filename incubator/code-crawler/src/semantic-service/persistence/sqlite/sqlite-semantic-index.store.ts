@@ -59,7 +59,7 @@ const toIntegerRowId = (lastInsertRowid: number | bigint): number => {
 };
 
 const isMemoryDbPath = (dbPath: string): boolean =>
-  dbPath === ":memory:" || dbPath === "" || dbPath.startsWith("file::memory:");
+  ["", ":memory:"].includes(dbPath) || dbPath.startsWith("file::memory:");
 
 const ensureDbParentDirectory = (dbPath: string): void => {
   if (isMemoryDbPath(dbPath)) {
