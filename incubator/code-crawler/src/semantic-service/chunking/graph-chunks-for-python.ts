@@ -18,6 +18,7 @@ import {
   finalizeSemanticGraphChunks,
   lastSegment,
 } from "./graph-chunks.utils";
+import { PYTHON_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
 
 const calleeNameFromPythonExpression = (expr: SyntaxNode): string | null => {
@@ -167,7 +168,8 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
   return dedupeRawChunks(out);
 };
 
-const isPythonPath = (pathRelative: string): boolean => [".py", ".pyi"].includes(extname(pathRelative).toLowerCase());
+const isPythonPath = (pathRelative: string): boolean =>
+  PYTHON_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
 
 export const buildSemanticGraphChunksForPythonSource = (
   args: BuildSemanticGraphChunksForSourceArgs

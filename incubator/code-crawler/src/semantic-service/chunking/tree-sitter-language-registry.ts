@@ -4,6 +4,13 @@ import tsGrammars from "tree-sitter-typescript";
 import javascriptGrammar from "tree-sitter-javascript";
 import pythonGrammar from "tree-sitter-python";
 import cppGrammar from "tree-sitter-cpp";
+import {
+  CPP_FILE_EXTENSIONS,
+  CSHARP_FILE_EXTENSIONS,
+  JAVASCRIPT_FILE_EXTENSIONS,
+  PYTHON_FILE_EXTENSIONS,
+  TYPESCRIPT_FILE_EXTENSIONS,
+} from "./chunk-language-file-extensions";
 import { loadCSharpLanguage } from "./load-csharp-tree-sitter";
 
 const csharpLanguage = loadCSharpLanguage();
@@ -13,22 +20,14 @@ const csharpLanguage = loadCSharpLanguage();
  * Extend when adding languages (new extension → npm grammar package).
  */
 const EXTENSION_TO_LANGUAGE = new Map<string, Language>([
-  [".ts", tsGrammars.typescript as Language],
-  [".tsx", tsGrammars.tsx as Language],
-  [".js", javascriptGrammar as Language],
-  [".jsx", javascriptGrammar as Language],
-  [".mjs", javascriptGrammar as Language],
-  [".cjs", javascriptGrammar as Language],
-  [".py", pythonGrammar as Language],
-  [".pyi", pythonGrammar as Language],
-  [".cpp", cppGrammar as Language],
-  [".cc", cppGrammar as Language],
-  [".cxx", cppGrammar as Language],
-  [".hpp", cppGrammar as Language],
-  [".hh", cppGrammar as Language],
-  [".hxx", cppGrammar as Language],
-  [".h", cppGrammar as Language],
-  [".cs", csharpLanguage],
+  ...TYPESCRIPT_FILE_EXTENSIONS.map((ext): [string, Language] => [
+    ext,
+    ext === ".tsx" ? (tsGrammars.tsx as Language) : (tsGrammars.typescript as Language),
+  ]),
+  ...JAVASCRIPT_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, javascriptGrammar as Language]),
+  ...PYTHON_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, pythonGrammar as Language]),
+  ...CPP_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, cppGrammar as Language]),
+  ...CSHARP_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, csharpLanguage]),
 ]);
 
 export const getTreeSitterLanguageForPath = (pathRelative: string): Language | null => {

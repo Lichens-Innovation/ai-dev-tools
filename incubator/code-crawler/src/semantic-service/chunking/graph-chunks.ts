@@ -1,4 +1,11 @@
 import { extname } from "node:path";
+import {
+  CPP_FILE_EXTENSION_SET,
+  CSHARP_FILE_EXTENSION_SET,
+  JAVASCRIPT_FILE_EXTENSION_SET,
+  PYTHON_FILE_EXTENSION_SET,
+  TYPESCRIPT_FILE_EXTENSION_SET,
+} from "./chunk-language-file-extensions";
 import type { BuildSemanticGraphChunksForSourceArgs, SemanticGraphChunk } from "./graph-chunks.types";
 import { buildSemanticGraphChunksForCppSource } from "./graph-chunks-for-cpp";
 import { buildSemanticGraphChunksForCSharpSource } from "./graph-chunks-for-csharp";
@@ -16,23 +23,23 @@ export const buildSemanticGraphChunksForSource = (
 ): SemanticGraphChunk[] => {
   const ext = extname(args.pathRelative).toLowerCase();
 
-  if ([".ts", ".tsx"].includes(ext)) {
+  if (TYPESCRIPT_FILE_EXTENSION_SET.has(ext)) {
     return buildSemanticGraphChunksForTypescriptSource(args);
   }
 
-  if ([".js", ".jsx", ".mjs", ".cjs"].includes(ext)) {
+  if (JAVASCRIPT_FILE_EXTENSION_SET.has(ext)) {
     return buildSemanticGraphChunksForJavaScriptSource(args);
   }
 
-  if ([".py", ".pyi"].includes(ext)) {
+  if (PYTHON_FILE_EXTENSION_SET.has(ext)) {
     return buildSemanticGraphChunksForPythonSource(args);
   }
 
-  if ([".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h"].includes(ext)) {
+  if (CPP_FILE_EXTENSION_SET.has(ext)) {
     return buildSemanticGraphChunksForCppSource(args);
   }
 
-  if (ext === ".cs") {
+  if (CSHARP_FILE_EXTENSION_SET.has(ext)) {
     return buildSemanticGraphChunksForCSharpSource(args);
   }
 

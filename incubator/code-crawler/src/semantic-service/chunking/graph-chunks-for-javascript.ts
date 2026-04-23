@@ -19,6 +19,7 @@ import {
   isSyntaxNodeType,
   lastSegment,
 } from "./graph-chunks.utils";
+import { JAVASCRIPT_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
 
 const calleeNameFromCallLike = (callNode: SyntaxNode): string | null => {
@@ -467,7 +468,7 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
 };
 
 const isJavascriptPath = (pathRelative: string): boolean =>
-  [".js", ".jsx", ".mjs", ".cjs"].includes(extname(pathRelative).toLowerCase());
+  JAVASCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
 
 /**
  * Parses JavaScript with tree-sitter, builds AST-first chunks with intra-file

@@ -19,6 +19,7 @@ import {
   isSyntaxNodeType,
   lastSegment,
 } from "./graph-chunks.utils";
+import { TYPESCRIPT_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
 
 const calleeNameFromCallLike = (callNode: SyntaxNode): string | null => {
@@ -509,7 +510,7 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
 };
 
 const isTypescriptPath = (pathRelative: string): boolean =>
-  [".ts", ".tsx"].includes(extname(pathRelative).toLowerCase());
+  TYPESCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
 
 /**
  * Parses TypeScript/TSX with tree-sitter, builds AST-first chunks with intra-file

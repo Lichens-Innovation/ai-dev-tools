@@ -18,6 +18,7 @@ import {
   finalizeSemanticGraphChunks,
   lastSegment,
 } from "./graph-chunks.utils";
+import { CPP_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
 
 const calleeNameFromCallLike = (callNode: SyntaxNode): string | null => {
@@ -218,9 +219,7 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
   return dedupeRawChunks(out);
 };
 
-const cppExtensions = new Set([".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h"]);
-
-const isCppPath = (pathRelative: string): boolean => cppExtensions.has(extname(pathRelative).toLowerCase());
+const isCppPath = (pathRelative: string): boolean => CPP_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
 
 export const buildSemanticGraphChunksForCppSource = (
   args: BuildSemanticGraphChunksForSourceArgs

@@ -13,6 +13,7 @@ import {
   finalizeSemanticGraphChunks,
   lastSegment,
 } from "./graph-chunks.utils";
+import { CSHARP_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
 
 const calleeNameFromInvocation = (invocation: SyntaxNode): string | null => {
@@ -152,7 +153,8 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
   return dedupeRawChunks(out);
 };
 
-const isCSharpPath = (pathRelative: string): boolean => extname(pathRelative).toLowerCase() === ".cs";
+const isCSharpPath = (pathRelative: string): boolean =>
+  CSHARP_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
 
 export const buildSemanticGraphChunksForCSharpSource = (
   args: BuildSemanticGraphChunksForSourceArgs
