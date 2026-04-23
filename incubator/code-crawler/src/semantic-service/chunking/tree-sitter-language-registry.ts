@@ -1,9 +1,9 @@
 import { extname } from "node:path";
 import type { Language } from "tree-sitter";
-import tsGrammars from "tree-sitter-typescript";
+import cppGrammar from "tree-sitter-cpp";
 import javascriptGrammar from "tree-sitter-javascript";
 import pythonGrammar from "tree-sitter-python";
-import cppGrammar from "tree-sitter-cpp";
+import tsGrammars from "tree-sitter-typescript";
 import {
   CPP_FILE_EXTENSIONS,
   CSHARP_FILE_EXTENSIONS,
@@ -20,10 +20,11 @@ const csharpLanguage = loadCSharpLanguage();
  * Extend when adding languages (new extension → npm grammar package).
  */
 const EXTENSION_TO_LANGUAGE = new Map<string, Language>([
-  ...TYPESCRIPT_FILE_EXTENSIONS.map((ext): [string, Language] => [
-    ext,
-    ext === ".tsx" ? (tsGrammars.tsx as Language) : (tsGrammars.typescript as Language),
-  ]),
+  ...TYPESCRIPT_FILE_EXTENSIONS.map((ext): [string, Language] => {
+    const { tsx, typescript } = tsGrammars;
+    const grammar = ext === ".tsx" ? tsx : typescript;
+    return [ext, grammar as Language];
+  }),
   ...JAVASCRIPT_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, javascriptGrammar as Language]),
   ...PYTHON_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, pythonGrammar as Language]),
   ...CPP_FILE_EXTENSIONS.map((ext): [string, Language] => [ext, cppGrammar as Language]),
