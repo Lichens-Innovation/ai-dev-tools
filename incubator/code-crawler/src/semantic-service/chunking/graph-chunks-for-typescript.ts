@@ -30,18 +30,8 @@ interface DefinitionEntry {
   startIndex: number;
 }
 
-let sharedParser: Parser | null = null;
-
 /** Tree-sitter `SyntaxNode.type` string equality against two or more alternatives. */
 const isSyntaxNodeType = (type: string, ...allowed: string[]): boolean => allowed.includes(type);
-
-const getSharedParser = (): Parser => {
-  if (sharedParser === null) {
-    sharedParser = new Parser();
-  }
-
-  return sharedParser;
-};
 
 const lineNumber1Based = (node: SyntaxNode): { endLine: number; startLine: number } => ({
   startLine: node.startPosition.row + 1,
@@ -50,7 +40,7 @@ const lineNumber1Based = (node: SyntaxNode): { endLine: number; startLine: numbe
 
 const calleeNameFromCallLike = (callNode: SyntaxNode): string | null => {
   const functionNode = callNode.childForFieldName("function");
-  if (functionNode === null) {
+  if (isNullish(functionNode)) {
     return null;
   }
 
@@ -73,7 +63,7 @@ const calleeNameFromExpression = (expr: SyntaxNode): string | null => {
 
   if (expr.type === "member_expression") {
     const prop = expr.childForFieldName("property");
-    if (prop !== null && isSyntaxNodeType(prop.type, "property_identifier", "private_property_identifier")) {
+    if (!isNullish(prop) && isSyntaxNodeType(prop.type, "property_identifier", "private_property_identifier")) {
       return prop.text;
     }
   }
@@ -86,7 +76,7 @@ const collectCallsInBody = (body: SyntaxNode): Map<string, number[]> => {
   const visit = (syntaxNode: SyntaxNode): void => {
     if (syntaxNode.type === "call_expression") {
       const name = calleeNameFromCallLike(syntaxNode);
-      if (name !== null) {
+      if (!isNullish(name)) {
         const line = syntaxNode.startPosition.row + 1;
         const arr = byName.get(name) ?? [];
         arr.push(line);
@@ -96,7 +86,7 @@ const collectCallsInBody = (body: SyntaxNode): Map<string, number[]> => {
 
     if (syntaxNode.type === "new_expression") {
       const name = calleeNameFromNewExpression(syntaxNode);
-      if (name !== null) {
+      if (!isNullish(name)) {
         const line = syntaxNode.startPosition.row + 1;
         const arr = byName.get(name) ?? [];
         arr.push(line);
@@ -128,7 +118,7 @@ interface ResolveLocalCalleeArgs {
 
 const resolveLocalCallee = ({ calleeName, callLine, defsByResolveName }: ResolveLocalCalleeArgs): boolean => {
   const candidates = defsByResolveName.get(calleeName);
-  if (candidates === undefined || candidates.length === 0) {
+  if (isNullish(candidates) || candidates.length === 0) {
     return false;
   }
 
@@ -137,14 +127,14 @@ const resolveLocalCallee = ({ calleeName, callLine, defsByResolveName }: Resolve
       return best;
     }
 
-    if (best === null || candidate.startLine > best.startLine) {
+    if (isNullish(best) || candidate.startLine > best.startLine) {
       return candidate;
     }
 
     return best;
   }, null);
 
-  if (bestAtOrAboveCallLine !== null) {
+  if (!isNullish(bestAtOrAboveCallLine)) {
     return true;
   }
 
@@ -194,7 +184,7 @@ const buildCallsAndCalledBy = (
   };
 
   raw.forEach((rawChunk, chunkIndex) => {
-    if (rawChunk.bodyNode === null) {
+    if (isNullish(rawChunk.bodyNode)) {
       return;
     }
 
@@ -228,7 +218,7 @@ const lastSegment = (displayName: string): string => {
 
 const classDisplayName = (classNode: SyntaxNode): string => {
   const name = classNode.childForFieldName("name");
-  if (name === null) {
+  if (isNullish(name)) {
     return "(anonymous class)";
   }
 
@@ -237,7 +227,7 @@ const classDisplayName = (classNode: SyntaxNode): string => {
 
 const shouldIndexMethodDefinition = (methodNode: SyntaxNode): boolean => {
   const parentNode = methodNode.parent;
-  if (parentNode === null) {
+  if (isNullish(parentNode)) {
     return false;
   }
 
@@ -253,7 +243,7 @@ const methodDisplayName = (methodNode: SyntaxNode): string => {
   }
 
   const classNode = parentNode.parent;
-  if (classNode === null || !isSyntaxNodeType(classNode.type, "class_declaration", "class")) {
+  if (isNullish(classNode) || !isSyntaxNodeType(classNode.type, "class_declaration", "class")) {
     return methodName;
   }
 
@@ -266,7 +256,7 @@ const variableDeclaratorName = (declaratorNode: SyntaxNode): string => {
 };
 
 const tryPushRawChunk = (out: RawAstChunk[], chunk: RawAstChunk | null): void => {
-  if (chunk === null) {
+  if (isNullish(chunk)) {
     return;
   }
 
@@ -369,7 +359,7 @@ const lexicalDeclaratorChunk = ({
   symbolKind,
 }: LexicalDeclaratorChunkArgs): RawAstChunk | null => {
   const val = declaratorNode.childForFieldName("value");
-  if (val === null) {
+  if (isNullish(val)) {
     if (!isExported) {
       return null;
     }
@@ -453,13 +443,13 @@ const collectDefaultExportFunctionLike = ({ node, out }: CollectFromExportStatem
 
 const collectFromExportStatement = ({ node, out }: CollectFromExportStatementArgs): void => {
   const decl = node.childForFieldName("declaration");
-  if (decl !== null) {
+  if (!isNullish(decl)) {
     collectFromStatementLike({ isExported: true, node: decl, out });
     return;
   }
 
   const val = node.childForFieldName("value");
-  if (val === null) {
+  if (isNullish(val)) {
     return;
   }
 
@@ -569,7 +559,7 @@ interface CollectFromPublicFieldDefinitionArgs {
 
 const collectFromPublicFieldDefinition = ({ node, out }: CollectFromPublicFieldDefinitionArgs): void => {
   const val = node.childForFieldName("value");
-  if (val !== null && isSyntaxNodeType(val.type, "arrow_function", "function_expression")) {
+  if (!isNullish(val) && isSyntaxNodeType(val.type, "arrow_function", "function_expression")) {
     const classNode = node.parent?.parent ?? null;
     const fieldName =
       node.childForFieldName("name")?.text ??
@@ -578,7 +568,7 @@ const collectFromPublicFieldDefinition = ({ node, out }: CollectFromPublicFieldD
       )?.text ??
       "(field)";
     const displayName =
-      classNode !== null && isSyntaxNodeType(classNode.type, "class_declaration", "class")
+      !isNullish(classNode) && isSyntaxNodeType(classNode.type, "class_declaration", "class")
         ? `${classDisplayName(classNode)}.${fieldName}`
         : fieldName;
 
@@ -817,7 +807,7 @@ const expandChunksToMaxUtf8 = ({
 const buildCalledByDisplayLists = (raw: RawAstChunk[], calledByByResolveName: Map<string, Set<string>>): string[][] => {
   return raw.map((rawChunk) => {
     const set = calledByByResolveName.get(rawChunk.resolveName);
-    if (set === undefined) {
+    if (isNullish(set)) {
       return [];
     }
 
@@ -846,11 +836,11 @@ export const buildSemanticGraphChunksForSource = ({
 }: BuildSemanticGraphChunksForSourceArgs): SemanticGraphChunk[] => {
   const normalized = normalizeSourceNewlines(source);
   const language = getTreeSitterLanguageForPath(pathRelative);
-  if (language === null) {
+  if (isNullish(language)) {
     return [];
   }
 
-  const parser = getSharedParser();
+  const parser = new Parser();
   parser.setLanguage(language);
   const tree = parser.parse(normalized);
 
