@@ -190,39 +190,6 @@ const generatorFunctionDeclarationChunk = (declarationNode: SyntaxNode): RawAstC
   });
 };
 
-const interfaceChunk = (declarationNode: SyntaxNode): RawAstChunk => {
-  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous interface)";
-  return {
-    bodyNode: null,
-    displayName: name,
-    node: declarationNode,
-    resolveName: lastSegment(name),
-    symbolKind: "Interface",
-  };
-};
-
-const typeAliasChunk = (declarationNode: SyntaxNode): RawAstChunk => {
-  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous type)";
-  return {
-    bodyNode: null,
-    displayName: name,
-    node: declarationNode,
-    resolveName: lastSegment(name),
-    symbolKind: "Type",
-  };
-};
-
-const enumChunk = (declarationNode: SyntaxNode): RawAstChunk => {
-  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous enum)";
-  return {
-    bodyNode: null,
-    displayName: name,
-    node: declarationNode,
-    resolveName: lastSegment(name),
-    symbolKind: "Enum",
-  };
-};
-
 interface LexicalDeclaratorChunkArgs {
   declaratorNode: SyntaxNode;
   isExported: boolean;
@@ -380,15 +347,6 @@ const collectFromStatementLike = ({ isExported, node, out }: CollectFromStatemen
       }
 
       return;
-    case "interface_declaration":
-      tryPushRawChunk({ out, chunk: interfaceChunk(node) });
-      return;
-    case "type_alias_declaration":
-      tryPushRawChunk({ out, chunk: typeAliasChunk(node) });
-      return;
-    case "enum_declaration":
-      tryPushRawChunk({ out, chunk: enumChunk(node) });
-      return;
     default:
       for (const childNode of node.namedChildren) {
         walkIndexableChunks({ node: childNode, out });
@@ -476,7 +434,7 @@ interface WalkIndexableChunksArgs {
  * functions and class methods are included.
  */
 const walkIndexableChunks = ({ node, out }: WalkIndexableChunksArgs): void => {
-  if (isSyntaxNodeType(node.type, "import_statement", "import_type")) {
+  if (node.type === "import_statement") {
     return;
   }
 
@@ -508,19 +466,19 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
   return dedupeRawChunks(out);
 };
 
-const isTypescriptPath = (pathRelative: string): boolean =>
-  [".ts", ".tsx"].includes(extname(pathRelative).toLowerCase());
+const isJavascriptPath = (pathRelative: string): boolean =>
+  [".js", ".jsx", ".mjs", ".cjs"].includes(extname(pathRelative).toLowerCase());
 
 /**
- * Parses TypeScript/TSX with tree-sitter, builds AST-first chunks with intra-file
+ * Parses JavaScript with tree-sitter, builds AST-first chunks with intra-file
  * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
  *
  * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
  */
-export const buildSemanticGraphChunksForTypescriptSource = (
+export const buildSemanticGraphChunksForJavaScriptSource = (
   args: BuildSemanticGraphChunksForSourceArgs
 ): SemanticGraphChunk[] => {
-  if (!isTypescriptPath(args.pathRelative)) {
+  if (!isJavascriptPath(args.pathRelative)) {
     return [];
   }
 

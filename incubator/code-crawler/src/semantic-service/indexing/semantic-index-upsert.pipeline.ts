@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { buildMcpErrorResponse } from "../../mcp/mcp-server.utils";
 import { toString } from "../../utils/arrays.utils";
 import { getCodeCrawlerChunkMaxChars, getCodeCrawlerEmbedBatchSize } from "../../utils/env.utils";
-import { buildSemanticGraphChunksForSource } from "../chunking/graph-chunks-for-typescript";
+import { buildSemanticGraphChunksForSource } from "../chunking/graph-chunks";
 import { embedTextsWithLanguageModel } from "../language-model-embedding.pipeline";
 import type { FileIndexMetadata, FileIndexRecord } from "../types/index-domain.types";
 import type { SemanticIndexChunkRow, SemanticIndexStore } from "../types/store.types";
