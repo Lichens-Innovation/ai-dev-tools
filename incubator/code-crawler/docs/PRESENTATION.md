@@ -231,9 +231,9 @@ flowchart TB
 #### Chunks : fenêtres de lignes
 
 - Découpage **par lignes** avec **recouvrement** (overlap) — évite de couper le contexte net.
-- Limites pilotées par l’environnement : `CODE_CRAWLER_CHUNK_MAX_CHARS`, `CODE_CRAWLER_CHUNK_MAX_LINES`, `CODE_CRAWLER_CHUNK_OVERLAP_LINES` (voir [`.env.example`](../.env.example)).
+- Limite pilotée par l’environnement : `CODE_CRAWLER_CHUNK_MAX_CHARS` (taille max UTF-8 du texte embeddé par chunk ; voir [`.env.example`](../.env.example)).
 
-> <small>Capture de l’en-tête et de `export const buildSemanticLineChunks` dans [`line-window-chunking.utils.ts`](../src/semantic-service/line-window-chunking.utils.ts).</small>
+> <small>Découpage sémantique : AST TypeScript/TSX + graphe d’appels intra-fichier dans [`typescript-graph-chunks.ts`](../src/semantic-service/chunking/typescript-graph-chunks.ts).</small>
 
 #### Quoi embedder exactement ?
 

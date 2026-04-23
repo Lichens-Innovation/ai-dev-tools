@@ -348,9 +348,6 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
 
   replaceIndexedFile(payload: ReplaceIndexedFilePayload): void {
     const { file, chunks } = payload;
-    if (chunks.length === 0) {
-      throw new Error("[Store.replaceIndexedFile] chunks must not be empty");
-    }
 
     const run = (): void => {
       const existingRows = this.stmtSelectChunkRowidsByFileId.all(file.fileId);
@@ -359,6 +356,10 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
       }
       this.stmtDeleteChunksByFileId.run(file.fileId);
       this.stmtDeleteFileById.run(file.fileId);
+
+      if (chunks.length === 0) {
+        return;
+      }
 
       this.stmtInsertFile.run(
         file.fileId,

@@ -2,9 +2,9 @@ import { getErrorMessage, isNotBlank, isNullish } from "@lichens-innovation/ts-c
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { buildMcpErrorResponse } from "../../mcp/mcp-server.utils";
 import { toString } from "../../utils/arrays.utils";
-import { getCodeCrawlerEmbedBatchSize } from "../../utils/env.utils";
+import { getCodeCrawlerChunkMaxChars, getCodeCrawlerEmbedBatchSize } from "../../utils/env.utils";
+import { buildSemanticGraphChunksForSource } from "../chunking/typescript-graph-chunks";
 import { embedTextsWithLanguageModel } from "../language-model-embedding.pipeline";
-import { buildSemanticLineChunks } from "../line-window-chunking.utils";
 import type { FileIndexMetadata, FileIndexRecord } from "../types/index-domain.types";
 import type { SemanticIndexChunkRow } from "../types/store.types";
 import type { SemanticIndexStore } from "../types/store.types";
@@ -23,13 +23,18 @@ const buildPendingChunksForRecords = (records: FileIndexRecord[]): PendingEmbedC
 
   for (const fileRecord of records) {
     const { pathRelative, repository } = fileRecord.metadata;
-    const chunks = buildSemanticLineChunks(fileRecord.document);
+    const astChunks = buildSemanticGraphChunksForSource({
+      maxEmbedUtf8Bytes: getCodeCrawlerChunkMaxChars(),
+      pathRelative,
+      repository,
+      source: fileRecord.document,
+    });
 
-    chunks.forEach((chunk, i) => {
+    astChunks.forEach((chunk) => {
       pending.push({
-        chunkId: `${fileRecord.id}#${i}`,
-        chunkIndex: i,
-        embedText: `File: ${pathRelative}\nRepo: ${repository}\n\n${chunk.body}`,
+        chunkId: `${fileRecord.id}#${chunk.chunkIndex}`,
+        chunkIndex: chunk.chunkIndex,
+        embedText: chunk.embedText,
         endLine: chunk.endLine,
         fileRecord,
         startLine: chunk.startLine,

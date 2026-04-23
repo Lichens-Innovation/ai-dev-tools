@@ -68,7 +68,9 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
     .describe(
       toString([
         "Natural-language search query; embedded and matched against indexed",
-        "source chunks (line windows with path prefix), not whole files only.",
+        "source chunks aligned with the abstract syntax tree (AST) via tree-sitter,",
+        "e.g. per-symbol regions—not arbitrary line windows or whole-file blobs.",
+        "Each chunk carries intra-file calls/calledBy hints and a path prefix for retrieval context.",
       ])
     ),
   nbResults: z

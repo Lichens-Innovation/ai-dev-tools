@@ -13,8 +13,6 @@ export const EnvNames = {
   semanticIndexDbPath: "CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH",
   maxIndexFileBytes: "CODE_CRAWLER_MAX_INDEX_FILE_BYTES",
   chunkMaxChars: "CODE_CRAWLER_CHUNK_MAX_CHARS",
-  chunkMaxLines: "CODE_CRAWLER_CHUNK_MAX_LINES",
-  chunkOverlapLines: "CODE_CRAWLER_CHUNK_OVERLAP_LINES",
   embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
   ragTextModel: "CODE_CRAWLER_RAG_TEXT_MODEL",
 } as const;
@@ -30,8 +28,6 @@ export type CodeCrawlerEnv = {
   semanticIndexDbPath: string;
   maxIndexFileBytes: number;
   chunkMaxChars: number;
-  chunkMaxLines: number;
-  chunkOverlapLines: number;
   embedBatchSize: number;
   ragTextModel: string;
 };
@@ -91,8 +87,6 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const semanticIndexRaw = requireNonBlankEnvVar(EnvNames.semanticIndexDbPath);
   const maxIndexFileBytes = requirePositiveIntEnvVar(EnvNames.maxIndexFileBytes);
   const chunkMaxChars = requirePositiveIntEnvVar(EnvNames.chunkMaxChars);
-  const chunkMaxLines = requirePositiveIntEnvVar(EnvNames.chunkMaxLines);
-  const chunkOverlapLines = requirePositiveIntEnvVar(EnvNames.chunkOverlapLines);
   const embedBatchSize = requirePositiveIntEnvVar(EnvNames.embedBatchSize);
   const ragTextModel = requireNonBlankEnvVar(EnvNames.ragTextModel);
 
@@ -107,8 +101,6 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     semanticIndexDbPath: path.resolve(expandUserDirectory(semanticIndexRaw)),
     maxIndexFileBytes,
     chunkMaxChars,
-    chunkMaxLines,
-    chunkOverlapLines,
     embedBatchSize,
     ragTextModel,
   };
@@ -144,10 +136,6 @@ export const getEmbeddingDimensions = (): number => getCodeCrawlerEnv().embeddin
 export const getCodeCrawlerMaxIndexFileBytes = (): number => getCodeCrawlerEnv().maxIndexFileBytes;
 
 export const getCodeCrawlerChunkMaxChars = (): number => getCodeCrawlerEnv().chunkMaxChars;
-
-export const getCodeCrawlerChunkMaxLines = (): number => getCodeCrawlerEnv().chunkMaxLines;
-
-export const getCodeCrawlerChunkOverlapLines = (): number => getCodeCrawlerEnv().chunkOverlapLines;
 
 export const getCodeCrawlerEmbedBatchSize = (): number => getCodeCrawlerEnv().embedBatchSize;
 
