@@ -411,15 +411,6 @@ body > .api-item:first-child {
   font-family: ui-monospace, monospace;
 }
 
-.search-match-card__preview {
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  color: #999;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .search-detail-panel {
   flex: 1 1 0;
   display: flex;

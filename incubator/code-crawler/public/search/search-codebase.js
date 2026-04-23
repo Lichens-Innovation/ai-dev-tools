@@ -159,15 +159,6 @@ const resolveHljsLanguage = ({ pathRelative }) => {
   return extensionToHljsLanguage[ext] ?? "plaintext";
 };
 
-const truncateOneLine = ({ text, maxLen }) => {
-  const line = text.split("\n")[0] ?? "";
-  if (line.length <= maxLen) {
-    return line;
-  }
-
-  return `${line.slice(0, maxLen - 1)}…`;
-};
-
 const formatDistanceLabel = ({ distance }) => {
   if (typeof distance !== "number" || !Number.isFinite(distance)) {
     return "";
@@ -198,7 +189,7 @@ const normalizeSearchMatch = ({ match }) => {
 const formatMatchCardLinesShort = ({ startLine, endLine }) =>
   startLine !== null && endLine !== null ? `L${startLine}–${endLine}` : "";
 
-const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLabel, previewLine }) => `
+const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLabel }) => `
     <span class="search-match-card__row">
       <span class="search-match-card__badge">${escapeHtml(repository || "—")}</span>
       <span class="search-match-card__path">${escapeHtml(pathRelative || "(no path)")}</span>
@@ -207,7 +198,6 @@ const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLa
       <span class="search-match-card__lines">${escapeHtml(linesShort)}</span>
       <span class="search-match-card__distance">${escapeHtml(distanceLabel)}</span>
     </span>
-    <span class="search-match-card__preview">${escapeHtml(previewLine)}</span>
   `;
 
 const formatMatchCountStatusHtml = ({ count }) =>
@@ -511,8 +501,6 @@ const loadAndRenderDetailForMatch = async ({ match, index }) => {
 
 const buildMatchCardButton = ({ match, index }) => {
   const m = normalizeSearchMatch({ match });
-  const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
-  const previewLine = truncateOneLine({ text: body, maxLen: 96 });
   const baseDistanceLabel = formatDistanceLabel({ distance: m.distance });
   const multiChunkHint = hasMultipleRelatedChunks(m.relatedChunkCount) ? ` · ${m.relatedChunkCount} chunks` : "";
   const distanceLabel = `${baseDistanceLabel}${multiChunkHint}`;
@@ -532,7 +520,6 @@ const buildMatchCardButton = ({ match, index }) => {
     pathRelative: m.pathRelative,
     linesShort,
     distanceLabel,
-    previewLine,
   });
 
   btn.addEventListener("click", () => {
