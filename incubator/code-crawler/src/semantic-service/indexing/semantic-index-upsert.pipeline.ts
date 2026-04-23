@@ -6,8 +6,7 @@ import { getCodeCrawlerChunkMaxChars, getCodeCrawlerEmbedBatchSize } from "../..
 import { buildSemanticGraphChunksForSource } from "../chunking/graph-chunks-for-typescript";
 import { embedTextsWithLanguageModel } from "../language-model-embedding.pipeline";
 import type { FileIndexMetadata, FileIndexRecord } from "../types/index-domain.types";
-import type { SemanticIndexChunkRow } from "../types/store.types";
-import type { SemanticIndexStore } from "../types/store.types";
+import type { SemanticIndexChunkRow, SemanticIndexStore } from "../types/store.types";
 
 interface PendingEmbedChunk {
   chunkId: string;
@@ -17,6 +16,35 @@ interface PendingEmbedChunk {
   fileRecord: FileIndexRecord;
   startLine: number;
 }
+
+interface PartitionRecordsNeedingSemanticUpsertArgs {
+  records: FileIndexRecord[];
+  store: SemanticIndexStore;
+}
+
+interface PartitionRecordsNeedingSemanticUpsertResult {
+  recordsToUpsert: FileIndexRecord[];
+  skippedUnchangedFileCount: number;
+}
+
+const partitionRecordsNeedingSemanticUpsert = ({
+  records,
+  store,
+}: PartitionRecordsNeedingSemanticUpsertArgs): PartitionRecordsNeedingSemanticUpsertResult => {
+  const recordsToUpsert: FileIndexRecord[] = [];
+  let skippedUnchangedFileCount = 0;
+
+  for (const record of records) {
+    const existing = store.getFileMetadataByFileId(record.id);
+    if (!isNullish(existing) && existing.contentSha256 === record.metadata.contentSha256) {
+      skippedUnchangedFileCount += 1;
+    } else {
+      recordsToUpsert.push(record);
+    }
+  }
+
+  return { recordsToUpsert, skippedUnchangedFileCount };
+};
 
 const buildPendingChunksForRecords = (records: FileIndexRecord[]): PendingEmbedChunk[] => {
   const pending: PendingEmbedChunk[] = [];
@@ -206,6 +234,7 @@ interface TryUpsertFileRecordsToSemanticIndexArgs {
 interface UpsertFileRecordsOk {
   ok: true;
   indexedChunkCount: number;
+  skippedUnchangedFileCount: number;
 }
 
 interface UpsertFileRecordsFail {
@@ -220,22 +249,35 @@ export const tryUpsertFileRecordsToSemanticIndex = async ({
   repository,
   store,
 }: TryUpsertFileRecordsToSemanticIndexArgs): Promise<UpsertFileRecordsOutcome> => {
-  const pendingChunks = buildPendingChunksForRecords(records);
+  const { recordsToUpsert, skippedUnchangedFileCount } = partitionRecordsNeedingSemanticUpsert({
+    records,
+    store,
+  });
+
+  if (skippedUnchangedFileCount > 0) {
+    console.info(`[${repository}] skipping ${skippedUnchangedFileCount} unchanged file(s)`);
+  }
+
+  if (recordsToUpsert.length === 0) {
+    return { indexedChunkCount: 0, ok: true, skippedUnchangedFileCount };
+  }
+
+  const pendingChunks = buildPendingChunksForRecords(recordsToUpsert);
   const chunkCount = pendingChunks.length;
 
   try {
-    logSemanticIndexUpsertStart({ chunkCount, fileCount: records.length, repository });
+    logSemanticIndexUpsertStart({ chunkCount, fileCount: recordsToUpsert.length, repository });
 
-    const chunksByFileId = buildEmptyFileChunksBuckets(records);
+    const chunksByFileId = buildEmptyFileChunksBuckets(recordsToUpsert);
     const embedOutcome = await embedPendingIntoFileChunkBuckets({ chunksByFileId, pendingChunks, repository });
     if (!embedOutcome.ok) {
       return embedOutcome;
     }
 
-    persistSortedFileChunksToSemanticIndex({ chunksByFileId, fileRecords: records, store });
+    persistSortedFileChunksToSemanticIndex({ chunksByFileId, fileRecords: recordsToUpsert, store });
 
-    logSemanticIndexUpsertComplete({ chunkCount, fileCount: records.length, repository });
-    return { ok: true, indexedChunkCount: chunkCount };
+    logSemanticIndexUpsertComplete({ chunkCount, fileCount: recordsToUpsert.length, repository });
+    return { indexedChunkCount: chunkCount, ok: true, skippedUnchangedFileCount };
   } catch (e: unknown) {
     const errorMessage = getErrorMessage(e);
     console.error(`[tryUpsertFileRecordsToSemanticIndex]: upsert failed: ${errorMessage}`, e);

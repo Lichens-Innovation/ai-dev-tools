@@ -120,6 +120,7 @@ interface BuildPrepareRepositoryForSemanticSearchSuccessResponseArgs {
   indexedChunkCount: number;
   indexedFileCount: number;
   repository: string;
+  skippedUnchangedFileCount: number;
 }
 
 const buildPrepareRepositoryForSemanticSearchSuccessResponse = ({
@@ -127,6 +128,7 @@ const buildPrepareRepositoryForSemanticSearchSuccessResponse = ({
   indexedChunkCount,
   indexedFileCount,
   repository,
+  skippedUnchangedFileCount,
 }: BuildPrepareRepositoryForSemanticSearchSuccessResponseArgs): CallToolResult => {
   const payload = {
     collectionName: WORKSPACE_REPOSITORIES_FILES_COLLECTION,
@@ -137,6 +139,7 @@ const buildPrepareRepositoryForSemanticSearchSuccessResponse = ({
     indexedChunkCount,
     indexedFileCount,
     repository,
+    skippedUnchangedFileCount,
   };
 
   return buildMcpTextResponse(JSON.stringify(payload, null, 2));
@@ -161,12 +164,13 @@ export const prepareRepositoryForSemanticSearch = async (
     return flowOutcome.result;
   }
 
-  const { exampleMatches, indexedChunkCount, indexedFileCount } = flowOutcome;
+  const { exampleMatches, indexedChunkCount, indexedFileCount, skippedUnchangedFileCount } = flowOutcome;
   return buildPrepareRepositoryForSemanticSearchSuccessResponse({
     exampleMatches,
     indexedChunkCount,
     indexedFileCount,
     repository,
+    skippedUnchangedFileCount,
   });
 };
 
@@ -195,6 +199,10 @@ export const prepareWorkspaceRepositoriesForSemanticSearch = async (
   const failedCount = perRepoResults.filter((r) => !r.ok).length;
   const indexedFileCount = perRepoResults.reduce((sum, r) => sum + (r.ok ? r.indexedFileCount : 0), 0);
   const indexedChunkCount = perRepoResults.reduce((sum, r) => sum + (r.ok ? r.indexedChunkCount : 0), 0);
+  const skippedUnchangedFileCount = perRepoResults.reduce(
+    (sum, r) => sum + (r.ok ? r.skippedUnchangedFileCount : 0),
+    0
+  );
 
   const exampleMatches = await runWorkspaceSemanticQuery({
     store: workspaceSemanticIndexStore,
@@ -213,6 +221,7 @@ export const prepareWorkspaceRepositoriesForSemanticSearch = async (
       indexedFileCount,
       preparedCount,
       repositoryCount: repos.length,
+      skippedUnchangedFileCount,
     },
   };
 

@@ -21,6 +21,7 @@ interface IndexRepositoryFlowOk {
   ok: true;
   indexedChunkCount: number;
   indexedFileCount: number;
+  skippedUnchangedFileCount: number;
   exampleMatches: QueryOutcome;
 }
 
@@ -35,6 +36,7 @@ interface UpsertRecordsAndRunExampleQueryOk {
   indexedChunkCount: number;
   ok: true;
   exampleMatches: QueryOutcome;
+  skippedUnchangedFileCount: number;
 }
 
 interface UpsertRecordsAndRunExampleQueryFail {
@@ -66,7 +68,12 @@ const upsertRecordsAndRunExampleQuery = async ({
     queryText: EXAMPLE_QUERY_TEXT,
     repository,
   });
-  return { indexedChunkCount: upsertOutcome.indexedChunkCount, ok: true, exampleMatches };
+  return {
+    indexedChunkCount: upsertOutcome.indexedChunkCount,
+    ok: true,
+    exampleMatches,
+    skippedUnchangedFileCount: upsertOutcome.skippedUnchangedFileCount,
+  };
 };
 
 export const runRepositoryIndexingFlow = async ({
@@ -82,7 +89,13 @@ export const runRepositoryIndexingFlow = async ({
 
   const { records } = collected;
   if (records.length === 0) {
-    return { indexedChunkCount: 0, indexedFileCount: 0, ok: true, exampleMatches: [] };
+    return {
+      indexedChunkCount: 0,
+      indexedFileCount: 0,
+      ok: true,
+      exampleMatches: [],
+      skippedUnchangedFileCount: 0,
+    };
   }
 
   const indexed = await upsertRecordsAndRunExampleQuery({ records, repository, store });
@@ -95,6 +108,7 @@ export const runRepositoryIndexingFlow = async ({
     indexedFileCount: records.length,
     ok: true,
     exampleMatches: indexed.exampleMatches,
+    skippedUnchangedFileCount: indexed.skippedUnchangedFileCount,
   };
 };
 
@@ -147,6 +161,7 @@ export interface RepoPrepareOk {
   indexedChunkCount: number;
   indexedFileCount: number;
   repository: string;
+  skippedUnchangedFileCount: number;
 }
 
 export interface RepoPrepareFail {
@@ -201,6 +216,7 @@ export const runWorkspaceRepositoriesIndexing = async ({
       ok: true,
       indexedChunkCount: flowOutcome.indexedChunkCount,
       indexedFileCount: flowOutcome.indexedFileCount,
+      skippedUnchangedFileCount: flowOutcome.skippedUnchangedFileCount,
     });
   }
 
