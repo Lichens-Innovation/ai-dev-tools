@@ -114,6 +114,8 @@ You can update all installed marketplace from the console: `claude plugin market
 5. Install a plugin from it with `/plugin install plugin-a@my-marketplace`
 6. Before publishing, validate the JSON and test installation locally: `claude plugin validate .` or inside Claude Code: `/plugin validate .`. The validator checks `marketplace.json`, every plugin's `plugin.json`, skill/agent/command frontmatter, and `hooks/hooks.json` for syntax and schema errors.
 7. To publish, push the marketplace directory to a Git host and add it with `/plugin marketplace add owner/repo`.
+8. See [Private Repositories](https://code.claude.com/docs/en/plugin-marketplaces#private-repositories) for accessing a marketplace that you published in a private repository.
+9. You can now reference your marketplace in any of your projects so other developpers are prompted to install it when they clone one of your project, see [Auto-register for a team](#auto-register-for-a-team) .
 
 ### Plugin Sources
 
@@ -133,12 +135,12 @@ Regardless of source, once installed a plugin is copied into the local versioned
 
 Each command below is available both as `/plugin marketplace <cmd>` inside a session and `claude plugin marketplace <cmd>` from the shell.
 
-| Command                                      | Action           | Notes                                                                                                                                              |
-| -------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `claude plugin marketplace list`             | List registered  | Add `--json` for machine-readable output.                                                                                                          |
-| `claude plugin marketplace update`           | Update all       | Re-pulls catalogs, picks up new plugins and version bumps. Auto-runs at startup for marketplaces reachable without interactive credentials.        |
-| `claude plugin marketplace update <name>`    | Update one       | Refresh a single marketplace by name.                                                                                                              |
-| `claude plugin marketplace remove <name>`    | Remove           | **Warning:** also uninstalls every plugin installed from this marketplace. To refresh without losing plugins, use `update` instead of remove + re-add. |
+| Command                                   | Action          | Notes                                                                                                                                                  |
+| ----------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `claude plugin marketplace list`          | List registered | Add `--json` for machine-readable output.                                                                                                              |
+| `claude plugin marketplace update`        | Update all      | Re-pulls catalogs, picks up new plugins and version bumps. Auto-runs at startup for marketplaces reachable without interactive credentials.            |
+| `claude plugin marketplace update <name>` | Update one      | Refresh a single marketplace by name.                                                                                                                  |
+| `claude plugin marketplace remove <name>` | Remove          | **Warning:** also uninstalls every plugin installed from this marketplace. To refresh without losing plugins, use `update` instead of remove + re-add. |
 
 ### Versioning and release channels
 
