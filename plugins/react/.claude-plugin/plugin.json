@@ -1,0 +1,10 @@
+{
+  "name": "react",
+  "version": "0.1.0",
+  "description": "React development tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react", "frontend", "components", "typescript"]
+}

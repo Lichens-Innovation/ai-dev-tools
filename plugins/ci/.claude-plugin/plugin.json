@@ -1,0 +1,10 @@
+{
+  "name": "ci",
+  "version": "0.1.0",
+  "description": "CI/CD tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["ci", "cd", "pipeline", "automation"]
+}
