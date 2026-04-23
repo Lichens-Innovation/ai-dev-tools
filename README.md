@@ -15,11 +15,29 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 
 ## Installation
 
-See the installation section depending on the type of tool that you want to install:
+### Plugin
 
-- [skills](./docs/skills-cli.md)
-- [rules](./docs/rules.md)
-- [subagents](./docs/subagents.md)
+For agents, skills, hooks and MCP, with Claude Code install the desired [plugin](./docs/plugins.md#using-skills-and-other-tool-from-plugins) :
+
+1. Clone the repository
+2. Register to the marketplace `claude plugin marketplace add ./ai-dev-tools`
+3. Install the desired plugin with `claude plugin install my-plugin@lichens-ai-dev-tools`, e.g. `claude plugin install ci@lichens-ai-dev-tools`
+
+### Rule
+
+For [rules installation](./docs/rules.md#installation):
+
+1. Clone the repository
+2. `npm i -g vibe-rules`
+3. `vibe-rules load ./path-to/rule.md <editor>` e.g. `vibe-rules load ./ai-dev-tools/rules/python-style.md claude-code`
+
+### Handpicked Skills
+
+For single [skill installation](./docs/skills-cli.md#installation) without using plugins. Note that for Claude Code, the only downside is that skill are installed in a separated `.agents` folder and not directly in the `.claude` to respect the AGENT.md convention that Anthropic seems to avoid at all cost to stay "special".
+
+1. Clone the repository
+2. `npx skills add ./ai-dev-tools/skills/my-skills` e.g. `npx skills add ./ai-dev-tools/skills/generate-pr-description`.
+3. The skill CLI will enter an interractive mode, you will select your agent (e.g. claude code) and the scope (project / global).
 
 ## Skills, Rules, Subagents, Memory And Hooks
 

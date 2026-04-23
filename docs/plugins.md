@@ -1,6 +1,6 @@
 # Plugins
 
-Claude Code uses the plugin concept. A plugin is a collection of tools for Claude Code. In short it is a way to export and import a `.claude` folder and it’s content. This means a plugin can be a mix of agents, skills, rules, hooks, etc.
+Claude Code uses the plugin concept. A plugin is a collection of tools for Claude Code. In short it is a way to export and import a `.claude` folder and it’s content. This means a plugin can be a mix of agents, skills, hooks and MCP servers. It cannot be used for rules.
 
 To enable claude code to access your plugin content globally and identify it’s content, a specific `.claude-plugin/plugin.json` **manifest** file is added. For example a simple plugin for a skill could look like this:
 
@@ -78,9 +78,9 @@ From Claude Code:
 4. Load the directory with `claude --plugin-dir ./my-plugin`
 5. Call your skill and other tools like you would normally (ex: `/my-skill`, `@my-agent`).
 
-## Referencing Plugin Files with `${CLAUDE_PLUGIN_ROOT}`
+## Hooks and Relative Paths
 
-When a plugin needs to point at its own files (for example from a hook command, an agent definition, or a script path), use the `${CLAUDE_PLUGIN_ROOT}` environment variable. It resolves to the absolute install path of the plugin at runtime, so paths stay valid no matter where the plugin is installed.
+You can add hooks directly to `plugin.json` or in `hooks/hooks.json` and define them as you would in your project’s `.claude/setting.json`. When a user enables the plugin, those hooks activate automatically and run alongside any user-defined hooks.
 
 Example hook entry in `plugin.json`:
 
@@ -96,5 +96,7 @@ Example hook entry in `plugin.json`:
   }
 }
 ```
+
+Note the `${CLAUDE_PLUGIN_ROOT}`. When a plugin needs to point at its own files, use the `${CLAUDE_PLUGIN_ROOT}` environment variable. It resolves to the absolute install path of the plugin at runtime, so paths stay valid no matter where the plugin is installed.
 
 Avoid hardcoded or relative paths — they break once the plugin is installed elsewhere.
