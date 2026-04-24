@@ -504,10 +504,34 @@ body > .api-item:first-child {
   font-family: ui-monospace, monospace;
   font-size: 13px;
   line-height: 1.45;
-  white-space: pre;
   text-align: right;
   color: #6e7681;
   user-select: none;
+}
+
+.search-detail-gutter-line {
+  display: block;
+  line-height: 1.45;
+  /* Match code lines so empty source lines still reserve one row (paired with gutter). */
+  min-height: 1.45em;
+}
+
+.search-detail-gutter-line--in-range {
+  background: rgba(56, 139, 253, 0.12);
+  color: #8cb8e8;
+  border-radius: 2px;
+}
+
+.search-detail-code-line {
+  display: block;
+  line-height: 1.45;
+  /* Empty lines have no tokens; without min-height the span collapses and rows desync from the gutter. */
+  min-height: 1.45em;
+}
+
+.search-detail-code-line--in-range {
+  background: rgba(56, 139, 253, 0.08);
+  border-radius: 2px;
 }
 
 .search-detail-panel__pre code.hljs {
