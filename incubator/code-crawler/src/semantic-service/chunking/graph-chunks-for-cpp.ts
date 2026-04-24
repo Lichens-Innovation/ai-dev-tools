@@ -155,6 +155,16 @@ interface WalkCppNodeArgs {
   className: string | null;
 }
 
+/** tree-sitter-cpp: `class`, `struct`, and `union` use parallel specifier rules with `field_declaration_list`. */
+const CLASS_LIKE_SPECIFIER_TYPES = new Set(["class_specifier", "struct_specifier", "union_specifier"]);
+
+const typeNameFromClassLikeSpecifier = (node: SyntaxNode): string => {
+  const typeId = node.namedChildren.find((c) =>
+    ["type_identifier", "template_type", "qualified_identifier"].includes(c.type)
+  );
+  return typeId?.text ?? "(anonymous)";
+};
+
 const walkCppNode = ({ node, out, className }: WalkCppNodeArgs): void => {
   if (node.type === "function_definition") {
     tryPushRawChunk({ out, chunk: cppFunctionChunk({ node, className }) });
@@ -166,14 +176,21 @@ const walkCppNode = ({ node, out, className }: WalkCppNodeArgs): void => {
     return;
   }
 
-  if (node.type === "class_specifier") {
-    const typeId = node.namedChildren.find((c) => ["type_identifier", "template_type"].includes(c.type));
-    const cn = typeId?.text ?? "(anonymous class)";
+  if (CLASS_LIKE_SPECIFIER_TYPES.has(node.type)) {
+    const cn = typeNameFromClassLikeSpecifier(node);
     const fields = node.namedChildren.find((c) => c.type === "field_declaration_list");
     if (!isNullish(fields)) {
       for (const child of fields.namedChildren) {
         walkCppNode({ node: child, out, className: cn });
       }
+    }
+
+    return;
+  }
+
+  if (node.type === "template_declaration") {
+    for (const child of node.namedChildren) {
+      walkCppNode({ node: child, out, className });
     }
 
     return;

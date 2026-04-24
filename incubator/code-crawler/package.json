@@ -14,6 +14,7 @@
     "start:prod": "node dist/main.js",
     "inspector": "npx @modelcontextprotocol/inspector --transport http --server-url http://127.0.0.1:3333/mcp",
     "generate:version": "tsx ./scripts/generate-version.ts",
+    "pull:workspace": "tsx ./scripts/pull-workspace-repositories.ts",
     "download:models:embeddings": "tsx ./scripts/models-download.ts jinaai/jina-embeddings-v2-base-code",
     "download:models:rag": "tsx ./scripts/models-download.ts jinaai/jina-embeddings-v2-base-code onnx-community/Qwen2.5-Coder-1.5B-Instruct",
     "build": "nest build",
