@@ -1,5 +1,8 @@
 const MAX_NB_RESULTS = 50;
 
+/** Must match API `SourceLanguageId` / Nest Zod schema. */
+const SEMANTIC_SEARCH_LANGUAGE_IDS = ["typescript", "javascript", "python", "cpp", "csharp"];
+
 /** @type {string} */
 let lastDetailFullPath = "";
 
@@ -108,10 +111,31 @@ const hasMultipleRelatedChunks = (relatedChunkCount) => relatedChunkCount !== nu
 
 const getTrimmedRepositoryFilter = () => document.getElementById("repository-filter").value.trim();
 
-const buildSemanticSearchBody = ({ queryText, nbResults, repository }) => {
+const getSelectedLanguagesOrEmpty = () => {
+  const el = document.getElementById("languages-filter");
+  if (!el) {
+    return [];
+  }
+  const $ = globalThis.jQuery;
+  if (typeof $ === "function" && typeof $(el).multipleSelect === "function") {
+    const raw = $(el).multipleSelect("getSelects");
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw.filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
+  }
+  return Array.from(el.selectedOptions)
+    .map((o) => o.value)
+    .filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
+};
+
+const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages }) => {
   const body = { queryText, nbResults };
   if (repository.length > 0) {
     body.repository = repository;
+  }
+  if (languages.length > 0) {
+    body.languages = languages;
   }
   return body;
 };
@@ -602,7 +626,8 @@ const readSearchFormOrNotify = () => {
   }
 
   const repository = getTrimmedRepositoryFilter();
-  return buildSemanticSearchBody({ queryText, nbResults, repository });
+  const languages = getSelectedLanguagesOrEmpty();
+  return buildSemanticSearchBody({ queryText, nbResults, repository, languages });
 };
 
 const runSearch = async () => {
@@ -716,6 +741,22 @@ const initSearchMasterDetailSplitter = () => {
 };
 
 initSearchMasterDetailSplitter();
+
+const initLanguageFilterUi = () => {
+  const el = document.getElementById("languages-filter");
+  const $ = globalThis.jQuery;
+  if (!el || typeof $ !== "function" || typeof $(el).multipleSelect !== "function") {
+    return;
+  }
+  $(el).multipleSelect({
+    filter: true,
+    placeholder: "All languages",
+    selectAll: false,
+    width: "100%",
+  });
+};
+
+initLanguageFilterUi();
 
 document.getElementById("search-button").addEventListener("click", runSearch);
 

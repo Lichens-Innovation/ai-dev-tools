@@ -7,6 +7,7 @@ import * as sqliteVec from "sqlite-vec";
 import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../../../utils/env.utils";
 import { buildSafeFts5MatchQuery } from "../../search/fts5-query-sanitize.utils";
 import type { FileIndexMetadata } from "../../types/index-domain.types";
+import type { SourceLanguageId } from "../../types/source-language.types";
 import type { QueryMatchSummary } from "../../types/search.types";
 import type {
   QueryLexicalChunksArgs,
@@ -20,6 +21,7 @@ import {
   META_KEY_EMBEDDING_DIM,
   SQL_FTS_CHUNK_REBUILD,
   SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX,
+  SQL_INDEX_FILE_INDEX_METADATA_SOURCE_LANGUAGE,
   SQL_TABLE_FILE_INDEX_CHUNK,
   SQL_TABLE_FILE_INDEX_CHUNK_FTS,
   SQL_TABLE_FILE_INDEX_METADATA,
@@ -84,7 +86,9 @@ interface ReadMetaValueArgs {
   key: string;
 }
 const readMetaValue = ({ db, key }: ReadMetaValueArgs): string => {
-  type DbMetaRow = { VALUE: string };
+  interface DbMetaRow {
+    VALUE: string;
+  }
   const row = db
     .prepare(`SELECT VALUE FROM ${SQL_TABLE_NAME_FILE_INDEX_STORE_META} WHERE KEY = ?`)
     .get(key) as DbMetaRow;
@@ -105,7 +109,9 @@ const writeMetaValue = ({ db, key, value }: WriteMetaValueArgs): void => {
 };
 
 const countSemanticChunks = (db: Database.Database): number => {
-  type DbCountRow = { n: number };
+  interface DbCountRow {
+    n: number;
+  }
   const row = db.prepare(`SELECT COUNT(*) AS n FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}`).get() as DbCountRow;
   return row?.n ?? 0;
 };
@@ -153,7 +159,29 @@ const dbMetadataRowToFileIndexMetadata = (row: DbFileIndexMetadataRow): FileInde
   pathRelative: row.PATH_RELATIVE,
   repository: row.REPOSITORY,
   sizeBytes: row.SIZE_BYTES,
+  sourceLanguage: row.SOURCE_LANGUAGE as SourceLanguageId,
 });
+
+interface SqliteSemanticIndexStoreArgs {
+  dbPath: string;
+  embeddingDimensions: number;
+}
+
+interface ResolveLexicalRowsArgs {
+  matchQuery: string;
+  nResults: number;
+  repository?: string;
+  hasLang: boolean;
+  jsonLangs: string;
+}
+
+interface ResolveKnnRowsArgs {
+  queryEmbedding: Float32Array;
+  nResults: number;
+  repository?: string;
+  hasLang: boolean;
+  jsonLangs: string;
+}
 
 export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly db: Database.Database;
@@ -163,7 +191,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly stmtDeleteChunksByFileId: Database.Statement<[string], unknown>;
   private readonly stmtDeleteFileById: Database.Statement<[string], unknown>;
   private readonly stmtInsertFile: Database.Statement<
-    [string, string, string, string, string, string, string, number],
+    [string, string, string, string, string, string, string, number, string],
     Database.RunResult
   >;
   private readonly stmtInsertChunk: Database.Statement<
@@ -172,15 +200,25 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
   >;
   private readonly stmtInsertVec: Database.Statement<[Buffer, string], Database.RunResult>;
   private readonly stmtKnnAllRepos: Database.Statement<[Float32Array, number], DbFileIndexKnnRow>;
+  private readonly stmtKnnAllReposWithLanguages: Database.Statement<[Float32Array, number, string], DbFileIndexKnnRow>;
   private readonly stmtKnnByRepository: Database.Statement<[Float32Array, number, string], DbFileIndexKnnRow>;
+  private readonly stmtKnnByRepositoryWithLanguages: Database.Statement<
+    [Float32Array, number, string, string],
+    DbFileIndexKnnRow
+  >;
   private readonly stmtDeleteAllVec: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllChunks: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllFiles: Database.Statement<[], unknown>;
   private readonly stmtSelectFileMetadataByFileId: Database.Statement<[string], DbFileIndexMetadataRow>;
   private readonly stmtLexicalAll: Database.Statement<[string, number], DbFileIndexLexicalRow>;
+  private readonly stmtLexicalAllWithLanguages: Database.Statement<[string, string, number], DbFileIndexLexicalRow>;
   private readonly stmtLexicalByRepository: Database.Statement<[string, string, number], DbFileIndexLexicalRow>;
+  private readonly stmtLexicalByRepositoryWithLanguages: Database.Statement<
+    [string, string, string, number],
+    DbFileIndexLexicalRow
+  >;
 
-  constructor(dbPath: string, embeddingDimensions: number) {
+  constructor({ dbPath, embeddingDimensions }: SqliteSemanticIndexStoreArgs) {
     ensureDbParentDirectory(dbPath);
 
     this.embeddingDimensions = embeddingDimensions;
@@ -192,6 +230,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
 
     this.db.exec(SQL_TABLE_FILE_INDEX_STORE_META);
     this.db.exec(SQL_TABLE_FILE_INDEX_METADATA);
+    this.db.exec(SQL_INDEX_FILE_INDEX_METADATA_SOURCE_LANGUAGE);
     this.db.exec(SQL_TABLE_FILE_INDEX_CHUNK);
     this.db.exec(SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX);
 
@@ -205,8 +244,8 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.stmtDeleteChunksByFileId = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`);
     this.stmtDeleteFileById = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA} WHERE FILE_ID = ?`);
     this.stmtInsertFile = this.db.prepare(
-      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     this.stmtInsertChunk = this.db.prepare(
       `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (ID, FILE_ID, CHUNK_INDEX, CHUNK_ID, DOCUMENT, START_LINE, END_LINE, CHUNK_BYTE_LENGTH)
@@ -233,6 +272,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         f.CONTENT_SHA256,
         f.LAST_MODIFIED_AT_ISO,
         f.SIZE_BYTES,
+        f.SOURCE_LANGUAGE,
         v.distance AS distance
       FROM ${FILE_INDEX_CHUNK_VEC_NAME} AS v
       INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = v.rowid
@@ -249,11 +289,30 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         AND v.repository = ?
       ORDER BY v.distance`);
 
+    this.stmtKnnAllReposWithLanguages = this.db.prepare<
+      [Float32Array, number, string],
+      DbFileIndexKnnRow
+    >(`${knnSelectBase}
+      WHERE v.embedding MATCH ?
+        AND k = ?
+        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
+      ORDER BY v.distance`);
+
+    this.stmtKnnByRepositoryWithLanguages = this.db.prepare<
+      [Float32Array, number, string, string],
+      DbFileIndexKnnRow
+    >(`${knnSelectBase}
+      WHERE v.embedding MATCH ?
+        AND k = ?
+        AND v.repository = ?
+        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
+      ORDER BY v.distance`);
+
     this.stmtDeleteAllVec = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME}`);
     this.stmtDeleteAllChunks = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}`);
     this.stmtDeleteAllFiles = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}`);
     this.stmtSelectFileMetadataByFileId = this.db.prepare(
-      `SELECT FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES
+      `SELECT FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE
        FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}
        WHERE FILE_ID = ?`
     );
@@ -275,6 +334,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         f.CONTENT_SHA256,
         f.LAST_MODIFIED_AT_ISO,
         f.SIZE_BYTES,
+        f.SOURCE_LANGUAGE,
         bm25(${FILE_INDEX_CHUNK_FTS_NAME}) AS bm25_score
       FROM ${FILE_INDEX_CHUNK_FTS_NAME}
       INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = ${FILE_INDEX_CHUNK_FTS_NAME}.rowid
@@ -291,6 +351,25 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     >(`${lexicalSelectBase}
       WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
         AND f.REPOSITORY = ?
+      ORDER BY bm25_score ASC
+      LIMIT ?`);
+
+    this.stmtLexicalAllWithLanguages = this.db.prepare<
+      [string, string, number],
+      DbFileIndexLexicalRow
+    >(`${lexicalSelectBase}
+      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
+        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
+      ORDER BY bm25_score ASC
+      LIMIT ?`);
+
+    this.stmtLexicalByRepositoryWithLanguages = this.db.prepare<
+      [string, string, string, number],
+      DbFileIndexLexicalRow
+    >(`${lexicalSelectBase}
+      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
+        AND f.REPOSITORY = ?
+        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
       ORDER BY bm25_score ASC
       LIMIT ?`);
   }
@@ -369,7 +448,8 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         file.fullPath,
         file.contentSha256,
         file.lastModifiedAtISO,
-        file.sizeBytes
+        file.sizeBytes,
+        file.sourceLanguage
       );
 
       for (const ch of chunks) {
@@ -403,7 +483,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     return dbMetadataRowToFileIndexMetadata(row);
   }
 
-  queryLexicalChunks({ queryText, nResults, repository }: QueryLexicalChunksArgs): QueryMatchSummary[] {
+  queryLexicalChunks({ queryText, nResults, repository, languages }: QueryLexicalChunksArgs): QueryMatchSummary[] {
     if (nResults < 1) {
       return [];
     }
@@ -413,9 +493,11 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
       return [];
     }
 
-    const rows: DbFileIndexLexicalRow[] = isBlank(repository)
-      ? this.stmtLexicalAll.all(matchQuery, nResults)
-      : this.stmtLexicalByRepository.all(matchQuery, repository, nResults);
+    const langList = languages ?? [];
+    const hasLang = langList.length > 0;
+    const jsonLangs = JSON.stringify(langList);
+
+    const rows = this.resolveLexicalRows({ matchQuery, nResults, repository, hasLang, jsonLangs });
 
     return rows.map(
       (row): QueryMatchSummary => ({
@@ -426,22 +508,13 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
         id: row.CHUNK_ID,
         startLine: row.START_LINE,
         endLine: row.END_LINE,
-        metadata: dbMetadataRowToFileIndexMetadata({
-          CONTENT_SHA256: row.CONTENT_SHA256,
-          FILE_ID: row.FILE_ID,
-          FILENAME: row.FILENAME,
-          FULL_PATH: row.FULL_PATH,
-          LAST_MODIFIED_AT_ISO: row.LAST_MODIFIED_AT_ISO,
-          PATH_RELATIVE: row.PATH_RELATIVE,
-          REPOSITORY: row.REPOSITORY,
-          SIZE_BYTES: row.SIZE_BYTES,
-        }),
+        metadata: dbMetadataRowToFileIndexMetadata(row),
       })
     );
   }
 
   queryNearest(params: QueryNearestArgs): QueryMatchSummary[] {
-    const { nResults, queryEmbedding, repository } = params;
+    const { nResults, queryEmbedding, repository, languages } = params;
     if (nResults < 1) {
       return [];
     }
@@ -450,9 +523,11 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
       throw new Error(`[queryNearest] query embedding length ${queryEmbedding.length} !== ${this.embeddingDimensions}`);
     }
 
-    const rows: DbFileIndexKnnRow[] = isBlank(repository)
-      ? this.stmtKnnAllRepos.all(queryEmbedding, nResults)
-      : this.stmtKnnByRepository.all(queryEmbedding, nResults, repository);
+    const langList = languages ?? [];
+    const hasLang = langList.length > 0;
+    const jsonLangs = JSON.stringify(langList);
+
+    const rows = this.resolveKnnRows({ queryEmbedding, nResults, repository, hasLang, jsonLangs });
 
     return rows.map(
       (row): QueryMatchSummary => ({
@@ -468,6 +543,42 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     );
   }
 
+  private resolveLexicalRows({
+    matchQuery,
+    nResults,
+    repository,
+    hasLang,
+    jsonLangs,
+  }: ResolveLexicalRowsArgs): DbFileIndexLexicalRow[] {
+    if (isBlank(repository)) {
+      return hasLang
+        ? this.stmtLexicalAllWithLanguages.all(matchQuery, jsonLangs, nResults)
+        : this.stmtLexicalAll.all(matchQuery, nResults);
+    }
+
+    return hasLang
+      ? this.stmtLexicalByRepositoryWithLanguages.all(matchQuery, repository!, jsonLangs, nResults)
+      : this.stmtLexicalByRepository.all(matchQuery, repository, nResults);
+  }
+
+  private resolveKnnRows({
+    queryEmbedding,
+    nResults,
+    repository,
+    hasLang,
+    jsonLangs,
+  }: ResolveKnnRowsArgs): DbFileIndexKnnRow[] {
+    if (isBlank(repository)) {
+      return hasLang
+        ? this.stmtKnnAllReposWithLanguages.all(queryEmbedding, nResults, jsonLangs)
+        : this.stmtKnnAllRepos.all(queryEmbedding, nResults);
+    }
+
+    return hasLang
+      ? this.stmtKnnByRepositoryWithLanguages.all(queryEmbedding, nResults, repository!, jsonLangs)
+      : this.stmtKnnByRepository.all(queryEmbedding, nResults, repository);
+  }
+
   close(): void {
     try {
       this.db.close();
@@ -478,7 +589,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
 }
 
 const createDefaultSqliteSemanticIndexStore = (): SqliteSemanticIndexStore =>
-  new SqliteSemanticIndexStore(resolveSemanticIndexDbPath(), getEmbeddingDimensions());
+  new SqliteSemanticIndexStore({ dbPath: resolveSemanticIndexDbPath(), embeddingDimensions: getEmbeddingDimensions() });
 
 const createLazyWorkspaceSemanticIndexStore = (): SemanticIndexStore => {
   let impl: SqliteSemanticIndexStore | null = null;

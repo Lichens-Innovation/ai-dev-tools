@@ -1,3 +1,5 @@
+import type { SourceLanguageId } from "./source-language.types";
+
 /** Indexed file identity and content envelope (one row per source file before chunking). */
 
 export interface FileIndexMetadata {
@@ -12,6 +14,8 @@ export interface FileIndexMetadata {
   repository: string;
   /** Full file size on disk in bytes. */
   sizeBytes: number;
+  /** Language used for tree-sitter chunking and search filters. */
+  sourceLanguage: SourceLanguageId;
 }
 
 export interface FileIndexRecord {

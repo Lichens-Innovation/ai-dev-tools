@@ -1,5 +1,6 @@
 import type { FileIndexMetadata } from "./index-domain.types";
 import type { QueryMatchSummary } from "./search.types";
+import type { SourceLanguageId } from "./source-language.types";
 
 /**
  * All reads/writes of the semantic search index should go through {@link SemanticIndexStore}.
@@ -25,6 +26,8 @@ export interface QueryNearestArgs {
   nResults: number;
   queryEmbedding: Float32Array;
   repository?: string;
+  /** Empty or omitted = no filter (all indexed languages). */
+  languages?: readonly SourceLanguageId[];
 }
 
 /** Lexical full-text search over indexed chunk bodies (FTS5 BM25). */
@@ -33,6 +36,8 @@ export interface QueryLexicalChunksArgs {
   queryText: string;
   nResults: number;
   repository?: string;
+  /** Empty or omitted = no filter (all indexed languages). */
+  languages?: readonly SourceLanguageId[];
 }
 
 export interface SemanticIndexStore {

@@ -21,6 +21,7 @@ erDiagram
     text CONTENT_SHA256
     text LAST_MODIFIED_AT_ISO
     int SIZE_BYTES
+    text SOURCE_LANGUAGE
   }
 
   FILE_INDEX_CHUNK {
@@ -53,7 +54,8 @@ erDiagram
 
 | Object | Kind | Notes |
 | --- | --- | --- |
-| `FILE_INDEX_METADATA` | table | One row per indexed file. `UNIQUE(REPOSITORY, PATH_RELATIVE)`. |
+| `FILE_INDEX_METADATA` | table | One row per indexed file. `UNIQUE(REPOSITORY, PATH_RELATIVE)`. `SOURCE_LANGUAGE` is a stable id (`typescript`, `javascript`, `python`, `cpp`, `csharp`) used for SQL filters on hybrid search. |
+| `IDX_FILE_INDEX_METADATA_SOURCE_LANGUAGE` | index | On `SOURCE_LANGUAGE`. |
 | `FILE_INDEX_CHUNK` | table | Chunk text and line span. `CHUNK_ID` is `UNIQUE`. `FOREIGN KEY (FILE_ID)` → `FILE_INDEX_METADATA(FILE_ID)` `ON DELETE CASCADE`. |
 | `IDX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX` | unique index | On `(FILE_ID, CHUNK_INDEX)`. |
 | `FILE_INDEX_STORE_META` | table | Store-level key/value (e.g. `EMBEDDING_DIM` = width used for vec0). |

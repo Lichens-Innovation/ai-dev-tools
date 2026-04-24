@@ -66,8 +66,12 @@ export const SQL_TABLE_FILE_INDEX_METADATA = `CREATE TABLE IF NOT EXISTS ${SQL_T
   CONTENT_SHA256 TEXT NOT NULL,
   LAST_MODIFIED_AT_ISO TEXT NOT NULL,
   SIZE_BYTES INTEGER NOT NULL,
+  SOURCE_LANGUAGE TEXT NOT NULL,
   UNIQUE(REPOSITORY, PATH_RELATIVE)
 );`;
+
+export const SQL_INDEX_FILE_INDEX_METADATA_SOURCE_LANGUAGE = `CREATE INDEX IF NOT EXISTS IDX_FILE_INDEX_METADATA_SOURCE_LANGUAGE
+  ON ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (SOURCE_LANGUAGE);`;
 
 export const SQL_TABLE_FILE_INDEX_CHUNK = `CREATE TABLE IF NOT EXISTS ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (
   ID INTEGER PRIMARY KEY NOT NULL,
@@ -111,6 +115,7 @@ export interface DbFileIndexMetadataRow {
   PATH_RELATIVE: string;
   REPOSITORY: string;
   SIZE_BYTES: number;
+  SOURCE_LANGUAGE: string;
 }
 
 export interface DbFileIndexChunkRow {
@@ -125,25 +130,11 @@ export interface DbFileIndexChunkRow {
 }
 
 /** Row shape returned by KNN join queries (distance from sqlite-vec). */
-export interface DbFileIndexKnnRow extends DbFileIndexChunkRow {
-  CONTENT_SHA256: string;
-  FILENAME: string;
-  FULL_PATH: string;
-  LAST_MODIFIED_AT_ISO: string;
-  PATH_RELATIVE: string;
-  REPOSITORY: string;
-  SIZE_BYTES: number;
+export interface DbFileIndexKnnRow extends DbFileIndexChunkRow, DbFileIndexMetadataRow {
   distance: number;
 }
 
 /** Row shape returned by FTS5 BM25 join queries. */
-export interface DbFileIndexLexicalRow extends DbFileIndexChunkRow {
-  CONTENT_SHA256: string;
-  FILENAME: string;
-  FULL_PATH: string;
-  LAST_MODIFIED_AT_ISO: string;
-  PATH_RELATIVE: string;
-  REPOSITORY: string;
-  SIZE_BYTES: number;
+export interface DbFileIndexLexicalRow extends DbFileIndexChunkRow, DbFileIndexMetadataRow {
   bm25_score: number;
 }

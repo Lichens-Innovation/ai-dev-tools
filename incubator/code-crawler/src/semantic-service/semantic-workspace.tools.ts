@@ -15,6 +15,8 @@ import { WORKSPACE_REPOSITORIES_FILES_COLLECTION } from "./indexing/workspace-se
 import { workspaceSemanticIndexStore } from "./persistence/sqlite/sqlite-semantic-index.store";
 import { EXAMPLE_QUERY_TEXT, runWorkspaceSemanticQuery } from "./search/workspace-semantic-query.service";
 import type { QueryOutcome } from "./types/search.types";
+import type { SourceLanguageId } from "./types/source-language.types";
+import { SOURCE_LANGUAGE_IDS } from "./types/source-language.types";
 
 export type { GetIndexedFileContentOutcome, IndexedFileContentPayload } from "./indexing/indexed-file-content.utils";
 
@@ -96,6 +98,16 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
         "Optional repository folder name (metadata filter, same basename as",
         "prepare-repository-for-semantic-search). When omitted, search runs across",
         "all indexed repositories.",
+      ])
+    ),
+  languages: z
+    .array(z.enum(SOURCE_LANGUAGE_IDS))
+    .optional()
+    .default([])
+    .describe(
+      toString([
+        "Optional list of source languages to restrict hits (same ids as indexing:",
+        `${SOURCE_LANGUAGE_IDS.join(", ")}). Empty = all languages.`,
       ])
     ),
 });
@@ -231,13 +243,14 @@ export const prepareWorkspaceRepositoriesForSemanticSearch = async (
 export const semanticSearchWorkspaceFiles = async (
   input: SemanticSearchWorkspaceFilesInput
 ): Promise<CallToolResult> => {
-  const { nbResults, queryText, repository } = input;
+  const { nbResults, queryText, repository, languages } = input;
 
   const outcome = await runWorkspaceSemanticQuery({
     store: workspaceSemanticIndexStore,
     nResults: nbResults,
     queryText,
     repository,
+    languages: languages as readonly SourceLanguageId[],
   });
 
   return buildMcpTextResponse(JSON.stringify({ queryText, outcome }, null, 2));
@@ -254,13 +267,14 @@ const respond = ({ queryText, outcome, ragResponse }: RespondArgs): CallToolResu
 export const semanticSearchWorkspaceFilesWithRag = async (
   input: SemanticSearchWorkspaceFilesInput
 ): Promise<CallToolResult> => {
-  const { nbResults, queryText, repository } = input;
+  const { nbResults, queryText, repository, languages } = input;
 
   const outcome = await runWorkspaceSemanticQuery({
     store: workspaceSemanticIndexStore,
     nResults: nbResults,
     queryText,
     repository,
+    languages: languages as readonly SourceLanguageId[],
   });
 
   if (!Array.isArray(outcome)) {

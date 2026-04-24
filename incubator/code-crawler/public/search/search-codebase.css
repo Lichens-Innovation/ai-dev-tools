@@ -198,6 +198,19 @@ body > .api-item:first-child {
   min-width: 0;
 }
 
+.semantic-search-options__languages {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.semantic-search-options__languages .ms-parent {
+  width: 100%;
+  max-width: 100%;
+}
+
 /* --- Results shell (master–detail) --- */
 
 .search-results-shell {

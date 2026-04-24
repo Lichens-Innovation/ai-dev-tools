@@ -1,4 +1,4 @@
-import { getErrorMessage } from "@lichens-innovation/ts-common";
+import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
 import { createHash } from "node:crypto";
 import type { Stats } from "node:fs";
 import { basename, extname, join, relative } from "node:path";
@@ -6,6 +6,10 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { buildMcpErrorResponse } from "../../mcp/mcp-server.utils";
 import { readDirEntriesOrNull, readFileBufferOrNull, statFileOrNull } from "../../utils/fs/async-fs.utils";
 import { getCodeCrawlerMaxIndexFileBytes } from "../../utils/env.utils";
+import {
+  inferSourceLanguageFromPath,
+  TREE_SITTER_INDEXABLE_EXTENSION_SET,
+} from "../chunking/chunk-language-file-extensions";
 import type { FileIndexRecord } from "../types/index-domain.types";
 
 const INDEX_SKIP_DIR_NAMES = new Set([
@@ -31,9 +35,6 @@ const INDEX_SKIP_DIR_NAMES = new Set([
   ".expo",
 ]);
 
-/** Only these extensions are embedded into the semantic index (case-insensitive). */
-const INDEX_ALLOWED_FILE_EXTENSIONS = new Set([".ts", ".tsx"]);
-
 type LoadedIndexableFileContent = { document: string; stat: Stats };
 
 const loadIndexableFileContent = async (fullPath: string): Promise<LoadedIndexableFileContent | null> => {
@@ -58,7 +59,7 @@ const loadIndexableFileContent = async (fullPath: string): Promise<LoadedIndexab
 };
 
 const pathHasIndexableExtension = (fullPath: string): boolean =>
-  INDEX_ALLOWED_FILE_EXTENSIONS.has(extname(fullPath).toLowerCase());
+  TREE_SITTER_INDEXABLE_EXTENSION_SET.has(extname(fullPath).toLowerCase());
 
 interface TryBuildFileIndexRecordArgs {
   fullPath: string;
@@ -83,6 +84,11 @@ const tryBuildFileIndexRecord = async ({
   const { document, stat: st } = loaded;
   const relRaw = relative(repoRoot, fullPath);
   const path = relRaw.split(/[/\\]/).join("/");
+  const sourceLanguage = inferSourceLanguageFromPath(path);
+  if (isNullish(sourceLanguage)) {
+    return null;
+  }
+
   const id = `${repository}::${path}`;
   const lastModifiedAtISO = st.mtime.toISOString();
   const contentSha256 = createHash("sha256").update(document, "utf8").digest("hex");
@@ -99,6 +105,7 @@ const tryBuildFileIndexRecord = async ({
       pathRelative: path,
       repository,
       sizeBytes: st.size,
+      sourceLanguage,
     },
   };
 };

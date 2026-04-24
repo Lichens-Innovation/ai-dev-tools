@@ -2,26 +2,76 @@ import { getErrorMessage, isNotBlank, isNullish } from "@lichens-innovation/ts-c
 import { embedTextsWithLanguageModel } from "../language-model-embedding.pipeline";
 import type { QueryMatchSummary, QueryOutcome } from "../types/search.types";
 import type { SemanticIndexStore } from "../types/store.types";
+import type { SourceLanguageId } from "../types/source-language.types";
 import { fuseHybridChunkMatches } from "./hybrid-chunk-fusion.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
+  FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX,
   resolveChunkFetchCountForFileConsolidation,
 } from "./match-consolidation-by-file.utils";
 
 export const EXAMPLE_QUERY_TEXT = "tanstack query returning a list of items with an infinite staleTime";
+
+/**
+ * When a language filter is active, sqlite-vec returns global top-k before SQL filters by language;
+ * fetch more neighbors so enough rows survive the join.
+ */
+const LANGUAGE_FILTER_SEMANTIC_FETCH_MULTIPLIER = 3;
+
+interface ResolveSemanticChunkFetchCountArgs {
+  nbResults: number;
+  languages?: readonly SourceLanguageId[];
+}
+
+const resolveSemanticChunkFetchCount = ({ nbResults, languages }: ResolveSemanticChunkFetchCountArgs): number => {
+  const base = resolveChunkFetchCountForFileConsolidation(nbResults);
+  if (isNullish(languages) || languages.length === 0) {
+    return base;
+  }
+  return Math.min(
+    FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX,
+    Math.ceil(base * LANGUAGE_FILTER_SEMANTIC_FETCH_MULTIPLIER)
+  );
+};
 
 interface RunWorkspaceSemanticQueryArgs {
   store: SemanticIndexStore;
   nResults: number;
   queryText: string;
   repository?: string;
+  languages?: readonly SourceLanguageId[];
 }
+
+interface SafeQueryLexicalChunksArgs {
+  store: SemanticIndexStore;
+  queryText: string;
+  nResults: number;
+  repository?: string;
+  languages?: readonly SourceLanguageId[];
+}
+
+const safeQueryLexicalChunks = ({
+  store,
+  queryText,
+  nResults,
+  repository,
+  languages,
+}: SafeQueryLexicalChunksArgs): QueryMatchSummary[] => {
+  try {
+    return store.queryLexicalChunks({ queryText, nResults, repository, languages });
+  } catch (lexErr: unknown) {
+    const msg = getErrorMessage(lexErr);
+    console.warn(`[runWorkspaceSemanticQuery] lexical search skipped (vector-only): ${msg}`);
+    return [];
+  }
+};
 
 export const runWorkspaceSemanticQuery = async ({
   store,
   nResults,
   queryText,
   repository,
+  languages,
 }: RunWorkspaceSemanticQueryArgs): Promise<QueryOutcome> => {
   const { embeddings, errorMessage } = await embedTextsWithLanguageModel([queryText]);
 
@@ -35,21 +85,16 @@ export const runWorkspaceSemanticQuery = async ({
   }
 
   try {
-    const knnLimit = resolveChunkFetchCountForFileConsolidation(nResults);
+    const knnLimit = resolveSemanticChunkFetchCount({ nbResults: nResults, languages });
 
-    const vectorMatches = store.queryNearest({ nResults: knnLimit, queryEmbedding, repository });
+    const vectorMatches = store.queryNearest({
+      nResults: knnLimit,
+      queryEmbedding,
+      repository,
+      languages,
+    });
 
-    let lexicalMatches: QueryMatchSummary[] = [];
-    try {
-      lexicalMatches = store.queryLexicalChunks({
-        queryText,
-        nResults: knnLimit,
-        repository,
-      });
-    } catch (lexErr: unknown) {
-      const msg = getErrorMessage(lexErr);
-      console.warn(`[runWorkspaceSemanticQuery] lexical search skipped (vector-only): ${msg}`);
-    }
+    const lexicalMatches = safeQueryLexicalChunks({ store, queryText, nResults: knnLimit, repository, languages });
 
     const matches = fuseHybridChunkMatches({ lexicalMatches, vectorMatches });
     return consolidateSemanticQueryMatchesByFile({ matches, nResults });
