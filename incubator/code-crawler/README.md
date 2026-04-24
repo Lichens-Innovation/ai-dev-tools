@@ -108,26 +108,30 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
 ## Example prompts (MCP)
 
-- Using code-crawler MCP: find date and time helpers for formatting dates.
-- Using code-crawler MCP: find date and time helpers for formatting time.
-- use code-crawler MCP to find water pump test result pdf generation
-- use code-crawler MCP to find service to remove latin accents from strings
+### Programming point of view
+
+- use code-crawler MCP to find helpers for formatting dates and time values
+- use code-crawler MCP to find string helper for removing latin special accents (normalize a string)
 - use code-crawler MCP to find code examples to present options to user through a drop down list
 - Use code-crawler MCP to find TanStack useMutation usage showing a snackbar message on error
-- Use code-crawler MCP to find bonjour service usage to detect a device
-- Use code-crawler MCP to find place where we consolidate segments and junctions for 3D
-- Use code-crawler MCP to find how to cache data retrieved from an http api call for a specific period of time
 - Use code-crawler MCP to find REST API controller definitions.
 - Use code-crawler MCP to find form validation examples with a schema and rules (e.g. Zod).
 
+### Feature point of view
+
+- use code-crawler MCP to find water pump test result pdf generation
+- use code-crawler MCP to find service to remove latin accents from strings
+- Use code-crawler MCP to find bonjour service usage to detect a device
+- Use code-crawler MCP to find place where we consolidate segments and junctions for 3D
+
+### 
+
+- use code-crawler MCP to find a modal webapp component displaying the version of both the frontend and backend systems
+- use code-crawler MCP to find an visual component allowing to select the backend environment
+
 ## TODOs
 
+* TODO-000: add a **reranker** after ANN retrieval to boost precision; `jinaai/jina-reranker-v1-tiny-en` is Transformers.js–compatible for a second-stage score on candidate chunks
 * TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively (usage of @microsoft/fetch-event-source on client side instead of SSE.js)
 * TODO-002: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
-* TODO-003: let users filter searches by source-code / file types (e.g. checkboxes for extensions or language groups)
-* TODO-004: stop loading scripts or assets from `cdn.jsdelivr.net`; ship pinned versions locally and reference them from HTML (no CDN dependency for the search UI)
-* ~~TODO-006~~: semantic indexing uses **tree-sitter** (`tree-sitter-typescript`) for AST-aware chunks with intra-file call hints (`calls` / `calledBy`); see `src/semantic-service/chunking/`.
-* TODO-007: add a **reranker** after ANN retrieval to boost precision; `jinaai/jina-reranker-v1-tiny-en` is Transformers.js–compatible for a second-stage score on candidate chunks
 * TODO-008: document and plan beyond sqlite-vec limits: it is **not** an approximate ANN index and stays strong up to roughly **100k–1M** vectors; for larger corpora evaluate dedicated ANN / vector stores
-* TODO-009: skip re-embedding / re-indexing a file when the persisted **content SHA** used for its stored semantic vectors matches the **current file SHA** (unchanged source → reuse existing chunks and vectors)
-

@@ -21,6 +21,7 @@ export default tseslint.config(
       // Vendored browser assets (minified; not meant for project ESLint rules)
       "public/search/jquery/**",
       "public/search/multiple-select/**",
+      "public/search/highlight/**",
     ],
   },
   {
