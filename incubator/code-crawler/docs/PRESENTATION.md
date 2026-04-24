@@ -323,6 +323,7 @@ erDiagram
   FILE_INDEX_CHUNK_VEC {
     blob embedding
     text repository
+    text source_language
   }
 ```
 

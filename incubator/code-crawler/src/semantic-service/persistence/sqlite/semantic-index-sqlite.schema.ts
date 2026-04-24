@@ -95,6 +95,9 @@ export const SQL_TABLE_FILE_INDEX_STORE_META = `CREATE TABLE IF NOT EXISTS ${SQL
 
 export const META_KEY_EMBEDDING_DIM = "EMBEDDING_DIM";
 
+/** sqlite-vec vec0 metadata column: must match `FILE_INDEX_METADATA.SOURCE_LANGUAGE` for the chunk's file (denormalized for KNN). */
+export const FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE = "source_language";
+
 /**
  * Declares float embedding column plus TEXT metadata for
  * repository-scoped KNN (sqlite-vec vec0).
@@ -102,7 +105,8 @@ export const META_KEY_EMBEDDING_DIM = "EMBEDDING_DIM";
 export const buildFileIndexChunkVecDdl = (embeddingDimensions: number): string =>
   `CREATE VIRTUAL TABLE IF NOT EXISTS ${FILE_INDEX_CHUNK_VEC_NAME} USING vec0(
   embedding float[${embeddingDimensions}],
-  repository TEXT
+  repository TEXT,
+  ${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE} TEXT
 );`;
 
 /** Row from {@link SQL_TABLE_NAME_FILE_INDEX_METADATA} (columns align with app `FileIndexMetadata`). */

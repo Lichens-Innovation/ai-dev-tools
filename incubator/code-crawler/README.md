@@ -113,8 +113,9 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 - use code-crawler MCP to find water pump test result pdf generation
 - use code-crawler MCP to find service to remove latin accents from strings
 - use code-crawler MCP to find code examples to present options to user through a drop down list
-- Use code-crawler MCP to find TanStack Query usage for a data mutation (update) with an error handler showing a snackbar type message.
+- Use code-crawler MCP to find TanStack useMutation usage showing a snackbar message on error
 - Use code-crawler MCP to find bonjour service usage to detect a device
+- Use code-crawler MCP to find place where we consolidate segments and junctions for 3D
 - Use code-crawler MCP to find how to cache data retrieved from an http api call for a specific period of time
 - Use code-crawler MCP to find REST API controller definitions.
 - Use code-crawler MCP to find form validation examples with a schema and rules (e.g. Zod).

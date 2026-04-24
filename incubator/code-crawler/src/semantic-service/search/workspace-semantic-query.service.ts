@@ -6,33 +6,10 @@ import type { SourceLanguageId } from "../types/source-language.types";
 import { fuseHybridChunkMatches } from "./hybrid-chunk-fusion.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
-  FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX,
   resolveChunkFetchCountForFileConsolidation,
 } from "./match-consolidation-by-file.utils";
 
 export const EXAMPLE_QUERY_TEXT = "tanstack query returning a list of items with an infinite staleTime";
-
-/**
- * When a language filter is active, sqlite-vec returns global top-k before SQL filters by language;
- * fetch more neighbors so enough rows survive the join.
- */
-const LANGUAGE_FILTER_SEMANTIC_FETCH_MULTIPLIER = 3;
-
-interface ResolveSemanticChunkFetchCountArgs {
-  nbResults: number;
-  languages?: readonly SourceLanguageId[];
-}
-
-const resolveSemanticChunkFetchCount = ({ nbResults, languages }: ResolveSemanticChunkFetchCountArgs): number => {
-  const base = resolveChunkFetchCountForFileConsolidation(nbResults);
-  if (isNullish(languages) || languages.length === 0) {
-    return base;
-  }
-  return Math.min(
-    FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX,
-    Math.ceil(base * LANGUAGE_FILTER_SEMANTIC_FETCH_MULTIPLIER)
-  );
-};
 
 interface RunWorkspaceSemanticQueryArgs {
   store: SemanticIndexStore;
@@ -85,7 +62,7 @@ export const runWorkspaceSemanticQuery = async ({
   }
 
   try {
-    const knnLimit = resolveSemanticChunkFetchCount({ nbResults: nResults, languages });
+    const knnLimit = resolveChunkFetchCountForFileConsolidation(nResults);
 
     const vectorMatches = store.queryNearest({
       nResults: knnLimit,

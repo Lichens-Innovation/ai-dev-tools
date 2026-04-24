@@ -18,6 +18,7 @@ import type {
 import {
   FILE_INDEX_CHUNK_FTS_NAME,
   FILE_INDEX_CHUNK_VEC_NAME,
+  FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE,
   META_KEY_EMBEDDING_DIM,
   SQL_FTS_CHUNK_REBUILD,
   SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX,
@@ -179,13 +180,17 @@ interface ResolveKnnRowsArgs {
   queryEmbedding: Float32Array;
   nResults: number;
   repository?: string;
-  hasLang: boolean;
-  jsonLangs: string;
+  /** Non-empty = filter with `v.source_language` OR-of-equals on vec0 (sqlite-vec metadata KNN). */
+  languages: readonly string[];
 }
 
 export class SqliteSemanticIndexStore implements SemanticIndexStore {
   private readonly db: Database.Database;
   private readonly embeddingDimensions: number;
+  /** KNN SELECT … FROM vec JOIN chunk JOIN metadata (no WHERE). */
+  private readonly knnSelectBase: string;
+  private readonly knnLangStmtAllRepos = new Map<string, Database.Statement>();
+  private readonly knnLangStmtByRepo = new Map<string, Database.Statement>();
   private readonly stmtSelectChunkRowidsByFileId: Database.Statement<[string], { ID: number }>;
   private readonly stmtDeleteVecByRowid: Database.Statement<[number], unknown>;
   private readonly stmtDeleteChunksByFileId: Database.Statement<[string], unknown>;
@@ -198,14 +203,9 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     [number, string, number, string, string, number, number, number],
     Database.RunResult
   >;
-  private readonly stmtInsertVec: Database.Statement<[Buffer, string], Database.RunResult>;
+  private readonly stmtInsertVec: Database.Statement<[Buffer, string, string], Database.RunResult>;
   private readonly stmtKnnAllRepos: Database.Statement<[Float32Array, number], DbFileIndexKnnRow>;
-  private readonly stmtKnnAllReposWithLanguages: Database.Statement<[Float32Array, number, string], DbFileIndexKnnRow>;
   private readonly stmtKnnByRepository: Database.Statement<[Float32Array, number, string], DbFileIndexKnnRow>;
-  private readonly stmtKnnByRepositoryWithLanguages: Database.Statement<
-    [Float32Array, number, string, string],
-    DbFileIndexKnnRow
-  >;
   private readonly stmtDeleteAllVec: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllChunks: Database.Statement<[], unknown>;
   private readonly stmtDeleteAllFiles: Database.Statement<[], unknown>;
@@ -237,25 +237,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.ensureVecSchema();
     ensureFts5SchemaOnDb(this.db);
 
-    this.stmtSelectChunkRowidsByFileId = this.db.prepare(
-      `SELECT ID FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`
-    );
-    this.stmtDeleteVecByRowid = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME} WHERE rowid = ?`);
-    this.stmtDeleteChunksByFileId = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`);
-    this.stmtDeleteFileById = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA} WHERE FILE_ID = ?`);
-    this.stmtInsertFile = this.db.prepare(
-      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    this.stmtInsertChunk = this.db.prepare(
-      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (ID, FILE_ID, CHUNK_INDEX, CHUNK_ID, DOCUMENT, START_LINE, END_LINE, CHUNK_BYTE_LENGTH)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    this.stmtInsertVec = this.db.prepare(
-      `INSERT INTO ${FILE_INDEX_CHUNK_VEC_NAME} (embedding, repository) VALUES (?, ?)`
-    );
-
-    const knnSelectBase = `
+    this.knnSelectBase = `
       SELECT
         c.ID,
         c.FILE_ID,
@@ -278,34 +260,33 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
       INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = v.rowid
       INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_METADATA} AS f ON f.FILE_ID = c.FILE_ID`;
 
-    this.stmtKnnAllRepos = this.db.prepare<[Float32Array, number], DbFileIndexKnnRow>(`${knnSelectBase}
+    this.stmtSelectChunkRowidsByFileId = this.db.prepare(
+      `SELECT ID FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`
+    );
+    this.stmtDeleteVecByRowid = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME} WHERE rowid = ?`);
+    this.stmtDeleteChunksByFileId = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`);
+    this.stmtDeleteFileById = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA} WHERE FILE_ID = ?`);
+    this.stmtInsertFile = this.db.prepare(
+      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    this.stmtInsertChunk = this.db.prepare(
+      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (ID, FILE_ID, CHUNK_INDEX, CHUNK_ID, DOCUMENT, START_LINE, END_LINE, CHUNK_BYTE_LENGTH)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    this.stmtInsertVec = this.db.prepare(
+      `INSERT INTO ${FILE_INDEX_CHUNK_VEC_NAME} (embedding, repository, ${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE}) VALUES (?, ?, ?)`
+    );
+
+    this.stmtKnnAllRepos = this.db.prepare<[Float32Array, number], DbFileIndexKnnRow>(`${this.knnSelectBase}
       WHERE v.embedding MATCH ?
         AND k = ?
       ORDER BY v.distance`);
 
-    this.stmtKnnByRepository = this.db.prepare<[Float32Array, number, string], DbFileIndexKnnRow>(`${knnSelectBase}
+    this.stmtKnnByRepository = this.db.prepare<[Float32Array, number, string], DbFileIndexKnnRow>(`${this.knnSelectBase}
       WHERE v.embedding MATCH ?
         AND k = ?
         AND v.repository = ?
-      ORDER BY v.distance`);
-
-    this.stmtKnnAllReposWithLanguages = this.db.prepare<
-      [Float32Array, number, string],
-      DbFileIndexKnnRow
-    >(`${knnSelectBase}
-      WHERE v.embedding MATCH ?
-        AND k = ?
-        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
-      ORDER BY v.distance`);
-
-    this.stmtKnnByRepositoryWithLanguages = this.db.prepare<
-      [Float32Array, number, string, string],
-      DbFileIndexKnnRow
-    >(`${knnSelectBase}
-      WHERE v.embedding MATCH ?
-        AND k = ?
-        AND v.repository = ?
-        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
       ORDER BY v.distance`);
 
     this.stmtDeleteAllVec = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME}`);
@@ -457,7 +438,11 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
           throw new Error(`[Store] embedding length ${ch.embedding.length} !== ${this.embeddingDimensions}`);
         }
 
-        const vecInsert = this.stmtInsertVec.run(float32ToSqliteBlob(ch.embedding), file.repository);
+        const vecInsert = this.stmtInsertVec.run(
+          float32ToSqliteBlob(ch.embedding),
+          file.repository,
+          file.sourceLanguage
+        );
         const rowId = toIntegerRowId(vecInsert.lastInsertRowid);
         this.stmtInsertChunk.run(
           rowId,
@@ -524,10 +509,8 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     }
 
     const langList = languages ?? [];
-    const hasLang = langList.length > 0;
-    const jsonLangs = JSON.stringify(langList);
 
-    const rows = this.resolveKnnRows({ queryEmbedding, nResults, repository, hasLang, jsonLangs });
+    const rows = this.resolveKnnRows({ queryEmbedding, nResults, repository, languages: langList });
 
     return rows.map(
       (row): QueryMatchSummary => ({
@@ -561,22 +544,67 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
       : this.stmtLexicalByRepository.all(matchQuery, repository, nResults);
   }
 
-  private resolveKnnRows({
-    queryEmbedding,
-    nResults,
-    repository,
-    hasLang,
-    jsonLangs,
-  }: ResolveKnnRowsArgs): DbFileIndexKnnRow[] {
+  private resolveKnnRows({ queryEmbedding, nResults, repository, languages }: ResolveKnnRowsArgs): DbFileIndexKnnRow[] {
+    const sortedUniqueLangs = [...new Set(languages)].sort((a, b) => a.localeCompare(b));
+    const hasLang = sortedUniqueLangs.length > 0;
+
     if (isBlank(repository)) {
-      return hasLang
-        ? this.stmtKnnAllReposWithLanguages.all(queryEmbedding, nResults, jsonLangs)
-        : this.stmtKnnAllRepos.all(queryEmbedding, nResults);
+      if (!hasLang) {
+        return this.stmtKnnAllRepos.all(queryEmbedding, nResults);
+      }
+
+      const stmt = this.getOrCreateKnnLangAllReposStatement(sortedUniqueLangs);
+      return stmt.all(queryEmbedding, nResults, ...sortedUniqueLangs) as DbFileIndexKnnRow[];
     }
 
-    return hasLang
-      ? this.stmtKnnByRepositoryWithLanguages.all(queryEmbedding, nResults, repository!, jsonLangs)
-      : this.stmtKnnByRepository.all(queryEmbedding, nResults, repository);
+    if (!hasLang) {
+      return this.stmtKnnByRepository.all(queryEmbedding, nResults, repository!);
+    }
+
+    const stmt = this.getOrCreateKnnLangByRepositoryStatement(sortedUniqueLangs);
+    return stmt.all(queryEmbedding, nResults, repository!, ...sortedUniqueLangs) as DbFileIndexKnnRow[];
+  }
+
+  // Example: "… AND (v.source_language = ? OR v.source_language = ?)" → .all(queryEmbedding, k, "typescript", "javascript").
+  /** sqlite-vec metadata KNN: use `=` / `OR` only (not `IN` on `v`) per vec0 docs. */
+  private getOrCreateKnnLangAllReposStatement(sortedUniqueLangs: readonly string[]): Database.Statement {
+    const key = sortedUniqueLangs.join("\0");
+    let stmt = this.knnLangStmtAllRepos.get(key);
+    if (!isNullish(stmt)) {
+      return stmt;
+    }
+
+    const orPred = sortedUniqueLangs.map(() => `v.${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE} = ?`).join(" OR ");
+    stmt = this.db.prepare(
+      `${this.knnSelectBase}
+       WHERE v.embedding MATCH ?
+         AND k = ?
+         AND (${orPred})
+       ORDER BY v.distance`
+    );
+    this.knnLangStmtAllRepos.set(key, stmt);
+    return stmt;
+  }
+
+  // Example: "… AND v.repository = ? AND (v.source_language = ? OR …)" → .all(queryEmbedding, k, "my-repo", "typescript", "javascript").
+  private getOrCreateKnnLangByRepositoryStatement(sortedUniqueLangs: readonly string[]): Database.Statement {
+    const key = sortedUniqueLangs.join("\0");
+    let stmt = this.knnLangStmtByRepo.get(key);
+    if (!isNullish(stmt)) {
+      return stmt;
+    }
+
+    const orPred = sortedUniqueLangs.map(() => `v.${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE} = ?`).join(" OR ");
+    stmt = this.db.prepare(
+      `${this.knnSelectBase}
+       WHERE v.embedding MATCH ?
+         AND k = ?
+         AND v.repository = ?
+         AND (${orPred})
+       ORDER BY v.distance`
+    );
+    this.knnLangStmtByRepo.set(key, stmt);
+    return stmt;
   }
 
   close(): void {

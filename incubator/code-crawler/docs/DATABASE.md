@@ -43,6 +43,7 @@ erDiagram
   FILE_INDEX_CHUNK_VEC {
     blob embedding
     text repository
+    text source_language
   }
 
   FILE_INDEX_CHUNK_FTS {
@@ -59,7 +60,7 @@ erDiagram
 | `FILE_INDEX_CHUNK` | table | Chunk text and line span. `CHUNK_ID` is `UNIQUE`. `FOREIGN KEY (FILE_ID)` → `FILE_INDEX_METADATA(FILE_ID)` `ON DELETE CASCADE`. |
 | `IDX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX` | unique index | On `(FILE_ID, CHUNK_INDEX)`. |
 | `FILE_INDEX_STORE_META` | table | Store-level key/value (e.g. `EMBEDDING_DIM` = width used for vec0). |
-| `FILE_INDEX_CHUNK_VEC` | virtual (`vec0`) | sqlite-vec KNN; columns `embedding float[N]` and `repository`. |
+| `FILE_INDEX_CHUNK_VEC` | virtual (`vec0`) | sqlite-vec KNN; columns `embedding float[N]`, `repository`, and `source_language` (metadata on `v`, same value as `FILE_INDEX_METADATA.SOURCE_LANGUAGE`, so language filters apply during KNN per sqlite-vec vec0). |
 | `FILE_INDEX_CHUNK_FTS` | virtual (`fts5`) | Full-text index on chunk `DOCUMENT` (BM25). **External content** on `FILE_INDEX_CHUNK` (`content_rowid='ID'`). Maintained by triggers on `FILE_INDEX_CHUNK`. |
 
 Hybrid search combines sqlite-vec KNN with FTS5 `bm25()` scores (fixed **70 % / 30 %** blend in `fuseHybridChunkMatches` after per-query min–max normalization).
