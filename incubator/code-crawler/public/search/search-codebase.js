@@ -192,8 +192,7 @@ const getFileExtension = ({ pathRelative }) => {
 };
 
 const resolveHljsLanguage = ({ pathRelative, sourceLanguage }) => {
-  const trimmed =
-    typeof sourceLanguage === "string" && sourceLanguage.trim().length > 0 ? sourceLanguage.trim() : "";
+  const trimmed = typeof sourceLanguage === "string" && sourceLanguage.trim().length > 0 ? sourceLanguage.trim() : "";
   if (trimmed.length > 0 && SEMANTIC_SEARCH_LANGUAGE_IDS.includes(trimmed)) {
     const hljs = globalThis.hljs;
     if (typeof hljs?.getLanguage === "function" && hljs.getLanguage(trimmed) !== undefined) {
