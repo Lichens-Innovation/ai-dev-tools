@@ -111,6 +111,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 - Using code-crawler MCP: find date and time helpers for formatting dates.
 - Using code-crawler MCP: find date and time helpers for formatting time.
 - use code-crawler MCP to find water pump test result pdf generation
+- use code-crawler MCP to find service to remove latin accents from strings
 - use code-crawler MCP to find code examples to present options to user through a drop down list
 - Use code-crawler MCP to find TanStack Query usage for a data mutation (update) with an error handler showing a snackbar type message.
 - Use code-crawler MCP to find bonjour service usage to detect a device

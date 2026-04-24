@@ -29,6 +29,23 @@ const extensionToHljsLanguage = {
   scss: "scss",
   less: "less",
   py: "python",
+  pyi: "python",
+  c: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  h: "cpp",
+  hpp: "cpp",
+  hh: "cpp",
+  hxx: "cpp",
+  "h++": "cpp",
+  inl: "cpp",
+  ipp: "cpp",
+  tpp: "cpp",
+  tcc: "cpp",
+  cu: "cpp",
+  cs: "csharp",
+  csx: "csharp",
   rb: "ruby",
   go: "go",
   rs: "rust",
@@ -174,7 +191,16 @@ const getFileExtension = ({ pathRelative }) => {
   return last.slice(dot + 1).toLowerCase();
 };
 
-const resolveHljsLanguage = ({ pathRelative }) => {
+const resolveHljsLanguage = ({ pathRelative, sourceLanguage }) => {
+  const trimmed =
+    typeof sourceLanguage === "string" && sourceLanguage.trim().length > 0 ? sourceLanguage.trim() : "";
+  if (trimmed.length > 0 && SEMANTIC_SEARCH_LANGUAGE_IDS.includes(trimmed)) {
+    const hljs = globalThis.hljs;
+    if (typeof hljs?.getLanguage === "function" && hljs.getLanguage(trimmed) !== undefined) {
+      return trimmed;
+    }
+  }
+
   const ext = getFileExtension({ pathRelative });
   if (ext.length === 0) {
     return "plaintext";
@@ -197,10 +223,14 @@ const normalizeSearchMatch = ({ match }) => {
   const fileIdFromMatch = typeof match?.fileId === "string" ? match.fileId : "";
   const fileId = fileIdFromMeta.length > 0 ? fileIdFromMeta : fileIdFromMatch;
 
+  const rawSourceLanguage = typeof meta.sourceLanguage === "string" ? meta.sourceLanguage.trim() : "";
+  const sourceLanguage = SEMANTIC_SEARCH_LANGUAGE_IDS.includes(rawSourceLanguage) ? rawSourceLanguage : "";
+
   return {
     pathRelative: typeof meta.pathRelative === "string" ? meta.pathRelative : "",
     repository: typeof meta.repository === "string" ? meta.repository : "",
     fullPath: typeof meta.fullPath === "string" ? meta.fullPath : "",
+    sourceLanguage,
     fileId,
     startLine: typeof match.startLine === "number" ? match.startLine : null,
     endLine: typeof match.endLine === "number" ? match.endLine : null,
@@ -403,7 +433,10 @@ const renderDetailFromChunkPreview = ({ normalizedMatch }) => {
   const body = extractBodyFromDocumentPreview({
     documentPreview: normalizedMatch.documentPreview,
   });
-  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const language = resolveHljsLanguage({
+    pathRelative: normalizedMatch.pathRelative,
+    sourceLanguage: normalizedMatch.sourceLanguage,
+  });
   const codeEl = getDetailCodeEl();
   const gutterEl = getDetailLineGutterEl();
   if (gutterEl) {
@@ -423,7 +456,10 @@ const renderDetailFromFullFilePayload = ({ normalizedMatch, payload }) => {
     pathEl.title = payload.fullPath;
   }
 
-  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const language = resolveHljsLanguage({
+    pathRelative: normalizedMatch.pathRelative,
+    sourceLanguage: normalizedMatch.sourceLanguage,
+  });
   const codeEl = getDetailCodeEl();
   const gutterEl = getDetailLineGutterEl();
   if (gutterEl) {
