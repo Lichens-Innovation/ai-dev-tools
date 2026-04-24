@@ -795,6 +795,17 @@ initLanguageFilterUi();
 
 document.getElementById("search-button").addEventListener("click", runSearch);
 
+document.getElementById("query-text").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  if (event.shiftKey) {
+    return;
+  }
+  event.preventDefault();
+  runSearch();
+});
+
 document.getElementById("detail-copy-path").addEventListener("click", async () => {
   if (lastDetailFullPath.length === 0) {
     return;
