@@ -28,6 +28,8 @@ const INDEX_SKIP_DIR_NAMES = new Set([
   "target",
   "vendor",
   ".amplify",
+  "assets",
+  "generated",
 
   // mobile app platforms
   "ios",
