@@ -10,6 +10,7 @@ export const EnvNames = {
   embeddingModel: "CODE_CRAWLER_EMBEDDING_MODEL",
   embeddingDim: "CODE_CRAWLER_EMBEDDING_DIM",
   rerankerModel: "CODE_CRAWLER_RERANKER_MODEL",
+  rerankerModelType: "CODE_CRAWLER_RERANKER_MODEL_TYPE",
   rerankerDtype: "CODE_CRAWLER_RERANKER_DTYPE",
   transformersModelsPath: "CODE_CRAWLER_TRANSFORMERS_MODELS_PATH",
   semanticIndexDbPath: "CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH",
@@ -29,6 +30,7 @@ export type CodeCrawlerEnv = {
   embeddingModel: string;
   embeddingDim: number;
   rerankerModel: string;
+  rerankerModelType: string;
   rerankerDtype: CodeCrawlerRerankerDtype;
   transformersModelsPath: string;
   semanticIndexDbPath: string;
@@ -98,6 +100,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const embeddingModel = requireNonBlankEnvVar(EnvNames.embeddingModel);
   const embeddingDim = requirePositiveIntEnvVar(EnvNames.embeddingDim);
   const rerankerModel = requireNonBlankEnvVar(EnvNames.rerankerModel);
+  const rerankerModelType = requireNonBlankEnvVar(EnvNames.rerankerModelType);
   const rerankerDtype = parseRerankerDtype(requireNonBlankEnvVar(EnvNames.rerankerDtype));
   const transformersModelsRaw = requireNonBlankEnvVar(EnvNames.transformersModelsPath);
   const semanticIndexRaw = requireNonBlankEnvVar(EnvNames.semanticIndexDbPath);
@@ -114,6 +117,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     embeddingModel,
     embeddingDim,
     rerankerModel,
+    rerankerModelType,
     rerankerDtype,
     transformersModelsPath: path.resolve(expandUserDirectory(transformersModelsRaw)),
     semanticIndexDbPath: path.resolve(expandUserDirectory(semanticIndexRaw)),
@@ -152,6 +156,8 @@ export const resolveSemanticIndexDbPath = (): string => getCodeCrawlerEnv().sema
 export const getEmbeddingDimensions = (): number => getCodeCrawlerEnv().embeddingDim;
 
 export const getCodeCrawlerRerankerModel = (): string => getCodeCrawlerEnv().rerankerModel;
+
+export const getCodeCrawlerRerankerModelType = (): string => getCodeCrawlerEnv().rerankerModelType;
 
 export const getCodeCrawlerRerankerDtype = (): CodeCrawlerRerankerDtype => getCodeCrawlerEnv().rerankerDtype;
 

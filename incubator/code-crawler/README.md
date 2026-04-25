@@ -115,7 +115,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 - use code-crawler MCP to find code examples to present options to user through a drop down list
 - Use code-crawler MCP to find TanStack useMutation usage showing a snackbar message on error
 - Use code-crawler MCP to find REST API controller definitions.
-- Use code-crawler MCP to find form validation examples with a schema and rules (e.g. Zod).
+- Use code-crawler MCP to find form fields validation with a schema and rules (e.g. Zod).
 
 ### Feature point of view
 
