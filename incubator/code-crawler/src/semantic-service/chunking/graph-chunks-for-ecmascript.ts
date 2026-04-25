@@ -1,26 +1,7 @@
 import { isNullish } from "@lichens-innovation/ts-common";
-import { extname } from "node:path";
-import Parser from "tree-sitter";
 import type { SyntaxNode } from "tree-sitter";
-import { normalizeSourceNewlines } from "../../utils/text/newlines.utils";
-import type {
-  BuildSemanticGraphChunksForSourceArgs,
-  RawAstChunk,
-  SemanticGraphChunk,
-  SemanticGraphSymbolKind,
-} from "./graph-chunks.types";
-import {
-  buildCalledByDisplayLists,
-  buildCallsAndCalledBy,
-  buildDefsIndex,
-  dedupeRawChunks,
-  expandChunksToMaxUtf8,
-  finalizeSemanticGraphChunks,
-  isSyntaxNodeType,
-  lastSegment,
-} from "./graph-chunks.utils";
-import { JAVASCRIPT_FILE_EXTENSION_SET, TYPESCRIPT_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
-import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
+import type { LanguageAstExtractor, RawAstChunk, SemanticGraphSymbolKind } from "./graph-chunks.types";
+import { dedupeRawChunks, isSyntaxNodeType, lastSegment } from "./graph-chunks.utils";
 
 type EcmascriptChunkerKind = "javascript" | "typescript";
 
@@ -492,95 +473,10 @@ const collectRawChunks = (root: SyntaxNode, kind: EcmascriptChunkerKind): RawAst
   return dedupeRawChunks(out);
 };
 
-/**
- * Parses JavaScript/TypeScript with tree-sitter, builds AST-first chunks with intra-file
- * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
- *
- * Callers must filter by file extension before invoking.
- *
- * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
- */
-interface BuildSemanticGraphChunksForEcmascriptSourceArgs {
-  args: BuildSemanticGraphChunksForSourceArgs;
-  kind: EcmascriptChunkerKind;
-}
+const makeEcmascriptExtractor = (kind: EcmascriptChunkerKind): LanguageAstExtractor => ({
+  collectRawChunks: (root) => collectRawChunks(root, kind),
+  collectCallsInBody,
+});
 
-const buildSemanticGraphChunksForEcmascriptSource = ({
-  args,
-  kind,
-}: BuildSemanticGraphChunksForEcmascriptSourceArgs): SemanticGraphChunk[] => {
-  const normalized = normalizeSourceNewlines(args.source);
-  const language = getTreeSitterLanguageForPath(args.pathRelative);
-  if (isNullish(language)) {
-    return [];
-  }
-
-  const parser = new Parser();
-  parser.setLanguage(language);
-  const tree = parser.parse(normalized);
-
-  if (tree.rootNode.hasError) {
-    console.warn(`[buildSemanticGraphChunksForEcmascriptSource] parse has errors, skipping file: ${args.pathRelative}`);
-    return [];
-  }
-
-  const raw = collectRawChunks(tree.rootNode, kind);
-  if (raw.length === 0) {
-    return [];
-  }
-
-  raw.sort((left, right) => left.node.startIndex - right.node.startIndex || left.node.endIndex - right.node.endIndex);
-
-  const defs = buildDefsIndex(raw);
-  const { callsByChunkIndex, calledByByResolveName } = buildCallsAndCalledBy(raw, defs, collectCallsInBody);
-  const calledByDisplay = buildCalledByDisplayLists(raw, calledByByResolveName);
-
-  const expanded = expandChunksToMaxUtf8({
-    calledByDisplayByCaller: calledByDisplay,
-    callsByIdx: callsByChunkIndex,
-    maxEmbedUtf8Bytes: args.maxEmbedUtf8Bytes,
-    pathRelative: args.pathRelative,
-    raw,
-    repository: args.repository,
-  });
-
-  return finalizeSemanticGraphChunks(expanded);
-};
-
-const isJavascriptPath = (pathRelative: string): boolean =>
-  JAVASCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
-
-/**
- * Parses JavaScript with tree-sitter, builds AST-first chunks with intra-file
- * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
- *
- * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
- */
-export const buildSemanticGraphChunksForJavaScriptSource = (
-  args: BuildSemanticGraphChunksForSourceArgs
-): SemanticGraphChunk[] => {
-  if (!isJavascriptPath(args.pathRelative)) {
-    return [];
-  }
-
-  return buildSemanticGraphChunksForEcmascriptSource({ args, kind: "javascript" });
-};
-
-const isTypescriptPath = (pathRelative: string): boolean =>
-  TYPESCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
-
-/**
- * Parses TypeScript/TSX with tree-sitter, builds AST-first chunks with intra-file
- * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
- *
- * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
- */
-export const buildSemanticGraphChunksForTypescriptSource = (
-  args: BuildSemanticGraphChunksForSourceArgs
-): SemanticGraphChunk[] => {
-  if (!isTypescriptPath(args.pathRelative)) {
-    return [];
-  }
-
-  return buildSemanticGraphChunksForEcmascriptSource({ args, kind: "typescript" });
-};
+export const typescriptAstExtractor: LanguageAstExtractor = makeEcmascriptExtractor("typescript");
+export const javascriptAstExtractor: LanguageAstExtractor = makeEcmascriptExtractor("javascript");
