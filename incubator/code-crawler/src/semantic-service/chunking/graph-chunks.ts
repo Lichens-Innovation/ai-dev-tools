@@ -31,15 +31,15 @@ const EXTRACTOR_BY_EXTENSION: ReadonlyMap<string, LanguageAstExtractor> = new Ma
   ...CSHARP_FILE_EXTENSIONS.map((ext) => [ext, csharpAstExtractor] as const),
 ]);
 
-interface BuildSemanticGraphChunksWithExtractorArgs {
+interface BuildSemanticGraphChunksArgs {
   graphChunksArgs: SemanticGraphChunksArgs;
   extractor: LanguageAstExtractor;
 }
 
-const buildSemanticGraphChunksWithExtractor = ({
+const buildSemanticGraphChunks = ({
   graphChunksArgs,
   extractor,
-}: BuildSemanticGraphChunksWithExtractorArgs): SemanticGraphChunk[] => {
+}: BuildSemanticGraphChunksArgs): SemanticGraphChunk[] => {
   const normalized = normalizeSourceNewlines(graphChunksArgs.source);
   const language = getTreeSitterLanguageForPath(graphChunksArgs.pathRelative);
   if (isNullish(language)) {
@@ -91,5 +91,5 @@ export const buildSemanticGraphChunksForSource = (graphChunksArgs: SemanticGraph
     return [];
   }
 
-  return buildSemanticGraphChunksWithExtractor({ graphChunksArgs, extractor });
+  return buildSemanticGraphChunks({ graphChunksArgs, extractor });
 };
