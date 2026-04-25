@@ -1,6 +1,7 @@
 /**
  * Vector helpers for semantic search. Embeddings from Transformers.js use `normalize: true`, so dot product equals cosine similarity.
  */
+export const NUMERIC_DIVISION_EPSILON = 1e-9;
 
 export const l2NormalizeInPlace = (v: Float32Array): Float32Array => {
   let sumSq = 0;

@@ -38,7 +38,7 @@ const INDEX_SKIP_DIR_NAMES = new Set([
 type LoadedIndexableFileContent = { document: string; stat: Stats };
 
 const loadIndexableFileContent = async (fullPath: string): Promise<LoadedIndexableFileContent | null> => {
-  console.info(`\t ${fullPath}`);
+  console.info(`[loadIndexableFileContent] reading: ${fullPath}`);
 
   const st = await statFileOrNull(fullPath);
   if (!st || !st.isFile() || st.size > getCodeCrawlerMaxIndexFileBytes()) {
@@ -158,7 +158,7 @@ interface CollectFileRecordsArgs {
 const collectFileRecords = async ({ repoRoot, repository }: CollectFileRecordsArgs): Promise<FileIndexRecord[]> => {
   const records: FileIndexRecord[] = [];
   await walkRepositoryForFileRecords({ dir: repoRoot, records, repoRoot, repository });
-  console.info(`[${repository}] discovery complete: ${records.length} indexable file(s)`);
+  console.info(`[collectFileRecords][${repository}] discovery complete: ${records.length} indexable file(s)`);
   return records;
 };
 

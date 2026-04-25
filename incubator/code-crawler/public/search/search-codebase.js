@@ -165,7 +165,7 @@ const parsePayloadFromResponseParts = ({ contentType, bodyText }) => {
   try {
     return JSON.parse(bodyText);
   } catch (error) {
-    console.error("[search-codebase] JSON parse failed:", error);
+    console.error("[parsePayloadFromResponseParts] JSON parse failed:", error);
     return bodyText;
   }
 };
@@ -425,7 +425,7 @@ const getSyntaxHighlightHtmlString = ({ language, codeText }) => {
       const { value } = hljs.highlight(codeText, { language: resolvedLanguage });
       return value;
     } catch (error) {
-      console.error("[search-codebase] highlight failed:", error);
+      console.error("[getSyntaxHighlightHtmlString] highlight failed:", error);
     }
   }
 
@@ -434,7 +434,7 @@ const getSyntaxHighlightHtmlString = ({ language, codeText }) => {
       const { value } = hljs.highlightAuto(codeText);
       return value;
     } catch (error) {
-      console.error("[search-codebase] highlightAuto failed:", error);
+      console.error("[getSyntaxHighlightHtmlString] highlightAuto failed:", error);
     }
   }
 
@@ -551,7 +551,7 @@ const showDetailPanelLoadingState = ({ message }) => {
 };
 
 const renderDetailPanelFetchError = ({ message }) => {
-  console.error("[search-codebase] indexed file content failed:", message);
+  console.error("[renderDetailPanelFetchError] indexed file content failed:", message);
   setDetailPanelPlainTextBody({ message });
 };
 
@@ -694,7 +694,7 @@ const loadAndRenderDetailForMatch = async ({ match, index }) => {
     if (error instanceof Error && error.name === "AbortError") {
       return;
     }
-    console.error("[search-codebase] indexed file content request threw:", error);
+    console.error("[loadAndRenderDetailForMatch] indexed file content request threw:", error);
     if (!signal.aborted) {
       renderDetailPanelFetchError({ message: formatThrownValue({ error }) });
     }
@@ -827,7 +827,7 @@ const runSearch = async () => {
   try {
     await postSemanticSearch({ body });
   } catch (error) {
-    console.error("[search-codebase] search failed:", error);
+    console.error("[runSearch] search failed:", error);
     setSearchError({ message: formatThrownValue({ error }) });
     setSearchStatus({ html: "Request failed.", isBusy: false });
     clearResultsUi();
@@ -907,7 +907,7 @@ const initSearchMasterDetailSplitter = () => {
     } catch (error) {
       const isExpectedUncapturedPointer = error instanceof window.DOMException && error.name === "NotFoundError";
       if (!isExpectedUncapturedPointer) {
-        console.error("[search-codebase] releasePointerCapture failed:", error);
+        console.error("[initSearchMasterDetailSplitter] releasePointerCapture failed:", error);
       }
     }
     endSplitterDrag();
@@ -970,7 +970,7 @@ document.getElementById("detail-copy-path").addEventListener("click", async () =
     await navigator.clipboard.writeText(lastDetailFullPath);
     setSearchStatus({ html: "Full path copied to clipboard.", isBusy: false });
   } catch (error) {
-    console.error("[search-codebase] clipboard failed:", error);
+    console.error("[detailCopyPathClickHandler] clipboard failed:", error);
     setSearchError({ message: "Could not copy path (clipboard permission denied or unavailable)." });
   }
 });

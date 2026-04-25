@@ -174,7 +174,7 @@ export const buildSemanticGraphChunksForCSharpSource = (
   const tree = parser.parse(normalized);
 
   if (tree.rootNode.hasError) {
-    console.warn(`[semantic-chunking] parse has errors, skipping file: ${args.pathRelative}`);
+    console.warn(`[buildSemanticGraphChunksForCSharpSource] parse has errors, skipping file: ${args.pathRelative}`);
     return [];
   }
 

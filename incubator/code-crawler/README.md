@@ -111,7 +111,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 ### Programming point of view
 
 - use code-crawler MCP to find helpers for formatting dates and time values
-- use code-crawler MCP to find string helper for removing latin special accents (normalize a string)
+- use code-crawler MCP to find helper for removing latin special accents (normalize a string)
 - use code-crawler MCP to find code examples to present options to user through a drop down list
 - Use code-crawler MCP to find TanStack useMutation usage showing a snackbar message on error
 - Use code-crawler MCP to find REST API controller definitions.
@@ -127,7 +127,7 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 ### 
 
 - use code-crawler MCP to find a modal webapp component displaying the version of both the frontend and backend systems
-- use code-crawler MCP to find an visual component allowing to select the backend environment
+- use code-crawler MCP to find a visual component allowing to select the backend environment
 
 ## TODOs
 

@@ -25,10 +25,10 @@ const loadTextGenerationPipeline = async (): Promise<TextGenerator> => {
   /** Default fp32 `model.onnx` + external data hits ORT shape-inference errors on some graphs; `q8` uses bundled `model_quantized.onnx`. */
   const options = { dtype: "q8" as const };
   console.info(
-    `[semantic-rag-text] Loading model "${model}" (dtype=${options.dtype}, local: "${env.localModelPath}"; first run may download assets)…`
+    `[loadTextGenerationPipeline] Loading model "${model}" (dtype=${options.dtype}, local: "${env.localModelPath}"; first run may download assets)…`
   );
   const generator = (await pipeline("text-generation", model, options)) as TextGenerator;
-  console.info(`[semantic-rag-text] Model ready: "${model}"`);
+  console.info(`[loadTextGenerationPipeline] Model ready: "${model}"`);
   return generator;
 };
 

@@ -4,6 +4,7 @@ import type { QueryMatchSummary, QueryOutcome } from "../types/search.types";
 import type { SemanticIndexStore } from "../types/store.types";
 import type { SourceLanguageId } from "../types/source-language.types";
 import { fuseHybridChunkMatches } from "./hybrid-chunk-fusion.utils";
+import { rerankWithCrossEncoder } from "./cross-encoder-rerank.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
   resolveChunkFetchCountForFileConsolidation,
@@ -38,8 +39,30 @@ const safeQueryLexicalChunks = ({
     return store.queryLexicalChunks({ queryText, nResults, repository, languages });
   } catch (lexErr: unknown) {
     const msg = getErrorMessage(lexErr);
-    console.warn(`[runWorkspaceSemanticQuery] lexical search skipped (vector-only): ${msg}`);
+    console.warn(`[safeQueryLexicalChunks] lexical search skipped (vector-only): ${msg}`);
     return [];
+  }
+};
+
+interface SafeRerankWithCrossEncoderArgs {
+  queryText: string;
+  matches: QueryMatchSummary[];
+}
+
+const safeRerankWithCrossEncoder = async ({
+  queryText,
+  matches,
+}: SafeRerankWithCrossEncoderArgs): Promise<QueryMatchSummary[]> => {
+  if (matches.length < 2) {
+    return matches;
+  }
+
+  try {
+    return await rerankWithCrossEncoder({ queryText, matches });
+  } catch (rerankErr: unknown) {
+    const msg = getErrorMessage(rerankErr);
+    console.warn(`[safeRerankWithCrossEncoder] cross-encoder rerank skipped (hybrid order kept): ${msg}`);
+    return matches;
   }
 };
 
@@ -80,8 +103,9 @@ export const runWorkspaceSemanticQuery = async ({
     });
 
     const matches: QueryMatchSummary[] = fuseHybridChunkMatches({ lexicalMatches, vectorMatches });
+    const rerankedMatches: QueryMatchSummary[] = await safeRerankWithCrossEncoder({ queryText, matches });
 
-    return consolidateSemanticQueryMatchesByFile({ matches, nResults });
+    return consolidateSemanticQueryMatchesByFile({ matches: rerankedMatches, nResults });
   } catch (e: unknown) {
     const queryError = getErrorMessage(e);
     console.error(`[runWorkspaceSemanticQuery]: query failed: ${queryError}`, e);

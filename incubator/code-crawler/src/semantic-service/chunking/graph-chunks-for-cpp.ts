@@ -256,7 +256,7 @@ export const buildSemanticGraphChunksForCppSource = (
   const tree = parser.parse(normalized);
 
   if (tree.rootNode.hasError) {
-    console.warn(`[semantic-chunking] parse has errors, skipping file: ${args.pathRelative}`);
+    console.warn(`[buildSemanticGraphChunksForCppSource] parse has errors, skipping file: ${args.pathRelative}`);
     return [];
   }
 

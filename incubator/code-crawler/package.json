@@ -16,6 +16,7 @@
     "generate:version": "tsx ./scripts/generate-version.ts",
     "pull:workspace": "tsx ./scripts/pull-workspace-repositories.ts",
     "download:models:embeddings": "tsx ./scripts/models-download.ts jinaai/jina-embeddings-v2-base-code",
+    "download:models:reranker": "tsx ./scripts/models-download.ts jinaai/jina-reranker-v2-base-multilingual",
     "download:models:rag": "tsx ./scripts/models-download.ts jinaai/jina-embeddings-v2-base-code onnx-community/Qwen2.5-Coder-1.5B-Instruct",
     "build": "nest build",
     "lint": "eslint . && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",

@@ -65,15 +65,15 @@ const createUpdatedPackageMetadata = ({
   newVersion,
 }: CreateUpdatedPackageMetadataArgs): PackageJsonData => {
   const newPackageMetadata = { ...packageMetadata, version: newVersion };
-  console.info(`\t- Updating package.json with version "${newVersion}"...`);
+  console.info(`[createUpdatedPackageMetadata] Updating package.json with version "${newVersion}"...`);
   writePackageJson(newPackageMetadata);
-  console.info(`\t- package.json updated successfully.`);
+  console.info("[createUpdatedPackageMetadata] package.json updated successfully.");
 
   return newPackageMetadata;
 };
 
 const main = async (): Promise<void> => {
-  console.info("\t[Version generator script]");
+  console.info("[main] Version generator script");
 
   try {
     let packageMetadata = readPackageJson();
@@ -86,16 +86,16 @@ const main = async (): Promise<void> => {
         newVersion,
       });
     } else {
-      console.info(`\t- Version unchanged: ${currentVersion}`);
+      console.info(`[main] Version unchanged: ${currentVersion}`);
     }
 
     const data = generateConstantsFile(packageMetadata);
-    console.info(`\t- Writing file "${versionGenFilename}" for version ${packageMetadata.version}...`);
+    console.info(`[main] Writing file "${versionGenFilename}" for version ${packageMetadata.version}...`);
     writeFileSync(versionGenFilename, data, { encoding: "utf8" });
-    console.info(`\t- File "${versionGenFilename}" written successfully.`);
+    console.info(`[main] File "${versionGenFilename}" written successfully.`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`\t- Error: ${message}`, err);
+    console.error(`[main] Error: ${message}`, err);
     process.exit(1);
   }
 };

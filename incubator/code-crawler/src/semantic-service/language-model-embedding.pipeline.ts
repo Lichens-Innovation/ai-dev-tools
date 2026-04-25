@@ -23,10 +23,10 @@ const loadFeatureExtractionPipeline = async (): Promise<FeaturePipeline> => {
 
   const model = getCodeCrawlerEmbeddingModel();
   console.info(
-    `[semantic-embedding] Loading model "${model}" (local: "${env.localModelPath}" first run may download assets)…`
+    `[loadFeatureExtractionPipeline] Loading model "${model}" (local: "${env.localModelPath}" first run may download assets)…`
   );
   const extractor = await pipeline("feature-extraction", model);
-  console.info(`[semantic-embedding] Model ready: "${model}"`);
+  console.info(`[loadFeatureExtractionPipeline] Model ready: "${model}"`);
   return extractor as FeaturePipeline;
 };
 

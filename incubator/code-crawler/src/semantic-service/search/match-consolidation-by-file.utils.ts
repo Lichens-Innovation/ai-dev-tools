@@ -8,10 +8,10 @@ import type { QueryMatchSummary } from "../types/search.types";
  */
 
 /** How many raw chunk neighbors to fetch per requested file (dedupe shrinks the list). */
-const FILE_CONSOLIDATION_CHUNK_FETCH_FACTOR = 4;
+const FILE_CONSOLIDATION_CHUNK_FETCH_FACTOR = 5;
 
 /** Upper bound on KNN size so consolidation stays cheap on large indexes. */
-export const FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX = 250;
+export const FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX = 500;
 
 /** Divides effective distance by `1 + weight * (hitCount - 1)` so multi-chunk files rank higher. */
 const FILE_CONSOLIDATION_MULTI_CHUNK_BOOST_WEIGHT = 0.25;

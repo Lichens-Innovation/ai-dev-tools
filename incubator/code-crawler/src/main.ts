@@ -32,6 +32,6 @@ const main = async (): Promise<void> => {
 };
 
 void main().catch((error: unknown) => {
-  console.error(error);
+  console.error("[main] bootstrap failed:", error);
   process.exitCode = 1;
 });

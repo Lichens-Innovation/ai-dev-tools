@@ -10,7 +10,7 @@ import { EnvNames, expandUserDirectory, readOptionalTrimmedEnvVar } from "../src
 import { listGitRepoRootsUnderParent } from "../src/utils/git-repositories.utils";
 
 const DEFAULT_WORKSPACE_ROOT = path.join(homedir(), "git", "lichens");
-const LOG_PREFIX = "[pull-workspace-repositories]";
+const LOG_PREFIX = "[pull-workspace-repositories] ";
 
 interface PullWorkspaceRepositoriesCliOpts {
   root?: string;
@@ -87,16 +87,16 @@ const main = async (): Promise<void> => {
   const parentInput = resolveWorkspaceParentInput({ cliRoot: opts.root, envRoot: fromEnv });
   const parentResolved = path.resolve(expandUserDirectory(parentInput));
 
-  console.info(`${LOG_PREFIX} parent: ${parentResolved}`);
+  console.info(`${LOG_PREFIX}[main] parent: ${parentResolved}`);
 
   const { repos, error } = await listGitRepoRootsUnderParent(parentInput);
   if (error) {
-    console.error(`${LOG_PREFIX} ${error}`);
+    console.error(`${LOG_PREFIX}[main] ${error}`);
     process.exit(1);
   }
 
   if (repos.length === 0) {
-    console.info(`${LOG_PREFIX} No Git repositories found.`);
+    console.info(`${LOG_PREFIX}[main] No Git repositories found.`);
     return;
   }
   let hasPullFailures = false;
@@ -107,12 +107,12 @@ const main = async (): Promise<void> => {
     const outcome = runGitFfOnlyPull(cwd);
 
     if (outcome.isSuccess) {
-      console.info(`${LOG_PREFIX} OK ${label}: ${outcome.summary}`);
+      console.info(`${LOG_PREFIX}[main] OK ${label}: ${outcome.summary}`);
       continue;
     }
 
     hasPullFailures = true;
-    console.error(`${LOG_PREFIX} FAIL ${label}: ${outcome.summary}`);
+    console.error(`${LOG_PREFIX}[main] FAIL ${label}: ${outcome.summary}`);
   }
 
   if (hasPullFailures) {
@@ -121,6 +121,6 @@ const main = async (): Promise<void> => {
 };
 
 void main().catch((err: unknown) => {
-  console.error(`${LOG_PREFIX} ${getErrorMessage(err)}`, err);
+  console.error(`${LOG_PREFIX}[main] ${getErrorMessage(err)}`, err);
   process.exit(1);
 });

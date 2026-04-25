@@ -1,12 +1,10 @@
 import { isNullish } from "@lichens-innovation/ts-common";
+import { NUMERIC_DIVISION_EPSILON } from "../../utils/embeddings.utils";
 
 import type { QueryMatchSummary } from "../types/search.types";
 
 const HYBRID_WEIGHT_VECTOR = 0.7;
 const HYBRID_WEIGHT_LEXICAL = 0.3;
-// Numerical epsilon: guards min–max division and 1/hybrid when spans or hybrid are ~0.
-const HYBRID_EPS = 1e-9;
-
 export interface FuseHybridChunkMatchesArgs {
   lexicalMatches: QueryMatchSummary[];
   vectorMatches: QueryMatchSummary[];
@@ -28,11 +26,11 @@ interface ToSimLowerIsBetterParams {
 
 const toSimLowerIsBetter = ({ value, min, max }: ToSimLowerIsBetterParams): number => {
   const span = max - min;
-  if (span <= HYBRID_EPS) {
+  if (span <= NUMERIC_DIVISION_EPSILON) {
     return 1;
   }
 
-  return (max - value) / (span + HYBRID_EPS);
+  return (max - value) / (span + NUMERIC_DIVISION_EPSILON);
 };
 
 const pickRepresentativeMatch = (
@@ -88,7 +86,7 @@ export const fuseHybridChunkMatches = ({
       : toSimLowerIsBetter({ value: lexicalMatch.distance, min: bMin, max: bMax });
 
     const hybrid = HYBRID_WEIGHT_VECTOR * simVec + HYBRID_WEIGHT_LEXICAL * simLex;
-    const distance = 1 / (hybrid + HYBRID_EPS);
+    const distance = 1 / (hybrid + NUMERIC_DIVISION_EPSILON);
     const base = pickRepresentativeMatch(vectorMatch, lexicalMatch);
 
     hybridMatches.push({

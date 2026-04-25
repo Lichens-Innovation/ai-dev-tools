@@ -157,7 +157,7 @@ const embedPendingIntoFileChunkBuckets = async ({
 
     console.info(
       toString([
-        `[${repository}] embed batch ${upsertBatchOrdinal}: +${slice.length} chunk(s)`,
+        `[embedPendingIntoFileChunkBuckets][${repository}] embed batch ${upsertBatchOrdinal}: +${slice.length} chunk(s)`,
         `(${Math.min(i + slice.length, pendingChunks.length)}/${pendingChunks.length})`,
       ])
     );
@@ -206,7 +206,7 @@ const logSemanticIndexUpsertStart = ({
   const embedBatchSize = getCodeCrawlerEmbedBatchSize();
   console.info(
     toString([
-      `[${repository}] semantic index: ${fileCount} file(s) → ${chunkCount} chunk(s);`,
+      `[logSemanticIndexUpsertStart][${repository}] semantic index: ${fileCount} file(s) → ${chunkCount} chunk(s);`,
       `embedding batches of up to ${embedBatchSize}…`,
     ])
   );
@@ -221,7 +221,10 @@ const logSemanticIndexUpsertComplete = ({
     return;
   }
   console.info(
-    toString([`[${repository}] semantic index upsert complete: ${fileCount} file(s),`, `${chunkCount} chunk(s).`])
+    toString([
+      `[logSemanticIndexUpsertComplete][${repository}] semantic index upsert complete: ${fileCount} file(s),`,
+      `${chunkCount} chunk(s).`,
+    ])
   );
 };
 
@@ -255,7 +258,9 @@ export const tryUpsertFileRecordsToSemanticIndex = async ({
   });
 
   if (skippedUnchangedFileCount > 0) {
-    console.info(`[${repository}] skipping ${skippedUnchangedFileCount} unchanged file(s)`);
+    console.info(
+      `[tryUpsertFileRecordsToSemanticIndex][${repository}] skipping ${skippedUnchangedFileCount} unchanged file(s)`
+    );
   }
 
   if (recordsToUpsert.length === 0) {
