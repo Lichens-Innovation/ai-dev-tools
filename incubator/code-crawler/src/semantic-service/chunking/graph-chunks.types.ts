@@ -1,5 +1,15 @@
 import type { SyntaxNode } from "tree-sitter";
 
+/**
+ * Language-specific AST extraction strategy used by the shared chunking orchestrator.
+ * Each language adapter provides the two language-specific operations; all common steps
+ * (parse, sort, graph enrichment, UTF-8 splitting) are handled by the orchestrator.
+ */
+export interface LanguageAstExtractor {
+  collectRawChunks: (root: SyntaxNode) => RawAstChunk[];
+  collectCallsInBody: (body: SyntaxNode) => Map<string, number[]>;
+}
+
 /** One row-ready chunk after AST extraction, graph enrichment, and UTF-8 size splitting. */
 export interface SemanticGraphChunk {
   chunkIndex: number;
@@ -26,7 +36,7 @@ export interface DefinitionEntry {
   startIndex: number;
 }
 
-export interface BuildSemanticGraphChunksForSourceArgs {
+export interface SemanticGraphChunksArgs {
   maxEmbedUtf8Bytes: number;
   pathRelative: string;
   repository: string;

@@ -1,25 +1,7 @@
 import { isNullish } from "@lichens-innovation/ts-common";
-import { extname } from "node:path";
-import Parser from "tree-sitter";
 import type { SyntaxNode } from "tree-sitter";
-import { normalizeSourceNewlines } from "../../utils/text/newlines.utils";
-import type {
-  BuildSemanticGraphChunksForSourceArgs,
-  RawAstChunk,
-  SemanticGraphChunk,
-  SemanticGraphSymbolKind,
-} from "./graph-chunks.types";
-import {
-  buildCalledByDisplayLists,
-  buildCallsAndCalledBy,
-  buildDefsIndex,
-  dedupeRawChunks,
-  expandChunksToMaxUtf8,
-  finalizeSemanticGraphChunks,
-  lastSegment,
-} from "./graph-chunks.utils";
-import { PYTHON_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
-import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
+import type { LanguageAstExtractor, RawAstChunk, SemanticGraphSymbolKind } from "./graph-chunks.types";
+import { dedupeRawChunks, lastSegment } from "./graph-chunks.utils";
 
 const calleeNameFromPythonExpression = (expr: SyntaxNode): string | null => {
   if (expr.type === "identifier") {
@@ -168,50 +150,7 @@ const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
   return dedupeRawChunks(out);
 };
 
-const isPythonPath = (pathRelative: string): boolean =>
-  PYTHON_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
-
-export const buildSemanticGraphChunksForPythonSource = (
-  args: BuildSemanticGraphChunksForSourceArgs
-): SemanticGraphChunk[] => {
-  if (!isPythonPath(args.pathRelative)) {
-    return [];
-  }
-
-  const normalized = normalizeSourceNewlines(args.source);
-  const language = getTreeSitterLanguageForPath(args.pathRelative);
-  if (isNullish(language)) {
-    return [];
-  }
-
-  const parser = new Parser();
-  parser.setLanguage(language);
-  const tree = parser.parse(normalized);
-
-  if (tree.rootNode.hasError) {
-    console.warn(`[buildSemanticGraphChunksForPythonSource] parse has errors, skipping file: ${args.pathRelative}`);
-    return [];
-  }
-
-  const raw = collectRawChunks(tree.rootNode);
-  if (raw.length === 0) {
-    return [];
-  }
-
-  raw.sort((left, right) => left.node.startIndex - right.node.startIndex || left.node.endIndex - right.node.endIndex);
-
-  const defs = buildDefsIndex(raw);
-  const { callsByChunkIndex, calledByByResolveName } = buildCallsAndCalledBy(raw, defs, collectCallsInBody);
-  const calledByDisplay = buildCalledByDisplayLists(raw, calledByByResolveName);
-
-  const expanded = expandChunksToMaxUtf8({
-    calledByDisplayByCaller: calledByDisplay,
-    callsByIdx: callsByChunkIndex,
-    maxEmbedUtf8Bytes: args.maxEmbedUtf8Bytes,
-    pathRelative: args.pathRelative,
-    raw,
-    repository: args.repository,
-  });
-
-  return finalizeSemanticGraphChunks(expanded);
+export const pythonAstExtractor: LanguageAstExtractor = {
+  collectRawChunks,
+  collectCallsInBody,
 };
