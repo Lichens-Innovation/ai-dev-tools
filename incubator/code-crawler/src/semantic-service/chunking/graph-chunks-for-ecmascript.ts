@@ -19,8 +19,16 @@ import {
   isSyntaxNodeType,
   lastSegment,
 } from "./graph-chunks.utils";
-import { JAVASCRIPT_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
+import { JAVASCRIPT_FILE_EXTENSION_SET, TYPESCRIPT_FILE_EXTENSION_SET } from "./chunk-language-file-extensions";
 import { getTreeSitterLanguageForPath } from "./tree-sitter-language-registry";
+
+type EcmascriptChunkerKind = "javascript" | "typescript";
+
+interface EcmascriptChunkWalkArgs {
+  kind: EcmascriptChunkerKind;
+  node: SyntaxNode;
+  out: RawAstChunk[];
+}
 
 const calleeNameFromCallLike = (callNode: SyntaxNode): string | null => {
   const functionNode = callNode.childForFieldName("function");
@@ -191,6 +199,39 @@ const generatorFunctionDeclarationChunk = (declarationNode: SyntaxNode): RawAstC
   });
 };
 
+const interfaceChunk = (declarationNode: SyntaxNode): RawAstChunk => {
+  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous interface)";
+  return {
+    bodyNode: null,
+    displayName: name,
+    node: declarationNode,
+    resolveName: lastSegment(name),
+    symbolKind: "Interface",
+  };
+};
+
+const typeAliasChunk = (declarationNode: SyntaxNode): RawAstChunk => {
+  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous type)";
+  return {
+    bodyNode: null,
+    displayName: name,
+    node: declarationNode,
+    resolveName: lastSegment(name),
+    symbolKind: "Type",
+  };
+};
+
+const enumChunk = (declarationNode: SyntaxNode): RawAstChunk => {
+  const name = declarationNode.childForFieldName("name")?.text ?? "(anonymous enum)";
+  return {
+    bodyNode: null,
+    displayName: name,
+    node: declarationNode,
+    resolveName: lastSegment(name),
+    symbolKind: "Enum",
+  };
+};
+
 interface LexicalDeclaratorChunkArgs {
   declaratorNode: SyntaxNode;
   isExported: boolean;
@@ -263,12 +304,7 @@ const collectLexicalDeclaration = ({ isExported, lex, out }: CollectLexicalDecla
   }
 };
 
-interface CollectFromExportStatementArgs {
-  node: SyntaxNode;
-  out: RawAstChunk[];
-}
-
-const collectDefaultExportFunctionLike = ({ node, out }: CollectFromExportStatementArgs): void => {
+const collectDefaultExportFunctionLike = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
   tryPushRawChunk({
     out,
     chunk: rawChunkFromFunctionLike({
@@ -281,14 +317,14 @@ const collectDefaultExportFunctionLike = ({ node, out }: CollectFromExportStatem
   });
 
   for (const childNode of node.namedChildren) {
-    walkIndexableChunks({ node: childNode, out });
+    walkIndexableChunks({ kind, node: childNode, out });
   }
 };
 
-const collectFromExportStatement = ({ node, out }: CollectFromExportStatementArgs): void => {
+const collectFromExportStatement = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
   const decl = node.childForFieldName("declaration");
   if (!isNullish(decl)) {
-    collectFromStatementLike({ isExported: true, node: decl, out });
+    collectFromStatementLike({ isExported: true, kind, node: decl, out });
     return;
   }
 
@@ -298,80 +334,75 @@ const collectFromExportStatement = ({ node, out }: CollectFromExportStatementArg
   }
 
   if (isSyntaxNodeType(val.type, "function_expression", "arrow_function")) {
-    collectDefaultExportFunctionLike({ node: val, out });
+    collectDefaultExportFunctionLike({ kind, node: val, out });
     return;
   }
 
   if (isSyntaxNodeType(val.type, "class_declaration", "class")) {
     for (const childNode of val.namedChildren) {
-      walkIndexableChunks({ node: childNode, out });
+      walkIndexableChunks({ kind, node: childNode, out });
     }
   }
 };
 
 interface CollectFromStatementLikeArgs {
   isExported: boolean;
+  kind: EcmascriptChunkerKind;
   node: SyntaxNode;
   out: RawAstChunk[];
 }
 
-const collectFromStatementLike = ({ isExported, node, out }: CollectFromStatementLikeArgs): void => {
+const walkNamedChildren = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
+  for (const childNode of node.namedChildren) {
+    walkIndexableChunks({ kind, node: childNode, out });
+  }
+};
+
+const collectFromStatementLike = ({ isExported, kind, node, out }: CollectFromStatementLikeArgs): void => {
   switch (node.type) {
     case "function_declaration":
       tryPushRawChunk({ out, chunk: functionDeclarationChunk(node) });
-
-      for (const childNode of node.namedChildren) {
-        walkIndexableChunks({ node: childNode, out });
-      }
-
+      walkNamedChildren({ kind, node, out });
       return;
     case "generator_function_declaration":
       tryPushRawChunk({ out, chunk: generatorFunctionDeclarationChunk(node) });
-
-      for (const childNode of node.namedChildren) {
-        walkIndexableChunks({ node: childNode, out });
-      }
-
+      walkNamedChildren({ kind, node, out });
       return;
     case "class_declaration":
     case "class":
-      for (const childNode of node.namedChildren) {
-        walkIndexableChunks({ node: childNode, out });
-      }
-
+      walkNamedChildren({ kind, node, out });
       return;
     case "lexical_declaration":
       collectLexicalDeclaration({ isExported, lex: node, out });
-
-      for (const childNode of node.namedChildren) {
-        walkIndexableChunks({ node: childNode, out });
+      walkNamedChildren({ kind, node, out });
+      return;
+    case "interface_declaration":
+      if (kind === "typescript") {
+        tryPushRawChunk({ out, chunk: interfaceChunk(node) });
+        return;
       }
-
+      walkNamedChildren({ kind, node, out });
+      return;
+    case "type_alias_declaration":
+      if (kind === "typescript") {
+        tryPushRawChunk({ out, chunk: typeAliasChunk(node) });
+        return;
+      }
+      walkNamedChildren({ kind, node, out });
+      return;
+    case "enum_declaration":
+      if (kind === "typescript") {
+        tryPushRawChunk({ out, chunk: enumChunk(node) });
+        return;
+      }
+      walkNamedChildren({ kind, node, out });
       return;
     default:
-      for (const childNode of node.namedChildren) {
-        walkIndexableChunks({ node: childNode, out });
-      }
+      walkNamedChildren({ kind, node, out });
   }
 };
 
-interface WalkNamedChildrenArgs {
-  node: SyntaxNode;
-  out: RawAstChunk[];
-}
-
-const walkNamedChildren = ({ node, out }: WalkNamedChildrenArgs): void => {
-  for (const childNode of node.namedChildren) {
-    walkIndexableChunks({ node: childNode, out });
-  }
-};
-
-interface CollectIndexedMethodDefinitionArgs {
-  node: SyntaxNode;
-  out: RawAstChunk[];
-}
-
-const collectIndexedMethodDefinition = ({ node, out }: CollectIndexedMethodDefinitionArgs): void => {
+const collectIndexedMethodDefinition = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
   const display = methodDisplayName(node);
   tryPushRawChunk({
     out,
@@ -384,15 +415,10 @@ const collectIndexedMethodDefinition = ({ node, out }: CollectIndexedMethodDefin
     }),
   });
 
-  walkNamedChildren({ node, out });
+  walkNamedChildren({ kind, node, out });
 };
 
-interface CollectFromPublicFieldDefinitionArgs {
-  node: SyntaxNode;
-  out: RawAstChunk[];
-}
-
-const collectFromPublicFieldDefinition = ({ node, out }: CollectFromPublicFieldDefinitionArgs): void => {
+const collectFromPublicFieldDefinition = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
   const val = node.childForFieldName("value");
   if (!isNullish(val) && isSyntaxNodeType(val.type, "arrow_function", "function_expression")) {
     const classNode = node.parent?.parent ?? null;
@@ -418,71 +444,71 @@ const collectFromPublicFieldDefinition = ({ node, out }: CollectFromPublicFieldD
       }),
     });
 
-    walkNamedChildren({ node, out });
+    walkNamedChildren({ kind, node, out });
     return;
   }
 
-  walkNamedChildren({ node, out });
+  walkNamedChildren({ kind, node, out });
 };
-
-interface WalkIndexableChunksArgs {
-  node: SyntaxNode;
-  out: RawAstChunk[];
-}
 
 /**
  * DFS over the syntax tree: index declarations, descend into bodies so nested
  * functions and class methods are included.
  */
-const walkIndexableChunks = ({ node, out }: WalkIndexableChunksArgs): void => {
-  if (node.type === "import_statement") {
+const walkIndexableChunks = ({ kind, node, out }: EcmascriptChunkWalkArgs): void => {
+  if (kind === "typescript") {
+    if (isSyntaxNodeType(node.type, "import_statement", "import_type")) {
+      return;
+    }
+  } else if (node.type === "import_statement") {
     return;
   }
 
   if (node.type === "export_statement") {
-    collectFromExportStatement({ node, out });
+    collectFromExportStatement({ kind, node, out });
     return;
   }
 
   if (node.type === "method_definition" && shouldIndexMethodDefinition(node)) {
-    collectIndexedMethodDefinition({ node, out });
+    collectIndexedMethodDefinition({ kind, node, out });
     return;
   }
 
   if (node.type === "public_field_definition") {
-    collectFromPublicFieldDefinition({ node, out });
+    collectFromPublicFieldDefinition({ kind, node, out });
     return;
   }
 
-  collectFromStatementLike({ isExported: false, node, out });
+  collectFromStatementLike({ isExported: false, kind, node, out });
 };
 
-const collectRawChunks = (root: SyntaxNode): RawAstChunk[] => {
+const collectRawChunks = (root: SyntaxNode, kind: EcmascriptChunkerKind): RawAstChunk[] => {
   const out: RawAstChunk[] = [];
 
   for (const childNode of root.namedChildren) {
-    walkIndexableChunks({ node: childNode, out });
+    walkIndexableChunks({ kind, node: childNode, out });
   }
 
   return dedupeRawChunks(out);
 };
 
-const isJavascriptPath = (pathRelative: string): boolean =>
-  JAVASCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
-
 /**
- * Parses JavaScript with tree-sitter, builds AST-first chunks with intra-file
+ * Parses JavaScript/TypeScript with tree-sitter, builds AST-first chunks with intra-file
  * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
+ *
+ * Callers must filter by file extension before invoking.
  *
  * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
  */
-export const buildSemanticGraphChunksForJavaScriptSource = (
-  args: BuildSemanticGraphChunksForSourceArgs
-): SemanticGraphChunk[] => {
-  if (!isJavascriptPath(args.pathRelative)) {
-    return [];
-  }
+interface BuildSemanticGraphChunksForEcmascriptSourceArgs {
+  args: BuildSemanticGraphChunksForSourceArgs;
+  kind: EcmascriptChunkerKind;
+}
 
+const buildSemanticGraphChunksForEcmascriptSource = ({
+  args,
+  kind,
+}: BuildSemanticGraphChunksForEcmascriptSourceArgs): SemanticGraphChunk[] => {
   const normalized = normalizeSourceNewlines(args.source);
   const language = getTreeSitterLanguageForPath(args.pathRelative);
   if (isNullish(language)) {
@@ -498,7 +524,7 @@ export const buildSemanticGraphChunksForJavaScriptSource = (
     return [];
   }
 
-  const raw = collectRawChunks(tree.rootNode);
+  const raw = collectRawChunks(tree.rootNode, kind);
   if (raw.length === 0) {
     return [];
   }
@@ -519,4 +545,42 @@ export const buildSemanticGraphChunksForJavaScriptSource = (
   });
 
   return finalizeSemanticGraphChunks(expanded);
+};
+
+const isJavascriptPath = (pathRelative: string): boolean =>
+  JAVASCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
+
+/**
+ * Parses JavaScript with tree-sitter, builds AST-first chunks with intra-file
+ * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
+ *
+ * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
+ */
+export const buildSemanticGraphChunksForJavaScriptSource = (
+  args: BuildSemanticGraphChunksForSourceArgs
+): SemanticGraphChunk[] => {
+  if (!isJavascriptPath(args.pathRelative)) {
+    return [];
+  }
+
+  return buildSemanticGraphChunksForEcmascriptSource({ args, kind: "javascript" });
+};
+
+const isTypescriptPath = (pathRelative: string): boolean =>
+  TYPESCRIPT_FILE_EXTENSION_SET.has(extname(pathRelative).toLowerCase());
+
+/**
+ * Parses TypeScript/TSX with tree-sitter, builds AST-first chunks with intra-file
+ * `calls` / `calledBy`, splits embedding text to stay under `maxEmbedUtf8Bytes`.
+ *
+ * On parse errors (`rootNode.hasError`), logs a warning and returns [] (caller should not index the file).
+ */
+export const buildSemanticGraphChunksForTypescriptSource = (
+  args: BuildSemanticGraphChunksForSourceArgs
+): SemanticGraphChunk[] => {
+  if (!isTypescriptPath(args.pathRelative)) {
+    return [];
+  }
+
+  return buildSemanticGraphChunksForEcmascriptSource({ args, kind: "typescript" });
 };

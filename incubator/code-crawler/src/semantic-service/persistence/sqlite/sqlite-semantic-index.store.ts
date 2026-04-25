@@ -1,13 +1,9 @@
 import { isBlank, isNullish } from "@lichens-innovation/ts-common";
 import Database from "better-sqlite3";
-import { Buffer } from "node:buffer";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
 import * as sqliteVec from "sqlite-vec";
 import { EnvNames, getEmbeddingDimensions, resolveSemanticIndexDbPath } from "../../../utils/env.utils";
 import { buildSafeFts5MatchQuery } from "../../search/fts5-query-sanitize.utils";
 import type { FileIndexMetadata } from "../../types/index-domain.types";
-import type { SourceLanguageId } from "../../types/source-language.types";
 import type { QueryMatchSummary } from "../../types/search.types";
 import type {
   QueryLexicalChunksArgs,
@@ -16,152 +12,33 @@ import type {
   SemanticIndexStore,
 } from "../../types/store.types";
 import {
-  FILE_INDEX_CHUNK_FTS_NAME,
   FILE_INDEX_CHUNK_VEC_NAME,
   FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE,
   META_KEY_EMBEDDING_DIM,
-  SQL_FTS_CHUNK_REBUILD,
   SQL_INDEX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX,
   SQL_INDEX_FILE_INDEX_METADATA_SOURCE_LANGUAGE,
   SQL_TABLE_FILE_INDEX_CHUNK,
-  SQL_TABLE_FILE_INDEX_CHUNK_FTS,
   SQL_TABLE_FILE_INDEX_METADATA,
   SQL_TABLE_FILE_INDEX_STORE_META,
   SQL_TABLE_NAME_FILE_INDEX_CHUNK,
-  SQL_TABLE_NAME_FILE_INDEX_METADATA,
-  SQL_TABLE_NAME_FILE_INDEX_STORE_META,
-  SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS,
   buildFileIndexChunkVecDdl,
   type DbFileIndexKnnRow,
   type DbFileIndexLexicalRow,
   type DbFileIndexMetadataRow,
 } from "./semantic-index-sqlite.schema";
-
-/**
- * sqlite-vec KNN returns L2 distance for float embeddings. With L2-normalized model outputs,
- * cosine distance (1 − dot) equals L2²/2 — same ranking as exact cosine distance on L2-normalized vectors.
- */
-const sqliteVecDistanceToCosineDistance = (l2: number): number => (l2 * l2) / 2;
-
-/** Compact float32 payload for sqlite-vec (avoids binding bugs when mixing integers and vectors in one INSERT). */
-const float32ToSqliteBlob = (v: Float32Array): Buffer => Buffer.from(v.buffer, v.byteOffset, v.byteLength);
-
-const toIntegerRowId = (lastInsertRowid: number | bigint): number => {
-  if (typeof lastInsertRowid === "bigint") {
-    const min = BigInt(Number.MIN_SAFE_INTEGER);
-    const max = BigInt(Number.MAX_SAFE_INTEGER);
-
-    if (lastInsertRowid < min || lastInsertRowid > max) {
-      throw new RangeError(`lastInsertRowid ${lastInsertRowid.toString()} is outside Number safe integer range`);
-    }
-
-    return Number(lastInsertRowid);
-  }
-
-  return lastInsertRowid;
-};
-
-const isMemoryDbPath = (dbPath: string): boolean =>
-  ["", ":memory:"].includes(dbPath) || dbPath.startsWith("file::memory:");
-
-const ensureDbParentDirectory = (dbPath: string): void => {
-  if (isMemoryDbPath(dbPath)) {
-    return;
-  }
-
-  const dir = path.dirname(dbPath);
-  if (dir.length > 0) {
-    mkdirSync(dir, { recursive: true });
-  }
-};
-
-const vecTableExists = (db: Database.Database): boolean => {
-  const row = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-    .get(FILE_INDEX_CHUNK_VEC_NAME) as { name: string } | undefined;
-  return !isNullish(row);
-};
-
-interface ReadMetaValueArgs {
-  db: Database.Database;
-  key: string;
-}
-const readMetaValue = ({ db, key }: ReadMetaValueArgs): string => {
-  interface DbMetaRow {
-    VALUE: string;
-  }
-  const row = db
-    .prepare(`SELECT VALUE FROM ${SQL_TABLE_NAME_FILE_INDEX_STORE_META} WHERE KEY = ?`)
-    .get(key) as DbMetaRow;
-
-  return row?.VALUE ?? "";
-};
-
-interface WriteMetaValueArgs {
-  db: Database.Database;
-  key: string;
-  value: string;
-}
-const writeMetaValue = ({ db, key, value }: WriteMetaValueArgs): void => {
-  db.prepare(`INSERT OR REPLACE INTO ${SQL_TABLE_NAME_FILE_INDEX_STORE_META} (KEY, VALUE) VALUES (?, ?)`).run(
-    key,
-    value
-  );
-};
-
-const countSemanticChunks = (db: Database.Database): number => {
-  interface DbCountRow {
-    n: number;
-  }
-  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}`).get() as DbCountRow;
-  return row?.n ?? 0;
-};
-
-const ftsChunkTableExists = (db: Database.Database): boolean => {
-  const row = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
-    .get(FILE_INDEX_CHUNK_FTS_NAME) as { name: string } | undefined;
-  return !isNullish(row);
-};
-
-const countFtsIndexedRows = (db: Database.Database): number => {
-  type DbCountRow = { n: number };
-  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${FILE_INDEX_CHUNK_FTS_NAME}`).get() as DbCountRow;
-  return row?.n ?? 0;
-};
-
-/**
- * Creates FTS5 + triggers when missing; `rebuild` when chunks exist but the FTS index is empty
- * (e.g. reused local DB file). Idempotent.
- */
-const ensureFts5SchemaOnDb = (db: Database.Database): void => {
-  if (!ftsChunkTableExists(db)) {
-    db.exec(SQL_TABLE_FILE_INDEX_CHUNK_FTS);
-    db.exec(SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS);
-    if (countSemanticChunks(db) > 0) {
-      db.exec(SQL_FTS_CHUNK_REBUILD);
-    }
-    return;
-  }
-
-  db.exec(SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS);
-  const n = countSemanticChunks(db);
-  if (n > 0 && countFtsIndexedRows(db) === 0) {
-    db.exec(SQL_FTS_CHUNK_REBUILD);
-  }
-};
-
-const dbMetadataRowToFileIndexMetadata = (row: DbFileIndexMetadataRow): FileIndexMetadata => ({
-  contentSha256: row.CONTENT_SHA256,
-  fileId: row.FILE_ID,
-  filename: row.FILENAME,
-  fullPath: row.FULL_PATH,
-  lastModifiedAtISO: row.LAST_MODIFIED_AT_ISO,
-  pathRelative: row.PATH_RELATIVE,
-  repository: row.REPOSITORY,
-  sizeBytes: row.SIZE_BYTES,
-  sourceLanguage: row.SOURCE_LANGUAGE as SourceLanguageId,
-});
+import { KNN_SELECT_BASE_SQL, prepareSqliteSemanticIndexStatements } from "./sqlite-semantic-index.store-statements";
+import {
+  countSemanticChunks,
+  dbMetadataRowToFileIndexMetadata,
+  ensureDbParentDirectory,
+  ensureFts5SchemaOnDb,
+  float32ToSqliteBlob,
+  readMetaValue,
+  sqliteVecDistanceToCosineDistance,
+  toIntegerRowId,
+  vecTableExists,
+  writeMetaValue,
+} from "./sqlite-semantic-index.store.utils";
 
 interface SqliteSemanticIndexStoreArgs {
   dbPath: string;
@@ -237,122 +114,25 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
     this.ensureVecSchema();
     ensureFts5SchemaOnDb(this.db);
 
-    this.knnSelectBase = `
-      SELECT
-        c.ID,
-        c.FILE_ID,
-        c.CHUNK_INDEX,
-        c.CHUNK_ID,
-        c.DOCUMENT,
-        c.START_LINE,
-        c.END_LINE,
-        c.CHUNK_BYTE_LENGTH,
-        f.REPOSITORY,
-        f.PATH_RELATIVE,
-        f.FILENAME,
-        f.FULL_PATH,
-        f.CONTENT_SHA256,
-        f.LAST_MODIFIED_AT_ISO,
-        f.SIZE_BYTES,
-        f.SOURCE_LANGUAGE,
-        v.distance AS distance
-      FROM ${FILE_INDEX_CHUNK_VEC_NAME} AS v
-      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = v.rowid
-      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_METADATA} AS f ON f.FILE_ID = c.FILE_ID`;
-
-    this.stmtSelectChunkRowidsByFileId = this.db.prepare(
-      `SELECT ID FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`
-    );
-    this.stmtDeleteVecByRowid = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME} WHERE rowid = ?`);
-    this.stmtDeleteChunksByFileId = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} WHERE FILE_ID = ?`);
-    this.stmtDeleteFileById = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA} WHERE FILE_ID = ?`);
-    this.stmtInsertFile = this.db.prepare(
-      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    this.stmtInsertChunk = this.db.prepare(
-      `INSERT INTO ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (ID, FILE_ID, CHUNK_INDEX, CHUNK_ID, DOCUMENT, START_LINE, END_LINE, CHUNK_BYTE_LENGTH)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-    this.stmtInsertVec = this.db.prepare(
-      `INSERT INTO ${FILE_INDEX_CHUNK_VEC_NAME} (embedding, repository, ${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE}) VALUES (?, ?, ?)`
-    );
-
-    this.stmtKnnAllRepos = this.db.prepare<[Float32Array, number], DbFileIndexKnnRow>(`${this.knnSelectBase}
-      WHERE v.embedding MATCH ?
-        AND k = ?
-      ORDER BY v.distance`);
-
-    this.stmtKnnByRepository = this.db.prepare<[Float32Array, number, string], DbFileIndexKnnRow>(`${this.knnSelectBase}
-      WHERE v.embedding MATCH ?
-        AND k = ?
-        AND v.repository = ?
-      ORDER BY v.distance`);
-
-    this.stmtDeleteAllVec = this.db.prepare(`DELETE FROM ${FILE_INDEX_CHUNK_VEC_NAME}`);
-    this.stmtDeleteAllChunks = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}`);
-    this.stmtDeleteAllFiles = this.db.prepare(`DELETE FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}`);
-    this.stmtSelectFileMetadataByFileId = this.db.prepare(
-      `SELECT FILE_ID, REPOSITORY, PATH_RELATIVE, FILENAME, FULL_PATH, CONTENT_SHA256, LAST_MODIFIED_AT_ISO, SIZE_BYTES, SOURCE_LANGUAGE
-       FROM ${SQL_TABLE_NAME_FILE_INDEX_METADATA}
-       WHERE FILE_ID = ?`
-    );
-
-    const lexicalSelectBase = `
-      SELECT
-        c.ID,
-        c.FILE_ID,
-        c.CHUNK_INDEX,
-        c.CHUNK_ID,
-        c.DOCUMENT,
-        c.START_LINE,
-        c.END_LINE,
-        c.CHUNK_BYTE_LENGTH,
-        f.REPOSITORY,
-        f.PATH_RELATIVE,
-        f.FILENAME,
-        f.FULL_PATH,
-        f.CONTENT_SHA256,
-        f.LAST_MODIFIED_AT_ISO,
-        f.SIZE_BYTES,
-        f.SOURCE_LANGUAGE,
-        bm25(${FILE_INDEX_CHUNK_FTS_NAME}) AS bm25_score
-      FROM ${FILE_INDEX_CHUNK_FTS_NAME}
-      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} AS c ON c.ID = ${FILE_INDEX_CHUNK_FTS_NAME}.rowid
-      INNER JOIN ${SQL_TABLE_NAME_FILE_INDEX_METADATA} AS f ON f.FILE_ID = c.FILE_ID`;
-
-    this.stmtLexicalAll = this.db.prepare<[string, number], DbFileIndexLexicalRow>(`${lexicalSelectBase}
-      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
-      ORDER BY bm25_score ASC
-      LIMIT ?`);
-
-    this.stmtLexicalByRepository = this.db.prepare<
-      [string, string, number],
-      DbFileIndexLexicalRow
-    >(`${lexicalSelectBase}
-      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
-        AND f.REPOSITORY = ?
-      ORDER BY bm25_score ASC
-      LIMIT ?`);
-
-    this.stmtLexicalAllWithLanguages = this.db.prepare<
-      [string, string, number],
-      DbFileIndexLexicalRow
-    >(`${lexicalSelectBase}
-      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
-        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
-      ORDER BY bm25_score ASC
-      LIMIT ?`);
-
-    this.stmtLexicalByRepositoryWithLanguages = this.db.prepare<
-      [string, string, string, number],
-      DbFileIndexLexicalRow
-    >(`${lexicalSelectBase}
-      WHERE ${FILE_INDEX_CHUNK_FTS_NAME} MATCH ?
-        AND f.REPOSITORY = ?
-        AND f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))
-      ORDER BY bm25_score ASC
-      LIMIT ?`);
+    this.knnSelectBase = KNN_SELECT_BASE_SQL;
+    const stmts = prepareSqliteSemanticIndexStatements(this.db);
+    this.stmtSelectChunkRowidsByFileId = stmts.stmtSelectChunkRowidsByFileId;
+    this.stmtDeleteVecByRowid = stmts.stmtDeleteVecByRowid;
+    this.stmtDeleteChunksByFileId = stmts.stmtDeleteChunksByFileId;
+    this.stmtDeleteFileById = stmts.stmtDeleteFileById;
+    this.stmtInsertFile = stmts.stmtInsertFile;
+    this.stmtInsertChunk = stmts.stmtInsertChunk;
+    this.stmtInsertVec = stmts.stmtInsertVec;
+    this.stmtKnnAllRepos = stmts.stmtKnnAllRepos;
+    this.stmtKnnByRepository = stmts.stmtKnnByRepository;
+    this.stmtDeleteAllVec = stmts.stmtDeleteAllVec;
+    this.stmtDeleteAllChunks = stmts.stmtDeleteAllChunks;
+    this.stmtDeleteAllFiles = stmts.stmtDeleteAllFiles;
+    this.stmtSelectFileMetadataByFileId = stmts.stmtSelectFileMetadataByFileId;
+    this.stmtLexicalAll = stmts.stmtLexicalAll;
+    this.stmtLexicalAllWithLanguages = stmts.stmtLexicalAllWithLanguages;
+    this.stmtLexicalByRepository = stmts.stmtLexicalByRepository;
+    this.stmtLexicalByRepositoryWithLanguages = stmts.stmtLexicalByRepositoryWithLanguages;
   }
 
   private ensureVecSchema(): void {
@@ -545,7 +325,7 @@ export class SqliteSemanticIndexStore implements SemanticIndexStore {
   }
 
   private resolveKnnRows({ queryEmbedding, nResults, repository, languages }: ResolveKnnRowsArgs): DbFileIndexKnnRow[] {
-    const sortedUniqueLangs = [...new Set(languages)].sort((a, b) => a.localeCompare(b));
+    const sortedUniqueLangs = [...new Set(languages)].sort((langA, langB) => langA.localeCompare(langB));
     const hasLang = sortedUniqueLangs.length > 0;
 
     if (isBlank(repository)) {

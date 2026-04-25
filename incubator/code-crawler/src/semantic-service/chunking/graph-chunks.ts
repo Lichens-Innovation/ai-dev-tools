@@ -9,11 +9,11 @@ import {
 import type { BuildSemanticGraphChunksForSourceArgs, SemanticGraphChunk } from "./graph-chunks.types";
 import { buildSemanticGraphChunksForCppSource } from "./graph-chunks-for-cpp";
 import { buildSemanticGraphChunksForCSharpSource } from "./graph-chunks-for-csharp";
-import { buildSemanticGraphChunksForJavaScriptSource } from "./graph-chunks-for-javascript";
+import {
+  buildSemanticGraphChunksForJavaScriptSource,
+  buildSemanticGraphChunksForTypescriptSource,
+} from "./graph-chunks-for-ecmascript";
 import { buildSemanticGraphChunksForPythonSource } from "./graph-chunks-for-python";
-import { buildSemanticGraphChunksForTypescriptSource } from "./graph-chunks-for-typescript";
-
-export type { BuildSemanticGraphChunksForSourceArgs, SemanticGraphChunk } from "./graph-chunks.types";
 
 /**
  * Routes to the language-specific semantic graph chunker based on file extension.
