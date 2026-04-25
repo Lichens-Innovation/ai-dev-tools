@@ -7,6 +7,10 @@ export type CallToolResultToRestOutcome = {
   body: Record<string, unknown> | unknown[];
 };
 
+export interface CallToolResultToRestBodyArgs {
+  result: CallToolResult;
+}
+
 const extractText = (result: CallToolResult): string => {
   const block = result.content[0];
   if (block?.type === "text" && typeof block.text === "string") {
@@ -18,7 +22,7 @@ const extractText = (result: CallToolResult): string => {
 const isJsonObjectOrArray = (value: unknown): value is Record<string, unknown> | unknown[] =>
   !isNullish(value) && (Array.isArray(value) || typeof value === "object");
 
-export const callToolResultToRestBody = ({ result }: { result: CallToolResult }): CallToolResultToRestOutcome => {
+export const callToolResultToRestBody = ({ result }: CallToolResultToRestBodyArgs): CallToolResultToRestOutcome => {
   if (result.isError) {
     return {
       httpStatus: StatusCodes.BAD_REQUEST,

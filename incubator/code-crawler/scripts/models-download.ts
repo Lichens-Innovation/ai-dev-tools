@@ -41,32 +41,32 @@ const downloadModel = async (repoId: string): Promise<void> => {
   const entries = await listAllRepoFileEntries(repoId);
   const filePaths = entries.filter((e) => e.type === "file").map((e) => e.path);
 
-  console.info(`[models-download][${repoId}] Syncing ${filePaths.length} file(s) to ${destRoot}`);
+  console.info(`[downloadModel][${repoId}] Syncing ${filePaths.length} file(s) to ${destRoot}`);
   for (const relativePath of filePaths) {
     const localPath = join(destRoot, relativePath);
     if (existsSync(localPath)) {
-      console.info(`  skip (already exists) ${relativePath}`);
+      console.info(`[downloadModel][${repoId}] skip (✅ exists) ${relativePath}`);
       continue;
     }
 
-    console.info(`  … downloading "${relativePath}" …`);
+    console.info(`[downloadModel][${repoId}] ... "${relativePath}"`);
     const blob = await downloadFile({ repo: repoId, path: relativePath });
     if (!blob) {
       throw new Error(`File not found on the Hub: ${repoId} @ ${relativePath}`);
     }
 
     await streamBlobToFile({ blob, destPath: localPath });
-    console.info(`  ✓ ${relativePath}`);
+    console.info(`[downloadModel][${repoId}] ✅ ${relativePath}`);
   }
 
-  console.info(`[models-download][${repoId}] Done.`);
+  console.info(`[downloadModel][${repoId}] done.`);
 };
 
 const main = async (): Promise<void> => {
   const modelIds = process.argv.slice(2).filter(Boolean);
 
   if (modelIds.length === 0) {
-    console.error("Usage: tsx ./scripts/models-download.ts <org/repo> [<org/repo> ...]");
+    console.error("[main] Usage: tsx ./scripts/models-download.ts <org/repo> [<org/repo> ...]");
     process.exit(1);
   }
 
@@ -78,7 +78,7 @@ const main = async (): Promise<void> => {
     }
   } catch (err) {
     const message = getErrorMessage(err);
-    console.error(`[models-download] Error: ${message}`, err);
+    console.error(`[main] models-download failed: ${message}`, err);
     process.exit(1);
   }
 };

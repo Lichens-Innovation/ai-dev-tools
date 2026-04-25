@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types";
-import { getRepositoriesInfos } from "../semantic-service/git-projects.utils";
+import { getRepositoriesInfos } from "../utils/git-repositories.utils";
 import { toString } from "../utils/arrays.utils";
 import { buildMcpResourceResponse, generateMcpResourceError } from "./mcp-server.utils";
 import {
   semanticSearchWorkspaceFiles,
   semanticSearchWorkspaceFilesInputSchema,
-} from "../semantic-service/repo-embeddings.utils";
+} from "../semantic-service/semantic-workspace.tools";
 import { EnvNames } from "../utils/env.utils";
 import { APP_VERSION_INFO } from "../version.gen";
 

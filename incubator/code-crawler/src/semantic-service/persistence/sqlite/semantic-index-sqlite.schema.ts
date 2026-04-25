@@ -1,9 +1,9 @@
 /**
- * SQLite schema for persistent {@link SemanticIndexStore} (file index metadata + chunk rows, sqlite-vec KNN).
+ * SQLite schema for persistent semantic index (file index metadata + chunk rows, sqlite-vec KNN).
  * Vector dimension in {@link FILE_INDEX_CHUNK_VEC_NAME} is set at creation via {@link buildFileIndexChunkVecDdl}.
  */
 
-/** Table of persisted {@link FileIndexMetadata} rows (one row per indexed file). */
+/** Table of persisted file index metadata rows (one row per indexed file). */
 export const SQL_TABLE_NAME_FILE_INDEX_METADATA = "FILE_INDEX_METADATA";
 
 /** Chunk text + line spans; embeddings live in {@link FILE_INDEX_CHUNK_VEC_NAME}. */
@@ -22,6 +22,41 @@ export const SQL_TABLE_NAME_FILE_INDEX_STORE_META = "FILE_INDEX_STORE_META";
 /** vec0 virtual table name (must match {@link buildFileIndexChunkVecDdl}). */
 export const FILE_INDEX_CHUNK_VEC_NAME = "FILE_INDEX_CHUNK_VEC";
 
+/** FTS5 (BM25) over chunk `DOCUMENT`; external content keyed by chunk `ID`. */
+export const FILE_INDEX_CHUNK_FTS_NAME = "FILE_INDEX_CHUNK_FTS";
+
+/** Rebuild FTS index from `FILE_INDEX_CHUNK` (one-shot after creating FTS on a non-empty DB). */
+export const SQL_FTS_CHUNK_REBUILD = `INSERT INTO ${FILE_INDEX_CHUNK_FTS_NAME}(${FILE_INDEX_CHUNK_FTS_NAME}) VALUES('rebuild');`;
+
+export const SQL_TABLE_FILE_INDEX_CHUNK_FTS = `CREATE VIRTUAL TABLE IF NOT EXISTS ${FILE_INDEX_CHUNK_FTS_NAME} USING fts5(
+  DOCUMENT,
+  content='${SQL_TABLE_NAME_FILE_INDEX_CHUNK}',
+  content_rowid='ID'
+);`;
+
+/**
+ * Keeps FTS5 in sync when `content=` is used (SQLite FTS5 external content).
+ * See SQLite FTS5 « external content » triggers — use `INSERT INTO fts(rowid, …)` on insert, and `'delete'` rows on delete/update.
+ */
+export const SQL_TRIGGERS_FILE_INDEX_CHUNK_FTS = [
+  `CREATE TRIGGER IF NOT EXISTS TRG_${FILE_INDEX_CHUNK_FTS_NAME}_AI
+   AFTER INSERT ON ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}
+   BEGIN
+     INSERT INTO ${FILE_INDEX_CHUNK_FTS_NAME}(rowid, DOCUMENT) VALUES (NEW.ID, NEW.DOCUMENT);
+   END;`,
+  `CREATE TRIGGER IF NOT EXISTS TRG_${FILE_INDEX_CHUNK_FTS_NAME}_AD
+   AFTER DELETE ON ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}
+   BEGIN
+     INSERT INTO ${FILE_INDEX_CHUNK_FTS_NAME}(${FILE_INDEX_CHUNK_FTS_NAME}, rowid, DOCUMENT) VALUES('delete', OLD.ID, OLD.DOCUMENT);
+   END;`,
+  `CREATE TRIGGER IF NOT EXISTS TRG_${FILE_INDEX_CHUNK_FTS_NAME}_AU
+   AFTER UPDATE ON ${SQL_TABLE_NAME_FILE_INDEX_CHUNK}
+   BEGIN
+     INSERT INTO ${FILE_INDEX_CHUNK_FTS_NAME}(${FILE_INDEX_CHUNK_FTS_NAME}, rowid, DOCUMENT) VALUES('delete', OLD.ID, OLD.DOCUMENT);
+     INSERT INTO ${FILE_INDEX_CHUNK_FTS_NAME}(rowid, DOCUMENT) VALUES (NEW.ID, NEW.DOCUMENT);
+   END;`,
+].join("\n");
+
 export const SQL_TABLE_FILE_INDEX_METADATA = `CREATE TABLE IF NOT EXISTS ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (
   FILE_ID TEXT PRIMARY KEY NOT NULL,
   REPOSITORY TEXT NOT NULL,
@@ -31,8 +66,12 @@ export const SQL_TABLE_FILE_INDEX_METADATA = `CREATE TABLE IF NOT EXISTS ${SQL_T
   CONTENT_SHA256 TEXT NOT NULL,
   LAST_MODIFIED_AT_ISO TEXT NOT NULL,
   SIZE_BYTES INTEGER NOT NULL,
+  SOURCE_LANGUAGE TEXT NOT NULL,
   UNIQUE(REPOSITORY, PATH_RELATIVE)
 );`;
+
+export const SQL_INDEX_FILE_INDEX_METADATA_SOURCE_LANGUAGE = `CREATE INDEX IF NOT EXISTS IDX_FILE_INDEX_METADATA_SOURCE_LANGUAGE
+  ON ${SQL_TABLE_NAME_FILE_INDEX_METADATA} (SOURCE_LANGUAGE);`;
 
 export const SQL_TABLE_FILE_INDEX_CHUNK = `CREATE TABLE IF NOT EXISTS ${SQL_TABLE_NAME_FILE_INDEX_CHUNK} (
   ID INTEGER PRIMARY KEY NOT NULL,
@@ -56,6 +95,9 @@ export const SQL_TABLE_FILE_INDEX_STORE_META = `CREATE TABLE IF NOT EXISTS ${SQL
 
 export const META_KEY_EMBEDDING_DIM = "EMBEDDING_DIM";
 
+/** sqlite-vec vec0 metadata column: must match `FILE_INDEX_METADATA.SOURCE_LANGUAGE` for the chunk's file (denormalized for KNN). */
+export const FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE = "source_language";
+
 /**
  * Declares float embedding column plus TEXT metadata for
  * repository-scoped KNN (sqlite-vec vec0).
@@ -63,10 +105,11 @@ export const META_KEY_EMBEDDING_DIM = "EMBEDDING_DIM";
 export const buildFileIndexChunkVecDdl = (embeddingDimensions: number): string =>
   `CREATE VIRTUAL TABLE IF NOT EXISTS ${FILE_INDEX_CHUNK_VEC_NAME} USING vec0(
   embedding float[${embeddingDimensions}],
-  repository TEXT
+  repository TEXT,
+  ${FILE_INDEX_CHUNK_VEC_SOURCE_LANGUAGE} TEXT
 );`;
 
-/** Row from {@link SQL_TABLE_NAME_FILE_INDEX_METADATA} (columns match {@link FileIndexMetadata}). */
+/** Row from {@link SQL_TABLE_NAME_FILE_INDEX_METADATA} (columns align with app `FileIndexMetadata`). */
 export interface DbFileIndexMetadataRow {
   CONTENT_SHA256: string;
   FILE_ID: string;
@@ -76,6 +119,7 @@ export interface DbFileIndexMetadataRow {
   PATH_RELATIVE: string;
   REPOSITORY: string;
   SIZE_BYTES: number;
+  SOURCE_LANGUAGE: string;
 }
 
 export interface DbFileIndexChunkRow {
@@ -90,13 +134,11 @@ export interface DbFileIndexChunkRow {
 }
 
 /** Row shape returned by KNN join queries (distance from sqlite-vec). */
-export interface DbFileIndexKnnRow extends DbFileIndexChunkRow {
-  CONTENT_SHA256: string;
-  FILENAME: string;
-  FULL_PATH: string;
-  LAST_MODIFIED_AT_ISO: string;
-  PATH_RELATIVE: string;
-  REPOSITORY: string;
-  SIZE_BYTES: number;
+export interface DbFileIndexKnnRow extends DbFileIndexChunkRow, DbFileIndexMetadataRow {
   distance: number;
+}
+
+/** Row shape returned by FTS5 BM25 join queries. */
+export interface DbFileIndexLexicalRow extends DbFileIndexChunkRow, DbFileIndexMetadataRow {
+  bm25_score: number;
 }

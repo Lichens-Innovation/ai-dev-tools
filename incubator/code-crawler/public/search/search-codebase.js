@@ -1,5 +1,8 @@
 const MAX_NB_RESULTS = 50;
 
+/** Must match API `SourceLanguageId` / Nest Zod schema. */
+const SEMANTIC_SEARCH_LANGUAGE_IDS = ["typescript", "javascript", "python", "cpp", "csharp"];
+
 /** @type {string} */
 let lastDetailFullPath = "";
 
@@ -26,6 +29,23 @@ const extensionToHljsLanguage = {
   scss: "scss",
   less: "less",
   py: "python",
+  pyi: "python",
+  c: "c",
+  cpp: "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  h: "cpp",
+  hpp: "cpp",
+  hh: "cpp",
+  hxx: "cpp",
+  "h++": "cpp",
+  inl: "cpp",
+  ipp: "cpp",
+  tpp: "cpp",
+  tcc: "cpp",
+  cu: "cpp",
+  cs: "csharp",
+  csx: "csharp",
   rb: "ruby",
   go: "go",
   rs: "rust",
@@ -108,10 +128,31 @@ const hasMultipleRelatedChunks = (relatedChunkCount) => relatedChunkCount !== nu
 
 const getTrimmedRepositoryFilter = () => document.getElementById("repository-filter").value.trim();
 
-const buildSemanticSearchBody = ({ queryText, nbResults, repository }) => {
+const getSelectedLanguagesOrEmpty = () => {
+  const el = document.getElementById("languages-filter");
+  if (!el) {
+    return [];
+  }
+  const jQuery = globalThis.jQuery;
+  if (typeof jQuery === "function" && typeof jQuery(el).multipleSelect === "function") {
+    const raw = jQuery(el).multipleSelect("getSelects");
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw.filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
+  }
+  return Array.from(el.selectedOptions)
+    .map((o) => o.value)
+    .filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
+};
+
+const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages }) => {
   const body = { queryText, nbResults };
   if (repository.length > 0) {
     body.repository = repository;
+  }
+  if (languages.length > 0) {
+    body.languages = languages;
   }
   return body;
 };
@@ -123,7 +164,8 @@ const parsePayloadFromResponseParts = ({ contentType, bodyText }) => {
 
   try {
     return JSON.parse(bodyText);
-  } catch {
+  } catch (error) {
+    console.error("[parsePayloadFromResponseParts] JSON parse failed:", error);
     return bodyText;
   }
 };
@@ -150,22 +192,21 @@ const getFileExtension = ({ pathRelative }) => {
   return last.slice(dot + 1).toLowerCase();
 };
 
-const resolveHljsLanguage = ({ pathRelative }) => {
+const resolveHljsLanguage = ({ pathRelative, sourceLanguage }) => {
+  const trimmed = typeof sourceLanguage === "string" && sourceLanguage.trim().length > 0 ? sourceLanguage.trim() : "";
+  if (trimmed.length > 0 && SEMANTIC_SEARCH_LANGUAGE_IDS.includes(trimmed)) {
+    const hljs = globalThis.hljs;
+    if (typeof hljs?.getLanguage === "function" && hljs.getLanguage(trimmed) !== undefined) {
+      return trimmed;
+    }
+  }
+
   const ext = getFileExtension({ pathRelative });
   if (ext.length === 0) {
     return "plaintext";
   }
 
   return extensionToHljsLanguage[ext] ?? "plaintext";
-};
-
-const truncateOneLine = ({ text, maxLen }) => {
-  const line = text.split("\n")[0] ?? "";
-  if (line.length <= maxLen) {
-    return line;
-  }
-
-  return `${line.slice(0, maxLen - 1)}…`;
 };
 
 const formatDistanceLabel = ({ distance }) => {
@@ -182,10 +223,14 @@ const normalizeSearchMatch = ({ match }) => {
   const fileIdFromMatch = typeof match?.fileId === "string" ? match.fileId : "";
   const fileId = fileIdFromMeta.length > 0 ? fileIdFromMeta : fileIdFromMatch;
 
+  const rawSourceLanguage = typeof meta.sourceLanguage === "string" ? meta.sourceLanguage.trim() : "";
+  const sourceLanguage = SEMANTIC_SEARCH_LANGUAGE_IDS.includes(rawSourceLanguage) ? rawSourceLanguage : "";
+
   return {
     pathRelative: typeof meta.pathRelative === "string" ? meta.pathRelative : "",
     repository: typeof meta.repository === "string" ? meta.repository : "",
     fullPath: typeof meta.fullPath === "string" ? meta.fullPath : "",
+    sourceLanguage,
     fileId,
     startLine: typeof match.startLine === "number" ? match.startLine : null,
     endLine: typeof match.endLine === "number" ? match.endLine : null,
@@ -198,16 +243,15 @@ const normalizeSearchMatch = ({ match }) => {
 const formatMatchCardLinesShort = ({ startLine, endLine }) =>
   startLine !== null && endLine !== null ? `L${startLine}–${endLine}` : "";
 
-const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLabel, previewLine }) => `
+const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLabel }) => `
     <span class="search-match-card__row">
-      <span class="search-match-card__badge">${escapeHtml(repository || "—")}</span>
-      <span class="search-match-card__path">${escapeHtml(pathRelative || "(no path)")}</span>
+      <span class="search-match-card__badge">${escapeHtml(repository.length > 0 ? repository : "—")}</span>
+      <span class="search-match-card__path">${escapeHtml(pathRelative.length > 0 ? pathRelative : "(no path)")}</span>
     </span>
     <span class="search-match-card__row search-match-card__row--meta">
       <span class="search-match-card__lines">${escapeHtml(linesShort)}</span>
       <span class="search-match-card__distance">${escapeHtml(distanceLabel)}</span>
     </span>
-    <span class="search-match-card__preview">${escapeHtml(previewLine)}</span>
   `;
 
 const formatMatchCountStatusHtml = ({ count }) =>
@@ -265,6 +309,173 @@ const escapeHtml = (raw) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
+const isValidLineRange = ({ startLine, endLine }) =>
+  typeof startLine === "number" &&
+  Number.isFinite(startLine) &&
+  typeof endLine === "number" &&
+  Number.isFinite(endLine) &&
+  startLine <= endLine;
+
+const getDisplayedLineNumberBounds = ({ codeText, firstLine1Based }) => {
+  const lineCount = codeText.split("\n").length;
+  const first =
+    typeof firstLine1Based === "number" && Number.isFinite(firstLine1Based) ? Math.trunc(firstLine1Based) : 1;
+  return { displayFirstLine: first, displayLastLine: first + lineCount - 1 };
+};
+
+const isLineNoInHighlightRange = ({ lineNo, rangeStart, rangeEnd, displayFirstLine, displayLastLine }) => {
+  if (!isValidLineRange({ startLine: rangeStart, endLine: rangeEnd })) {
+    return false;
+  }
+  const visibleRangeStart = Math.max(rangeStart, displayFirstLine);
+  const visibleRangeEnd = Math.min(rangeEnd, displayLastLine);
+  if (visibleRangeStart > visibleRangeEnd) {
+    return false;
+  }
+  return lineNo >= visibleRangeStart && lineNo <= visibleRangeEnd;
+};
+
+const buildGutterLinesHtml = ({ codeText, firstLine1Based, rangeStart, rangeEnd }) => {
+  const lines = codeText.split("\n");
+  const { displayFirstLine, displayLastLine } = getDisplayedLineNumberBounds({ codeText, firstLine1Based });
+  const padWidth = String(displayLastLine).length;
+  return lines
+    .map((_, lineIndex) => {
+      const lineNumber = displayFirstLine + lineIndex;
+      const padded = String(lineNumber).padStart(padWidth, " ");
+      const inRange = isLineNoInHighlightRange({
+        lineNo: lineNumber,
+        rangeStart,
+        rangeEnd,
+        displayFirstLine,
+        displayLastLine,
+      });
+      const cls = inRange
+        ? "search-detail-gutter-line search-detail-gutter-line--in-range"
+        : "search-detail-gutter-line";
+      return `<span class="${cls}" data-line="${lineNumber}">${escapeHtml(padded)}</span>`;
+    })
+    .join("");
+};
+
+const normalizeHighlightedLineParts = ({ highlightedHtml, codeText }) => {
+  const nLines = codeText.split("\n").length;
+  const parts = highlightedHtml.split("\n");
+  if (parts.length > nLines && nLines > 0) {
+    const tail = parts.slice(nLines - 1).join("\n");
+    return [...parts.slice(0, nLines - 1), tail];
+  }
+  while (parts.length < nLines) {
+    parts.push("");
+  }
+  return parts;
+};
+
+const wrapHighlightedHtmlIntoLineSpans = ({ highlightedHtml, firstLine1Based, rangeStart, rangeEnd, codeText }) => {
+  const { displayFirstLine, displayLastLine } = getDisplayedLineNumberBounds({ codeText, firstLine1Based });
+  const parts = normalizeHighlightedLineParts({ highlightedHtml, codeText });
+  return parts
+    .map((fragment, lineIndex) => {
+      const lineNo = displayFirstLine + lineIndex;
+      const inRange = isLineNoInHighlightRange({ lineNo, rangeStart, rangeEnd, displayFirstLine, displayLastLine });
+      const cls = inRange ? "search-detail-code-line search-detail-code-line--in-range" : "search-detail-code-line";
+      return `<span class="${cls}" data-line="${lineNo}">${fragment}</span>`;
+    })
+    .join("");
+};
+
+const getDetailPreEl = () => {
+  const codeEl = getDetailCodeEl();
+  return codeEl?.closest?.(".search-detail-panel__pre") ?? null;
+};
+
+const scrollDetailPreToFirstInRange = ({ rangeStart, rangeEnd, codeText, firstLine1Based }) => {
+  if (!isValidLineRange({ startLine: rangeStart, endLine: rangeEnd })) {
+    return;
+  }
+  const { displayFirstLine, displayLastLine } = getDisplayedLineNumberBounds({ codeText, firstLine1Based });
+  const visibleRangeStart = Math.max(rangeStart, displayFirstLine);
+  const visibleRangeEnd = Math.min(rangeEnd, displayLastLine);
+  if (visibleRangeStart > visibleRangeEnd) {
+    return;
+  }
+  const pre = getDetailPreEl();
+  if (!(pre instanceof window.HTMLElement)) {
+    return;
+  }
+  const target = pre.querySelector(`.search-detail-code-line[data-line="${visibleRangeStart}"]`);
+  if (!(target instanceof window.HTMLElement)) {
+    return;
+  }
+  target.scrollIntoView({ block: "nearest" });
+};
+
+const getSyntaxHighlightHtmlString = ({ language, codeText }) => {
+  const escapeLinesForPlainHtml = () => codeText.split("\n").map(escapeHtml).join("\n");
+
+  const hljs = globalThis.hljs;
+  if (!hljs || typeof hljs.highlight !== "function") {
+    return escapeLinesForPlainHtml();
+  }
+
+  const hasRegisteredLanguage = typeof hljs.getLanguage === "function" && hljs.getLanguage(language) !== undefined;
+  const resolvedLanguage = hasRegisteredLanguage ? language : null;
+  if (resolvedLanguage !== null) {
+    try {
+      const { value } = hljs.highlight(codeText, { language: resolvedLanguage });
+      return value;
+    } catch (error) {
+      console.error("[getSyntaxHighlightHtmlString] highlight failed:", error);
+    }
+  }
+
+  if (typeof hljs.highlightAuto === "function") {
+    try {
+      const { value } = hljs.highlightAuto(codeText);
+      return value;
+    } catch (error) {
+      console.error("[getSyntaxHighlightHtmlString] highlightAuto failed:", error);
+    }
+  }
+
+  return escapeLinesForPlainHtml();
+};
+
+const applyDetailSyntaxHighlightWithLineRange = ({
+  codeEl,
+  language,
+  codeText,
+  firstLine1Based,
+  rangeStart,
+  rangeEnd,
+  gutterEl,
+  shouldScrollToMatchRange,
+}) => {
+  codeEl.className = "hljs";
+  if (gutterEl) {
+    gutterEl.innerHTML = buildGutterLinesHtml({
+      codeText,
+      firstLine1Based,
+      rangeStart,
+      rangeEnd,
+    });
+  }
+  const highlightedHtml = getSyntaxHighlightHtmlString({ language, codeText });
+  codeEl.innerHTML = wrapHighlightedHtmlIntoLineSpans({
+    highlightedHtml,
+    firstLine1Based,
+    rangeStart,
+    rangeEnd,
+    codeText,
+  });
+
+  if (shouldScrollToMatchRange) {
+    window.requestAnimationFrame(() => {
+      scrollDetailPreToFirstInRange({ rangeStart, rangeEnd, codeText, firstLine1Based });
+    });
+  }
+};
+
 const deselectAllMatchCards = () => {
   document.querySelectorAll(".search-match-card--selected").forEach((card) => {
     card.classList.remove("search-match-card--selected");
@@ -287,46 +498,9 @@ const showDetailPlaceholder = () => {
   codeEl.className = "hljs";
   const gutterEl = getDetailLineGutterEl();
   if (gutterEl) {
-    gutterEl.textContent = "";
+    gutterEl.innerHTML = "";
   }
   deselectAllMatchCards();
-};
-
-const buildLineGutterText = ({ codeText, startLine }) => {
-  const lines = codeText.split("\n");
-  const baseLine = typeof startLine === "number" && Number.isFinite(startLine) ? Math.trunc(startLine) : 1;
-  const numbers = lines.map((_, i) => baseLine + i);
-  const padWidth = String(numbers[numbers.length - 1] ?? baseLine).length;
-  return numbers.map((n) => String(n).padStart(padWidth, " ")).join("\n");
-};
-
-const applySyntaxHighlight = ({ codeEl, language, codeText }) => {
-  const hljs = globalThis.hljs;
-  codeEl.className = "hljs";
-  if (!hljs || typeof hljs.highlight !== "function") {
-    codeEl.textContent = codeText;
-    return;
-  }
-
-  const hasRegisteredLanguage = typeof hljs.getLanguage === "function" && hljs.getLanguage(language) !== undefined;
-  const resolvedLanguage = hasRegisteredLanguage ? language : null;
-  if (resolvedLanguage !== null) {
-    try {
-      const { value } = hljs.highlight(codeText, { language: resolvedLanguage });
-      codeEl.innerHTML = value;
-      return;
-    } catch (error) {
-      console.error("[search-codebase] highlight failed:", error);
-    }
-  }
-
-  if (typeof hljs.highlightAuto === "function") {
-    const { value } = hljs.highlightAuto(codeText);
-    codeEl.innerHTML = value;
-    return;
-  }
-
-  codeEl.textContent = codeText;
 };
 
 const cancelPendingDetailFileFetch = () => {
@@ -367,7 +541,7 @@ const setDetailPanelPlainTextBody = ({ message }) => {
   codeEl.className = "hljs";
   const gutterEl = getDetailLineGutterEl();
   if (gutterEl) {
-    gutterEl.textContent = "";
+    gutterEl.innerHTML = "";
   }
 };
 
@@ -377,7 +551,7 @@ const showDetailPanelLoadingState = ({ message }) => {
 };
 
 const renderDetailPanelFetchError = ({ message }) => {
-  console.error("[search-codebase] indexed file content failed:", message);
+  console.error("[renderDetailPanelFetchError] indexed file content failed:", message);
   setDetailPanelPlainTextBody({ message });
 };
 
@@ -389,16 +563,29 @@ const renderDetailFromChunkPreview = ({ normalizedMatch }) => {
   const body = extractBodyFromDocumentPreview({
     documentPreview: normalizedMatch.documentPreview,
   });
-  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const language = resolveHljsLanguage({
+    pathRelative: normalizedMatch.pathRelative,
+    sourceLanguage: normalizedMatch.sourceLanguage,
+  });
   const codeEl = getDetailCodeEl();
   const gutterEl = getDetailLineGutterEl();
-  if (gutterEl) {
-    gutterEl.textContent = buildLineGutterText({
-      codeText: body,
+  const firstLine1Based =
+    typeof normalizedMatch.startLine === "number" && Number.isFinite(normalizedMatch.startLine)
+      ? Math.trunc(normalizedMatch.startLine)
+      : 1;
+  applyDetailSyntaxHighlightWithLineRange({
+    codeEl,
+    language,
+    codeText: body,
+    firstLine1Based,
+    rangeStart: normalizedMatch.startLine,
+    rangeEnd: normalizedMatch.endLine,
+    gutterEl,
+    shouldScrollToMatchRange: isValidLineRange({
       startLine: normalizedMatch.startLine,
-    });
-  }
-  applySyntaxHighlight({ codeEl, language, codeText: body });
+      endLine: normalizedMatch.endLine,
+    }),
+  });
 };
 
 const renderDetailFromFullFilePayload = ({ normalizedMatch, payload }) => {
@@ -409,16 +596,25 @@ const renderDetailFromFullFilePayload = ({ normalizedMatch, payload }) => {
     pathEl.title = payload.fullPath;
   }
 
-  const language = resolveHljsLanguage({ pathRelative: normalizedMatch.pathRelative });
+  const language = resolveHljsLanguage({
+    pathRelative: normalizedMatch.pathRelative,
+    sourceLanguage: normalizedMatch.sourceLanguage,
+  });
   const codeEl = getDetailCodeEl();
   const gutterEl = getDetailLineGutterEl();
-  if (gutterEl) {
-    gutterEl.textContent = buildLineGutterText({
-      codeText: payload.content,
-      startLine: 1,
-    });
-  }
-  applySyntaxHighlight({ codeEl, language, codeText: payload.content });
+  applyDetailSyntaxHighlightWithLineRange({
+    codeEl,
+    language,
+    codeText: payload.content,
+    firstLine1Based: 1,
+    rangeStart: normalizedMatch.startLine,
+    rangeEnd: normalizedMatch.endLine,
+    gutterEl,
+    shouldScrollToMatchRange: isValidLineRange({
+      startLine: normalizedMatch.startLine,
+      endLine: normalizedMatch.endLine,
+    }),
+  });
 };
 
 const parseIndexedFileContentResponse = ({ response, contentType, bodyText }) => {
@@ -498,7 +694,7 @@ const loadAndRenderDetailForMatch = async ({ match, index }) => {
     if (error instanceof Error && error.name === "AbortError") {
       return;
     }
-    console.error("[search-codebase] indexed file content request threw:", error);
+    console.error("[loadAndRenderDetailForMatch] indexed file content request threw:", error);
     if (!signal.aborted) {
       renderDetailPanelFetchError({ message: formatThrownValue({ error }) });
     }
@@ -510,13 +706,16 @@ const loadAndRenderDetailForMatch = async ({ match, index }) => {
 };
 
 const buildMatchCardButton = ({ match, index }) => {
-  const m = normalizeSearchMatch({ match });
-  const body = extractBodyFromDocumentPreview({ documentPreview: m.documentPreview });
-  const previewLine = truncateOneLine({ text: body, maxLen: 96 });
-  const baseDistanceLabel = formatDistanceLabel({ distance: m.distance });
-  const multiChunkHint = hasMultipleRelatedChunks(m.relatedChunkCount) ? ` · ${m.relatedChunkCount} chunks` : "";
+  const normalizedMatch = normalizeSearchMatch({ match });
+  const baseDistanceLabel = formatDistanceLabel({ distance: normalizedMatch.distance });
+  const multiChunkHint = hasMultipleRelatedChunks(normalizedMatch.relatedChunkCount)
+    ? ` · ${normalizedMatch.relatedChunkCount} chunks`
+    : "";
   const distanceLabel = `${baseDistanceLabel}${multiChunkHint}`;
-  const linesShort = formatMatchCardLinesShort({ startLine: m.startLine, endLine: m.endLine });
+  const linesShort = formatMatchCardLinesShort({
+    startLine: normalizedMatch.startLine,
+    endLine: normalizedMatch.endLine,
+  });
 
   const li = document.createElement("li");
   li.className = "search-results-list__item";
@@ -526,13 +725,12 @@ const buildMatchCardButton = ({ match, index }) => {
   btn.className = "search-match-card";
   btn.dataset.matchIndex = String(index);
   btn.setAttribute("aria-selected", "false");
-  btn.title = `${m.pathRelative} (${distanceLabel})`;
+  btn.title = `${normalizedMatch.pathRelative} (${distanceLabel})`;
   btn.innerHTML = buildMatchCardMarkup({
-    repository: m.repository,
-    pathRelative: m.pathRelative,
+    repository: normalizedMatch.repository,
+    pathRelative: normalizedMatch.pathRelative,
     linesShort,
     distanceLabel,
-    previewLine,
   });
 
   btn.addEventListener("click", () => {
@@ -615,7 +813,8 @@ const readSearchFormOrNotify = () => {
   }
 
   const repository = getTrimmedRepositoryFilter();
-  return buildSemanticSearchBody({ queryText, nbResults, repository });
+  const languages = getSelectedLanguagesOrEmpty();
+  return buildSemanticSearchBody({ queryText, nbResults, repository, languages });
 };
 
 const runSearch = async () => {
@@ -628,7 +827,7 @@ const runSearch = async () => {
   try {
     await postSemanticSearch({ body });
   } catch (error) {
-    console.error("[search-codebase] search failed:", error);
+    console.error("[runSearch] search failed:", error);
     setSearchError({ message: formatThrownValue({ error }) });
     setSearchStatus({ html: "Request failed.", isBusy: false });
     clearResultsUi();
@@ -705,8 +904,11 @@ const initSearchMasterDetailSplitter = () => {
     }
     try {
       splitter.releasePointerCapture(event.pointerId);
-    } catch {
-      /* pointer was not captured */
+    } catch (error) {
+      const isExpectedUncapturedPointer = error instanceof window.DOMException && error.name === "NotFoundError";
+      if (!isExpectedUncapturedPointer) {
+        console.error("[initSearchMasterDetailSplitter] releasePointerCapture failed:", error);
+      }
     }
     endSplitterDrag();
   };
@@ -730,7 +932,34 @@ const initSearchMasterDetailSplitter = () => {
 
 initSearchMasterDetailSplitter();
 
+const initLanguageFilterUi = () => {
+  const el = document.getElementById("languages-filter");
+  const jQuery = globalThis.jQuery;
+  if (!el || typeof jQuery !== "function" || typeof jQuery(el).multipleSelect !== "function") {
+    return;
+  }
+  jQuery(el).multipleSelect({
+    filter: true,
+    placeholder: "All languages",
+    selectAll: false,
+    width: "100%",
+  });
+};
+
+initLanguageFilterUi();
+
 document.getElementById("search-button").addEventListener("click", runSearch);
+
+document.getElementById("query-text").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  if (event.shiftKey) {
+    return;
+  }
+  event.preventDefault();
+  runSearch();
+});
 
 document.getElementById("detail-copy-path").addEventListener("click", async () => {
   if (lastDetailFullPath.length === 0) {
@@ -741,7 +970,7 @@ document.getElementById("detail-copy-path").addEventListener("click", async () =
     await navigator.clipboard.writeText(lastDetailFullPath);
     setSearchStatus({ html: "Full path copied to clipboard.", isBusy: false });
   } catch (error) {
-    console.error("[search-codebase] clipboard failed:", error);
+    console.error("[detailCopyPathClickHandler] clipboard failed:", error);
     setSearchError({ message: "Could not copy path (clipboard permission denied or unavailable)." });
   }
 });

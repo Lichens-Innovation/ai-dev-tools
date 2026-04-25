@@ -3,8 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Code Crawler — semantic search</title>
+
+    <title>Code Crawler</title>
+
+    <link rel="icon" type="image/svg+xml" href="../images/logo.svg" />
     <link rel="stylesheet" href="search-codebase.css" />
+    <link rel="stylesheet" href="multiple-select/multiple-select.min.css" />
     <link rel="stylesheet" href="highlight-github-dark.min.css" />
   </head>
 
@@ -36,6 +40,16 @@
               autocomplete="off"
             />
           </div>
+          <fieldset class="field-row semantic-search-options__languages">
+            <legend class="field-label">Languages (optional)</legend>
+            <select id="languages-filter" name="languages" multiple aria-label="Filter by source language">
+              <option value="typescript">TypeScript</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="cpp">C/C++</option>
+              <option value="csharp">C#</option>
+            </select>
+          </fieldset>
         </aside>
       </div>
     </div>
@@ -78,7 +92,9 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" crossorigin="anonymous"></script>
+    <script src="jquery/jquery.min.js"></script>
+    <script src="multiple-select/multiple-select.min.js"></script>
+    <script src="highlight/highlight.min.js"></script>
     <script src="search-codebase.js"></script>
   </body>
 </html>

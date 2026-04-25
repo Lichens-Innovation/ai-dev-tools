@@ -5,7 +5,7 @@ import {
   prepareRepositoryForSemanticSearchInputSchema,
   prepareWorkspaceRepositoriesForSemanticSearchInputSchema,
   semanticSearchWorkspaceFilesInputSchema,
-} from "../semantic-service/repo-embeddings.utils";
+} from "../semantic-service/semantic-workspace.tools";
 
 export class PrepareRepositoryForSemanticSearchDto extends createZodDto(
   prepareRepositoryForSemanticSearchInputSchema

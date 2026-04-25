@@ -9,15 +9,17 @@ export const EnvNames = {
   corsOrigin: "CODE_CRAWLER_CORS_ORIGIN",
   embeddingModel: "CODE_CRAWLER_EMBEDDING_MODEL",
   embeddingDim: "CODE_CRAWLER_EMBEDDING_DIM",
+  rerankerModel: "CODE_CRAWLER_RERANKER_MODEL",
+  rerankerDtype: "CODE_CRAWLER_RERANKER_DTYPE",
   transformersModelsPath: "CODE_CRAWLER_TRANSFORMERS_MODELS_PATH",
   semanticIndexDbPath: "CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH",
   maxIndexFileBytes: "CODE_CRAWLER_MAX_INDEX_FILE_BYTES",
   chunkMaxChars: "CODE_CRAWLER_CHUNK_MAX_CHARS",
-  chunkMaxLines: "CODE_CRAWLER_CHUNK_MAX_LINES",
-  chunkOverlapLines: "CODE_CRAWLER_CHUNK_OVERLAP_LINES",
   embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
   ragTextModel: "CODE_CRAWLER_RAG_TEXT_MODEL",
 } as const;
+
+export type CodeCrawlerRerankerDtype = "q8" | "fp32";
 
 export type CodeCrawlerEnv = {
   root: string;
@@ -26,17 +28,25 @@ export type CodeCrawlerEnv = {
   corsOrigin: string | boolean;
   embeddingModel: string;
   embeddingDim: number;
+  rerankerModel: string;
+  rerankerDtype: CodeCrawlerRerankerDtype;
   transformersModelsPath: string;
   semanticIndexDbPath: string;
   maxIndexFileBytes: number;
   chunkMaxChars: number;
-  chunkMaxLines: number;
-  chunkOverlapLines: number;
   embedBatchSize: number;
   ragTextModel: string;
 };
 
 let cached: CodeCrawlerEnv | null = null;
+
+const parseRerankerDtype = (rawValue: string): CodeCrawlerRerankerDtype => {
+  if (["q8", "fp32"].includes(rawValue)) {
+    return rawValue as CodeCrawlerRerankerDtype;
+  }
+
+  throw new Error(`[env] ${EnvNames.rerankerDtype} must be either "q8" or "fp32" (got: ${rawValue})`);
+};
 
 // `~` in env values is often not expanded outside a shell; normalize before `path.resolve`.
 export const expandUserDirectory = (input: string): string => {
@@ -87,12 +97,12 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const root = requireNonBlankEnvVar(EnvNames.root);
   const embeddingModel = requireNonBlankEnvVar(EnvNames.embeddingModel);
   const embeddingDim = requirePositiveIntEnvVar(EnvNames.embeddingDim);
+  const rerankerModel = requireNonBlankEnvVar(EnvNames.rerankerModel);
+  const rerankerDtype = parseRerankerDtype(requireNonBlankEnvVar(EnvNames.rerankerDtype));
   const transformersModelsRaw = requireNonBlankEnvVar(EnvNames.transformersModelsPath);
   const semanticIndexRaw = requireNonBlankEnvVar(EnvNames.semanticIndexDbPath);
   const maxIndexFileBytes = requirePositiveIntEnvVar(EnvNames.maxIndexFileBytes);
   const chunkMaxChars = requirePositiveIntEnvVar(EnvNames.chunkMaxChars);
-  const chunkMaxLines = requirePositiveIntEnvVar(EnvNames.chunkMaxLines);
-  const chunkOverlapLines = requirePositiveIntEnvVar(EnvNames.chunkOverlapLines);
   const embedBatchSize = requirePositiveIntEnvVar(EnvNames.embedBatchSize);
   const ragTextModel = requireNonBlankEnvVar(EnvNames.ragTextModel);
 
@@ -103,12 +113,12 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     root,
     embeddingModel,
     embeddingDim,
+    rerankerModel,
+    rerankerDtype,
     transformersModelsPath: path.resolve(expandUserDirectory(transformersModelsRaw)),
     semanticIndexDbPath: path.resolve(expandUserDirectory(semanticIndexRaw)),
     maxIndexFileBytes,
     chunkMaxChars,
-    chunkMaxLines,
-    chunkOverlapLines,
     embedBatchSize,
     ragTextModel,
   };
@@ -141,13 +151,13 @@ export const resolveSemanticIndexDbPath = (): string => getCodeCrawlerEnv().sema
 
 export const getEmbeddingDimensions = (): number => getCodeCrawlerEnv().embeddingDim;
 
+export const getCodeCrawlerRerankerModel = (): string => getCodeCrawlerEnv().rerankerModel;
+
+export const getCodeCrawlerRerankerDtype = (): CodeCrawlerRerankerDtype => getCodeCrawlerEnv().rerankerDtype;
+
 export const getCodeCrawlerMaxIndexFileBytes = (): number => getCodeCrawlerEnv().maxIndexFileBytes;
 
 export const getCodeCrawlerChunkMaxChars = (): number => getCodeCrawlerEnv().chunkMaxChars;
-
-export const getCodeCrawlerChunkMaxLines = (): number => getCodeCrawlerEnv().chunkMaxLines;
-
-export const getCodeCrawlerChunkOverlapLines = (): number => getCodeCrawlerEnv().chunkOverlapLines;
 
 export const getCodeCrawlerEmbedBatchSize = (): number => getCodeCrawlerEnv().embedBatchSize;
 
@@ -155,7 +165,12 @@ export const getCodeCrawlerRagTextModel = (): string => getCodeCrawlerEnv().ragT
 
 export const CODE_CRAWLER_TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
 
-export const getCodeCrawlerTransformersFsEnvValues = (): { localModelPath: string; cacheDir: string } => {
+export interface CodeCrawlerTransformersFsEnvValues {
+  localModelPath: string;
+  cacheDir: string;
+}
+
+export const getCodeCrawlerTransformersFsEnvValues = (): CodeCrawlerTransformersFsEnvValues => {
   const modelsRoot = getCodeCrawlerTransformersModelsPath();
 
   const localModelPath = modelsRoot.endsWith(path.sep) ? modelsRoot : `${modelsRoot}${path.sep}`;

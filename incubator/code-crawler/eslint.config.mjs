@@ -14,7 +14,15 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist/**", "node_modules/**", "scripts/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "scripts/**",
+      // Vendored browser assets (minified; not meant for project ESLint rules)
+      "public/search/jquery/**",
+      "public/search/multiple-select/**",
+      "public/search/highlight/**",
+    ],
   },
   {
     files: ["public/**/*.js"],
