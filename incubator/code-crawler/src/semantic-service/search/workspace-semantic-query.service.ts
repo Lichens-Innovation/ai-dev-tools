@@ -64,16 +64,23 @@ export const runWorkspaceSemanticQuery = async ({
   try {
     const knnLimit = resolveChunkFetchCountForFileConsolidation(nResults);
 
-    const vectorMatches = store.queryNearest({
+    const vectorMatches: QueryMatchSummary[] = store.queryNearest({
       nResults: knnLimit,
       queryEmbedding,
       repository,
       languages,
     });
 
-    const lexicalMatches = safeQueryLexicalChunks({ store, queryText, nResults: knnLimit, repository, languages });
+    const lexicalMatches: QueryMatchSummary[] = safeQueryLexicalChunks({
+      store,
+      queryText,
+      nResults: knnLimit,
+      repository,
+      languages,
+    });
 
-    const matches = fuseHybridChunkMatches({ lexicalMatches, vectorMatches });
+    const matches: QueryMatchSummary[] = fuseHybridChunkMatches({ lexicalMatches, vectorMatches });
+
     return consolidateSemanticQueryMatchesByFile({ matches, nResults });
   } catch (e: unknown) {
     const queryError = getErrorMessage(e);
