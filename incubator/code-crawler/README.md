@@ -108,26 +108,32 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
 ## Example prompts (MCP)
 
+Prefix each bullet with:
+
+    use code-crawler MCP to find <query-here>
+
 ### Programming point of view
 
-- use code-crawler MCP to find helpers for formatting dates and time values
-- use code-crawler MCP to find helper for removing latin special accents (normalize a string)
-- use code-crawler MCP to find code examples to present options to user through a drop down list
-- Use code-crawler MCP to find TanStack useMutation usage showing a snackbar message on error
-- Use code-crawler MCP to find REST API controller definitions.
-- Use code-crawler MCP to find form fields validation with a schema and rules (e.g. Zod).
+- helpers for formatting dates and time values
+- helper for removing latin special accents (normalize a string)
+- code examples to present options to user through a drop down list
+- TanStack useMutation usage showing a snackbar message on error
+- REST API controller definitions.
+- form fields validation with a schema and rules (e.g. Zod).
 
-### Feature point of view
+### Feature (business domain) point of view
 
-- use code-crawler MCP to find water pump test result pdf generation
-- use code-crawler MCP to find service to remove latin accents from strings
-- Use code-crawler MCP to find bonjour service usage to detect a device
-- Use code-crawler MCP to find place where we consolidate segments and junctions for 3D
+- REST API controller returning list of pump motors
+- REST API controller returning list of semantic search results
+- water pump test result pdf generation
+- service to remove latin accents from strings
+- bonjour service usage to detect a device
+- place where we consolidate segments and junctions for 3D
 
-### 
+### Merged use case and technology
 
-- use code-crawler MCP to find a modal webapp component displaying the version of both the frontend and backend systems
-- use code-crawler MCP to find a visual component allowing to select the backend environment
+- modal webapp component displaying the version of both the frontend and backend systems
+- visual component allowing to select the backend environment
 
 ## TODOs
 

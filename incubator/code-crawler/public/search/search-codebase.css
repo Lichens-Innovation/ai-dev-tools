@@ -251,6 +251,11 @@ body > .api-item:first-child {
   font-size: 12px;
 }
 
+.search-status-bar__timing {
+  color: #888;
+  font-size: 12px;
+}
+
 .search-error {
   padding: 10px 12px;
   border-radius: 6px;
