@@ -1,42 +1,22 @@
 import { isNullish } from "@lichens-innovation/ts-common";
-import { NUMERIC_DIVISION_EPSILON } from "../../utils/embeddings.utils";
 
 import type { QueryMatchSummary } from "../types/search.types";
 
-const HYBRID_WEIGHT_VECTOR = 0.7;
-const HYBRID_WEIGHT_LEXICAL = 0.3;
-export interface FuseHybridChunkMatchesArgs {
+export interface RrfFuseChunkMatchesArgs {
   lexicalMatches: QueryMatchSummary[];
   vectorMatches: QueryMatchSummary[];
+  /** Share of the RRF score attributed to semantic (vector) matches. Default: 0.7 */
+  weightSemantic?: number;
+  /** RRF smoothing constant — dampens the rank advantage of top results. Default: 60 */
+  rrfK?: number;
 }
 
-const minMaxLowerIsBetter = (values: number[]): { min: number; max: number } => {
-  if (values.length === 0) {
-    return { min: 0, max: 0 };
-  }
-
-  return { min: Math.min(...values), max: Math.max(...values) };
-};
-
-interface ToSimLowerIsBetterParams {
-  value: number;
-  min: number;
-  max: number;
+interface PickRepresentativeMatchArgs {
+  vectorMatch?: QueryMatchSummary;
+  lexicalMatch?: QueryMatchSummary;
 }
 
-const toSimLowerIsBetter = ({ value, min, max }: ToSimLowerIsBetterParams): number => {
-  const span = max - min;
-  if (span <= NUMERIC_DIVISION_EPSILON) {
-    return 1;
-  }
-
-  return (max - value) / (span + NUMERIC_DIVISION_EPSILON);
-};
-
-const pickRepresentativeMatch = (
-  vectorMatch?: QueryMatchSummary,
-  lexicalMatch?: QueryMatchSummary
-): QueryMatchSummary => {
+const pickRepresentativeMatch = ({ vectorMatch, lexicalMatch }: PickRepresentativeMatchArgs): QueryMatchSummary => {
   if (!isNullish(vectorMatch)) {
     return vectorMatch;
   }
@@ -49,45 +29,50 @@ const pickRepresentativeMatch = (
 };
 
 /**
- * Merges vector KNN hits with lexical BM25 hits using fixed 0.7/0.3 weights and per-branch min–max
- * similarity in [0, 1]. Missing branch contributes 0. Maps to `distance` ascending for consolidation.
+ * Fuses vector KNN hits with lexical BM25 hits using Reciprocal Rank Fusion (RRF).
+ * RRF_score = weightSemantic / (rrfK + rank_vector) + (1 − weightSemantic) / (rrfK + rank_lexical)
+ * Missing branch contributes 0. Result mapped to `distance` ascending (lower = better).
  */
-export const fuseHybridChunkMatches = ({
+export const fuseChunkMatchesWithRRF = ({
   lexicalMatches,
   vectorMatches,
-}: FuseHybridChunkMatchesArgs): QueryMatchSummary[] => {
+  weightSemantic = 0.7,
+  rrfK = 60,
+}: RrfFuseChunkMatchesArgs): QueryMatchSummary[] => {
+  const weightLexical = 1 - weightSemantic;
+
+  const vectorRankById = new Map<string, number>();
+  vectorMatches.forEach((match, index) => vectorRankById.set(match.id, index + 1));
+
+  const lexicalRankById = new Map<string, number>();
+  lexicalMatches.forEach((match, index) => lexicalRankById.set(match.id, index + 1));
+
   const vectorMatchById = new Map<string, QueryMatchSummary>();
   for (const match of vectorMatches) {
     vectorMatchById.set(match.id, match);
   }
+
   const lexicalMatchById = new Map<string, QueryMatchSummary>();
   for (const match of lexicalMatches) {
     lexicalMatchById.set(match.id, match);
   }
 
-  const vectorDistances: number[] = vectorMatches.map((match) => match.distance);
-  const lexicalDistances: number[] = lexicalMatches.map((match) => match.distance);
-
-  const { min: dMin, max: dMax } = minMaxLowerIsBetter(vectorDistances);
-  const { min: bMin, max: bMax } = minMaxLowerIsBetter(lexicalDistances);
-
   const unionIds = new Set<string>([...vectorMatchById.keys(), ...lexicalMatchById.keys()]);
   const hybridMatches: QueryMatchSummary[] = [];
 
   for (const id of unionIds) {
-    const vectorMatch = vectorMatchById.get(id);
-    const lexicalMatch = lexicalMatchById.get(id);
+    const vectorRank = vectorRankById.get(id);
+    const lexicalRank = lexicalRankById.get(id);
 
-    const simVec = isNullish(vectorMatch)
-      ? 0
-      : toSimLowerIsBetter({ value: vectorMatch.distance, min: dMin, max: dMax });
-    const simLex = isNullish(lexicalMatch)
-      ? 0
-      : toSimLowerIsBetter({ value: lexicalMatch.distance, min: bMin, max: bMax });
+    const rrfScore =
+      (!isNullish(vectorRank) ? weightSemantic / (rrfK + vectorRank) : 0) +
+      (!isNullish(lexicalRank) ? weightLexical / (rrfK + lexicalRank) : 0);
 
-    const hybrid = HYBRID_WEIGHT_VECTOR * simVec + HYBRID_WEIGHT_LEXICAL * simLex;
-    const distance = 1 / (hybrid + NUMERIC_DIVISION_EPSILON);
-    const base = pickRepresentativeMatch(vectorMatch, lexicalMatch);
+    const distance = 1 / rrfScore;
+    const base = pickRepresentativeMatch({
+      vectorMatch: vectorMatchById.get(id),
+      lexicalMatch: lexicalMatchById.get(id),
+    });
 
     hybridMatches.push({
       ...base,
@@ -95,6 +80,6 @@ export const fuseHybridChunkMatches = ({
     });
   }
 
-  hybridMatches.sort((a, b) => a.distance - b.distance);
+  hybridMatches.sort((left, right) => left.distance - right.distance);
   return hybridMatches;
 };

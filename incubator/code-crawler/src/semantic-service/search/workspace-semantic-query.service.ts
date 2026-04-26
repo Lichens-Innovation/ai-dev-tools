@@ -3,7 +3,7 @@ import { embedTextsWithLanguageModel } from "../language-model-embedding.pipelin
 import type { QueryMatchSummary, QueryOutcome } from "../types/search.types";
 import type { SemanticIndexStore } from "../types/store.types";
 import type { SourceLanguageId } from "../types/source-language.types";
-import { fuseHybridChunkMatches } from "./hybrid-chunk-fusion.utils";
+import { fuseChunkMatchesWithRRF } from "./hybrid-chunk-fusion.utils";
 import { rerankWithCrossEncoder } from "./cross-encoder-rerank.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
@@ -102,7 +102,7 @@ export const runWorkspaceSemanticQuery = async ({
       languages,
     });
 
-    const matches: QueryMatchSummary[] = fuseHybridChunkMatches({ lexicalMatches, vectorMatches });
+    const matches: QueryMatchSummary[] = fuseChunkMatchesWithRRF({ lexicalMatches, vectorMatches });
     const rerankedMatches: QueryMatchSummary[] = await safeRerankWithCrossEncoder({ queryText, matches });
 
     return consolidateSemanticQueryMatchesByFile({ matches: rerankedMatches, nResults });

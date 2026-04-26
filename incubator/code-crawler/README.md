@@ -131,7 +131,9 @@ See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
 ## TODOs
 
-* TODO-000: add a **reranker** after ANN retrieval to boost precision; `jinaai/jina-reranker-v1-tiny-en` is Transformers.js–compatible for a second-stage score on candidate chunks
-* TODO-001: generateRagAnswerFromMatches should use a streaming API to return the answer progressively (usage of @microsoft/fetch-event-source on client side instead of SSE.js)
-* TODO-002: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
+* TODO-001: Reciprocal Rank Fusion (RRF) on hybrid queries (BM25 weight formula is to simplified)
+* TODO-002: generateRagAnswerFromMatches should use a streaming API to return the answer progressively (usage of @microsoft/fetch-event-source on client side instead of SSE.js)
+* TODO-003: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
+* TODO-004: API to show database state statistics
+* TODO-005: Multi-queries variations (generate 2 new queries from original)
 * TODO-008: document and plan beyond sqlite-vec limits: it is **not** an approximate ANN index and stays strong up to roughly **100k–1M** vectors; for larger corpora evaluate dedicated ANN / vector stores

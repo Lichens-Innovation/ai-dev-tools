@@ -27,7 +27,7 @@ Query text
   → embed → parallel retrieval:
       Vector Search: sqlite-vec KNN (L2 distance)
       Lexical Search: FTS5 BM25
-  → min-max normalize each branch → fuse (70% vector + 30% lexical)
+  → fuse with Reciprocal Rank Fusion (weightSemantic=0.7, rrfK=60)
   → optional Cross-Encoder reranking
   → File Consolidation: collapse per-chunk matches → one result per file,
     boosting files with multiple close-distance chunks (Effective Distance)
@@ -58,7 +58,7 @@ Use these canonical terms (see `UBIQUITOUS_LANGUAGE.md` for full reference):
 | **Chunk**              | Atomic indexed unit: AST-aligned source excerpt + embed text + float vector    |
 | **Embed Text**         | The string sent to the embedding model (source excerpt + optional graph hints) |
 | **Semantic Index**     | The SQLite database; single source of truth for all search                     |
-| **Hybrid Search**      | 70% vector + 30% lexical fusion                                                |
+| **Hybrid Search**      | RRF fusion: weightSemantic=0.7 (vector), weightLexical=0.3 (lexical), rrfK=60 |
 | **File Consolidation** | Collapsing chunk-level hits into one result row per file                       |
 | **Effective Distance** | File-level score after consolidation boost                                     |
 | **RAG Response**       | Natural-language answer generated from consolidated search hits                |
