@@ -118,8 +118,10 @@ Prefix each bullet with:
 - helper for removing latin special accents (normalize a string)
 - code examples to present options to user through a drop down list
 - TanStack useMutation usage showing a snackbar message on error
-- REST API controller definitions.
-- form fields validation with a schema and rules (e.g. Zod).
+- REST API controller definitions
+- REST API controller returning list of semantic search results
+- REST API controller returning list of motors
+- form fields validation with a schema and rules (e.g. Zod)
 
 ### Feature (business domain) point of view
 
