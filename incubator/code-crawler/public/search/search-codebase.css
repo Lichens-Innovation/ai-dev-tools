@@ -277,9 +277,6 @@ body > .api-item:first-child {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background: #252525;
   overflow: hidden;
 }
 
@@ -319,18 +316,6 @@ body > .api-item:first-child {
 .search-master-detail__splitter:focus-visible {
   outline: 2px solid #007acc;
   outline-offset: 2px;
-}
-
-.search-results-column__header {
-  padding: 8px 12px;
-  margin: 0;
-  border-bottom: 1px solid #444;
-  background: #2a2a2a;
-}
-
-.search-results-column__title {
-  font-weight: 600;
-  font-size: 14px;
 }
 
 .search-results-list {
