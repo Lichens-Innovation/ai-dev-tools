@@ -37,6 +37,8 @@ const INDEX_SKIP_DIR_NAMES = new Set([
   ".expo",
 ]);
 
+const SKIP_FILE_EXTENSIONS = [".min.css", ".min.js", ".min.mjs", ".min.cjs"];
+
 type LoadedIndexableFileContent = { document: string; stat: Stats };
 
 const loadIndexableFileContent = async (fullPath: string): Promise<LoadedIndexableFileContent | null> => {
@@ -60,8 +62,19 @@ const loadIndexableFileContent = async (fullPath: string): Promise<LoadedIndexab
   return { document, stat: st };
 };
 
-const pathHasIndexableExtension = (fullPath: string): boolean =>
-  TREE_SITTER_INDEXABLE_EXTENSION_SET.has(extname(fullPath).toLowerCase());
+const pathHasIndexableExtension = (fullPath: string): boolean => {
+  const normalizedPath = fullPath.toLowerCase();
+  if (SKIP_FILE_EXTENSIONS.some((skipExt) => normalizedPath.endsWith(skipExt))) {
+    return false;
+  }
+
+  const ext = extname(fullPath).toLowerCase();
+  if (TREE_SITTER_INDEXABLE_EXTENSION_SET.has(ext)) {
+    return true;
+  }
+
+  return false;
+};
 
 interface TryBuildFileIndexRecordArgs {
   fullPath: string;
