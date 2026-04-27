@@ -170,7 +170,7 @@ File: src/semantic-service/search/workspace-semantic-query.service.ts
 Repo: code-crawler
 Type: Function
 Name: runWorkspaceSemanticQuery
-Calls: embedTextsWithLanguageModel, queryNearest, fuseHybridChunkMatches
+Calls: embedTextsWithLanguageModel, queryNearest, fuseChunkMatchesWithRRF
 CalledBy: semanticSearchWorkspaceFiles
 ```
 
