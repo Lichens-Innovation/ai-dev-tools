@@ -112,6 +112,14 @@ Prefix each bullet with:
 
     use code-crawler MCP to find <query-here>
 
+| Query: use code-crawler MCP to find an axios interceptor for handling the MSAL authorization bearer token |
+| --- |
+| <img src="docs/demos/claude-code-MCP-example-bearer-MSAL.png" alt="Claude Code MCP — interceptor axios bearer MSAL example" width="100%" /> |
+
+| Query: use code-crawler MCP to find form fields validation with a schema and rules (e.g. Zod) |
+| --- |
+| <img src="docs/demos/claude-code-MCP-example-zod-form-validations.png" alt="Claude Code MCP — Zod form validations example" width="100%" /> |
+
 ### Lexical search only
 
 - isAlphanumeric removeDiacriticalMarks
@@ -127,7 +135,6 @@ Prefix each bullet with:
 
 ### Programming point of view
 
-- interceptor axios for authorization bearer
 - helpers for formatting dates and time values
 - helper for removing latin special accents (normalize a string)
 - code examples to present options through a drop down list (menu like)
