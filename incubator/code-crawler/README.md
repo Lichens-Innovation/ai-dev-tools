@@ -2,7 +2,7 @@
 
 MCP server (Model Context Protocol) for crawling local Git repositories and **semantic search** over file contents using [**@huggingface/transformers**](https://www.npmjs.com/package/@huggingface/transformers) (Transformers.js) in-process. This package exposes **Streamable HTTP** at `/mcp` (no stdio transport). The same process also serves a **REST API** under `/api` and static files (hub, demos, search UI) at `/`.
 
-The semantic index is persisted in **SQLite** (see `SemanticIndexStore` / `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`).
+The semantic index is persisted in **SQLite** (see `SqliteSemanticIndexStore` / `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`; the store interface is `SemanticIndexStore` in `src/semantic-service/types/store.types.ts`).
 
 ## Database schema
 
@@ -29,7 +29,7 @@ Edit `.env` and set all required keys (e.g. `CODE_CRAWLER_ROOT`, `CODE_CRAWLER_S
 
 `.env.example` uses **Jina** for embeddings (`jinaai/jina-embeddings-v2-base-code`, 768-dim, long context, heavier RAM) and **Qwen2.5 Coder** for RAG answers (`CODE_CRAWLER_RAG_TEXT_MODEL`, e.g. `onnx-community/Qwen2.5-Coder-1.5B-Instruct`). **MiniLM** (`Xenova/all-MiniLM-L6-v2` or `onnx-community/all-MiniLM-L6-v2-ONNX`) is lighter (384-dim) if you change the embedding model id and matching `CODE_CRAWLER_EMBEDDING_DIM`. Changing embedding width requires a **new** semantic index database (or wiping the old one) so vec0 stays consistent. For large models, reduce `CODE_CRAWLER_EMBED_BATCH_SIZE` if indexing runs out of memory.
 
-Models are loaded from `CODE_CRAWLER_TRANSFORMERS_MODELS_PATH` (Hub-style folders). To prefetch weights (useful offline or to avoid first-run downloads), from this package run `yarn download:models:embeddings` and/or `yarn download:models:rag` (see `package.json`).
+Models are loaded from `CODE_CRAWLER_TRANSFORMERS_MODELS_PATH` (Hub-style folders). To prefetch weights (useful offline or to avoid first-run downloads), from this package run `yarn download:models:embeddings`, `yarn download:models:reranker`, and/or `yarn download:models:rag` (see `package.json`).
 
 Upgrading the `@huggingface/transformers` dependency can change floating-point embeddings for the same model id; if search quality degrades after an upgrade, **rebuild the semantic index** (new `CODE_CRAWLER_SEMANTIC_INDEX_DB_PATH` or delete the existing DB and re-index).
 
@@ -53,7 +53,7 @@ MCP endpoint: `http://<host>:<port>/mcp` (defaults from `.env.example`: `127.0.0
 
 ## Extending persistence
 
-All index **CRUD** goes through `SemanticIndexStore` (`src/semantic-service/types/store.types.ts`), implemented by `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts` (SQLite + sqlite-vec + **FTS5 BM25** for hybrid workspace search: 70 % vector / 30 % lexical in `fuseHybridChunkMatches`; FTS schema is ensured when the store opens — see `docs/DATABASE.md`).
+All index **CRUD** goes through `SemanticIndexStore` (`src/semantic-service/types/store.types.ts`), implemented by `SqliteSemanticIndexStore` / `workspaceSemanticIndexStore` in `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts` (SQLite + sqlite-vec + **FTS5 BM25** for hybrid workspace search: 70 % vector / 30 % lexical fused via `fuseChunkMatchesWithRRF` in `src/semantic-service/search/hybrid-chunk-fusion.utils.ts`; FTS schema is ensured when the store opens — see `docs/DATABASE.md`).
 
 ## Consumers: Cursor and Claude Code
 
@@ -112,6 +112,10 @@ Prefix each bullet with:
 
     use code-crawler MCP to find <query-here>
 
+### Lexical search only
+
+- isAlphanumeric removeDiacriticalMarks
+
 ### Programming point of view
 
 - helpers for formatting dates and time values
@@ -119,8 +123,6 @@ Prefix each bullet with:
 - code examples to present options to user through a drop down list
 - TanStack useMutation usage showing a snackbar message on error
 - REST API controller definitions
-- REST API controller returning list of semantic search results
-- REST API controller returning list of motors
 - form fields validation with a schema and rules (e.g. Zod)
 
 ### Feature (business domain) point of view
@@ -139,7 +141,6 @@ Prefix each bullet with:
 
 ## TODOs
 
-* TODO-001: Reciprocal Rank Fusion (RRF) on hybrid queries (BM25 weight formula is to simplified)
 * TODO-002: generateRagAnswerFromMatches should use a streaming API to return the answer progressively (usage of @microsoft/fetch-event-source on client side instead of SSE.js)
 * TODO-003: extend `public/search/search-codebase` (HTML, CSS, JS) to call `/api/semantic-search-workspace-files-rag` in streaming mode and render the answer incrementally as chunks arrive
 * TODO-004: API to show database state statistics

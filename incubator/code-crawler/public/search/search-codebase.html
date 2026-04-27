@@ -25,31 +25,44 @@
         </div>
 
         <aside class="semantic-search-options" aria-label="Search options">
-          <div class="field-row field-row--inline">
-            <label class="field-label" for="nb-results">Number of results (1–50)</label>
-            <input id="nb-results" type="number" min="1" max="50" value="10" class="field-input-number" />
+          <div class="semantic-search-options__columns">
+            <div class="semantic-search-options__column semantic-search-options__column--filters">
+              <div class="field-row field-row--inline semantic-search-options__nb-results-row">
+                <label class="field-label" for="nb-results">Number of results (1–50)</label>
+                <input id="nb-results" type="number" min="1" max="50" value="10" class="field-input-number field-input-number--two-digits" />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="repository-filter">Repository (optional)</label>
+                <input
+                  id="repository-filter"
+                  type="text"
+                  class="field-input-text semantic-search-options__repo-input"
+                  placeholder="Repository folder name, e.g. ai-dev-tools"
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+              </div>
+              <fieldset class="field-row semantic-search-options__languages">
+                <legend class="field-label">Languages (optional)</legend>
+                <select id="languages-filter" name="languages" multiple aria-label="Filter by source language">
+                  <option value="typescript">TypeScript</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="python">Python</option>
+                  <option value="cpp">C/C++</option>
+                  <option value="csharp">C#</option>
+                </select>
+              </fieldset>
+            </div>
+            <div class="semantic-search-options__column semantic-search-options__column--modes">
+              <fieldset class="field-row semantic-search-options__search-mode">
+                <legend class="field-label">Search mode</legend>
+                <label class="field-checkbox"><input type="checkbox" id="search-mode-vector" checked /> Vector search</label>
+                <label class="field-checkbox"><input type="checkbox" id="search-mode-lexical" /> Lexical (BM25) search</label>
+                <label class="field-checkbox"><input type="checkbox" id="search-use-reranker" /> Reranker</label>
+                <label class="field-checkbox"><input type="checkbox" id="search-use-multi-query" /> Multi-query</label>
+              </fieldset>
+            </div>
           </div>
-          <div class="field-row">
-            <label class="field-label" for="repository-filter">Repository (optional)</label>
-            <input
-              id="repository-filter"
-              type="text"
-              class="field-input-text semantic-search-options__repo-input"
-              placeholder="Repository folder name, e.g. ai-dev-tools"
-              spellcheck="false"
-              autocomplete="off"
-            />
-          </div>
-          <fieldset class="field-row semantic-search-options__languages">
-            <legend class="field-label">Languages (optional)</legend>
-            <select id="languages-filter" name="languages" multiple aria-label="Filter by source language">
-              <option value="typescript">TypeScript</option>
-              <option value="javascript">JavaScript</option>
-              <option value="python">Python</option>
-              <option value="cpp">C/C++</option>
-              <option value="csharp">C#</option>
-            </select>
-          </fieldset>
         </aside>
       </div>
     </div>

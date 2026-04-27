@@ -146,8 +146,21 @@ const getSelectedLanguagesOrEmpty = () => {
     .filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
 };
 
-const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages }) => {
-  const body = { queryText, nbResults };
+const getSearchModeOrNull = () => {
+  const vector = document.getElementById("search-mode-vector").checked;
+  const lexical = document.getElementById("search-mode-lexical").checked;
+  if (vector && lexical) return "hybrid";
+  if (vector) return "vector";
+  if (lexical) return "lexical";
+  return null;
+};
+
+const getUseReranker = () => document.getElementById("search-use-reranker").checked;
+
+const getUseMultiQuery = () => document.getElementById("search-use-multi-query").checked;
+
+const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages, searchMode, useReranker, useMultiQuery }) => {
+  const body = { queryText, nbResults, searchMode, useReranker, useMultiQuery };
   if (repository.length > 0) {
     body.repository = repository;
   }
@@ -840,9 +853,18 @@ const readSearchFormOrNotify = () => {
     return null;
   }
 
+  const searchMode = getSearchModeOrNull();
+  if (searchMode === null) {
+    setSearchError({ message: "Select at least one search mode (Vector or Lexical)." });
+    setSearchStatus({ html: "", isBusy: false });
+    return null;
+  }
+
   const repository = getTrimmedRepositoryFilter();
   const languages = getSelectedLanguagesOrEmpty();
-  return buildSemanticSearchBody({ queryText, nbResults, repository, languages });
+  const useReranker = getUseReranker();
+  const useMultiQuery = getUseMultiQuery();
+  return buildSemanticSearchBody({ queryText, nbResults, repository, languages, searchMode, useReranker, useMultiQuery });
 };
 
 const runSearch = async () => {

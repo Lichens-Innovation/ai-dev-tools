@@ -116,6 +116,23 @@ body > .api-item:first-child {
   background-color: #3d3d3d;
   color: #e0e0e0;
   font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Max two digits (1–50); spinners hidden to keep width tight */
+.field-input-number--two-digits {
+  width: 3ch;
+  min-width: 2.25rem;
+  flex-shrink: 0;
+  padding: 8px 6px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.field-input-number--two-digits::-webkit-outer-spin-button,
+.field-input-number--two-digits::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .field-input-text {
@@ -167,12 +184,27 @@ body > .api-item:first-child {
 }
 
 .semantic-search-options {
-  flex: 0 1 280px;
-  min-width: 200px;
+  flex: 0 1 416px;
+  min-width: min(100%, 256px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: 0;
+}
+
+.semantic-search-options__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+  align-items: start;
+  width: 100%;
+}
+
+.semantic-search-options__column {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 0;
+  min-width: 0;
 }
 
 .semantic-search-options .field-row {
@@ -192,6 +224,11 @@ body > .api-item:first-child {
   margin-bottom: 0;
 }
 
+.semantic-search-options__nb-results-row {
+  flex-wrap: nowrap;
+  gap: 8px 10px;
+}
+
 .semantic-search-options__repo-input {
   width: 100%;
   max-width: none;
@@ -209,6 +246,33 @@ body > .api-item:first-child {
 .semantic-search-options__languages .ms-parent {
   width: 100%;
   max-width: 100%;
+}
+
+.semantic-search-options__search-mode {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.field-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 /* --- Results shell (master–detail) --- */
@@ -568,5 +632,9 @@ body > .api-item:first-child {
     width: 100%;
     padding-top: 4px;
     border-top: 1px solid #444;
+  }
+
+  .semantic-search-options__columns {
+    grid-template-columns: 1fr;
   }
 }
