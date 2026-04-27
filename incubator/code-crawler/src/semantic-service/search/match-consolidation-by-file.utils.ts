@@ -26,13 +26,13 @@ const CONFIGS = {
   multiHitBoostMaxChunks: 5,
 } as const;
 
-export const resolveChunkFetchCountForFileConsolidation = (maxFiles: number): number => {
-  if (maxFiles < 1) {
+export const resolveChunkFetchCountForFileConsolidation = (nbResults: number): number => {
+  if (nbResults < 1) {
     return 0;
   }
 
-  const scaled = Math.ceil(maxFiles * CONFIGS.fetchFactor);
-  return Math.min(CONFIGS.fetchAbsoluteMax, Math.max(maxFiles, scaled));
+  const scaled = Math.ceil(nbResults * CONFIGS.fetchFactor);
+  return Math.min(CONFIGS.fetchAbsoluteMax, Math.max(nbResults, scaled));
 };
 
 export const groupQueryMatchesByFileId = (matches: QueryMatchSummary[]): Map<string, QueryMatchSummary[]> => {
@@ -144,6 +144,6 @@ export const consolidateSemanticQueryMatchesByFile = ({
     aggregated.push(buildAggregatedQueryMatchFromFileChunks(chunks));
   }
 
-  aggregated.sort((a, b) => a.distance - b.distance);
+  aggregated.sort((left, right) => left.distance - right.distance);
   return aggregated.slice(0, nResults);
 };

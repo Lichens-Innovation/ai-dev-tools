@@ -18,6 +18,7 @@ export const EnvNames = {
   chunkMaxChars: "CODE_CRAWLER_CHUNK_MAX_CHARS",
   embedBatchSize: "CODE_CRAWLER_EMBED_BATCH_SIZE",
   ragTextModel: "CODE_CRAWLER_RAG_TEXT_MODEL",
+  multiQueryVariantCount: "CODE_CRAWLER_MULTI_QUERY_VARIANT_COUNT",
 } as const;
 
 export type CodeCrawlerRerankerDtype = "q8" | "fp32";
@@ -38,6 +39,7 @@ export type CodeCrawlerEnv = {
   chunkMaxChars: number;
   embedBatchSize: number;
   ragTextModel: string;
+  multiQueryVariantCount: number;
 };
 
 let cached: CodeCrawlerEnv | null = null;
@@ -108,6 +110,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
   const chunkMaxChars = requirePositiveIntEnvVar(EnvNames.chunkMaxChars);
   const embedBatchSize = requirePositiveIntEnvVar(EnvNames.embedBatchSize);
   const ragTextModel = requireNonBlankEnvVar(EnvNames.ragTextModel);
+  const multiQueryVariantCount = requirePositiveIntEnvVar(EnvNames.multiQueryVariantCount);
 
   return {
     host,
@@ -125,6 +128,7 @@ const buildCodeCrawlerEnv = (): CodeCrawlerEnv => {
     chunkMaxChars,
     embedBatchSize,
     ragTextModel,
+    multiQueryVariantCount,
   };
 };
 
@@ -168,6 +172,8 @@ export const getCodeCrawlerChunkMaxChars = (): number => getCodeCrawlerEnv().chu
 export const getCodeCrawlerEmbedBatchSize = (): number => getCodeCrawlerEnv().embedBatchSize;
 
 export const getCodeCrawlerRagTextModel = (): string => getCodeCrawlerEnv().ragTextModel;
+
+export const getCodeCrawlerMultiQueryVariantCount = (): number => getCodeCrawlerEnv().multiQueryVariantCount;
 
 export const CODE_CRAWLER_TRANSFORMERS_FS_CACHE_DIR = ".hf-transformers-cache";
 
