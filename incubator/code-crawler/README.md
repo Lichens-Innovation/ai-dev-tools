@@ -106,7 +106,7 @@ The server has **no authentication**. Binding to `127.0.0.1` limits exposure to 
 
 See [`assets/examples/mcp.json`](assets/examples/mcp.json).
 
-## Example prompts (MCP)
+## Example prompts (MCP or API)
 
 Prefix each bullet with:
 
@@ -115,12 +115,22 @@ Prefix each bullet with:
 ### Lexical search only
 
 - isAlphanumeric removeDiacriticalMarks
+- interceptors InternalAxiosRequestConfig
+  (play with the plural, remove the 's')
+
+### How ranking is affected by adding rare lexical word(s)
+
+- interceptor axios for authorization bearer
+- interceptor axios for authorization bearer MSAL
+- sanitize a string remove unwanted characters helper
+- sanitize a string remove unwanted characters helper NFD
 
 ### Programming point of view
 
+- interceptor axios for authorization bearer
 - helpers for formatting dates and time values
 - helper for removing latin special accents (normalize a string)
-- code examples to present options to user through a drop down list
+- code examples to present options through a drop down list (menu like)
 - TanStack useMutation usage showing a snackbar message on error
 - REST API controller definitions
 - form fields validation with a schema and rules (e.g. Zod)
