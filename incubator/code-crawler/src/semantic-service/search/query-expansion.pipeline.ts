@@ -32,19 +32,60 @@ interface ParseVariantArgs {
   count: number;
 }
 
+const isMarkdownFenceLine = (line: string): boolean => line.trimStart().startsWith("```");
+
+/** Drops the first and last line when they start with ``` (language tag after backticks is ignored). */
+const stripMarkdownFenceLines = (text: string): string => {
+  const lines = text.trim().split(/\r?\n/);
+  let start = 0;
+  let end = lines.length;
+
+  if (end > 0 && isMarkdownFenceLine(lines[0])) {
+    start = 1;
+  }
+
+  if (end > start && isMarkdownFenceLine(lines[end - 1])) {
+    end = lines.length - 1;
+  }
+
+  return lines.slice(start, end).join("\n").trim();
+};
+
+/** Yields parse candidates (fence-stripped text, then first `[`…last `]` slice if different). */
+const jsonArrayStringCandidates = (text: string): string[] => {
+  const trimmed = stripMarkdownFenceLines(text);
+
+  const start = trimmed.indexOf("[");
+  const end = trimmed.lastIndexOf("]");
+  const bracketSlice = start >= 0 && end > start ? trimmed.slice(start, end + 1) : null;
+
+  if (isNullish(bracketSlice) || bracketSlice === trimmed) {
+    return [trimmed];
+  }
+
+  return [trimmed, bracketSlice];
+};
+
 const parseJsonVariants = ({ raw, count }: ParseVariantArgs): string[] => {
   if (isBlank(raw)) {
     return [];
   }
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-      return parsed.slice(0, count);
+  let lastErr: unknown;
+  for (const candidate of jsonArrayStringCandidates(raw)) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+        return parsed.slice(0, count);
+      }
+    } catch (error: unknown) {
+      lastErr = error;
     }
-  } catch (err: unknown) {
-    const msg = getErrorMessage(err);
-    console.warn(`[parseJsonVariants] failed to parse JSON: ${msg}`, err);
+  }
+
+  if (!isNullish(lastErr)) {
+    const errorMessage = getErrorMessage(lastErr);
+    console.warn(`[parseJsonVariants] failed to parse JSON: ${errorMessage}`, lastErr);
   }
 
   return [];
