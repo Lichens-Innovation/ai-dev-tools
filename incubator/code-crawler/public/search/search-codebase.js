@@ -159,7 +159,15 @@ const getUseReranker = () => document.getElementById("search-use-reranker").chec
 
 const getUseMultiQuery = () => document.getElementById("search-use-multi-query").checked;
 
-const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages, searchMode, useReranker, useMultiQuery }) => {
+const buildSemanticSearchBody = ({
+  queryText,
+  nbResults,
+  repository,
+  languages,
+  searchMode,
+  useReranker,
+  useMultiQuery,
+}) => {
   const body = { queryText, nbResults, searchMode, useReranker, useMultiQuery };
   if (repository.length > 0) {
     body.repository = repository;
@@ -864,7 +872,15 @@ const readSearchFormOrNotify = () => {
   const languages = getSelectedLanguagesOrEmpty();
   const useReranker = getUseReranker();
   const useMultiQuery = getUseMultiQuery();
-  return buildSemanticSearchBody({ queryText, nbResults, repository, languages, searchMode, useReranker, useMultiQuery });
+  return buildSemanticSearchBody({
+    queryText,
+    nbResults,
+    repository,
+    languages,
+    searchMode,
+    useReranker,
+    useMultiQuery,
+  });
 };
 
 const runSearch = async () => {
