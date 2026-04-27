@@ -3,7 +3,7 @@ import { getCodeCrawlerRagTextModel } from "../utils/env.utils";
 import { applyTransformersFilesystemEnv } from "../utils/ml/transformers-fs-env.utils";
 import type { QueryMatchSummary } from "./types/search.types";
 
-interface TextGenOutputItem {
+export interface TextGenOutputItem {
   generated_text: string;
 }
 
@@ -34,7 +34,7 @@ const loadTextGenerationPipeline = async (): Promise<TextGenerator> => {
 
 let pipelinePromise: Promise<TextGenerator> | null = null;
 
-const getTextGenerationPipeline = (): Promise<TextGenerator> => {
+export const getTextGenerationPipeline = (): Promise<TextGenerator> => {
   if (isNullish(pipelinePromise)) {
     pipelinePromise = loadTextGenerationPipeline();
   }

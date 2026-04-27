@@ -3,12 +3,14 @@ import { embedTextsWithLanguageModel } from "../language-model-embedding.pipelin
 import type { QueryMatchSummary, QueryOutcome } from "../types/search.types";
 import type { SourceLanguageId } from "../types/source-language.types";
 import type { SemanticIndexStore } from "../types/store.types";
+import { getCodeCrawlerMultiQueryVariantCount } from "../../utils/env.utils";
 import { rerankWithCrossEncoder } from "./cross-encoder-rerank.utils";
 import { fuseChunkMatchesWithRRF } from "./hybrid-chunk-fusion.utils";
 import {
   consolidateSemanticQueryMatchesByFile,
   resolveChunkFetchCountForFileConsolidation,
 } from "./match-consolidation-by-file.utils";
+import { generateQueryExpansionVariants } from "./query-expansion.pipeline";
 
 export const EXAMPLE_QUERY_TEXT = "tanstack query returning a list of items with an infinite staleTime";
 
@@ -72,10 +74,20 @@ const safeRerankWithCrossEncoder = async ({
   }
 };
 
-// Expands a single query into multiple variants for multi-query vector RRF.
-// Stub: currently returns the original query unchanged — replace with LLM expansion later.
 const expandQueryVariants = async (queryText: string): Promise<string[]> => {
-  return [queryText];
+  const count = getCodeCrawlerMultiQueryVariantCount();
+  try {
+    const variants = await generateQueryExpansionVariants({ queryText, count });
+    const result = [queryText, ...variants];
+    console.info(
+      `[expandQueryVariants] ${result.length} queries (original + ${variants.length} variant(s)):\n${result.map((q, i) => `  [${i}] ${q}`).join("\n\t")}`
+    );
+    return result;
+  } catch (err: unknown) {
+    const msg = getErrorMessage(err);
+    console.warn(`[expandQueryVariants] LLM expansion failed; using original query only: ${msg}`);
+    return [queryText];
+  }
 };
 
 /** RRF across several ranked lists (e.g. one KNN list per query variant), equal weight per list. */

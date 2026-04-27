@@ -51,28 +51,11 @@ erDiagram
   }
 ```
 
-## Tables and indexes
 
-| Object | Kind | Notes |
-| --- | --- | --- |
-| `FILE_INDEX_METADATA` | table | One row per indexed file. `UNIQUE(REPOSITORY, PATH_RELATIVE)`. `SOURCE_LANGUAGE` is `TEXT NOT NULL` at SQL level (no DB enum/check); values like `typescript`, `javascript`, `python`, `cpp`, `csharp` are an app-level convention used for hybrid-search filters. |
-| `IDX_FILE_INDEX_METADATA_SOURCE_LANGUAGE` | index | On `SOURCE_LANGUAGE`. |
-| `FILE_INDEX_CHUNK` | table | Chunk text and line span. `CHUNK_ID` is `UNIQUE`. `FOREIGN KEY (FILE_ID)` → `FILE_INDEX_METADATA(FILE_ID)` `ON DELETE CASCADE`. |
-| `IDX_FILE_INDEX_CHUNK_FILE_CHUNK_INDEX` | unique index | On `(FILE_ID, CHUNK_INDEX)`. |
-| `FILE_INDEX_STORE_META` | table | Store-level key/value (e.g. `EMBEDDING_DIM` = width used for vec0). |
-| `FILE_INDEX_CHUNK_VEC` | virtual (`vec0`) | sqlite-vec KNN; columns `embedding float[N]`, `repository TEXT`, and `source_language TEXT` (metadata on `v`, same value as `FILE_INDEX_METADATA.SOURCE_LANGUAGE`, so language filters apply during KNN per sqlite-vec vec0). |
-| `FILE_INDEX_CHUNK_FTS` | virtual (`fts5`) | Full-text index on chunk `DOCUMENT` (BM25). **External content** on `FILE_INDEX_CHUNK` (`content_rowid='ID'`). Maintained by triggers on `FILE_INDEX_CHUNK`. |
-| `TRG_FILE_INDEX_CHUNK_FTS_AI` | trigger | `AFTER INSERT` on `FILE_INDEX_CHUNK`: inserts `(rowid, DOCUMENT)` in `FILE_INDEX_CHUNK_FTS`. |
-| `TRG_FILE_INDEX_CHUNK_FTS_AD` | trigger | `AFTER DELETE` on `FILE_INDEX_CHUNK`: writes FTS `'delete'` row for old content. |
-| `TRG_FILE_INDEX_CHUNK_FTS_AU` | trigger | `AFTER UPDATE` on `FILE_INDEX_CHUNK`: writes `'delete'` for old content, then inserts new `(rowid, DOCUMENT)`. |
+Hybrid search runs sqlite-vec KNN and FTS5 lexical retrieval in parallel, then fuses **ranked lists** with **Reciprocal Rank Fusion (RRF)** in `fuseChunkMatchesWithRRF` (`src/semantic-service/search/hybrid-chunk-fusion.utils.ts`): default **70%** weight on vector branch ranks, **30%** on lexical, smoothing constant **`rrfK = 60`**. Called from `runWorkspaceSemanticQuery` after BM25 and distance-ordered lists are built (`workspace-semantic-query.service.ts`). This step does **not** use per-query min–max normalization on branch scores.
 
-Hybrid search combines sqlite-vec KNN with FTS5 `bm25()` scores (fixed **70 % / 30 %** blend in `fuseHybridChunkMatches` after per-query min-max normalization).
+**Language filters (queries):** optional KNN filters use `v.source_language` on vec0 with `OR` of equality predicates (sqlite-vec vec0 constraints). Optional lexical filters use `f.SOURCE_LANGUAGE IN (SELECT value FROM json_each(?))` against file metadata (`sqlite-semantic-index.store-statements.ts`).
 
-**FTS lifecycle (idempotent):** on open, `SqliteSemanticIndexStore` ensures FTS triggers always exist; if the FTS table is missing it creates it, then runs `rebuild` only when `FILE_INDEX_CHUNK` already has rows. If the FTS table exists, it runs `rebuild` only when chunk rows exist and the FTS index is empty (handy for a reused local file). There is no separate production migration path for this dev-oriented SQLite index.
-
-## Chunk rows and vectors (application link)
-
-There is **no SQL foreign key** between `FILE_INDEX_CHUNK` and `FILE_INDEX_CHUNK_VEC`. The store **inserts the vector row first**, then inserts the chunk row with `ID` equal to the vector insert’s `lastInsertRowid` (the vec table **rowid**). Deletes remove vec rows by that same id (`DELETE FROM FILE_INDEX_CHUNK_VEC WHERE rowid = ?`). See `replaceIndexedFile` in `src/semantic-service/persistence/sqlite/sqlite-semantic-index.store.ts`.
 
 ## Configuration
 
