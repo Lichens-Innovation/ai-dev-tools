@@ -125,14 +125,6 @@ Prefix each bullet with:
 - sanitize a string remove unwanted characters helper
 - sanitize a string remove unwanted characters helper NFD
 
-Prefix each bullet with:
-
-    use code-crawler MCP to find <query-here>
-
-### Lexical search only
-
-- isAlphanumeric removeDiacriticalMarks
-
 ### Programming point of view
 
 - interceptor axios for authorization bearer
