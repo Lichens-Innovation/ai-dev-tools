@@ -1,11 +1,37 @@
 import { getErrorMessage, isNullish } from "@lichens-innovation/ts-common";
 import { getCodeCrawlerRagTextModel } from "../utils/env.utils";
 import { applyTransformersFilesystemEnv } from "../utils/ml/transformers-fs-env.utils";
+import type {
+  TextGenChatMessage,
+  TextGenChatOutputItem,
+  TextGenOutputItem,
+} from "./code-text-generation.pipeline.types";
 import type { QueryMatchSummary } from "./types/search.types";
 
-export interface TextGenOutputItem {
-  generated_text: string;
-}
+export type {
+  TextGenChatGenerator,
+  TextGenChatMessage,
+  TextGenChatOutputItem,
+} from "./code-text-generation.pipeline.types";
+
+export const getFirstTextGenChatOutputItem = (
+  output: TextGenChatOutputItem[] | TextGenChatOutputItem[][]
+): TextGenChatOutputItem | null => {
+  const firstBatch = Array.isArray(output[0])
+    ? (output[0] as TextGenChatOutputItem[])
+    : (output as TextGenChatOutputItem[]);
+
+  return firstBatch[0] ?? null;
+};
+
+export const getLastAssistantStringContent = (messages: TextGenChatMessage[]): string | null => {
+  const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+  if (!lastAssistant || typeof lastAssistant.content !== "string") {
+    return null;
+  }
+
+  return lastAssistant.content;
+};
 
 interface TextGenerationCallOptions {
   max_new_tokens?: number;

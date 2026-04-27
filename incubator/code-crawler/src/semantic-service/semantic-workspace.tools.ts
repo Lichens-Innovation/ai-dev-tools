@@ -4,7 +4,7 @@ import { z } from "zod";
 import { buildMcpErrorResponse, buildMcpTextResponse } from "../mcp/mcp-server.utils";
 import { toString } from "../utils/arrays.utils";
 import { resolveRepositoryUnderCodeCrawlerRoot } from "../utils/git-repositories.utils";
-import { generateRagAnswerFromMatches } from "./code-rag-text.pipeline";
+import { generateRagAnswerFromMatches } from "./code-text-generation.pipeline";
 import { getIndexedFileContentByFileId as getIndexedFileContentByFileIdWithStore } from "./indexing/indexed-file-content.utils";
 import {
   resolveParentDirectoryForSemanticWorkspace,

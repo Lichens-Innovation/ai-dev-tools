@@ -158,6 +158,8 @@ Prefix each bullet with:
 * TODO-008: document and plan beyond sqlite-vec limits: it is **not** an approximate ANN index and stays strong up to roughly **100k–1M** vectors; for larger corpora evaluate dedicated ANN / vector stores
 * TODO-009: use LSP / tree-sitter static analysis to extract symbols and relations as first-class terms, so **semantic retrieval** (lean RAG: “find code similar to X”) and **dependency / call graph** reasoning (“what else is affected by X”) can evolve separately and be **combined** later (semantic search plus impact analysis)
 * TODO-010: explore **ontology RAG**: ground truth in an **RDF graph** queried with **SPARQL**; layer an **LLM on top** only for natural-language access (translate intent to structured queries, explain results). The **ontology is the source of truth**; the LLM **assists**, it does not replace the triple store.
+* TODO-011: when query variants are generated (e.g. multi-query expansion), expose them on the search response as extra metadata: add a `queryVariants: string[]` field listing the variant strings used for retrieval.
+* TODO-012: when several chunks contribute to the same consolidated hit, surface every contributing span: add `allChunkLines: { startLine: number; endLine: number }[]` so clients can see all chunk line ranges behind that hit, not only a single range.
 
 ## Ontology
 

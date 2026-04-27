@@ -16,7 +16,7 @@ Short reference for acronyms and technical terms used around **embeddings**, **h
 | **hybrid (search)** | — | Combines **vector KNN** and **lexical BM25** ranked lists, then fuses them with **RRF** in `fuseChunkMatchesWithRRF` (`hybrid-chunk-fusion.utils.ts`): default **70%** weight on vector ranks, **30%** on lexical, **`rrfK = 60`**. |
 | **RRF** | reciprocal rank fusion | Rank-based merge: `weightSemantic/(rrfK + rank_vector) + weightLexical/(rrfK + rank_lexical)`; used by `fuseChunkMatchesWithRRF` for hybrid chunk lists. |
 | **min–max (normalization)** | min–max scaling | Used when mapping **cross-encoder** classification scores to distance-like values after reranking (`cross-encoder-rerank.utils.ts`); not used in the vector/lexical RRF fusion step. |
-| **RAG** | retrieval-augmented generation | After **retrieving** semantic hits, a **causal language model** generates an answer from consolidated context (`code-rag-text.pipeline.ts`, `CODE_CRAWLER_RAG_TEXT_MODEL`). |
+| **RAG** | retrieval-augmented generation | After **retrieving** semantic hits, a **causal language model** generates an answer from consolidated context (`code-text-generation.pipeline.ts`, `CODE_CRAWLER_RAG_TEXT_MODEL`). |
 | **embedding** | — | Dense **float** vector representing chunk text for similarity search; produced by Transformers.js and stored as `Float32Array` / blob in `FILE_INDEX_CHUNK_VEC`. |
 | **EMBEDDING_DIM** / **dim** | embedding dimension | Width *N* of vectors; must match the model and `vec0` schema (`META_KEY_EMBEDDING_DIM`, `CODE_CRAWLER_EMBEDDING_DIM`). |
 | **AST** | abstract syntax tree | Parsed syntax tree; chunks are **AST-aligned** (via **tree-sitter**) before graph enrichment and embedding. |
