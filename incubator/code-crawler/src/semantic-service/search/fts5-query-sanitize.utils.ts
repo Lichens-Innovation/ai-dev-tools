@@ -1,7 +1,7 @@
 import { isBlank } from "@lichens-innovation/ts-common";
 
 /**
- * Builds a conservative FTS5 `MATCH` string (implicit AND between tokens).
+ * Builds a safe FTS5 `MATCH` string with explicit OR between tokens.
  * Returns `null` when there is nothing safe to search.
  */
 export const buildSafeFts5MatchQuery = (queryText: string): string | null => {
@@ -21,5 +21,5 @@ export const buildSafeFts5MatchQuery = (queryText: string): string | null => {
     return `"${inner}"`;
   });
 
-  return escaped.join(" ");
+  return escaped.join(" OR ");
 };

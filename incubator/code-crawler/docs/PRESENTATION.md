@@ -39,8 +39,8 @@ flowchart LR
     I["🎯 Intention\ntrouver la gestion\ndes retries HTTP"]
     I --> G["grep -r 'retry'\n──────────────────\n✗ rate fetchWithRetry\n✗ rate http_retry_wrapper"]
     I --> S["Recherche sémantique\n──────────────────\n✓ trouve fetchWithRetry\n✓ trouve http_retry_wrapper"]
-    style G fill:#ffd6d6,stroke:#cc0000,color:#000
-    style S fill:#d6ffd6,stroke:#00aa00,color:#000
+    style G fill:grey,stroke:#cc0000,color:#000
+    style S fill:grey,stroke:#00aa00,color:#000
 ```
 
 ### Démo
@@ -135,9 +135,9 @@ block-beta
     A1["function foo() { … }\n→ chunk 1 complet ✓"]
     A2["function bar() { … }\n→ chunk 2 complet ✓"]
   end
-  style N3 fill:#ffd6d6,stroke:#cc0000
-  style A1 fill:#d6ffd6,stroke:#00aa00
-  style A2 fill:#d6ffd6,stroke:#00aa00
+  style N3 fill:grey,stroke:#cc0000
+  style A1 fill:grey,stroke:#00aa00
+  style A2 fill:grey,stroke:#00aa00
 ```
 
 ### Pointeurs de code (développeurs)
@@ -460,8 +460,8 @@ flowchart LR
     CA --> FY
     CE --> FZ
 
-    style FX fill:#d6ffd6,stroke:#00aa00
-    style CA fill:#fff3cd,stroke:#ffc107
+    style FX fill:grey,stroke:#00aa00
+    style CA fill:grey,stroke:#ffc107
 ```
 
 ### Pointeurs de code (développeurs)
