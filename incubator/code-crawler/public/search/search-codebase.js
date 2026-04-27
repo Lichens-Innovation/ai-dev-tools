@@ -146,8 +146,29 @@ const getSelectedLanguagesOrEmpty = () => {
     .filter((v) => SEMANTIC_SEARCH_LANGUAGE_IDS.includes(v));
 };
 
-const buildSemanticSearchBody = ({ queryText, nbResults, repository, languages }) => {
-  const body = { queryText, nbResults };
+const getSearchModeOrNull = () => {
+  const vector = document.getElementById("search-mode-vector").checked;
+  const lexical = document.getElementById("search-mode-lexical").checked;
+  if (vector && lexical) return "hybrid";
+  if (vector) return "vector";
+  if (lexical) return "lexical";
+  return null;
+};
+
+const getUseReranker = () => document.getElementById("search-use-reranker").checked;
+
+const getUseMultiQuery = () => document.getElementById("search-use-multi-query").checked;
+
+const buildSemanticSearchBody = ({
+  queryText,
+  nbResults,
+  repository,
+  languages,
+  searchMode,
+  useReranker,
+  useMultiQuery,
+}) => {
+  const body = { queryText, nbResults, searchMode, useReranker, useMultiQuery };
   if (repository.length > 0) {
     body.repository = repository;
   }
@@ -254,8 +275,31 @@ const buildMatchCardMarkup = ({ repository, pathRelative, linesShort, distanceLa
     </span>
   `;
 
-const formatMatchCountStatusHtml = ({ count }) =>
-  `${count} file${count === 1 ? "" : "s"} <span class="search-status-bar__hint">(lower distance is closer)</span>`;
+const formatFetchDurationLabel = ({ durationMs }) => {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs < 0) {
+    return "";
+  }
+  if (durationMs < 1000) {
+    return `${Math.round(durationMs)} ms`;
+  }
+  const seconds = durationMs / 1000;
+  const decimals = seconds < 10 ? 2 : 1;
+  return `${seconds.toFixed(decimals)} s`;
+};
+
+const appendFetchTimingToStatusHtml = ({ html, fetchDurationMs }) => {
+  const label = formatFetchDurationLabel({ durationMs: fetchDurationMs });
+  if (label.length === 0) {
+    return html;
+  }
+  const escaped = escapeHtml(label);
+  return `${html} · <span class="search-status-bar__timing" aria-label="Request duration">${escaped}</span>`;
+};
+
+const formatMatchCountStatusHtml = ({ count, fetchDurationMs }) => {
+  const base = `${count} file${count === 1 ? "" : "s"} <span class="search-status-bar__hint">(lower distance is closer)</span>`;
+  return appendFetchTimingToStatusHtml({ html: base, fetchDurationMs });
+};
 
 const rejectInvalidSuccessPayload = () => {
   setSearchError({ message: "Unexpected response shape." });
@@ -274,18 +318,21 @@ const showSemanticSearchOutcomeError = ({ outcome }) => {
   showDetailPlaceholder();
 };
 
-const renderMatchOutcomeList = ({ outcome }) => {
+const renderMatchOutcomeList = ({ outcome, fetchDurationMs }) => {
   const listEl = getResultsListEl();
   listEl.innerHTML = "";
 
   if (outcome.length === 0) {
-    setSearchStatus({ html: "No matches.", isBusy: false });
+    setSearchStatus({
+      html: appendFetchTimingToStatusHtml({ html: "No matches.", fetchDurationMs }),
+      isBusy: false,
+    });
     showDetailPlaceholder();
     return;
   }
 
   setSearchStatus({
-    html: formatMatchCountStatusHtml({ count: outcome.length }),
+    html: formatMatchCountStatusHtml({ count: outcome.length, fetchDurationMs }),
     isBusy: false,
   });
 
@@ -741,7 +788,7 @@ const buildMatchCardButton = ({ match, index }) => {
   return li;
 };
 
-const renderSuccessPayload = ({ payload }) => {
+const renderSuccessPayload = ({ payload, fetchDurationMs }) => {
   clearSearchError();
 
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
@@ -761,7 +808,7 @@ const renderSuccessPayload = ({ payload }) => {
     return;
   }
 
-  renderMatchOutcomeList({ outcome });
+  renderMatchOutcomeList({ outcome, fetchDurationMs });
 };
 
 const displayHttpError = ({ status, statusText, payload }) => {
@@ -775,6 +822,7 @@ const postSemanticSearch = async ({ body }) => {
   setSearchStatus({ html: "Searching…", isBusy: true });
   clearSearchError();
 
+  const fetchStartedAt = globalThis.performance.now();
   const response = await fetch("/api/semantic-search-workspace-files", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -782,13 +830,14 @@ const postSemanticSearch = async ({ body }) => {
   });
   const contentType = response.headers.get("content-type") ?? "";
   const bodyText = await response.text();
+  const fetchDurationMs = globalThis.performance.now() - fetchStartedAt;
   const payload = parsePayloadFromResponseParts({ contentType, bodyText });
   if (!response.ok) {
     displayHttpError({ status: response.status, statusText: response.statusText, payload });
     return;
   }
 
-  renderSuccessPayload({ payload });
+  renderSuccessPayload({ payload, fetchDurationMs });
 };
 
 const formatThrownValue = ({ error }) => (error instanceof Error ? error.message : String(error));
@@ -812,9 +861,26 @@ const readSearchFormOrNotify = () => {
     return null;
   }
 
+  const searchMode = getSearchModeOrNull();
+  if (searchMode === null) {
+    setSearchError({ message: "Select at least one search mode (Vector or Lexical)." });
+    setSearchStatus({ html: "", isBusy: false });
+    return null;
+  }
+
   const repository = getTrimmedRepositoryFilter();
   const languages = getSelectedLanguagesOrEmpty();
-  return buildSemanticSearchBody({ queryText, nbResults, repository, languages });
+  const useReranker = getUseReranker();
+  const useMultiQuery = getUseMultiQuery();
+  return buildSemanticSearchBody({
+    queryText,
+    nbResults,
+    repository,
+    languages,
+    searchMode,
+    useReranker,
+    useMultiQuery,
+  });
 };
 
 const runSearch = async () => {

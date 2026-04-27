@@ -7,31 +7,32 @@ import type { QueryMatchSummary } from "../types/search.types";
  * Fetches extra chunks upstream; this module groups by `fileId`, boosts multi-hit files, and re-sorts by effective distance.
  */
 
-/** How many raw chunk neighbors to fetch per requested file (dedupe shrinks the list). */
-const FILE_CONSOLIDATION_CHUNK_FETCH_FACTOR = 5;
-
-/** Upper bound on KNN size so consolidation stays cheap on large indexes. */
-export const FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX = 500;
-
-/** Divides effective distance by `1 + weight * (hitCount - 1)` so multi-chunk files rank higher. */
-const FILE_CONSOLIDATION_MULTI_CHUNK_BOOST_WEIGHT = 0.25;
-
 /**
- * Chunks farther than this relative band from the file's best distance do not increase the boost
- * (weak neighbors from oversplitting no longer count like strong ones).
+ * Tunables for collapsing chunk-level KNN hits into file-level results (fetch sizing, multi-hit boost).
  */
-const FILE_CONSOLIDATION_MULTI_HIT_PROXIMITY_RELATIVE_SLACK = 0.12;
-
-/** Caps how many proximity-eligible chunks can increase the boost (limits huge-file / fine-chunk bias). */
-const FILE_CONSOLIDATION_MULTI_HIT_BOOST_MAX_CHUNKS = 6;
+const CONFIGS = {
+  /** How many raw chunk neighbors to fetch per requested file (dedupe shrinks the list). */
+  fetchFactor: 5,
+  /** Upper bound on KNN size so consolidation stays cheap on large indexes. */
+  fetchAbsoluteMax: 500,
+  /** Divides effective distance by `1 + weight * (hitCount - 1)` so multi-chunk files rank higher. */
+  multiChunkBoostWeight: 0.25,
+  /**
+   * Chunks farther than this relative band from the file's best distance do not increase the boost
+   * (weak neighbors from oversplitting no longer count like strong ones).
+   */
+  multiHitProximityRelativeSlack: 0.12,
+  /** Caps how many proximity-eligible chunks can increase the boost (limits huge-file / fine-chunk bias). */
+  multiHitBoostMaxChunks: 5,
+} as const;
 
 export const resolveChunkFetchCountForFileConsolidation = (maxFiles: number): number => {
   if (maxFiles < 1) {
     return 0;
   }
 
-  const scaled = Math.ceil(maxFiles * FILE_CONSOLIDATION_CHUNK_FETCH_FACTOR);
-  return Math.min(FILE_CONSOLIDATION_CHUNK_FETCH_ABSOLUTE_MAX, Math.max(maxFiles, scaled));
+  const scaled = Math.ceil(maxFiles * CONFIGS.fetchFactor);
+  return Math.min(CONFIGS.fetchAbsoluteMax, Math.max(maxFiles, scaled));
 };
 
 export const groupQueryMatchesByFileId = (matches: QueryMatchSummary[]): Map<string, QueryMatchSummary[]> => {
@@ -104,13 +105,13 @@ export const buildAggregatedQueryMatchFromFileChunks = (chunks: QueryMatchSummar
   const eligibleForBoost = countChunkHitsWithinBestProximityBand({
     chunks,
     bestDistance: representative.distance,
-    relativeSlack: FILE_CONSOLIDATION_MULTI_HIT_PROXIMITY_RELATIVE_SLACK,
+    relativeSlack: CONFIGS.multiHitProximityRelativeSlack,
   });
-  const boostHitCount = Math.min(Math.max(1, eligibleForBoost), FILE_CONSOLIDATION_MULTI_HIT_BOOST_MAX_CHUNKS);
+  const boostHitCount = Math.min(Math.max(1, eligibleForBoost), CONFIGS.multiHitBoostMaxChunks);
   const effectiveDistance = computeEffectiveDistanceForFileHits({
     bestDistance: representative.distance,
     hitCount: boostHitCount,
-    weight: FILE_CONSOLIDATION_MULTI_CHUNK_BOOST_WEIGHT,
+    weight: CONFIGS.multiChunkBoostWeight,
   });
 
   return {

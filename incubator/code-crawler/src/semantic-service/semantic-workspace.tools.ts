@@ -13,7 +13,11 @@ import {
 } from "./indexing/repository-indexing.flow";
 import { WORKSPACE_REPOSITORIES_FILES_COLLECTION } from "./indexing/workspace-semantic.constants";
 import { workspaceSemanticIndexStore } from "./persistence/sqlite/sqlite-semantic-index.store";
-import { EXAMPLE_QUERY_TEXT, runWorkspaceSemanticQuery } from "./search/workspace-semantic-query.service";
+import {
+  EXAMPLE_QUERY_TEXT,
+  SEARCH_MODE_VALUES,
+  runWorkspaceSemanticQuery,
+} from "./search/workspace-semantic-query.service";
 import type { QueryOutcome } from "./types/search.types";
 import type { SourceLanguageId } from "./types/source-language.types";
 import { SOURCE_LANGUAGE_IDS } from "./types/source-language.types";
@@ -108,6 +112,28 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
       toString([
         "Optional list of source languages to restrict hits (same ids as indexing:",
         `${SOURCE_LANGUAGE_IDS.join(", ")}). Empty = all languages.`,
+      ])
+    ),
+  searchMode: z
+    .enum(SEARCH_MODE_VALUES)
+    .optional()
+    .default("vector")
+    .describe(
+      "Retrieval pipeline: 'vector' (KNN only), 'lexical' (BM25 only), or 'hybrid' (RRF fusion of both). Default: 'vector'."
+    ),
+  useReranker: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Enable cross-encoder reranking of fused results. Default: false."),
+  useMultiQuery: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      toString([
+        "Expand the query into multiple variants; vector KNN lists are fused with RRF, then hybrid mode runs",
+        "a single BM25 pass on the original query and one RRF vector+lexical fusion. Default: false.",
       ])
     ),
 });
@@ -243,7 +269,7 @@ export const prepareWorkspaceRepositoriesForSemanticSearch = async (
 export const semanticSearchWorkspaceFiles = async (
   input: SemanticSearchWorkspaceFilesInput
 ): Promise<CallToolResult> => {
-  const { nbResults, queryText, repository, languages } = input;
+  const { nbResults, queryText, repository, languages, searchMode, useReranker, useMultiQuery } = input;
 
   const outcome = await runWorkspaceSemanticQuery({
     store: workspaceSemanticIndexStore,
@@ -251,6 +277,9 @@ export const semanticSearchWorkspaceFiles = async (
     queryText,
     repository,
     languages: languages as readonly SourceLanguageId[],
+    searchMode,
+    useReranker,
+    useMultiQuery,
   });
 
   return buildMcpTextResponse(JSON.stringify({ queryText, outcome }, null, 2));
@@ -267,7 +296,7 @@ const respond = ({ queryText, outcome, ragResponse }: RespondArgs): CallToolResu
 export const semanticSearchWorkspaceFilesWithRag = async (
   input: SemanticSearchWorkspaceFilesInput
 ): Promise<CallToolResult> => {
-  const { nbResults, queryText, repository, languages } = input;
+  const { nbResults, queryText, repository, languages, searchMode, useReranker, useMultiQuery } = input;
 
   const outcome = await runWorkspaceSemanticQuery({
     store: workspaceSemanticIndexStore,
@@ -275,6 +304,9 @@ export const semanticSearchWorkspaceFilesWithRag = async (
     queryText,
     repository,
     languages: languages as readonly SourceLanguageId[],
+    searchMode,
+    useReranker,
+    useMultiQuery,
   });
 
   if (!Array.isArray(outcome)) {

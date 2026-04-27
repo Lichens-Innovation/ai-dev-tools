@@ -23,12 +23,13 @@ Git repos (CODE_CRAWLER_ROOT)
 ### Search flow
 
 ```
-Query text
-  → embed → parallel retrieval:
-      Vector Search: sqlite-vec KNN (L2 distance)
-      Lexical Search: FTS5 BM25
-  → min-max normalize each branch → fuse (70% vector + 30% lexical)
-  → optional Cross-Encoder reranking
+Query text (+ optional multi-query variants for vector only)
+  → Vector: embed each variant → sqlite-vec KNN per variant
+      If multiple variants: RRF across vector ranked lists (equal weight per list)
+  → Hybrid: one FTS5 BM25 run on the original query text only, then one RRF fuse
+      (weightSemantic=0.7, rrfK=60) between fused vector ranks and BM25 ranks
+  → Lexical-only: BM25 on the original query only (variants do not add BM25 calls)
+  → optional Cross-Encoder reranking (once, on the primary query text)
   → File Consolidation: collapse per-chunk matches → one result per file,
     boosting files with multiple close-distance chunks (Effective Distance)
   → optional RAG: Qwen2.5-Coder generates a natural-language answer from top hits
@@ -58,7 +59,7 @@ Use these canonical terms (see `UBIQUITOUS_LANGUAGE.md` for full reference):
 | **Chunk**              | Atomic indexed unit: AST-aligned source excerpt + embed text + float vector    |
 | **Embed Text**         | The string sent to the embedding model (source excerpt + optional graph hints) |
 | **Semantic Index**     | The SQLite database; single source of truth for all search                     |
-| **Hybrid Search**      | 70% vector + 30% lexical fusion                                                |
+| **Hybrid Search**      | RRF fusion: weightSemantic=0.7 (vector), weightLexical=0.3 (lexical), rrfK=60 |
 | **File Consolidation** | Collapsing chunk-level hits into one result row per file                       |
 | **Effective Distance** | File-level score after consolidation boost                                     |
 | **RAG Response**       | Natural-language answer generated from consolidated search hits                |
