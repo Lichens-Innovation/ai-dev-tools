@@ -19,28 +19,11 @@ When resolving standards, use this order:
 
 ## Reference categories
 
-Standards are defined in the `references/` folder. Load these files when you need the exact Avoid/Prefer rules and examples:
-
-| Category            | File                                                                         | Scope                                                                |
-| ------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **Coding patterns** | [references/common-coding-patterns.md](references/common-coding-patterns.md) | TypeScript (types, control flow, errors, enums, destructuring, etc.) |
-| **Naming patterns** | [references/common-naming-patterns.md](references/common-naming-patterns.md) | In-code naming (boolean prefixes, descriptive names)                 |
-| **React patterns**  | [references/common-react-patterns.md](references/common-react-patterns.md)   | Hooks, components, JSX, state, styling, fragments                    |
-| **Unit testing**    | [references/common-unit-testing.md](references/common-unit-testing.md)       | Jest / Vitest, React Testing Library, AAA, mocks, selectors        |
-| **Codebase summary**| [references/reference-codebase-summary.md](references/reference-codebase-summary.md) | Concrete patterns from reference frontend (optional)        |
+Standards are defined in the `references/` folder. Load these files when you need the exact Avoid/Prefer rules.
 
 ## Three-phase workflow
 
 When the skill is invoked on code (selected files, git staged files, branch):
-
-### Preliminary — Run linter
-
-1. **Run** the project linter: `yarn lint` or `npm run lint` (use the one that matches the project).
-2. **Collect** every reported rule violation (rule id/name, file, line, message).
-3. For **each** violation:
-   - If the rule is **auto-fixable** (e.g. `--fix` / `eslint --fix`), run the fix (e.g. `yarn lint --fix` or `npm run lint --fix`) and consider the violation resolved.
-   - If the fix is **not automatic**, do your best to find a solution with the help of coding guidelines in `references/*.md` (coding → common-coding-patterns, naming → common-naming-patterns, React → common-react-patterns, tests → common-unit-testing) and apply the **Prefer** correction described for that rule.
-4. Re-run the linter after fixes; repeat until lint passes or only violations that need manual interpretation remain.
 
 ### Phase 1 — Collect violations
 
@@ -50,7 +33,6 @@ When the skill is invoked on code (selected files, git staged files, branch):
    - **Category** (coding / naming / React / unit testing)
    - **Rule name** (e.g. "Avoid Using `any` for Type Definitions")
    - **Location** (file and line or snippet)
-   - **Short reason** (what is wrong)
 4. If no Avoid pattern is found, state that the code complies and stop. Otherwise proceed to Phase 2.
 
 ### Phase 2 — Apply corrections
@@ -70,8 +52,5 @@ When the skill is invoked on code (selected files, git staged files, branch):
 
 ## Quick reference
 
-- **Lint first**: Run `yarn lint` or `npm run lint`; fix auto-fixable issues, then resolve remaining ones using `references/*.md`.
-- **Tests**: Project may use **Jest** or **Vitest**; same patterns apply (AAA, `screen`, `it.each`, mock factories). Use `vi` (Vitest) or `jest` (Jest) for spies/mocks.
-- **Collect next**: Complete the full list of Avoid violations (manual analysis) before making edits.
+- **Collect first**: Complete the full list of Avoid violations (manual analysis) before making edits.
 - **Then redress**: Apply each Prefer in turn, using the reference file as the source of truth.
-- **File/folder naming**: Use react-files-structure-standards for normalizing file and folder names and structure.
