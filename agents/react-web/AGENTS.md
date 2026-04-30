@@ -28,7 +28,7 @@ If the user asks to **normalize** the code (e.g. "normalize", "normalize this co
 
 Execute all steps in order; do not summarize the workflow.
 
-1. **Check linter configuration** — Read the project's `package.json` and ensure `scripts.lint` exists. If the linter is **not** configured: **stop the workflow**, do not run steps 2–8, and tell the user that normalization requires a configured linter and suggest using the skill **react-linter-setup** (e.g. "The linter is not configured for this project. Stop here and use the **react-linter-setup** skill to configure ESLint and lint scripts in package.json, then run normalization again."). Only proceed to step 2 if the check passes.
+1. **Check linter configuration** — Read the project's `package.json` and ensure `scripts.lint` exists. If the linter is **not** configured: **stop the workflow**, do not run steps 2–8, and tell the user that normalization requires a configured linter and suggest (dont execute it) using the skill **react-linter-setup**. Only proceed to step 2 if the check passes.
 
 2. **Resolve scope** — Determine the initial set of files in scope (selected files, git staged files, branch, selected lines, directory, or glob). Maintain a **current scope** for the whole run: start with this initial set, and **add to it every file you create or modify** during the workflow (steps 3–5), e.g. renamed paths, new sub-components, or any file touched by the skills. Steps 3, 4, and 5 always run on the **current scope**. Whenever you create or modify a file, add it to the current scope so that subsequent steps and re-validation (6–7) always consider the full set of files touched by this normalization run.
 
