@@ -117,9 +117,9 @@ export const semanticSearchWorkspaceFilesInputSchema = z.object({
   searchMode: z
     .enum(SEARCH_MODE_VALUES)
     .optional()
-    .default("vector")
+    .default("hybrid")
     .describe(
-      "Retrieval pipeline: 'vector' (KNN only), 'lexical' (BM25 only), or 'hybrid' (RRF fusion of both). Default: 'vector'."
+      "Retrieval pipeline: 'vector' (KNN only), 'lexical' (BM25 only), or 'hybrid' (RRF fusion of both). Default: 'hybrid'."
     ),
   useReranker: z
     .boolean()
