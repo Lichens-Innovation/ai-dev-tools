@@ -1,0 +1,29 @@
+{
+  "name": "lichens-ai-dev-tools",
+  "owner": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "metadata": {
+    "description": "AI-assisted development tools for Claude Code",
+    "version": "0.1.0",
+    "homepage": "https://github.com/lichens-ai/ai-dev-tools"
+  },
+  "plugins": [
+    {
+      "name": "ci",
+      "source": "./plugins/ci",
+      "description": "CI/CD tools and skills for Claude Code"
+    },
+    {
+      "name": "react",
+      "source": "./plugins/react",
+      "description": "React development tools and skills for Claude Code"
+    },
+    {
+      "name": "dev",
+      "source": "./plugins/dev",
+      "description": "General developer tools and skills for Claude Code"
+    }
+  ]
+}

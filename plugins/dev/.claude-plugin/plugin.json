@@ -1,0 +1,10 @@
+{
+  "name": "dev",
+  "version": "0.1.0",
+  "description": "General developer tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["dev", "tools", "general", "utilities"]
+}
