@@ -1,7 +1,11 @@
-# Unit testing coding standards
+---
+paths:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+---
 
-Apply these rules when writing or modifying unit tests in a `React` `TypeScript` project using **Jest** or **Vitest** with React Testing Library.
-Use `jest` (Jest) or `vi` (Vitest) for spies and mocks (e.g. `vi.spyOn`, `vi.clearAllMocks`, `jest.spyOn`). If you really need concrete code examples of a specific rule, see [coding-examples/common-unit-testing.md](../coding-examples/common-unit-testing.md).
 
 | Avoid | Prefer |
 |-------|--------|
