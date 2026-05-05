@@ -115,6 +115,10 @@
     - [❌ Avoid Verbose null/undefined/Empty-String Checks](#-avoid-verbose-nullundefinedempty-string-checks)
     - [✅ Prefer isNullish, isBlank and Their Negations for Readable Conditions](#-prefer-isnullish-isblank-and-their-negations-for-readable-conditions)
     - [ℹ️ Explanation](#ℹ️-explanation-27)
+  - [*MEDIUM* Avoid Double Negation in Conditions](#medium-avoid-double-negation-in-conditions)
+    - [❌ Avoid Negated Conditions in Ternaries and `if` Guards](#-avoid-negated-conditions-in-ternaries-and-if-guards)
+    - [✅ Prefer Positive-First Conditions with Direct Predicates](#-prefer-positive-first-conditions-with-direct-predicates)
+    - [ℹ️ Why This Pattern Reduces Cognitive Load](#ℹ️-why-this-pattern-reduces-cognitive-load)
   - [*MEDIUM* Prefer Named Exports Over Default Exports](#medium-prefer-named-exports-over-default-exports)
     - [❌ Avoid `export default` Unless Required](#-avoid-export-default-unless-required)
     - [✅ Prefer Explicit Named Exports](#-prefer-explicit-named-exports)
@@ -1446,6 +1450,34 @@ Use `isNullish(value)` for `value === null || value === undefined`; use `!isNull
 
 - **Readability:** Type guards like `isNullish`, `isBlank`, and `isNotBlank` make conditions self-explanatory and reduce repetition.
 - **Consistency:** Using them for these checks keeps the codebase consistent and easier to maintain.
+
+## *MEDIUM* Avoid Double Negation in Conditions
+
+Use direct predicates and positive-first branching so conditions can be read left-to-right without mental inversion.
+
+### ❌ Avoid Negated Conditions in Ternaries and `if` Guards
+
+```ts
+import { isNullish } from "@lichens-innovation/ts-common";
+
+// Negation in a ternary forces mental inversion: "if NOT nullish then..."
+const motorIdLabel = !isNullish(motor.MotorId) ? String(motor.MotorId) : "";
+```
+
+### ✅ Prefer Positive-First Conditions with Direct Predicates
+
+```ts
+import { isNullish } from "@lichens-innovation/ts-common";
+
+// Readable flow: "if nullish use fallback, else transform"
+const rawMotorId = motor.MotorId;
+const motorIdLabel = isNullish(rawMotorId) ? "" : String(rawMotorId);
+```
+
+### ℹ️ Why This Pattern Reduces Cognitive Load
+
+- **Lower cognitive load:** `isNullish(value) ? fallback : mappedValue` is easier to parse than `!isNullish(value) ? mappedValue : fallback`.
+- **Fewer logic mistakes:** Positive-first branching reduces accidental branch swaps when refactoring.
 
 ## *MEDIUM* Prefer Named Exports Over Default Exports
 
