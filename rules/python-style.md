@@ -7,10 +7,15 @@ paths:
 
 ## Python Best Practices
 
-- Follow PEP 8 with 120 character line limit
-- Use double quotes for Python strings
-- Sort imports with `isort`
-- Use f-strings for string formatting
+- Use f-strings for string formatting.
+
+## Linting and Formatting
+
+At the end of each task:
+
+1. Use the project’s linter to lint the files that you updated.
+2. Do the same with the project’s formatter if there is one.
+3. If the project has a library to sort imports, like `isort`, make sure to use it as well.
 
 ## Naming Conventions
 
