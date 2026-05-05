@@ -1,8 +1,8 @@
 {
   "name": "lichens-ai-dev-tools",
   "owner": {
-    "name": "Samuel Daigle",
-    "email": "daigles@lichens.ai"
+    "name": "Lichens Innovation",
+    "email": "info@lichens.ai"
   },
   "metadata": {
     "description": "AI-assisted development tools for Claude Code",
@@ -24,6 +24,11 @@
       "name": "dev",
       "source": "./plugins/dev",
       "description": "General developer tools and skills for Claude Code"
+    },
+    {
+      "name": "ai-tools-manager",
+      "source": "./plugins/ai-tools-manager",
+      "description": "Skills for managing the ai-dev-tools marketplace: create new skills and plugins"
     }
   ]
 }
