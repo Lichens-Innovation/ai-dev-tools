@@ -7,12 +7,38 @@ description: "Scaffolds a new plugin in a local marketplace repository: creates 
 
 Scaffold a new plugin in a local marketplace and register it.
 
+## User's intention
+
+$ARGUMENTS
+
+## References
+
+Consult the relevant doc(s) before making structural decisions:
+
+- [`docs/plugins.md`](docs/plugins.md) — plugin structure, manifest, hooks and relative paths
+- [`docs/marketplace.md`](docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
+- [`docs/skills.md`](docs/skills.md) — skill format, popular repositories, skills CLI
+- [`docs/subagents.md`](docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
+- [`docs/hooks.md`](docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
+- [`docs/rules.md`](docs/rules.md) — rules format and scope
+- [`docs/mcp.md`](docs/mcp.md) — MCP server configuration
+- [`docs/memory.md`](docs/memory.md) — memory system, persistent memory for subagents
+- [`docs/skills-cli.md`](docs/skills-cli.md) — skills CLI commands
+- [`docs/claude-code.md`](docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+
 ## Workflow
 
-1. **Gather info via script**
-   Run: `node <skill-dir>/scripts/gather-plugin-info.cjs`
-   The script prompts the user in the terminal and returns one JSON line:
+1. **Gather info**
+   Run the gather script — it opens a browser form for the user to fill in:
+   ```bash
+   node "${CLAUDE_SKILL_DIR}/scripts/gather-plugin-info.cjs" "$PWD"
+   ```
+   The command blocks until the user submits the form, then prints one JSON line to stdout:
    `{ name, description, keywords, marketplacePath }`
+   Parse and use these values, then immediately clean up:
+   ```bash
+   rm -f plugin-gather-info.json
+   ```
 
 2. **Create plugin directory structure**
    ```
@@ -52,9 +78,8 @@ Scaffold a new plugin in a local marketplace and register it.
    }
    ```
 
-6. **Validate**
-   Run: `claude plugin validate <marketplacePath>/plugins/<name>`
-   Fix any errors before proceeding.
+6. **Hooks**
+   If the plugin needs event hooks, add them to `hooks/hooks.json` in the plugin root (or inline in `plugin.json`) rather than user settings. See [Hooks and Relative Paths](docs/plugins.md#hooks-and-relative-paths).
 
 7. **Report to user**
    - `<marketplacePath>/plugins/<name>/.claude-plugin/plugin.json` created
@@ -62,6 +87,6 @@ Scaffold a new plugin in a local marketplace and register it.
    - `<marketplacePath>/plugins/<name>/README.md` created
    - Entry added to `<marketplacePath>/.claude-plugin/marketplace.json`
    - Next steps:
-     - Add skills: use `create-skill` and point to plugin `<name>`
+     - Use `/create-skill` or `/create-subagent` to populate the plugin with tools
      - Test locally: `claude --plugin-dir <marketplacePath>/plugins/<name>`
-     - Publish: push to Git and `claude plugin marketplace add owner/repo`
+     - Once satisfied with the result, update the marketplace so the plugin becomes visible: `claude plugin marketplace update`
