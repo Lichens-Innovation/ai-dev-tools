@@ -40,10 +40,7 @@ Disabled plugins keep their files but are not loaded by Claude Code.
 
 ### Update
 
-```bash
-claude plugin update <plugin>
-```
-
+Always include the marketplace name — omitting it will fail with "plugin not found": `claude plugin update <plugin>@<marketplace>`.
 A restart is required to apply the update.
 
 ### Remove

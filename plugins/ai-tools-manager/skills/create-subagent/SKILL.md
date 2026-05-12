@@ -9,15 +9,50 @@ Scaffold a new subagent directly inside the chosen plugin of a local marketplace
 
 For Claude Code, subagents are distributed via plugins. The AGENTS.md format is also compatible with other coding tools (Cursor, Copilot, Codex, Gemini, VS Code, Zed).
 
+## User's intention
+
+$ARGUMENTS
+
+## References
+
+Consult the relevant doc(s) before generating subagent content in auto mode or before making structural decisions in manual mode:
+
+- [`docs/subagents.md`](docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
+- [`docs/plugins.md`](docs/plugins.md) — plugin structure, manifest, hooks and relative paths
+- [`docs/hooks.md`](docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
+- [`docs/skills.md`](docs/skills.md) — skill format, popular repositories, skills CLI
+- [`docs/marketplace.md`](docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
+- [`docs/rules.md`](docs/rules.md) — rules format and scope
+- [`docs/mcp.md`](docs/mcp.md) — MCP server configuration
+- [`docs/memory.md`](docs/memory.md) — memory system, persistent memory for subagents
+- [`docs/skills-cli.md`](docs/skills-cli.md) — skills CLI commands
+- [`docs/claude-code.md`](docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+
 ## Workflow
 
-1. **Gather info via script**
-   Run: `node <skill-dir>/scripts/gather-subagent-info.cjs`
-   The script prompts the user in the terminal and returns one JSON line:
-   `{ name, description, triggers, tools, marketplacePath, plugin }`
+1. **Gather info**
+   Run the gather script — it opens a browser form for the user to fill in:
 
-2. **Create agent directory and AGENTS.md**
-   Create `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md` with a minimal skeleton — do not impose a structure:
+   ```bash
+   node "${CLAUDE_SKILL_DIR}/scripts/gather-subagent-info.cjs" "$PWD"
+   ```
+
+   The command blocks until the user submits the form, then prints one JSON line to stdout.
+   Parse the JSON and check the `mode` field, then immediately clean up:
+
+   ```bash
+   rm -f subagent-gather-info.json
+   ```
+
+2. **Create agent directory and AGENTS.md** — behaviour depends on `mode`:
+
+   **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, name, idea, marketplacePath, plugin }`:
+   - Use `name` if provided, otherwise derive a concise kebab-case name from the idea.
+   - Generate a complete, ready-to-use AGENTS.md: a clear role description, when-to-apply conditions, tool list, full step-by-step workflow, and expected output format — as if a domain expert wrote it. Do not leave placeholder text.
+
+   **Manual mode** (`mode: "manual"`) — the JSON contains `{ mode, name, description, triggers, tools, marketplacePath, plugin }`:
+   - Use the provided values as-is.
+   - Create a minimal skeleton the user will fill in:
 
    ```markdown
    # <Title Case of name>
@@ -46,12 +81,11 @@ For Claude Code, subagents are distributed via plugins. The AGENTS.md format is 
    Describe the expected output format here.
    ```
 
-3. **Report to user**
+3. **Hooks**
+   If the subagent needs event hooks, add them to the plugin rather than user settings so they're distributed automatically. See [Hooks and Relative Paths](docs/plugins.md#hooks-and-relative-paths).
+
+4. **Report to user**
    - `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md` created
-   - The root `agents/` folder will be updated automatically when changes are merged to `main` via the `sync-skills` GitHub Action
    - Next steps:
-     - Fill in `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md` with the full workflow
-     - To make the main thread coordinate this subagent, give it a skill that delegates using the `Agent` tool
-     - Enable persistent memory for the subagent: set `memory: project` in its settings — see [Claude Code docs](https://code.claude.com/docs/en/sub-agents#enable-persistent-memory)
-     - To run the main thread itself as a named subagent, use the `agent` key in `settings.json`
-     - Use `TaskCreate` in the coordinator session so it does not lose track of delegated work
+     - Fill in `AGENTS.md` with the full workflow (manual mode)
+     - Once satisfied with the result, update the marketplace so the agent becomes visible: `claude plugin marketplace update`
