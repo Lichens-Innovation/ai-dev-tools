@@ -15,16 +15,16 @@ $ARGUMENTS
 
 Consult the relevant doc(s) before making structural decisions:
 
-- [`docs/marketplace.md`](docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
-- [`docs/plugins.md`](docs/plugins.md) — plugin structure, manifest, hooks and relative paths
-- [`docs/skills.md`](docs/skills.md) — skill format, popular repositories, skills CLI
-- [`docs/subagents.md`](docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
-- [`docs/hooks.md`](docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
-- [`docs/rules.md`](docs/rules.md) — rules format and scope
-- [`docs/mcp.md`](docs/mcp.md) — MCP server configuration
-- [`docs/memory.md`](docs/memory.md) — memory system, persistent memory for subagents
-- [`docs/skills-cli.md`](docs/skills-cli.md) — skills CLI commands
-- [`docs/claude-code.md`](docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+- [`docs/marketplace.md`](${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
+- [`docs/plugins.md`](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md) — plugin structure, manifest, hooks and relative paths
+- [`docs/skills.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills.md) — skill format, popular repositories, skills CLI
+- [`docs/subagents.md`](${CLAUDE_SKILL_DIR}/../../../../docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
+- [`docs/hooks.md`](${CLAUDE_SKILL_DIR}/../../../../docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
+- [`docs/rules.md`](${CLAUDE_SKILL_DIR}/../../../../docs/rules.md) — rules format and scope
+- [`docs/mcp.md`](${CLAUDE_SKILL_DIR}/../../../../docs/mcp.md) — MCP server configuration
+- [`docs/memory.md`](${CLAUDE_SKILL_DIR}/../../../../docs/memory.md) — memory system, persistent memory for subagents
+- [`docs/skills-cli.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills-cli.md) — skills CLI commands
+- [`docs/claude-code.md`](${CLAUDE_SKILL_DIR}/../../../../docs/claude-code.md) — Claude Code settings, commands, IDE integrations
 
 ## Workflow
 
@@ -105,7 +105,7 @@ Consult the relevant doc(s) before making structural decisions:
    | GitLab    | `GITLAB_TOKEN` or `GL_TOKEN` |
    | Bitbucket | `BITBUCKET_TOKEN`            |
 
-   Add to `.bashrc` / `.zshrc` so it persists. For CI, set as a secret. See `docs/marketplace.md#private-repositories`.
+   Add to `.bashrc` / `.zshrc` so it persists. For CI, set as a secret. See `${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md#private-repositories`.
 
 8. **Report to user**
    - `<targetDir>/.claude-plugin/marketplace.json` created
