@@ -1,11 +1,9 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import { useStore } from '@tanstack/react-store'
 import Footer from '../components/Footer'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
-import { useEffect } from 'react'
-import { closeSidebar, sidebarStore } from '../store/sidebar-store'
+import ChatSidebar from '../components/ChatSidebar'
 import { listDocs } from '../utils/docs'
 
 import appCss from '../styles.css?url'
@@ -43,21 +41,11 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { docs } = Route.useLoaderData()
-  const sidebarOpen = useStore(sidebarStore, (s) => s.isOpen)
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && sidebarOpen) {
-        closeSidebar()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [sidebarOpen])
 
   return (
     <>
       <Sidebar docs={docs} />
+      <ChatSidebar />
       <div>
         <Header />
         <Outlet />
