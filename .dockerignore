@@ -1,6 +1,7 @@
 node_modules
 apps/*/node_modules
 apps/*/dist
+apps/ai-tools-manager/.output
 .git
 .env*
 *.log

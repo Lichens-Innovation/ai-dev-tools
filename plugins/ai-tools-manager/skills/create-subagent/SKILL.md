@@ -30,21 +30,7 @@ Consult the relevant doc(s) before generating subagent content in auto mode or b
 
 ## Workflow
 
-1. **Gather info**
-   Run the gather script — it opens a browser form for the user to fill in:
-
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/gather-subagent-info.cjs" "$PWD"
-   ```
-
-   The command blocks until the user submits the form, then prints one JSON line to stdout.
-   Parse the JSON and check the `mode` field, then immediately clean up:
-
-   ```bash
-   rm -f subagent-gather-info.json
-   ```
-
-2. **Create agent directory and AGENTS.md** — behaviour depends on `mode`:
+1. **Create agent directory and AGENTS.md** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with a `mode` field. Behaviour depends on `mode`:
 
    **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, name, idea, marketplacePath, plugin }`:
    - Use `name` if provided, otherwise derive a concise kebab-case name from the idea.
@@ -81,10 +67,10 @@ Consult the relevant doc(s) before generating subagent content in auto mode or b
    Describe the expected output format here.
    ```
 
-3. **Hooks**
+2. **Hooks**
    If the subagent needs event hooks, add them to the plugin rather than user settings so they're distributed automatically. See [Hooks and Relative Paths](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md#hooks-and-relative-paths).
 
-4. **Report to user**
+3. **Report to user**
    - `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md` created
    - Next steps:
      - Fill in `AGENTS.md` with the full workflow (manual mode)

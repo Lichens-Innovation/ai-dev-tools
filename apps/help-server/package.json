@@ -41,6 +41,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@repo/claude-fs": "*",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@tailwindcss/typography": "^0.5.16",

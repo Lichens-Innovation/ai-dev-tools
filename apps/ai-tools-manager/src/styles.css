@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+:root {
+  --color-page: #0d0d0d;
+  --color-card: #1a1a1a;
+  --color-border: #2e2e2e;
+  --color-border-hover: #444;
+  --color-border-active: #e8e8e8;
+  --color-surface: #111;
+  --color-surface-active: #222;
+  --color-text: #e8e8e8;
+  --color-text-muted: #666;
+  --color-text-dim: #777;
+  --color-text-label: #999;
+  --color-text-hint: #555;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-text);
+}
