@@ -1,8 +1,5 @@
-import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const HOME = process.env.HOME || ''
-export const CLAUDE_DIR = path.join(HOME, '.claude')
 const PROJECT_ROOT = path.resolve(process.cwd(), '../..')
 export const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins')
 export const RULES_DIR = path.join(PROJECT_ROOT, 'rules')
@@ -22,13 +19,4 @@ export function parseFrontmatter(content: string): Record<string, string> {
     result[key] = value
   }
   return result
-}
-
-export async function readJsonSafe<T>(filePath: string): Promise<T | null> {
-  try {
-    const content = await readFile(filePath, 'utf-8')
-    return JSON.parse(content) as T
-  } catch {
-    return null
-  }
 }

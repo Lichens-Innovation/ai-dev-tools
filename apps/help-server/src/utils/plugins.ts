@@ -1,22 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import {
-  CLAUDE_DIR,
-  PLUGINS_DIR,
-  MARKETPLACE_JSON,
-  parseFrontmatter,
-  readJsonSafe,
-} from './helpers'
+import type { InstalledPlugin } from '@repo/claude-fs'
+import { getInstalledPlugins as getInstalledPluginsData, readJsonSafe } from '@repo/claude-fs'
+import { PLUGINS_DIR, MARKETPLACE_JSON, parseFrontmatter } from './helpers'
 
-export interface InstalledPlugin {
-  key: string
-  marketplace: string
-  pluginName: string
-  version: string
-  scope: string
-  installedAt: string
-}
+export type { InstalledPlugin }
 
 export interface SkillInfo {
   name: string
@@ -33,32 +22,9 @@ export interface MarketplacePluginInfo {
   installCommand: string
 }
 
-export const getInstalledPlugins = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<InstalledPlugin[]> => {
-    const data = await readJsonSafe<{
-      version: number
-      plugins: Record<
-        string,
-        { scope: string; version: string; installedAt: string }[]
-      >
-    }>(path.join(CLAUDE_DIR, 'plugins', 'installed_plugins.json'))
-
-    if (!data) return []
-
-    return Object.entries(data.plugins).map(([key, installs]) => {
-      const install = installs[0]
-      const [pluginName, marketplace] = key.split('@')
-      return {
-        key,
-        marketplace: marketplace,
-        pluginName: pluginName,
-        version: install.version,
-        scope: install.scope,
-        installedAt: install.installedAt,
-      }
-    })
-  },
-)
+export const getInstalledPlugins = createServerFn({ method: 'GET' }).handler(async (): Promise<InstalledPlugin[]> => {
+  return getInstalledPluginsData()
+})
 
 export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
   async (): Promise<MarketplacePluginInfo[]> => {
@@ -69,10 +35,8 @@ export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
 
     if (!marketplace) return []
 
-    const installedData = await readJsonSafe<{
-      plugins: Record<string, unknown[]>
-    }>(path.join(CLAUDE_DIR, 'plugins', 'installed_plugins.json'))
-    const installedKeys = new Set(Object.keys(installedData?.plugins ?? {}))
+    const installedPlugins = await getInstalledPluginsData()
+    const installedKeys = new Set(installedPlugins.map((p) => p.key))
     const marketplaceName = marketplace.name
 
     const results: MarketplacePluginInfo[] = []
@@ -93,16 +57,10 @@ export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
       try {
         const skillDirs = await readdir(skillsDir)
         for (const skillName of skillDirs) {
-          const skillMd = await readFile(
-            path.join(skillsDir, skillName, 'SKILL.md'),
-            'utf-8',
-          ).catch(() => null)
+          const skillMd = await readFile(path.join(skillsDir, skillName, 'SKILL.md'), 'utf-8').catch(() => null)
           if (!skillMd) continue
           const fm = parseFrontmatter(skillMd)
-          skills.push({
-            name: fm.name || skillName,
-            description: fm.description || '',
-          })
+          skills.push({ name: fm.name || skillName, description: fm.description || '' })
         }
       } catch {}
 
@@ -110,18 +68,11 @@ export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
       try {
         const agentDirs = await readdir(agentsDir)
         for (const agentName of agentDirs) {
-          const agentMd = await readFile(
-            path.join(agentsDir, agentName, 'AGENTS.md'),
-            'utf-8',
-          ).catch(() => null)
+          const agentMd = await readFile(path.join(agentsDir, agentName, 'AGENTS.md'), 'utf-8').catch(() => null)
           if (!agentMd) continue
           const fm = parseFrontmatter(agentMd)
-          const firstHeading =
-            agentMd.match(/^#\s+(.+)/m)?.[1]?.trim() ?? agentName
-          agents.push({
-            name: fm.name || agentName,
-            description: fm.description || firstHeading,
-          })
+          const firstHeading = agentMd.match(/^#\s+(.+)/m)?.[1]?.trim() ?? agentName
+          agents.push({ name: fm.name || agentName, description: fm.description || firstHeading })
         }
       } catch {}
 

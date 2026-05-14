@@ -1,0 +1,10 @@
+{
+  "extends": "../../packages/typescript-config/react.json",
+  "include": ["**/*.ts", "**/*.tsx", "vite.config.ts"],
+  "compilerOptions": {
+    "paths": {
+      "#/*": ["./src/*"],
+      "@/*": ["./src/*"]
+    }
+  }
+}

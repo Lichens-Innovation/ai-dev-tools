@@ -18,4 +18,5 @@ services:
       - /app/apps/help-server/dist
     environment:
       - NODE_ENV=development
+      - RUNNING_IN_DOCKER=true
     command: yarn workspace helper-server dev

@@ -28,18 +28,7 @@ Consult the relevant doc(s) before generating skill content in auto mode or befo
 
 ## Workflow
 
-1. **Gather info**
-   Run the gather script — it opens a browser form for the user to fill in:
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/gather-skill-info.cjs" "$PWD"
-   ```
-   The command blocks until the user submits the form, then prints one JSON line to stdout.
-   Parse the JSON and check the `mode` field, then immediately clean up:
-   ```bash
-   rm -f skill-gather-info.json
-   ```
-
-2. **Create skill directory and SKILL.md** — behaviour depends on `mode`:
+1. **Create skill directory and SKILL.md** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with a `mode` field. Behaviour depends on `mode`:
 
    **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, name, idea, marketplacePath, plugin }`:
    - Use `name` if provided, otherwise derive a concise kebab-case name from the idea.
@@ -61,15 +50,16 @@ Consult the relevant doc(s) before generating skill content in auto mode or befo
    Add instructions here. Structure freely: step-by-step workflow, reference tables, decision trees — whatever fits the skill.
 
    Optional subdirectories (create only if needed):
-   - `scripts/`    — executable helpers (Node.js, Python, shell)
+
+   - `scripts/` — executable helpers (Node.js, Python, shell)
    - `references/` — supporting docs or templates
-   - `assets/`     — static files (images, data)
+   - `assets/` — static files (images, data)
    ```
 
-3. **Hooks**
+2. **Hooks**
    If the skill needs a hook (e.g. to collect input before the skill runs), add it to the plugin instead of user settings so it's distributed automatically. See [Hooks and Relative Paths](${CLAUDE_SKILL_DIR}/../../docs/plugins.md#hooks-and-relative-paths).
 
-4. **Report to user**
+3. **Report to user**
    - `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md` created
    - Next steps:
      - Fill in `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md` with instructions

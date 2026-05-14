@@ -28,19 +28,9 @@ Consult the relevant doc(s) before making structural decisions:
 
 ## Workflow
 
-1. **Gather info**
-   Run the gather script — it opens a browser form for the user to fill in:
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/gather-marketplace-info.cjs" "$PWD"
-   ```
-   The command blocks until the user submits the form, then prints one JSON line to stdout:
-   `{ name, description, ownerName, ownerEmail, homepage, targetDir, privateRepo }`
-   Parse and use these values, then immediately clean up:
-   ```bash
-   rm -f marketplace-gather-info.json
-   ```
+The form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. Parse the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` and proceed:
 
-2. **Create marketplace directory structure**
+1. **Create marketplace directory structure**
    ```
    <targetDir>/
    ├── .claude-plugin/
@@ -50,7 +40,7 @@ Consult the relevant doc(s) before making structural decisions:
    └── README.md
    ```
 
-3. **Write `.claude-plugin/marketplace.json`**
+2. **Write `.claude-plugin/marketplace.json`**
    ```json
    {
      "name": "<name>",
@@ -68,7 +58,7 @@ Consult the relevant doc(s) before making structural decisions:
    ```
    Omit `homepage` if the user left it blank.
 
-4. **Write `README.md`**
+3. **Write `README.md`**
    Minimal: title, one-line description, install instructions:
    ```markdown
    # <name>
@@ -83,10 +73,10 @@ Consult the relevant doc(s) before making structural decisions:
    \`\`\`
    ```
 
-5. **Write `CLAUDE.md`**
+4. **Write `CLAUDE.md`**
    Short context file for Claude Code sessions opened inside this marketplace repo. Explain that this is a marketplace catalog, point at `.claude-plugin/marketplace.json`, and describe the plugin source layout convention.
 
-6. **Configure auto-updates**
+5. **Configure auto-updates**
    Third-party and local marketplaces have auto-update **disabled** by default. To enable once the marketplace is registered:
    - Run `/plugin` → **Marketplaces** tab → select marketplace → **Enable auto-update**.
 
@@ -96,7 +86,7 @@ Consult the relevant doc(s) before making structural decisions:
    export FORCE_AUTOUPDATE_PLUGINS=1     # keep plugin auto-update, disable Claude Code updates
    ```
 
-7. **Configure private repository access** _(only if `privateRepo` is true)_
+6. **Configure private repository access** _(only if `privateRepo` is true)_
    For background auto-update at startup, credential helpers are skipped — set the matching env var:
 
    | Provider  | Env vars                     |
@@ -107,7 +97,7 @@ Consult the relevant doc(s) before making structural decisions:
 
    Add to `.bashrc` / `.zshrc` so it persists. For CI, set as a secret. See `${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md#private-repositories`.
 
-8. **Report to user**
+7. **Report to user**
    - `<targetDir>/.claude-plugin/marketplace.json` created
    - `<targetDir>/plugins/`, `README.md`, and `CLAUDE.md` created
    - Next steps:
