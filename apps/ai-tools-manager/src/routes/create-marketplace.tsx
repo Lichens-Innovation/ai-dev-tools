@@ -27,12 +27,11 @@ interface FormPayload {
 // ---------------------------------------------------------------------------
 
 const getMarketplaceDefaults = createServerFn({ method: "GET" }).handler(async (): Promise<MarketplaceDefaults> => {
-  try {
+  if (process.env.RUNNING_IN_DOCKER) {
     const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8"));
     return { cwd: data.cwd ?? "" };
-  } catch {
-    return { cwd: "" };
   }
+  return { cwd: "" };
 });
 
 const submitMarketplaceForm = createServerFn({ method: "POST" })
@@ -111,8 +110,8 @@ function CreateMarketplace() {
 
   return (
     <Page>
-      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-white">New Marketplace</h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--color-text-muted)" }}>
+      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-(--ink)">New Marketplace</h1>
+      <p className="mb-6 text-sm" style={{ color: "var(--ink-3)" }}>
         Scaffold a new plugin marketplace with manifest and documentation.
       </p>
 
@@ -182,18 +181,18 @@ function CreateMarketplace() {
               style={{
                 width: 16,
                 height: 16,
-                accentColor: "var(--color-border-active)",
+                accentColor: "var(--primary)",
                 cursor: "pointer",
               }}
             />
             <label
               htmlFor="private-repo"
               className="cursor-pointer text-sm"
-              style={{ color: "var(--color-text)" }}
+              style={{ color: "var(--ink)" }}
             >
               Private repository
             </label>
-            <span className="text-xs" style={{ color: "var(--color-text-hint)" }}>
+            <span className="text-xs" style={{ color: "var(--ink-3)" }}>
               — adds token-based auth setup instructions
             </span>
           </div>

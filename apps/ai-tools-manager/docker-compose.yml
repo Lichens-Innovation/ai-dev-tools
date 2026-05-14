@@ -15,5 +15,6 @@ services:
       - /tmp/ai-tools-marketplace.json:/tmp/marketplace-data.json:ro
     environment:
       - NODE_ENV=development
+      - RUNNING_IN_DOCKER=true
       - RESULT_FILE=/tmp/result.json
 

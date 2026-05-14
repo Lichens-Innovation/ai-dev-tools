@@ -25,10 +25,10 @@ interface FormPayload {
 // ---------------------------------------------------------------------------
 
 const getMarketplaceList = createServerFn({ method: "GET" }).handler(async (): Promise<MarketplaceList> => {
-  try {
+  if (process.env.RUNNING_IN_DOCKER) {
     const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8"));
-    if (data.marketplaces?.length > 0) return { marketplaces: data.marketplaces };
-  } catch { /* fall through */ }
+    return { marketplaces: data.marketplaces };
+  }
 
   const localMarketplaces = await getLocalMarketplaces();
   return { marketplaces: Object.keys(localMarketplaces) };
@@ -104,8 +104,8 @@ function CreatePlugin() {
 
   return (
     <Page>
-      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-white">New Plugin</h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--color-text-muted)" }}>
+      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-(--ink)">New Plugin</h1>
+      <p className="mb-6 text-sm" style={{ color: "var(--ink-3)" }}>
         Scaffold a new plugin and register it in the marketplace.
       </p>
 

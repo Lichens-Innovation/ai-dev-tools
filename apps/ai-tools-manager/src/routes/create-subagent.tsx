@@ -32,10 +32,9 @@ interface FormPayload {
 // ---------------------------------------------------------------------------
 
 const getMarketplaceData = createServerFn({ method: "GET" }).handler(async (): Promise<MarketplaceData> => {
-  try {
-    const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as MarketplaceData;
-    if (data.marketplaces.length > 0) return data;
-  } catch { /* fall through */ }
+  if (process.env.RUNNING_IN_DOCKER) {
+    return JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as MarketplaceData;
+  }
 
   const localMarketplaces = await getLocalMarketplaces();
   const byMarketplace: Record<string, string[]> = {};
@@ -135,8 +134,8 @@ function CreateSubagent() {
 
   return (
     <Page>
-      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-white">New Subagent</h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--color-text-muted)" }}>
+      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-(--ink)">New Subagent</h1>
+      <p className="mb-6 text-sm" style={{ color: "var(--ink-3)" }}>
         Choose how you want to create the subagent.
       </p>
 
