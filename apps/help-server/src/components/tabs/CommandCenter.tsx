@@ -20,7 +20,7 @@ function ScopeChip({ scope }: { scope: string }) {
   return (
     <span
       className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-        isUser ? 'border-ring bg-(--amber-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
+        isUser ? 'border-ring bg-(--primary-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
       }`}
     >
       {scope}
@@ -37,7 +37,7 @@ const cmdColumns = [
       const value = getValue()
       return (
         <CopyableText text={value} className="inline-block">
-          <span className="inline-block rounded-md border border-ring bg-(--amber-dim) px-2 py-0.5 font-mono text-[12px] text-primary transition group-hover:border-primary group-hover:bg-(--amber-glow)">
+          <span className="inline-block rounded-md border border-ring bg-(--primary-dim) px-2 py-0.5 font-mono text-[12px] text-primary transition group-hover:border-primary group-hover:bg-(--primary-glow)">
             {value}
           </span>
         </CopyableText>
@@ -103,7 +103,7 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
                     className="border-b border-(--line) last:border-0 hover:bg-(--bg-3) transition-colors"
                   >
                     <td className="px-4 py-2.5">
-                      <span className="inline-block rounded-md border border-ring bg-(--amber-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
+                      <span className="inline-block rounded-md border border-ring bg-(--primary-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
                         {p.pluginName}
                       </span>
                     </td>

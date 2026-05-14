@@ -28,7 +28,7 @@ const columns = [
     filterFn: nameSearchFilter,
     cell: ({ row }) => (
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="inline-block rounded-md border border-ring bg-(--amber-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
+        <span className="inline-block rounded-md border border-ring bg-(--primary-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
           {row.original.name}
         </span>
         {row.original.isInstalled && (
@@ -49,7 +49,7 @@ const columns = [
       return (
         <span
           className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-            isAnthropic ? 'border-ring bg-(--amber-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
+            isAnthropic ? 'border-ring bg-(--primary-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
           }`}
         >
           {label}
@@ -78,7 +78,7 @@ const columns = [
           className="inline-block"
           previewText="Click to copy install command"
         >
-          <code className="inline-block rounded-md border border-(--line) bg-(--bg-2) px-2.5 py-1.5 font-mono text-[12px] text-(--ink-2) transition group-hover:border-ring group-hover:bg-(--amber-dim) group-hover:text-primary">
+          <code className="inline-block rounded-md border border-(--line) bg-(--bg-2) px-2.5 py-1.5 font-mono text-[12px] text-(--ink-2) transition group-hover:border-ring group-hover:bg-(--primary-dim) group-hover:text-primary">
             {row.original.installCommand}
           </code>
         </CopyableText>

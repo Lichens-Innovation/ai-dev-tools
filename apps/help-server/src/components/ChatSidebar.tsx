@@ -179,7 +179,7 @@ export default function ChatSidebar() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && !error && skillAvailable !== false && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--amber-dim)">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--primary-dim)">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-primary">
                 <path
                   d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
@@ -201,7 +201,7 @@ export default function ChatSidebar() {
           <div key={i} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                msg.role === 'user' ? 'border border-ring bg-(--amber-dim) text-primary' : 'bg-(--bg-3) text-(--ink)'
+                msg.role === 'user' ? 'border border-ring bg-(--primary-dim) text-primary' : 'bg-(--bg-3) text-(--ink)'
               }`}
             >
               {msg.content.split('\n').map((line, li) => (
@@ -306,7 +306,7 @@ export default function ChatSidebar() {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading || skillAvailable === false || localOnly}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-(--amber-3) text-[#1c1917] transition hover:bg-(--amber-2) disabled:opacity-40 disabled:hover:bg-(--amber-3)"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-(--primary-3) text-[#1c1917] transition hover:bg-(--primary-2) disabled:opacity-40 disabled:hover:bg-(--primary-3)"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path

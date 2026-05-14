@@ -29,7 +29,7 @@ export default function Sidebar({ docs }: SidebarProps) {
                 className="flex items-center gap-2 rounded-sm px-5 py-2 text-[13px] text-(--ink-2) no-underline hover:bg-(--bg-3) hover:text-(--ink)"
                 activeProps={{
                   className:
-                    'flex items-center gap-2 rounded-sm px-5 py-2 text-[13px] text-primary no-underline bg-(--amber-dim) border-l-2 border-primary -ml-px',
+                    'flex items-center gap-2 rounded-sm px-5 py-2 text-[13px] text-primary no-underline bg-(--primary-dim) border-l-2 border-primary -ml-px',
                 }}
               >
                 {doc.title}

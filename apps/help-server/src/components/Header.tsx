@@ -218,7 +218,7 @@ export default function Header() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleSelect(section)}
                         className={`flex w-full flex-col gap-1 rounded-sm px-4 py-2.5 text-left mx-1 my-0.5 ${
-                          i === selectedIndex ? 'bg-(--amber-dim)' : 'hover:bg-(--bg-3)'
+                          i === selectedIndex ? 'bg-(--primary-dim)' : 'hover:bg-(--bg-3)'
                         }`}
                       >
                         <div className="flex items-center gap-1.5 text-[12px] text-subtle">
@@ -226,7 +226,7 @@ export default function Header() {
                             searchWords={[query]}
                             textToHighlight={section.docTitle}
                             autoEscape
-                            highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                            highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                           />
                           {section.headingText !== section.docTitle && (
                             <>
@@ -235,7 +235,7 @@ export default function Header() {
                                 searchWords={[query]}
                                 textToHighlight={section.headingText}
                                 autoEscape
-                                highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                                highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                               />
                             </>
                           )}
@@ -245,7 +245,7 @@ export default function Header() {
                             searchWords={[query]}
                             textToHighlight={getSnippet(section.bodyText, query)}
                             autoEscape
-                            highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                            highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                           />
                         </p>
                       </button>
@@ -265,7 +265,7 @@ export default function Header() {
             aria-label={chatOpen ? 'Close help chat' : 'Open help chat'}
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-1.5 transition ${
               chatOpen
-                ? 'bg-(--amber-3) text-[#1c1917] hover:bg-(--amber-2)'
+                ? 'bg-(--primary-3) text-[#1c1917] hover:bg-(--primary-2)'
                 : 'text-(--ink-2) hover:bg-(--bg-3) hover:text-(--ink)'
             }`}
           >
