@@ -38,3 +38,60 @@ On Claude side, `/skill-creator` is the equivalent skill. However, it can be ins
 | Resources      | scripts / references / assets clearly defined            | scripts/ and optional files (reference.md, examples.md)  |
 | Packaging      | Yes → distributable `.skill` file                        | No, skills created in place                              |
 | Best practices | Structure, progressive disclosure, "what not to include" | Descriptions, anti-patterns, writing patterns, checklist |
+
+## Inject Dynamic Context
+
+The `` !`<command>` `` syntax runs shell commands before the skill content is sent to Claude. The command output replaces the placeholder, so Claude receives actual data, not the command itself.
+
+Example skill that summarizes a pull request by fetching live PR data:
+
+```yaml
+---
+name: pr-summary
+description: Summarize changes in a pull request
+---
+
+## Pull request context
+- PR diff: !`gh pr diff`
+- PR comments: !`gh pr view --comments`
+- Changed files: !`gh pr diff --name-only`
+
+## Your task
+Summarize this pull request...
+```
+
+When this skill runs:
+
+1. Each `` !`<command>` `` executes immediately (before Claude sees anything)
+2. The output replaces the placeholder in the skill content
+3. Claude receives the fully-rendered prompt with actual data
+
+This is preprocessing, not something Claude executes. Claude only sees the final result.
+
+For multi-line commands, use a fenced code block opened with ` ```! ` instead of the inline form:
+
+````markdown
+## Environment
+
+```!
+node --version
+npm --version
+git status --short
+```
+````
+
+### Limitations
+
+Note that the !`` syntax in skills is synchronous AND is called before Claude sees the skill, so when using a hook as well to set the content to inject, the hook must be **PRIOR TO PreToolUse**.
+
+### Alternatives
+
+An alternative is to use the json output field `additionalContext` to your hook if you want to give more context to your skill, but bypass the dynamic context injection
+
+## Skill Path
+
+Use `${CLAUDE_SKILL_DIR}` to point Claude to the directory where the skill is located.
+
+## Security
+
+To disable the users to inject dynamic content inside skills, set `"disableSkillShellExecution": true` in settings. This setting is most useful in managed settings, where users cannot override it.

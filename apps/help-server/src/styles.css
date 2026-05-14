@@ -20,14 +20,12 @@
   --bg-elev: #ffffff;
   --line: #e0ddd7;
   --line-2: #d0ccc5;
-  /* Accent — was coral; switched to sky blue. Variable name kept as
-     --amber for source-compat with existing components. */
-  --amber: #0369a1;
-  --amber-2: #0284c7;
-  --amber-3: #0ea5e9;
-  --amber-dim: rgba(3, 105, 161, 0.08);
-  --amber-dim-2: rgba(3, 105, 161, 0.2);
-  --amber-glow: rgba(3, 105, 161, 0.28);
+  --primary: #0369a1;
+  --primary-2: #0284c7;
+  --primary-3: #0ea5e9;
+  --primary-dim: rgba(3, 105, 161, 0.08);
+  --primary-dim-2: rgba(3, 105, 161, 0.2);
+  --primary-glow: rgba(3, 105, 161, 0.28);
   --green: #15803d;
   --green-dim: rgba(21, 128, 61, 0.1);
   --red: #dc2626;
@@ -64,14 +62,12 @@
   /* Borders — brighter so table rows and panels actually have edges */
   --line: #36322c;
   --line-2: #4a463f;
-  /* Amber — push toward warm gold so it pops on dark */
-  /* Accent — sky blue, tuned for warm-stone dark bg */
-  --amber: #38bdf8;
-  --amber-2: #7dd3fc;
-  --amber-3: #bae6fd;
-  --amber-dim: rgba(56, 189, 248, 0.14);
-  --amber-dim-2: rgba(56, 189, 248, 0.28);
-  --amber-glow: rgba(56, 189, 248, 0.42);
+  --primary: #38bdf8;
+  --primary-2: #7dd3fc;
+  --primary-3: #bae6fd;
+  --primary-dim: rgba(56, 189, 248, 0.14);
+  --primary-dim-2: rgba(56, 189, 248, 0.28);
+  --primary-glow: rgba(56, 189, 248, 0.42);
   --green: #5eead4;
   --green-dim: rgba(94, 234, 212, 0.12);
   --red: #fca5a5;
@@ -111,14 +107,14 @@
   --color-muted: var(--bg-3);
   --color-muted-foreground: var(--ink-2);
   --color-subtle: var(--ink-3);
-  --color-primary: var(--amber);
+  --color-primary: var(--primary);
   --color-primary-foreground: var(--bg);
   --color-secondary: var(--bg-3);
   --color-secondary-foreground: var(--ink-2);
   --color-destructive: var(--red);
   --color-destructive-foreground: var(--ink);
   --color-success: var(--green);
-  --color-ring: var(--amber-dim-2);
+  --color-ring: var(--primary-dim-2);
   --color-input: var(--line);
   --color-popover: var(--bg-2);
   --color-popover-foreground: var(--ink);
@@ -162,20 +158,20 @@ footer.TanStackRouterDevtools {
 }
 
 ::selection {
-  background: var(--amber-dim-2);
+  background: var(--primary-dim-2);
   color: var(--ink);
 }
 
 a {
-  color: var(--amber);
+  color: var(--primary);
   text-decoration: underline;
-  text-decoration-color: var(--amber-dim-2);
+  text-decoration-color: var(--primary-dim-2);
   text-underline-offset: 2px;
   transition: text-decoration-color 150ms ease;
 }
 
 a:hover {
-  text-decoration-color: var(--amber);
+  text-decoration-color: var(--primary);
 }
 
 code,
@@ -211,13 +207,13 @@ pre code {
   --tw-prose-body: var(--ink-2);
   --tw-prose-headings: var(--ink);
   --tw-prose-lead: var(--ink-2);
-  --tw-prose-links: var(--amber);
+  --tw-prose-links: var(--primary);
   --tw-prose-bold: var(--ink);
   --tw-prose-counters: var(--ink-3);
   --tw-prose-bullets: var(--ink-3);
   --tw-prose-hr: var(--line);
   --tw-prose-quotes: var(--ink);
-  --tw-prose-quote-borders: var(--amber);
+  --tw-prose-quote-borders: var(--primary);
   --tw-prose-captions: var(--ink-3);
   --tw-prose-code: var(--ink);
   --tw-prose-pre-code: var(--ink);
@@ -309,7 +305,7 @@ pre code {
   inset: 0;
   background: radial-gradient(
     120% 80% at 0% 0%,
-    var(--amber-dim),
+    var(--primary-dim),
     transparent 55%
   );
   opacity: 0.6;
@@ -339,7 +335,7 @@ pre code {
 
 .section-label::before {
   content: '//';
-  color: var(--amber);
+  color: var(--primary);
   font-weight: 500;
   letter-spacing: 0.04em;
 }
@@ -359,8 +355,9 @@ pre code {
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--primary);
 }
+
 .eyebrow::before {
   content: '// ';
   opacity: 0.65;
@@ -404,9 +401,9 @@ pre code {
   font-size: 0.75rem;
   font-weight: 500;
   border-radius: 6px;
-  border: 1px solid var(--amber-dim-2);
-  background: var(--amber-dim);
-  color: var(--amber);
+  border: 1px solid var(--primary-dim-2);
+  background: var(--primary-dim);
+  color: var(--primary);
 }
 .chip-local {
   border-color: var(--line-2);
@@ -426,9 +423,9 @@ pre code {
   text-transform: uppercase;
 }
 .scope-badge.user {
-  color: var(--amber);
-  background: var(--amber-dim);
-  border: 1px solid var(--amber-dim-2);
+  color: var(--primary);
+  background: var(--primary-dim);
+  border: 1px solid var(--primary-dim-2);
 }
 .scope-badge.local {
   color: var(--ink-2);
@@ -520,7 +517,7 @@ pre code {
   right: 0.75rem;
   bottom: -1px;
   height: 2px;
-  background: var(--amber);
+  background: var(--primary);
   border-radius: 2px;
 }
 
@@ -550,16 +547,16 @@ pre code {
   border-color: var(--line-2);
 }
 .btn.primary {
-  background: var(--amber);
+  background: var(--primary);
   color: #1c1917;
-  border-color: var(--amber);
+  border-color: var(--primary);
 }
 .dark .btn.primary {
   color: #1c1917;
 }
 .btn.primary:hover {
-  background: var(--amber-2);
-  border-color: var(--amber-2);
+  background: var(--primary-2);
+  border-color: var(--primary-2);
 }
 .btn.pill {
   border-radius: 999px;
@@ -604,7 +601,7 @@ pre code {
   color: var(--ink-3);
 }
 .input:focus {
-  border-color: var(--amber);
+  border-color: var(--primary);
   background: var(--bg-3);
 }
 
@@ -667,7 +664,7 @@ pre code {
 }
 .cmd-row .name::before {
   content: '/';
-  color: var(--amber);
+  color: var(--primary);
   font-weight: 600;
 }
 .cmd-row .desc {
@@ -766,7 +763,7 @@ button:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 4px var(--amber-dim-2);
+    0 0 0 4px var(--primary-dim-2);
 }
 
 table th,

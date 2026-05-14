@@ -40,7 +40,7 @@ function makeHeadingComponent(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', sear
             searchWords={searchWords}
             textToHighlight={text}
             autoEscape
-            highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+            highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
           />
         ) : (
           children
@@ -59,7 +59,7 @@ function makeTextComponent(searchWords: string[]) {
         searchWords={searchWords}
         textToHighlight={children}
         autoEscape
-        highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+        highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
       />
     )
   }
