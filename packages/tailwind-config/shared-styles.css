@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Bodoni+Moda:ital,opsz,wght@1,6..96,600;1,6..96,700&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
+@import 'tailwindcss';
+@source '../ui/src/**/*.{tsx,ts}';
+@plugin '@tailwindcss/typography';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ───────────────────────────────────────────────────────────────
+   TAILWIND THEME WIRING
+   ─────────────────────────────────────────────────────────────── */
+@theme inline {
+  --font-sans:
+    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-serif: 'Domine', Georgia, serif;
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--bg-2);
+  --color-card-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-border-strong: var(--line-2);
+  --color-muted: var(--bg-3);
+  --color-muted-foreground: var(--ink-2);
+  --color-subtle: var(--ink-3);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--bg);
+  --color-secondary: var(--bg-3);
+  --color-secondary-foreground: var(--ink-2);
+  --color-destructive: var(--red);
+  --color-destructive-foreground: var(--ink);
+  --color-success: var(--green);
+  --color-ring: var(--primary-dim-2);
+  --color-input: var(--line);
+  --color-popover: var(--bg-2);
+  --color-popover-foreground: var(--ink);
+  --color-accent: var(--bg-3);
+  --color-accent-foreground: var(--ink);
+
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   DESIGN SYSTEM — Sass partials
+   ─────────────────────────────────────────────────────────────── */
+@import './scss/abstracts/_tokens.scss';
+@import './scss/base/_reset.scss';
+@import './scss/base/_typography.scss';
+@import './scss/components/_panels.scss';
+@import './scss/components/_buttons.scss';
+@import './scss/components/_chips.scss';
+@import './scss/components/_inputs.scss';
+@import './scss/components/_tables.scss';
+@import './scss/layout/_labels.scss';
+@import './scss/layout/_tabs.scss';
+@import './scss/layout/_cmd-row.scss';
+@import './scss/utilities/_animations.scss';
+@import './scss/utilities/_misc.scss';
