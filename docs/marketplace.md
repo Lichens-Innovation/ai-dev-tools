@@ -52,6 +52,64 @@ From the console:
 
 You can update all installed marketplace from the console: `claude plugin marketplace update`.
 
+### Auto-updates
+
+Claude Code can automatically refresh marketplaces and update installed plugins at startup. When auto-update runs, the marketplace data is re-pulled and any installed plugin is bumped to its latest version. If anything changed, you are prompted to run `/reload-plugins` to apply the new files in the current session.
+
+**Defaults:**
+
+- Official Anthropic marketplaces: auto-update **enabled** by default.
+- Third-party and local development marketplaces: auto-update **disabled** by default.
+
+**Toggle per marketplace (UI):**
+
+1. Run `/plugin` to open the plugin manager.
+2. Go to the **Marketplaces** tab.
+3. Select the marketplace.
+4. Choose **Enable auto-update** or **Disable auto-update**.
+
+**Disable globally via env vars:**
+
+To disable all automatic updates (Claude Code itself + plugins):
+
+```bash
+export DISABLE_AUTOUPDATER=1
+```
+
+To keep plugin auto-updates while disabling Claude Code auto-updates:
+
+```bash
+export DISABLE_AUTOUPDATER=1
+export FORCE_AUTOUPDATE_PLUGINS=1
+```
+
+This is useful when you want to manage Claude Code updates manually but still receive automatic plugin updates.
+
+## Private Repositories
+
+Claude Code can install marketplaces and plugins from private git repositories.
+
+**Manual install/update** uses your existing git credential helpers:
+
+- HTTPS: works with `gh auth login`, macOS Keychain, `git-credential-store`.
+- SSH: works as long as the host is in `known_hosts` and the key is loaded in `ssh-agent`. Claude Code suppresses interactive SSH prompts for the host fingerprint and key passphrase, so unconfigured keys will fail silently.
+
+**Background auto-updates** at startup do **not** use credential helpers (interactive prompts would block startup). To allow auto-update for a private marketplace, set the right token in your environment:
+
+| Provider  | Environment variables        | Notes                                     |
+| --------- | ---------------------------- | ----------------------------------------- |
+| GitHub    | `GITHUB_TOKEN` or `GH_TOKEN` | Personal access token or GitHub App token |
+| GitLab    | `GITLAB_TOKEN` or `GL_TOKEN` | Personal access token or project token    |
+| Bitbucket | `BITBUCKET_TOKEN`            | App password or repository access token   |
+
+Set the token in your shell config (`.bashrc`, `.zshrc`) or pass it when running Claude Code:
+
+```bash
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
+> For CI/CD, configure the token as a secret env var. GitHub Actions automatically provides `GITHUB_TOKEN` for repos in the same organization.
+
 ## Creating a Marketplace
 
 1. Create one or more local plugins. Each plugin follows the `.claude-plugin/plugin.json` convention (see [plugins](./plugins.md)). Optionally split plugins by use case (e.g. one plugin for skills only, another for back-end tools).
