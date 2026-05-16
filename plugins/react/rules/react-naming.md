@@ -1,7 +1,12 @@
 ---
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
 ---
 
 # Naming conventions
+
+Files and folders naming conventions
 
 - **kebab-case everywhere** — no camelCase, PascalCase, or snake_case in file/folder names
 - Hooks → `use-<name>.ts` (e.g. `use-conversations.ts`)
