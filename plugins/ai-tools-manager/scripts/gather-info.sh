@@ -25,6 +25,7 @@ MARKETPLACE_FILE="/tmp/ai-tools-marketplace.json"
 
 # Ensure the result file exists as a file (Docker won't create a dir in its place)
 [[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"
+[[ -d "$MARKETPLACE_FILE" ]] && rm -rf "$MARKETPLACE_FILE"
 > "$RESULT_FILE"
 trap 'docker compose -f "$COMPOSE_FILE" down > /dev/null 2>&1 || true; rm -f "$RESULT_FILE" "$MARKETPLACE_FILE"' EXIT
 
