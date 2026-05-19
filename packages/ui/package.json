@@ -1,0 +1,33 @@
+{
+  "name": "@repo/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./theme-toggle": "./src/theme-toggle.tsx",
+    "./copyable-text": "./src/copyable-text.tsx",
+    "./slide-panel": "./src/slide-panel.tsx",
+    "./button": "./src/button.tsx",
+    "./field": "./src/field.tsx",
+    "./chip-input": "./src/chip-input.tsx",
+    "./select": "./src/select.tsx",
+    "./dialog": "./src/dialog.tsx",
+    "./mode-pill": "./src/mode-pill.tsx",
+    "./success-state": "./src/success-state.tsx",
+    "./shortcuts-dialog": "./src/shortcuts-dialog.tsx",
+    "./file-preview": "./src/file-preview.tsx",
+    "./syntax-line": "./src/syntax-line.tsx"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.0.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/react": "19.2.0",
+    "react": "19.2.0",
+    "typescript": "6.0.2"
+  },
+  "peerDependencies": {
+    "react": "19.2.0"
+  }
+}

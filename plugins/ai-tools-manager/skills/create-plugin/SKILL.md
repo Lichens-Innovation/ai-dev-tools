@@ -28,19 +28,9 @@ Consult the relevant doc(s) before making structural decisions:
 
 ## Workflow
 
-1. **Gather info**
-   Run the gather script — it opens a browser form for the user to fill in:
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/gather-plugin-info.cjs" "$PWD"
-   ```
-   The command blocks until the user submits the form, then prints one JSON line to stdout:
-   `{ name, description, keywords, marketplacePath }`
-   Parse and use these values, then immediately clean up:
-   ```bash
-   rm -f plugin-gather-info.json
-   ```
+The form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. Parse the JSON object `{ name, description, keywords, marketplacePath }` and proceed:
 
-2. **Create plugin directory structure**
+1. **Create plugin directory structure**
    ```
    <marketplacePath>/plugins/<name>/
    ├── .claude-plugin/
@@ -49,7 +39,7 @@ Consult the relevant doc(s) before making structural decisions:
    └── README.md
    ```
 
-3. **Write plugin.json**
+2. **Write plugin.json**
    Read `<marketplacePath>/.claude-plugin/marketplace.json` to get the owner name and email, then write `<marketplacePath>/plugins/<name>/.claude-plugin/plugin.json`:
    ```json
    {
@@ -65,10 +55,10 @@ Consult the relevant doc(s) before making structural decisions:
    }
    ```
 
-4. **Write README.md**
+3. **Write README.md**
    Create `<marketplacePath>/plugins/<name>/README.md` with a minimal header and the plugin description.
 
-5. **Register in marketplace**
+4. **Register in marketplace**
    Edit `<marketplacePath>/.claude-plugin/marketplace.json` and append to the `plugins` array:
    ```json
    {
@@ -78,10 +68,10 @@ Consult the relevant doc(s) before making structural decisions:
    }
    ```
 
-6. **Hooks**
+5. **Hooks**
    If the plugin needs event hooks, add them to `hooks/hooks.json` in the plugin root (or inline in `plugin.json`) rather than user settings. See [Hooks and Relative Paths](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md#hooks-and-relative-paths).
 
-7. **Report to user**
+6. **Report to user**
    - `<marketplacePath>/plugins/<name>/.claude-plugin/plugin.json` created
    - `<marketplacePath>/plugins/<name>/skills/` created
    - `<marketplacePath>/plugins/<name>/README.md` created

@@ -1,6 +1,6 @@
 import type { MarketplacePluginInfo } from '../../utils/plugins'
 import type { RuleInfo } from '../../utils/rules'
-import CopyableText from '../CopyableText'
+import CopyableText from '@repo/ui/copyable-text'
 
 interface MarketplaceTabProps {
   plugins: MarketplacePluginInfo[]

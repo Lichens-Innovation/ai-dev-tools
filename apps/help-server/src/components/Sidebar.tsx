@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { useSelector } from '@tanstack/react-store'
-import SlidePanel from './SlidePanel'
+import { useStore } from '@tanstack/react-store'
+import SlidePanel from '@repo/ui/slide-panel'
 import { closeSidebar, sidebarStore } from '../store/sidebar-store'
 import type { DocMeta } from '../utils/docs'
 
@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ docs }: SidebarProps) {
-  const isOpen = useSelector(sidebarStore, (s) => s.isOpen)
+  const isOpen = useStore(sidebarStore, (s) => s.isOpen)
 
   return (
     <SlidePanel isOpen={isOpen} onClose={closeSidebar} side="left" toggleDataAttr={['data-sidebar-toggle', 'data-chat-toggle']}>

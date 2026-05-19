@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { CLAUDE_DIR, readJsonSafe } from './helpers'
+import { isPluginInstalled } from '@repo/claude-fs'
 
 // Resolves to monorepo root regardless of cwd (works locally and in Docker)
 const PROJECT_ROOT = path.resolve(new URL(import.meta.url).pathname, '../../../../..')
@@ -55,11 +55,7 @@ async function clearHistoryFile() {
 }
 
 async function isSuperHelpAvailable(): Promise<boolean> {
-  const installedData = await readJsonSafe<{
-    plugins: Record<string, unknown[]>
-  }>(path.join(CLAUDE_DIR, 'plugins', 'installed_plugins.json'))
-  const installedKeys = new Set(Object.keys(installedData?.plugins ?? {}))
-  return installedKeys.has('ai-tools-manager@lichens-ai-dev-tools')
+  return isPluginInstalled('ai-tools-manager@lichens-ai-dev-tools')
 }
 
 function buildPrompt(message: string, history: ChatHistoryEntry[]): string {

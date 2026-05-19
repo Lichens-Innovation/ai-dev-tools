@@ -1,7 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { readdir } from 'node:fs/promises'
-import path from 'node:path'
-import { CLAUDE_DIR, readJsonSafe } from './helpers'
+import { getCachedMarketplacePlugins, getInstalledPlugins } from '@repo/claude-fs'
 
 export interface CuratedPlugin {
   name: string
@@ -14,51 +12,29 @@ export interface CuratedPlugin {
 
 export const getCuratedPlugins = createServerFn({ method: 'GET' }).handler(
   async (): Promise<CuratedPlugin[]> => {
-    const marketplacesDir = path.join(CLAUDE_DIR, 'plugins', 'marketplaces')
-    const installedData = await readJsonSafe<{
-      plugins: Record<string, unknown[]>
-    }>(path.join(CLAUDE_DIR, 'plugins', 'installed_plugins.json'))
-    const installedKeys = new Set(Object.keys(installedData?.plugins ?? {}))
+    const curatedMarketplaces = [
+      { name: 'claude-plugins-official', label: 'Anthropic Official' },
+      { name: 'astral-sh', label: 'Astral' },
+    ]
 
-    const curatedMarketplaces: { dir: string; name: string; label: string }[] =
-      [
-        {
-          dir: path.join(marketplacesDir, 'claude-plugins-official'),
-          name: 'claude-plugins-official',
-          label: 'Anthropic Official',
-        },
-        {
-          dir: path.join(marketplacesDir, 'astral-sh'),
-          name: 'astral-sh',
-          label: 'Astral',
-        },
-      ]
+    const installedPlugins = await getInstalledPlugins()
+    const installedKeys = new Set(installedPlugins.map((p) => p.key))
 
     const results: CuratedPlugin[] = []
-
-    for (const { dir, name: mktName, label } of curatedMarketplaces) {
-      const pluginsDir = path.join(dir, 'plugins')
-      try {
-        const pluginDirs = await readdir(pluginsDir)
-        for (const pluginName of pluginDirs) {
-          const pluginJson = await readJsonSafe<{
-            name?: string
-            description?: string
-          }>(path.join(pluginsDir, pluginName, '.claude-plugin', 'plugin.json'))
-          if (!pluginJson) continue
-          const key = `${pluginName}@${mktName}`
-          results.push({
-            name: pluginName,
-            marketplace: mktName,
-            marketplaceLabel: label,
-            description: pluginJson.description ?? '',
-            isInstalled: installedKeys.has(key),
-            installCommand: `claude plugin install ${pluginName}@${mktName}`,
-          })
-        }
-      } catch {}
+    for (const { name: mktName, label } of curatedMarketplaces) {
+      const plugins = await getCachedMarketplacePlugins(mktName)
+      for (const plugin of plugins) {
+        const key = `${plugin.name}@${mktName}`
+        results.push({
+          name: plugin.name,
+          marketplace: mktName,
+          marketplaceLabel: label,
+          description: plugin.description,
+          isInstalled: installedKeys.has(key),
+          installCommand: `claude plugin install ${plugin.name}@${mktName}`,
+        })
+      }
     }
-
     return results
   },
 )

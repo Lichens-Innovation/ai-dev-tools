@@ -1,0 +1,26 @@
+FROM node:24-alpine
+
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+
+WORKDIR /app
+
+# Copy root manifests
+COPY package.json yarn.lock ./
+
+# Copy workspace package.json files so Yarn can resolve the workspaces
+COPY apps/help-server/package.json ./apps/help-server/
+COPY apps/ai-tools-manager/package.json ./apps/ai-tools-manager/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/tailwind-config/package.json ./packages/tailwind-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/claude-fs/package.json ./packages/claude-fs/
+
+RUN cp yarn.lock yarn.lock.bak && \
+    yarn install && \
+    if diff -q yarn.lock yarn.lock.bak > /dev/null; then \
+      echo "✓ yarn.lock is up to date — no changes"; \
+    else \
+      echo "✗ yarn.lock was updated:" && diff yarn.lock.bak yarn.lock; \
+      exit 1; \
+    fi

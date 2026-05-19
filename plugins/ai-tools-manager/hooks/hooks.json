@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "UserPromptExpansion": [
+      {
+        "matcher": "create-skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-skill"]
+          }
+        ]
+      },
+      {
+        "matcher": "create-subagent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-subagent"]
+          }
+        ]
+      },
+      {
+        "matcher": "create-plugin",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-plugin"]
+          }
+        ]
+      },
+      {
+        "matcher": "create-marketplace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-marketplace"]
+          }
+        ]
+      }
+    ]
+  }
+}

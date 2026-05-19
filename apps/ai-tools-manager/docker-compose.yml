@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: apps/ai-tools-manager/Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '3009:3009'
+    volumes:
+      - ../..:/app
+      - ~/.claude:/root/.claude:ro
+      - /app/node_modules
+      - /app/apps/ai-tools-manager/.output
+      - /tmp/ai-tools-result.json:/tmp/result.json
+      - /tmp/ai-tools-marketplace.json:/tmp/marketplace-data.json:ro
+    environment:
+      - NODE_ENV=development
+      - RUNNING_IN_DOCKER=true
+      - RESULT_FILE=/tmp/result.json
+

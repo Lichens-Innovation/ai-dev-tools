@@ -28,32 +28,31 @@ Consult the relevant doc(s) before generating skill content in auto mode or befo
 
 ## Workflow
 
-1. **Gather info**
-   Run the gather script — it opens a browser form for the user to fill in:
-   ```bash
-   node "${CLAUDE_SKILL_DIR}/scripts/gather-skill-info.cjs" "$PWD"
-   ```
-   The command blocks until the user submits the form, then prints one JSON line to stdout.
-   Parse the JSON and check the `mode` field, then immediately clean up:
-   ```bash
-   rm -f skill-gather-info.json
-   ```
+1. **Create skill directory and SKILL.md** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with `mode` and `target` fields.
 
-2. **Create skill directory and SKILL.md** — behaviour depends on `mode`:
+   **Target dispatch** — the JSON includes a `target` field that determines where the skill lives:
+   - `target: "marketplace"` — the JSON has `marketplacePath` and `plugin`. Write to `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md`.
+   - `target: "project"` — the JSON has `projectPath` (the user's cwd). Write to `<projectPath>/.claude/skills/<name>/SKILL.md`. This is a project-local skill, not registered in any marketplace.
 
-   **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, name, idea, marketplacePath, plugin }`:
+   Behaviour also depends on `mode`:
+
+   **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, target, name?, idea, useWhen, ...destination }` where `destination` is either `{ marketplacePath, plugin }` or `{ projectPath }`:
    - Use `name` if provided, otherwise derive a concise kebab-case name from the idea.
-   - Write a polished one-sentence `description` ending with a "Use when…" clause that covers the main trigger patterns.
+   - Build the `description` frontmatter value:
+     - Take the first sentence of `idea` as the "what" clause.
+     - If `useWhen` is non-empty, append `Use when ` + the chips joined naturally (Oxford-style with "or" before the last item). If empty, append `Use when <trigger condition>.` as a placeholder.
+     - Clip the full description to 140 characters.
    - Generate complete, ready-to-use SKILL.md content: a clear workflow, concrete steps, and any relevant reference tables or decision trees — as if a domain expert wrote it. Do not leave placeholder text.
 
-   **Manual mode** (`mode: "manual"`) — the JSON contains `{ mode, name, description, triggers, marketplacePath, plugin }`:
-   - Use the provided values as-is.
+   **Manual mode** (`mode: "manual"`) — the JSON contains `{ mode, target, name, description, triggers, ...destination }`:
+   - Use all provided values as-is.
+   - Build the `description` frontmatter: `"<description>. Use when <triggers joined with ', ' and 'or' before the last>."` If `triggers` is empty, use the raw description only.
    - Create a minimal skeleton the user will fill in:
 
    ```markdown
    ---
    name: <name>
-   description: "<description>. Use when <triggers>."
+   description: "<built description>"
    ---
 
    # <Title Case of name>
@@ -61,17 +60,21 @@ Consult the relevant doc(s) before generating skill content in auto mode or befo
    Add instructions here. Structure freely: step-by-step workflow, reference tables, decision trees — whatever fits the skill.
 
    Optional subdirectories (create only if needed):
-   - `scripts/`    — executable helpers (Node.js, Python, shell)
+
+   - `scripts/` — executable helpers (Node.js, Python, shell)
    - `references/` — supporting docs or templates
-   - `assets/`     — static files (images, data)
+   - `assets/` — static files (images, data)
    ```
 
-3. **Hooks**
+2. **Hooks**
    If the skill needs a hook (e.g. to collect input before the skill runs), add it to the plugin instead of user settings so it's distributed automatically. See [Hooks and Relative Paths](${CLAUDE_SKILL_DIR}/../../docs/plugins.md#hooks-and-relative-paths).
 
-4. **Report to user**
-   - `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md` created
+3. **Report to user**
+   - Report the path where the skill was created:
+     - Marketplace target: `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md`
+     - Project target: `<projectPath>/.claude/skills/<name>/SKILL.md`
    - Next steps:
-     - Fill in `<marketplacePath>/plugins/<plugin>/skills/<name>/SKILL.md` with instructions
+     - Fill in the new `SKILL.md` with instructions
      - Add `scripts/` or `references/` dirs if the skill needs helper files
-     - Once satisfied with the result, update the marketplace so the skill becomes visible: `claude plugin marketplace update`
+     - For marketplace targets only: update the marketplace so the skill becomes visible: `claude plugin marketplace update`
+     - Project skills are picked up automatically by Claude Code running in that project.
