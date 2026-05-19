@@ -1,0 +1,5 @@
+services:
+  lockfile-check:
+    build:
+      context: .
+      dockerfile: Dockerfile.lockfile-check

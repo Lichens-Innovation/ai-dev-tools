@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSelector } from '@tanstack/react-store'
+import { useStore } from '@tanstack/react-store'
 import { RotateCw, Loader2 } from 'lucide-react'
 import { getUsageStats } from '../../utils/stats'
 import type { UsageStats, StatsView } from '../../utils/stats'
@@ -32,7 +32,10 @@ function StatCard({ label, value, formatter }: { label: string; value: number; f
 }
 
 export default function StatsTab() {
-  const { statsView, usageCache, errorCache, fetchTimeCache } = useSelector(statsStore)
+  const statsView = useStore(statsStore, (s) => s.statsView)
+  const usageCache = useStore(statsStore, (s) => s.usageCache)
+  const errorCache = useStore(statsStore, (s) => s.errorCache)
+  const fetchTimeCache = useStore(statsStore, (s) => s.fetchTimeCache)
 
   const [isFetching, setIsFetching] = useState(false)
   const [forceRefreshFlag, setForceRefreshFlag] = useState(0)

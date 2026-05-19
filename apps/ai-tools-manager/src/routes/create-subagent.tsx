@@ -1,248 +1,449 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import fs from "fs";
-import { getKnownMarketplaces, getLocalMarketplaces, getMarketplacePluginsFromPath } from "@repo/claude-fs";
-import { Page, ModeCard, Divider, Field, Input, Select, DoneScreen, FormActions, inputStyle } from "../components/form-ui";
+import { useState, useRef, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import Button from "@repo/ui/button";
+import { Field, Input, Textarea } from "@repo/ui/field";
+import ChipInput from "@repo/ui/chip-input";
+import Select from "@repo/ui/select";
+import ModePill from "@repo/ui/mode-pill";
+import ThemeToggle from "@repo/ui/theme-toggle";
+import SuccessState from "@repo/ui/success-state";
+import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
+import { Sparkles, Pencil, Keyboard, Check, Store, Folder } from "lucide-react";
+import { getMarketplaceData } from "../utils/marketplace";
+import { submitSubagentForm, cancelSubagentForm } from "../utils/create-subagent";
+import SubagentTemplatePreview from "../components/subagent-template-preview";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type Mode = "auto" | "manual";
-
-interface MarketplaceData {
-  marketplaces: string[];
-  byMarketplace: Record<string, string[]>;
-}
-
-interface FormPayload {
-  mode: Mode;
-  name?: string;
-  idea?: string;
-  description?: string;
-  triggers?: string;
-  tools?: string;
-  marketplace: string;
-  plugin: string;
-}
-
-// ---------------------------------------------------------------------------
-// Server functions
-// ---------------------------------------------------------------------------
-
-const getMarketplaceData = createServerFn({ method: "GET" }).handler(async (): Promise<MarketplaceData> => {
-  if (process.env.RUNNING_IN_DOCKER) {
-    return JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as MarketplaceData;
-  }
-
-  const localMarketplaces = await getLocalMarketplaces();
-  const byMarketplace: Record<string, string[]> = {};
-  for (const [name, marketplace] of Object.entries(localMarketplaces)) {
-    byMarketplace[name] = await getMarketplacePluginsFromPath(marketplace.installLocation);
-  }
-  return { marketplaces: Object.keys(localMarketplaces), byMarketplace };
-});
-
-const submitSubagentForm = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => data as FormPayload)
-  .handler(async ({ data }) => {
-    const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-    const knownMarketplaces = await getKnownMarketplaces();
-    const marketplacePath = knownMarketplaces[data.marketplace]?.installLocation ?? "";
-
-    const formData = JSON.stringify({
-      mode: data.mode,
-      ...(data.mode === "auto"
-        ? { name: data.name?.trim() || undefined, idea: data.idea?.trim() }
-        : {
-            name: data.name?.trim(),
-            description: data.description?.trim(),
-            triggers: data.triggers?.trim(),
-            tools: data.tools?.trim(),
-          }),
-      marketplacePath,
-      plugin: data.plugin,
-    });
-
-    fs.writeFileSync(
-      resultFile,
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "UserPromptExpansion",
-          additionalContext: `Subagent form data: ${formData}`,
-        },
-      })
-    );
-    return { ok: true };
+const subagentSchema = z
+  .object({
+    mode: z.enum(["auto", "manual"]),
+    target: z.enum(["marketplace", "project"]),
+    name: z.string().refine((v) => v === "" || /^[a-z][a-z0-9-]*$/.test(v), {
+      message: "Use kebab-case: lowercase letters, numbers, and dashes.",
+    }),
+    idea: z.string(),
+    description: z.string(),
+    triggers: z.array(z.string()),
+    tools: z.array(z.string()),
+    marketplace: z.string(),
+    plugin: z.string(),
+  })
+  .refine((v) => (v.mode === "auto" ? v.idea.trim().length > 0 : v.description.trim().length > 0), {
+    message: "Tell Claude what this subagent should do.",
+    path: ["idea"],
+  })
+  .refine((v) => v.mode === "auto" || v.name.trim().length > 0, {
+    message: "Manual mode requires a name.",
+    path: ["name"],
+  })
+  .refine((v) => v.target === "project" || (v.marketplace.length > 0 && v.plugin.length > 0), {
+    message: "Pick a marketplace and plugin, or switch to Project.",
+    path: ["marketplace"],
   });
 
-const cancelSubagentForm = createServerFn({ method: "POST" }).handler(async () => {
-  const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-  fs.writeFileSync(resultFile, JSON.stringify({ decision: "block", reason: "Subagent creation cancelled." }));
-  return { ok: true };
-});
-
-// ---------------------------------------------------------------------------
-// Route
-// ---------------------------------------------------------------------------
+type SubagentForm = z.infer<typeof subagentSchema>;
+type Phase = "idle" | "creating" | "done" | "cancelled";
 
 export const Route = createFileRoute("/create-subagent")({
   loader: () => getMarketplaceData(),
   component: CreateSubagent,
 });
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+const SHORTCUT_SECTIONS = [
+  {
+    title: "Navigation",
+    items: [
+      ["Jump to field 1–6", "⌘1–6"],
+      ["Next / previous field", "Tab / ⇧Tab"],
+    ] satisfies [string, string][],
+  },
+  {
+    title: "Actions",
+    items: [
+      ["Toggle Auto / Manual", "⌘M"],
+      ["Create subagent", "⌘↵"],
+      ["Show this help", "?"],
+      ["Close overlay", "Esc"],
+    ] satisfies [string, string][],
+  },
+];
+
+const FIELD_IDS = ["cs-name", "cs-idea", "cs-triggers", "cs-tools", "cs-marketplace", "cs-plugin"];
+const ROW_IDS = ["cs-row-1", "cs-row-2", "cs-row-3", "cs-row-4", "cs-row-5", "cs-row-6"];
 
 function CreateSubagent() {
-  const { marketplaces, byMarketplace } = Route.useLoaderData();
+  const { marketplaces, byMarketplace, cwd } = Route.useLoaderData();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [helpOpen, setHelpOpen] = useState(false);
 
-  const [screen, setScreen] = useState<"form" | "success" | "cancelled">("form");
-  const [mode, setMode] = useState<Mode>("auto");
-  const [name, setName] = useState("");
-  const [idea, setIdea] = useState("");
-  const [description, setDescription] = useState("");
-  const [triggers, setTriggers] = useState("");
-  const [tools, setTools] = useState("");
-  const [marketplace, setMarketplace] = useState(marketplaces[0] ?? "");
-  const [plugin, setPlugin] = useState(byMarketplace[marketplaces[0] ?? ""]?.[0] ?? "");
-  const [submitting, setSubmitting] = useState(false);
+  const {
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<SubagentForm>({
+    resolver: zodResolver(subagentSchema),
+    defaultValues: {
+      mode: "auto",
+      target: marketplaces.length > 0 ? "marketplace" : "project",
+      name: "",
+      idea: "",
+      description: "",
+      triggers: [],
+      tools: [],
+      marketplace: marketplaces[0] ?? "",
+      plugin: byMarketplace[marketplaces[0] ?? ""]?.[0] ?? "",
+    },
+  });
 
-  const plugins = byMarketplace[marketplace] ?? [];
+  const mode = watch("mode");
+  const target = watch("target");
+  const name = watch("name");
+  const idea = watch("idea");
+  const description = watch("description");
+  const triggers = watch("triggers");
+  const tools = watch("tools");
+  const marketplace = watch("marketplace");
+  const plugin = watch("plugin");
 
-  function handleMarketplaceChange(value: string) {
-    setMarketplace(value);
-    setPlugin(byMarketplace[value]?.[0] ?? "");
+  const marketplaceOptions = marketplaces.map((m) => ({ id: m, name: m }));
+  const pluginOptions = (byMarketplace[marketplace] ?? []).map((p) => ({ id: p, name: p }));
+
+  function jumpTo(n: number) {
+    document.getElementById(FIELD_IDS[n - 1])?.focus();
+    const row = document.getElementById(ROW_IDS[n - 1]);
+    if (row) {
+      row.style.boxShadow = "0 0 0 4px var(--primary-glow)";
+      setTimeout(() => {
+        if (row) row.style.boxShadow = "none";
+      }, 600);
+    }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    await submitSubagentForm({ data: { mode, name, idea, description, triggers, tools, marketplace, plugin } });
-    setScreen("success");
-  }
+  const onSubmit = async (values: SubagentForm) => {
+    setPhase("creating");
+    await submitSubagentForm({ data: { ...values, cwd } });
+    setPhase("done");
+  };
 
-  async function handleCancel() {
-    await cancelSubagentForm({ data: undefined });
-    setScreen("cancelled");
-  }
+  const onError = (errs: typeof errors) => {
+    if (errs.idea) jumpTo(2);
+    else if (errs.name) jumpTo(1);
+  };
 
-  if (screen === "success") return <DoneScreen title="Done! You can close this tab." subtitle="Returning control to Claude…" />;
-  if (screen === "cancelled") return <DoneScreen title="Cancelled." subtitle="You can close this tab." />;
+  const submitRef = useRef<() => void>(() => {});
+  submitRef.current = () => void handleSubmit(onSubmit, onError)();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const inField = ["INPUT", "TEXTAREA"].includes((document.activeElement as HTMLElement)?.tagName ?? "");
+      if ((e.metaKey || e.ctrlKey) && /^[1-6]$/.test(e.key)) {
+        e.preventDefault();
+        jumpTo(Number(e.key));
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setValue("mode", getValues("mode") === "auto" ? "manual" : "auto");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        submitRef.current();
+      } else if (e.key === "?" && !inField) {
+        e.preventDefault();
+        setHelpOpen(true);
+      } else if (e.key === "Escape") {
+        setHelpOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (phase === "cancelled") {
+    return (
+      <div className="w-full h-screen bg-(--bg) font-sans flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-base text-(--ink-2)">Subagent creation cancelled.</p>
+          <p className="text-[13px] text-subtle mt-1.5">You can close this tab.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Page>
-      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-(--ink)">New Subagent</h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--ink-3)" }}>
-        Choose how you want to create the subagent.
-      </p>
+    <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden">
+      <div
+        className="h-full grid transition-[grid-template-columns] duration-300 ease-out"
+        style={{ gridTemplateColumns: phase === "done" ? "1fr" : "minmax(0, 1fr) 460px" }}
+      >
+        <div className="overflow-y-auto px-10 py-8">
+          <div className="max-w-155 mx-auto">
+            {phase === "done" ? (
+              <SuccessState
+                icon={<Check size={28} strokeWidth={2.4} />}
+                title="Your subagent is being created"
+                description={
+                  <>
+                    The repository is generating it now. You can close this page — you'll find{" "}
+                    <span className="font-mono text-(--ink-2)">{name || "my-agent"}</span> in your marketplace when it's
+                    ready.
+                  </>
+                }
+              />
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                  <h1 className="m-0 text-2xl font-bold text-(--ink) tracking-[-0.5px]">New subagent</h1>
+                  <Controller
+                    name="mode"
+                    control={control}
+                    render={({ field }) => (
+                      <ModePill
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: "auto", label: "Auto", icon: <Sparkles size={12} /> },
+                          { value: "manual", label: "Manual", icon: <Pencil size={12} /> },
+                        ]}
+                      />
+                    )}
+                  />
+                  <Controller
+                    name="target"
+                    control={control}
+                    render={({ field }) => (
+                      <ModePill
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[
+                          { value: "marketplace", label: "Marketplace", icon: <Store size={12} /> },
+                          { value: "project", label: "Project", icon: <Folder size={12} /> },
+                        ]}
+                      />
+                    )}
+                  />
+                  <div className="flex-1" />
+                  <ThemeToggle />
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    title="Keyboard shortcuts (?)"
+                    className="w-7.5 h-7.5 rounded-lg bg-(--bg-elev) border border-(--line) flex items-center justify-center text-subtle text-[13px] font-bold cursor-pointer focus:outline-none focus:shadow-none"
+                  >
+                    ?
+                  </button>
+                </div>
+                <p className="m-0 mb-4.5 text-[13px] text-subtle">
+                  {mode === "auto"
+                    ? "Describe your idea — Claude writes the subagent for you."
+                    : "Provide name, description, triggers and tools — Claude scaffolds the template."}
+                </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-        <div className="flex-1">
-          <div className="mb-7 grid grid-cols-2 gap-2.5">
-            <ModeCard
-              active={mode === "auto"}
-              onClick={() => setMode("auto")}
-              title="Auto"
-              description="Describe your idea in plain language. Claude generates the subagent name, role description, and full workflow for you."
-            />
-            <ModeCard
-              active={mode === "manual"}
-              onClick={() => setMode("manual")}
-              title="Manual"
-              description="Provide the name, role description, trigger conditions, and tools yourself. Claude creates a structured template you fill in."
-            />
+                <div className="flex items-center gap-3 px-3.5 py-3 mb-1 bg-(--bg-elev) border border-(--line) rounded-lg text-[13px] text-(--ink-2)">
+                  <div className="w-7 h-7 rounded-[7px] bg-(--primary-dim) text-primary flex items-center justify-center">
+                    {mode === "auto" ? <Sparkles size={15} /> : <Pencil size={15} />}
+                  </div>
+                  <div className="flex-1 leading-normal">
+                    {mode === "auto" ? (
+                      <>
+                        <strong className="text-(--ink)">Auto.</strong> Claude generates the subagent from your idea +
+                        triggers.
+                      </>
+                    ) : (
+                      <>
+                        <strong className="text-(--ink)">Manual.</strong> You provide every field — Claude only
+                        scaffolds the file.
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <Field
+                  id="cs-row-1"
+                  label="Subagent name"
+                  hint={
+                    mode === "auto"
+                      ? "kebab-case. Leave blank to let Claude derive one from your idea."
+                      : "kebab-case, e.g. security-reviewer."
+                  }
+                  error={errors.name?.message ?? null}
+                >
+                  <Controller
+                    name="name"
+                    control={control}
+                    render={({ field }) => (
+                      <Input id="cs-name" {...field} mono placeholder="my-agent" error={errors.name?.message ?? null} />
+                    )}
+                  />
+                </Field>
+
+                <Field
+                  id="cs-row-2"
+                  label={mode === "auto" ? "Subagent idea" : "Role description"}
+                  hint={
+                    mode === "auto"
+                      ? 'Describe what the subagent does. Best descriptions start with a verb ("Reviews…", "Audits…", "Drafts…").'
+                      : "Used as the docstring. First sentence: what it does."
+                  }
+                  error={errors.idea?.message ?? null}
+                >
+                  <Controller
+                    name={mode === "auto" ? "idea" : "description"}
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        id="cs-idea"
+                        {...field}
+                        rows={4}
+                        placeholder={
+                          mode === "auto"
+                            ? "Audits pull requests for security issues. Checks for hardcoded secrets, missing input validation, and unsafe dependencies."
+                            : "A short, focused description of what this subagent does and when it applies."
+                        }
+                        error={errors.idea?.message ?? null}
+                      />
+                    )}
+                  />
+                </Field>
+
+                <Field
+                  id="cs-row-3"
+                  label="When to apply"
+                  hint="Specific triggers that tell Claude when to hand off to this subagent. Press Enter to add each."
+                >
+                  <Controller
+                    name="triggers"
+                    control={control}
+                    render={({ field }) => (
+                      <ChipInput
+                        id="cs-triggers"
+                        values={field.value}
+                        onChange={field.onChange}
+                        placeholder="e.g. user asks to review a PR for security"
+                      />
+                    )}
+                  />
+                </Field>
+
+                <Field
+                  id="cs-row-4"
+                  label="Tools"
+                  hint="Tools this subagent is allowed to use. Press Enter to add each."
+                >
+                  <Controller
+                    name="tools"
+                    control={control}
+                    render={({ field }) => (
+                      <ChipInput
+                        id="cs-tools"
+                        values={field.value}
+                        onChange={field.onChange}
+                        placeholder="e.g. Bash, Read, WebSearch"
+                      />
+                    )}
+                  />
+                </Field>
+
+                {target === "marketplace" ? (
+                  <>
+                    <Field
+                      id="cs-row-5"
+                      label="Marketplace"
+                      hint="The workspace this subagent belongs to."
+                      error={errors.marketplace?.message ?? null}
+                    >
+                      <Controller
+                        name="marketplace"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            id="cs-marketplace"
+                            value={field.value}
+                            options={marketplaceOptions}
+                            onChange={(v) => {
+                              field.onChange(v);
+                              setValue("plugin", byMarketplace[v]?.[0] ?? "");
+                            }}
+                          />
+                        )}
+                      />
+                    </Field>
+
+                    <Field id="cs-row-6" label="Plugin" hint="Which plugin group to file the subagent under.">
+                      <Controller
+                        name="plugin"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            id="cs-plugin"
+                            value={field.value}
+                            options={pluginOptions}
+                            onChange={field.onChange}
+                          />
+                        )}
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <Field
+                    id="cs-row-5"
+                    label="Project location"
+                    hint="The subagent will be created at <project>/.claude/agents/<name>.md."
+                  >
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-(--bg-2) border border-(--line) font-mono text-[12px] text-(--ink-2)">
+                      <Folder size={13} className="text-(--ink-3)" />
+                      {cwd || "<current working directory not available>"}
+                    </div>
+                  </Field>
+                )}
+
+                <div className="mt-6 pt-4 border-t border-(--line) flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => void cancelSubagentForm({ data: undefined }).then(() => setPhase("cancelled"))}
+                  >
+                    Cancel
+                  </Button>
+                  <div className="flex-1" />
+                  <Button
+                    variant="primary"
+                    icon={phase === "idle" ? <Sparkles size={14} /> : undefined}
+                    loading={phase === "creating"}
+                    onClick={() => submitRef.current()}
+                  >
+                    {phase === "creating" ? "Creating…" : "Create subagent"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
-
-          <Divider />
-
-          {mode === "auto" && (
-            <>
-              <Field label="Subagent name" hint="kebab-case — leave blank to let Claude derive one from your idea">
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="my-agent"
-                  pattern="[a-z][a-z0-9-]*"
-                />
-              </Field>
-              <Field label="Describe your subagent idea">
-                <textarea
-                  required
-                  rows={6}
-                  value={idea}
-                  onChange={(e) => setIdea(e.target.value)}
-                  placeholder="e.g. A subagent that audits pull requests for security issues — checks for hardcoded secrets, missing input validation, and unsafe dependencies."
-                  className="input resize-y"
-                  style={inputStyle}
-                />
-              </Field>
-            </>
-          )}
-
-          {mode === "manual" && (
-            <>
-              <Field label="Subagent name" hint="kebab-case, e.g. security-reviewer">
-                <Input
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="my-agent"
-                  pattern="[a-z][a-z0-9-]*"
-                />
-              </Field>
-              <Field label="Role description">
-                <Input
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What this subagent does"
-                />
-              </Field>
-              <Field label="When to apply">
-                <Input
-                  required
-                  value={triggers}
-                  onChange={(e) => setTriggers(e.target.value)}
-                  placeholder='e.g. "user asks to review a PR for security"'
-                />
-              </Field>
-              <Field label="Tools" hint="comma-separated list of tools the agent should use">
-                <Input
-                  value={tools}
-                  onChange={(e) => setTools(e.target.value)}
-                  placeholder="e.g. Bash, Read, WebSearch"
-                />
-              </Field>
-            </>
-          )}
-
-          <Divider />
-
-          <Field label="Marketplace">
-            <Select value={marketplace} onChange={(e) => handleMarketplaceChange(e.target.value)}>
-              {marketplaces.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Plugin">
-            <Select value={plugin} onChange={(e) => setPlugin(e.target.value)}>
-              {plugins.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </Select>
-          </Field>
         </div>
 
-        <FormActions onCancel={handleCancel} submitLabel="Create Subagent" submitting={submitting} />
-      </form>
-    </Page>
+        {phase !== "done" && (
+          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
+            <SubagentTemplatePreview
+              mode={mode}
+              target={target}
+              name={name}
+              idea={idea}
+              description={description}
+              triggers={triggers}
+              tools={tools}
+              marketplace={marketplace}
+              plugin={plugin}
+              cwd={cwd}
+            />
+          </div>
+        )}
+      </div>
+      <ShortcutsDialog
+        open={helpOpen}
+        onOpenChange={setHelpOpen}
+        titleIcon={<Keyboard size={15} />}
+        sections={SHORTCUT_SECTIONS}
+      />
+    </div>
   );
 }

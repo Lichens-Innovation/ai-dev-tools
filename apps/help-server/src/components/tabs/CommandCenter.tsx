@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { InstalledPlugin } from '../../utils/plugins'
 import type { ClaudeCommand } from '../../utils/commands'
-import CopyableText from '../CopyableText'
+import CopyableText from '@repo/ui/copyable-text'
 
 interface CommandCenterProps {
   installedPlugins: InstalledPlugin[]

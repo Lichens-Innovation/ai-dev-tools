@@ -1,6 +1,6 @@
-import { useSelector } from '@tanstack/react-store'
+import { useStore } from '@tanstack/react-store'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import SlidePanel from './SlidePanel'
+import SlidePanel from '@repo/ui/slide-panel'
 import {
   chatStore,
   closeChat,
@@ -13,10 +13,10 @@ import { sendChatMessage, getChatHistory, clearChatHistory, checkSuperHelpAvaila
 import type { ChatHistoryEntry } from '../utils/chat'
 
 export default function ChatSidebar() {
-  const isOpen = useSelector(chatStore, (s) => s.isOpen)
-  const messages = useSelector(chatStore, (s) => s.messages)
-  const isLoading = useSelector(chatStore, (s) => s.isLoading)
-  const error = useSelector(chatStore, (s) => s.error)
+  const isOpen = useStore(chatStore, (s) => s.isOpen)
+  const messages = useStore(chatStore, (s) => s.messages)
+  const isLoading = useStore(chatStore, (s) => s.isLoading)
+  const error = useStore(chatStore, (s) => s.error)
   const [input, setInput] = useState('')
   const [skillAvailable, setSkillAvailable] = useState<boolean | null>(null)
   const localOnly = error === 'CLAUDE_NOT_FOUND'

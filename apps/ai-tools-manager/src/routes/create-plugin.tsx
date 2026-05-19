@@ -1,156 +1,297 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import fs from "fs";
-import { getKnownMarketplaces, getLocalMarketplaces } from "@repo/claude-fs";
-import { Page, Divider, Field, Input, Select, DoneScreen, FormActions } from "../components/form-ui";
+import { useState, useRef, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import Button from "@repo/ui/button";
+import { Field, Input } from "@repo/ui/field";
+import ChipInput from "@repo/ui/chip-input";
+import Select from "@repo/ui/select";
+import ThemeToggle from "@repo/ui/theme-toggle";
+import SuccessState from "@repo/ui/success-state";
+import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
+import { Sparkles, Keyboard, Check } from "lucide-react";
+import { getMarketplaceList } from "../utils/marketplace";
+import { submitPluginForm, cancelPluginForm } from "../utils/create-plugin";
+import PluginManifestPreview from "../components/plugin-manifest-preview";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface MarketplaceList {
-  marketplaces: string[];
-}
-
-interface FormPayload {
-  name: string;
-  description: string;
-  keywords: string;
-  marketplace: string;
-}
-
-// ---------------------------------------------------------------------------
-// Server functions
-// ---------------------------------------------------------------------------
-
-const getMarketplaceList = createServerFn({ method: "GET" }).handler(async (): Promise<MarketplaceList> => {
-  if (process.env.RUNNING_IN_DOCKER) {
-    const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8"));
-    return { marketplaces: data.marketplaces };
-  }
-
-  const localMarketplaces = await getLocalMarketplaces();
-  return { marketplaces: Object.keys(localMarketplaces) };
+const pluginSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Required.")
+    .refine((v) => /^[a-z][a-z0-9-]*$/.test(v), {
+      message: "Use kebab-case: lowercase letters, numbers, and dashes.",
+    }),
+  description: z.string().min(1, "Tell Claude what this plugin provides."),
+  keywords: z.array(z.string()),
+  marketplace: z.string(),
 });
 
-const submitPluginForm = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => data as FormPayload)
-  .handler(async ({ data }) => {
-    const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-    const knownMarketplaces = await getKnownMarketplaces();
-    const marketplacePath = knownMarketplaces[data.marketplace]?.installLocation ?? "";
-
-    fs.writeFileSync(
-      resultFile,
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "UserPromptExpansion",
-          additionalContext: `Plugin form data: ${JSON.stringify({
-            name: data.name.trim(),
-            description: data.description.trim(),
-            keywords: data.keywords.trim(),
-            marketplacePath,
-          })}`,
-        },
-      })
-    );
-    return { ok: true };
-  });
-
-const cancelPluginForm = createServerFn({ method: "POST" }).handler(async () => {
-  const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-  fs.writeFileSync(resultFile, JSON.stringify({ decision: "block", reason: "Plugin creation cancelled." }));
-  return { ok: true };
-});
-
-// ---------------------------------------------------------------------------
-// Route
-// ---------------------------------------------------------------------------
+type PluginForm = z.infer<typeof pluginSchema>;
+type Phase = "idle" | "creating" | "done" | "cancelled";
 
 export const Route = createFileRoute("/create-plugin")({
   loader: () => getMarketplaceList(),
   component: CreatePlugin,
 });
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+const SHORTCUT_SECTIONS = [
+  {
+    title: "Navigation",
+    items: [
+      ["Jump to field 1–4", "⌘1–4"],
+      ["Next / previous field", "Tab / ⇧Tab"],
+    ] satisfies [string, string][],
+  },
+  {
+    title: "Actions",
+    items: [
+      ["Create plugin", "⌘↵"],
+      ["Show this help", "?"],
+      ["Close overlay", "Esc"],
+    ] satisfies [string, string][],
+  },
+];
+
+const FIELD_IDS = ["cp-name", "cp-description", "cp-keywords", "cp-marketplace"];
+const ROW_IDS = ["cp-row-1", "cp-row-2", "cp-row-3", "cp-row-4"];
 
 function CreatePlugin() {
   const { marketplaces } = Route.useLoaderData();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [helpOpen, setHelpOpen] = useState(false);
 
-  const [screen, setScreen] = useState<"form" | "success" | "cancelled">("form");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [keywords, setKeywords] = useState("");
-  const [marketplace, setMarketplace] = useState(marketplaces[0] ?? "");
-  const [submitting, setSubmitting] = useState(false);
+  const {
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<PluginForm>({
+    resolver: zodResolver(pluginSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      keywords: [],
+      marketplace: marketplaces[0] ?? "",
+    },
+  });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    await submitPluginForm({ data: { name, description, keywords, marketplace } });
-    setScreen("success");
+  const name = watch("name");
+  const description = watch("description");
+  const keywords = watch("keywords");
+  const marketplace = watch("marketplace");
+
+  const marketplaceOptions = marketplaces.map((m) => ({ id: m, name: m }));
+
+  function jumpTo(n: number) {
+    document.getElementById(FIELD_IDS[n - 1])?.focus();
+    const row = document.getElementById(ROW_IDS[n - 1]);
+    if (row) {
+      row.style.boxShadow = "0 0 0 4px var(--primary-glow)";
+      setTimeout(() => {
+        if (row) row.style.boxShadow = "none";
+      }, 600);
+    }
   }
 
-  async function handleCancel() {
-    await cancelPluginForm({ data: undefined });
-    setScreen("cancelled");
-  }
+  const onSubmit = async (values: PluginForm) => {
+    setPhase("creating");
+    await submitPluginForm({ data: values });
+    setPhase("done");
+  };
 
-  if (screen === "success") return <DoneScreen title="Done! You can close this tab." subtitle="Returning control to Claude…" />;
-  if (screen === "cancelled") return <DoneScreen title="Cancelled." subtitle="You can close this tab." />;
+  const onError = (errs: typeof errors) => {
+    if (errs.name) jumpTo(1);
+    else if (errs.description) jumpTo(2);
+  };
+
+  const submitRef = useRef<() => void>(() => {});
+  submitRef.current = () => void handleSubmit(onSubmit, onError)();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const inField = ["INPUT", "TEXTAREA"].includes((document.activeElement as HTMLElement)?.tagName ?? "");
+      if ((e.metaKey || e.ctrlKey) && /^[1-4]$/.test(e.key)) {
+        e.preventDefault();
+        jumpTo(Number(e.key));
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        submitRef.current();
+      } else if (e.key === "?" && !inField) {
+        e.preventDefault();
+        setHelpOpen(true);
+      } else if (e.key === "Escape") {
+        setHelpOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (phase === "cancelled") {
+    return (
+      <div className="w-full h-screen bg-(--bg) font-sans flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-base text-(--ink-2)">Plugin creation cancelled.</p>
+          <p className="text-[13px] text-subtle mt-1.5">You can close this tab.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Page>
-      <h1 className="mb-1.5 text-lg font-semibold tracking-tight text-(--ink)">New Plugin</h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--ink-3)" }}>
-        Scaffold a new plugin and register it in the marketplace.
-      </p>
+    <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden">
+      <div
+        className="h-full grid transition-[grid-template-columns] duration-300 ease-out"
+        style={{ gridTemplateColumns: phase === "done" ? "1fr" : "minmax(0, 1fr) 460px" }}
+      >
+        <div className="overflow-y-auto px-10 py-8">
+          <div className="max-w-155 mx-auto">
+            {phase === "done" ? (
+              <SuccessState
+                icon={<Check size={28} strokeWidth={2.4} />}
+                title="Your plugin is being created"
+                description={
+                  <>
+                    The repository is generating it now. You can close this page — you'll find{" "}
+                    <span className="font-mono text-(--ink-2)">{name || "my-plugin"}</span> registered in your
+                    marketplace when it's ready.
+                  </>
+                }
+              />
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                  <h1 className="m-0 text-2xl font-bold text-(--ink) tracking-[-0.5px]">New plugin</h1>
+                  <div className="flex-1" />
+                  <ThemeToggle />
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    title="Keyboard shortcuts (?)"
+                    className="w-7.5 h-7.5 rounded-lg bg-(--bg-elev) border border-(--line) flex items-center justify-center text-subtle text-[13px] font-bold cursor-pointer focus:outline-none focus:shadow-none"
+                  >
+                    ?
+                  </button>
+                </div>
+                <p className="m-0 mb-4.5 text-[13px] text-subtle">
+                  Scaffold a new plugin and register it in the marketplace.
+                </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-        <div className="flex-1">
-          <Field label="Plugin name" hint="kebab-case, e.g. my-plugin">
-            <Input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="my-plugin"
-              pattern="[a-z][a-z0-9-]*"
-            />
-          </Field>
-          <Field label="Description">
-            <Input
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this plugin provides"
-            />
-          </Field>
-          <Field label="Keywords" hint="comma-separated, e.g. testing, automation">
-            <Input
-              value={keywords}
-              onChange={(e) => setKeywords(e.target.value)}
-              placeholder="e.g. testing, automation"
-            />
-          </Field>
+                <Field
+                  id="cp-row-1"
+                  label="Plugin name"
+                  hint="kebab-case, e.g. my-plugin."
+                  error={errors.name?.message ?? null}
+                >
+                  <Controller
+                    name="name"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        id="cp-name"
+                        {...field}
+                        mono
+                        placeholder="my-plugin"
+                        error={errors.name?.message ?? null}
+                      />
+                    )}
+                  />
+                </Field>
 
-          <Divider />
+                <Field
+                  id="cp-row-2"
+                  label="Description"
+                  hint="One-line summary of what this plugin provides."
+                  error={errors.description?.message ?? null}
+                >
+                  <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        id="cp-description"
+                        {...field}
+                        placeholder="What this plugin provides"
+                        error={errors.description?.message ?? null}
+                      />
+                    )}
+                  />
+                </Field>
 
-          <Field label="Marketplace">
-            <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)}>
-              {marketplaces.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </Select>
-          </Field>
+                <Field
+                  id="cp-row-3"
+                  label="Keywords"
+                  hint="Searchable tags. Press Enter to add each."
+                >
+                  <Controller
+                    name="keywords"
+                    control={control}
+                    render={({ field }) => (
+                      <ChipInput
+                        id="cp-keywords"
+                        values={field.value}
+                        onChange={field.onChange}
+                        placeholder="e.g. testing"
+                      />
+                    )}
+                  />
+                </Field>
+
+                <Field id="cp-row-4" label="Marketplace" hint="The workspace this plugin belongs to.">
+                  <Controller
+                    name="marketplace"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        id="cp-marketplace"
+                        value={field.value}
+                        options={marketplaceOptions}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                </Field>
+
+                <div className="mt-6 pt-4 border-t border-(--line) flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => void cancelPluginForm({ data: undefined }).then(() => setPhase("cancelled"))}
+                  >
+                    Cancel
+                  </Button>
+                  <div className="flex-1" />
+                  <Button
+                    variant="primary"
+                    icon={phase === "idle" ? <Sparkles size={14} /> : undefined}
+                    loading={phase === "creating"}
+                    onClick={() => submitRef.current()}
+                  >
+                    {phase === "creating" ? "Creating…" : "Create plugin"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        <FormActions onCancel={handleCancel} submitLabel="Create Plugin" submitting={submitting} />
-      </form>
-    </Page>
+        {phase !== "done" && (
+          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
+            <PluginManifestPreview
+              name={name}
+              description={description}
+              keywords={keywords}
+              marketplace={marketplace}
+            />
+          </div>
+        )}
+      </div>
+      <ShortcutsDialog
+        open={helpOpen}
+        onOpenChange={setHelpOpen}
+        titleIcon={<Keyboard size={15} />}
+        sections={SHORTCUT_SECTIONS}
+      />
+    </div>
   );
 }

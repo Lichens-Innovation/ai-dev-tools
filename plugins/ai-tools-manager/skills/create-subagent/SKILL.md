@@ -30,32 +30,45 @@ Consult the relevant doc(s) before generating subagent content in auto mode or b
 
 ## Workflow
 
-1. **Create agent directory and AGENTS.md** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with a `mode` field. Behaviour depends on `mode`:
+1. **Create agent file** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with `mode` and `target` fields.
 
-   **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, name, idea, marketplacePath, plugin }`:
+   **Target dispatch** — the JSON includes a `target` field that determines where the subagent lives:
+   - `target: "marketplace"` — the JSON has `marketplacePath` and `plugin`. Write to `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md`.
+   - `target: "project"` — the JSON has `projectPath` (the user's cwd). Write to `<projectPath>/.claude/agents/<name>.md` as a single file (no enclosing directory). This is a project-local subagent, not registered in any marketplace.
+
+   Behaviour also depends on `mode`:
+
+   **Auto mode** (`mode: "auto"`) — the JSON contains `{ mode, target, name?, idea, triggers, tools, ...destination }` where `destination` is either `{ marketplacePath, plugin }` or `{ projectPath }`, and `triggers`/`tools` are string arrays:
    - Use `name` if provided, otherwise derive a concise kebab-case name from the idea.
-   - Generate a complete, ready-to-use AGENTS.md: a clear role description, when-to-apply conditions, tool list, full step-by-step workflow, and expected output format — as if a domain expert wrote it. Do not leave placeholder text.
+   - Build the `description` frontmatter value:
+     - Take the first sentence of `idea` as the "what" clause.
+     - If `triggers` is non-empty, append `Use when ` + the chips joined naturally (Oxford-style with "or" before the last item). If empty, append `Use when <trigger condition>.` as a placeholder.
+     - Clip the full description to 140 characters.
+   - Set the `tools` frontmatter to the comma-joined `tools` array (or omit the line if empty).
+   - Generate complete, ready-to-use AGENTS.md content: a clear role description, when-to-apply conditions, full step-by-step workflow, and expected output format — as if a domain expert wrote it. Do not leave placeholder text.
 
-   **Manual mode** (`mode: "manual"`) — the JSON contains `{ mode, name, description, triggers, tools, marketplacePath, plugin }`:
-   - Use the provided values as-is.
+   **Manual mode** (`mode: "manual"`) — the JSON contains `{ mode, target, name, description, triggers, tools, ...destination }` where `triggers` and `tools` are string arrays:
+   - Use all provided values as-is.
+   - Build the `description` frontmatter: `"<description>. Use when <triggers joined with ', ' and 'or' before the last>."` If `triggers` is empty, use the raw description only.
+   - Set the `tools` frontmatter to the comma-joined `tools` array (or omit if empty).
    - Create a minimal skeleton the user will fill in:
 
    ```markdown
+   ---
+   name: <name>
+   description: "<built description>"
+   tools: <comma-joined tools>
+   ---
+
    # <Title Case of name>
 
    Instructions for AI coding agents acting as <name>. See [agents.md](https://agents.md/) for the format.
-
-   <description>
-
-   ---
 
    ## Role — workflow
 
    ### When to apply
 
-   <triggers>
-
-   **Tools:** <tools>
+   <triggers joined as a sentence, or a placeholder if empty>
 
    ### Workflow
 
@@ -71,7 +84,10 @@ Consult the relevant doc(s) before generating subagent content in auto mode or b
    If the subagent needs event hooks, add them to the plugin rather than user settings so they're distributed automatically. See [Hooks and Relative Paths](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md#hooks-and-relative-paths).
 
 3. **Report to user**
-   - `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md` created
+   - Report the path where the subagent was created:
+     - Marketplace target: `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md`
+     - Project target: `<projectPath>/.claude/agents/<name>.md`
    - Next steps:
-     - Fill in `AGENTS.md` with the full workflow (manual mode)
-     - Once satisfied with the result, update the marketplace so the agent becomes visible: `claude plugin marketplace update`
+     - Fill in the file with the full workflow (manual mode)
+     - For marketplace targets only: update the marketplace so the agent becomes visible: `claude plugin marketplace update`
+     - Project subagents are picked up automatically by Claude Code running in that project.

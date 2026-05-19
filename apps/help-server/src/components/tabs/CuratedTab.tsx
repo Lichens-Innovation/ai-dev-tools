@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { ColumnFiltersState, FilterFn } from '@tanstack/react-table'
 import type { CuratedPlugin } from '../../utils/marketplace'
-import CopyableText from '../CopyableText'
+import CopyableText from '@repo/ui/copyable-text'
 
 interface CuratedTabProps {
   plugins: CuratedPlugin[]

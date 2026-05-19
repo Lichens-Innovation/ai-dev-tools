@@ -1,8 +1,8 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useSelector } from '@tanstack/react-store'
+import { useStore } from '@tanstack/react-store'
 import { useEffect, useRef, useState } from 'react'
 import Highlighter from 'react-highlight-words'
-import ThemeToggle from './ThemeToggle'
+import ThemeToggle from '@repo/ui/theme-toggle'
 import { toggleSidebar, sidebarStore } from '../store/sidebar-store'
 import { searchStore, setSearchQuery, setSearchFocused, shiftSelectedIndex, clearSearch } from '../store/search-store'
 import { toggleChat, chatStore } from '../store/chat-store'
@@ -20,7 +20,10 @@ function getSnippet(text: string, query: string, maxLen = 120): string {
 const DEBOUNCE_MS = 150
 
 function useDebouncedSearch(inputRef: React.RefObject<HTMLInputElement | null>) {
-  const { query, results, focused, selectedIndex } = useSelector(searchStore)
+  const query = useStore(searchStore, (s) => s.query)
+  const results = useStore(searchStore, (s) => s.results)
+  const focused = useStore(searchStore, (s) => s.focused)
+  const selectedIndex = useStore(searchStore, (s) => s.selectedIndex)
   const [inputValue, setInputValue] = useState(query)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [kbdHint, setKbdHint] = useState('⌘K')
@@ -88,8 +91,8 @@ export default function Header() {
   const inputRef = useRef<HTMLInputElement>(null)
   const { inputValue, query, results, focused, selectedIndex, showResults, updateQuery, clearQuery, kbdHint } =
     useDebouncedSearch(inputRef)
-  const sidebarOpen = useSelector(sidebarStore, (s) => s.isOpen)
-  const chatOpen = useSelector(chatStore, (s) => s.isOpen)
+  const sidebarOpen = useStore(sidebarStore, (s) => s.isOpen)
+  const chatOpen = useStore(chatStore, (s) => s.isOpen)
 
   function handleSelect(section: DocSection) {
     navigate({

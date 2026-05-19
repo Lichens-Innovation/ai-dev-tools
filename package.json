@@ -15,5 +15,8 @@
   "devDependencies": {
     "prettier": "^3.8.1",
     "turbo": "latest"
+  },
+  "resolutions": {
+    "zod": "4.3.6"
   }
 }
