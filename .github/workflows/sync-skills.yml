@@ -1,0 +1,41 @@
+name: Sync skills and agents from plugins
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/*/skills/**'
+      - 'plugins/*/agents/**'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild skills/ from plugins
+        run: |
+          rm -rf skills/
+          mkdir -p skills/
+          for skill_dir in plugins/*/skills/*/; do
+            skill_name=$(basename "$skill_dir")
+            cp -r "$skill_dir" "skills/$skill_name"
+          done
+
+      - name: Rebuild agents/ from plugins
+        run: |
+          rm -rf agents/
+          mkdir -p agents/
+          for agent_dir in plugins/*/agents/*/; do
+            agent_name=$(basename "$agent_dir")
+            cp -r "$agent_dir" "agents/$agent_name"
+          done
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skills/ agents/
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: sync skills and agents from plugins"
+          git push

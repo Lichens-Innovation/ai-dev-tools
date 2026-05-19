@@ -1,0 +1,11 @@
+{
+  "name": "ai-tools-manager",
+  "version": "0.1.0",
+  "description": "Skills for managing the ai-dev-tools marketplace: create new skills and plugins",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["scaffold", "marketplace", "plugin", "skill", "create", "generator"],
+  "commands": "./commands"
+}
