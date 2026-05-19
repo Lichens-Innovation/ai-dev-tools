@@ -78,7 +78,7 @@ From Claude Code:
 4. Load the directory with `claude --plugin-dir ./my-plugin`
 5. Call your skill and other tools like you would normally (ex: `/my-skill`, `@my-agent`).
 
-## Hooks and Relative Paths
+## Hooks
 
 You can add hooks directly to `plugin.json` or in `hooks/hooks.json` and define them as you would in your project’s `.claude/setting.json`. When a user enables the plugin, those hooks activate automatically and run alongside any user-defined hooks.
 
@@ -90,13 +90,48 @@ Example hook entry in `plugin.json`:
     "PostToolUse": [
       {
         "matcher": "Edit",
-        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/format.sh" }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/format.sh",
+            "args": []
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-Note the `${CLAUDE_PLUGIN_ROOT}`. When a plugin needs to point at its own files, use the `${CLAUDE_PLUGIN_ROOT}` environment variable. It resolves to the absolute install path of the plugin at runtime, so paths stay valid no matter where the plugin is installed.
+### Hooks with Relative Paths
 
-Avoid hardcoded or relative paths — they break once the plugin is installed elsewhere.
+When a plugin needs to point at its own files, use the `${CLAUDE_PLUGIN_ROOT}` environment variable. It resolves to the absolute install path of the plugin at runtime, so paths stay valid no matter where the plugin is installed.
+
+If your plugin hooks uses a path placeholder (e.g. `${CLAUDE_PLUGIN_ROOT}`), always set the `args` field so the hook runs in exec form, since each element is passed as one argument with no quoting.
+
+**Important:** In exec form, `command` is the raw binary to spawn — it is never tokenized or split by spaces. If your hook runs a script through an interpreter (e.g. `node`, `python`), put the interpreter in `command` and the script path in `args`:
+
+```json
+{
+  "hooks": {
+    "UserPromptExpansion": [
+      {
+        "matcher": "my-skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/my-script.cjs"]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Setting `"command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/my-script.cjs"` would fail with `ENOENT` because the entire string is treated as a single binary name.
+
+### Hooks with Shell features
+
+To use the shell features, like pipes or `&&`, make sure that you run the hook as shell form by omitting the `args` field from the hook.

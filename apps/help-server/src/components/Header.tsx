@@ -5,6 +5,7 @@ import Highlighter from 'react-highlight-words'
 import ThemeToggle from './ThemeToggle'
 import { toggleSidebar, sidebarStore } from '../store/sidebar-store'
 import { searchStore, setSearchQuery, setSearchFocused, shiftSelectedIndex, clearSearch } from '../store/search-store'
+import { toggleChat, chatStore } from '../store/chat-store'
 import type { DocSection } from '../utils/docs'
 
 function getSnippet(text: string, query: string, maxLen = 120): string {
@@ -51,7 +52,6 @@ function useDebouncedSearch(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   function updateQuery(value: string) {
     setInputValue(value)
-    // Clear stale results immediately when typing starts
     searchStore.setState((s) => ({ ...s, results: [], selectedIndex: -1 }))
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -89,6 +89,7 @@ export default function Header() {
   const { inputValue, query, results, focused, selectedIndex, showResults, updateQuery, clearQuery, kbdHint } =
     useDebouncedSearch(inputRef)
   const sidebarOpen = useSelector(sidebarStore, (s) => s.isOpen)
+  const chatOpen = useSelector(chatStore, (s) => s.isOpen)
 
   function handleSelect(section: DocSection) {
     navigate({
@@ -217,7 +218,7 @@ export default function Header() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleSelect(section)}
                         className={`flex w-full flex-col gap-1 rounded-sm px-4 py-2.5 text-left mx-1 my-0.5 ${
-                          i === selectedIndex ? 'bg-(--amber-dim)' : 'hover:bg-(--bg-3)'
+                          i === selectedIndex ? 'bg-(--primary-dim)' : 'hover:bg-(--bg-3)'
                         }`}
                       >
                         <div className="flex items-center gap-1.5 text-[12px] text-subtle">
@@ -225,7 +226,7 @@ export default function Header() {
                             searchWords={[query]}
                             textToHighlight={section.docTitle}
                             autoEscape
-                            highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                            highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                           />
                           {section.headingText !== section.docTitle && (
                             <>
@@ -234,7 +235,7 @@ export default function Header() {
                                 searchWords={[query]}
                                 textToHighlight={section.headingText}
                                 autoEscape
-                                highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                                highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                               />
                             </>
                           )}
@@ -244,7 +245,7 @@ export default function Header() {
                             searchWords={[query]}
                             textToHighlight={getSnippet(section.bodyText, query)}
                             autoEscape
-                            highlightClassName="bg-[var(--amber-dim-2)] text-primary rounded-sm px-0.5"
+                            highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                           />
                         </p>
                       </button>
@@ -256,8 +257,29 @@ export default function Header() {
           )}
         </div>
 
-        {/* Right: Theme toggle */}
-        <div className="flex justify-end">
+        {/* Right: Chat + Theme toggle */}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            data-chat-toggle
+            onClick={toggleChat}
+            aria-label={chatOpen ? 'Close help chat' : 'Open help chat'}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-1.5 transition ${
+              chatOpen
+                ? 'bg-(--primary-3) text-[#1c1917] hover:bg-(--primary-2)'
+                : 'text-(--ink-2) hover:bg-(--bg-3) hover:text-(--ink)'
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              {chatOpen ? (
+                <path d="M4 4h16v14H7l-3 3V4z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              ) : (
+                <>
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </>
+              )}
+            </svg>
+          </button>
           <ThemeToggle />
         </div>
       </nav>

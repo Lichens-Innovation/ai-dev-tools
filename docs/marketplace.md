@@ -50,7 +50,9 @@ From the console:
 
 ## Updating Marketplaces and Plugins
 
-You can update all installed marketplace from the console: `claude plugin marketplace update`.
+You can update all installed marketplaces from the console: `claude plugin marketplace update`.
+
+To update a single plugin, always include the marketplace name — omitting it will fail with "plugin not found": `claude plugin update <plugin>@<marketplace>`
 
 ### Auto-updates
 

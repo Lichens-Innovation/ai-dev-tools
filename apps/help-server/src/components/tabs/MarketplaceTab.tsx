@@ -25,7 +25,7 @@ function TypeTag({ type }: { type: 'skill' | 'agent' }) {
   return (
     <span
       className={`inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border ${
-        type === 'skill' ? 'border-ring text-primary bg-(--amber-dim)' : 'border-(--line) text-subtle bg-(--bg-3)'
+        type === 'skill' ? 'border-ring text-primary bg-(--primary-dim)' : 'border-(--line) text-subtle bg-(--bg-3)'
       }`}
     >
       {type}
@@ -80,7 +80,7 @@ function PluginCard({ plugin }: { plugin: MarketplacePluginInfo }) {
                 className="border-b border-(--line) last:border-0 hover:bg-(--bg-3) transition-colors"
               >
                 <td className="px-4 py-2 align-top">
-                  <span className="inline-block rounded-md border border-ring bg-(--amber-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
+                  <span className="inline-block rounded-md border border-ring bg-(--primary-dim) px-2 py-0.5 font-mono text-[12px] text-primary">
                     {skill.name}
                   </span>
                 </td>
