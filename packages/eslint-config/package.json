@@ -1,0 +1,10 @@
+{
+  "name": "@repo/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@tanstack/eslint-config": "latest"
+  }
+}

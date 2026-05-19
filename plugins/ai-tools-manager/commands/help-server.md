@@ -7,14 +7,14 @@ description: Start the AI Dev Tools help server and open the dashboard in the br
 
 Manage the help-server using Docker Compose.
 
-- Compose file location: `/Users/samueldaigle/Documents/gits/ai-dev-tools/help-server/docker-compose.yml`
+- Compose file location: `/Users/samueldaigle/Documents/gits/ai-dev-tools/apps/help-server/docker-compose.yml`
 - URL: `http://localhost:3008`
 
 Follow this decision tree (run checks in parallel where possible):
 
 ### 1. Check if the service is already running
 ```bash
-cd /Users/samueldaigle/Documents/gits/ai-dev-tools/help-server && docker compose ps --format "{{.State}}"
+cd /Users/samueldaigle/Documents/gits/ai-dev-tools/apps/help-server && docker compose ps --format "{{.State}}"
 ```
 
 **If the output contains `running`:**
@@ -26,7 +26,7 @@ cd /Users/samueldaigle/Documents/gits/ai-dev-tools/help-server && docker compose
 **If the output is empty, `exited`, or `stopped`:**
 - Start (and build if necessary) the service:
   ```bash
-  cd /Users/samueldaigle/Documents/gits/ai-dev-tools/help-server && docker compose up -d
+  cd /Users/samueldaigle/Documents/gits/ai-dev-tools/apps/help-server && docker compose up -d
   ```
 - Wait 5 seconds, then open the dashboard:
   ```bash
@@ -36,7 +36,7 @@ cd /Users/samueldaigle/Documents/gits/ai-dev-tools/help-server && docker compose
 ### 2. First-time or rebuild note
 If the user says the image is outdated or needs a rebuild, add `--build`:
 ```bash
-cd /Users/samueldaigle/Documents/gits/ai-dev-tools/help-server && docker compose up -d --build
+cd /Users/samueldaigle/Documents/gits/ai-dev-tools/apps/help-server && docker compose up -d --build
 ```
 
 Report which case applied (already running / started with docker compose / rebuilt and started).
