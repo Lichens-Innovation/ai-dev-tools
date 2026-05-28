@@ -1,5 +1,17 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/inject-agent-skills.js"]
+          }
+        ]
+      }
+    ],
     "UserPromptExpansion": [
       {
         "matcher": "create-skill",
@@ -38,6 +50,16 @@
             "type": "command",
             "command": "bash",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-marketplace"]
+          }
+        ]
+      },
+      {
+        "matcher": "agents-framework-kickstarter",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "agents-framework-kickstarter"]
           }
         ]
       }

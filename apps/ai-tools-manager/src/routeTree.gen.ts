@@ -13,6 +13,7 @@ import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
+import { Route as AgentsFrameworkKickstarterRouteImport } from './routes/agents-framework-kickstarter'
 import { Route as IndexRouteImport } from './routes/index'
 
 const CreateSubagentRoute = CreateSubagentRouteImport.update({
@@ -35,6 +36,12 @@ const CreateMarketplaceRoute = CreateMarketplaceRouteImport.update({
   path: '/create-marketplace',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsFrameworkKickstarterRoute =
+  AgentsFrameworkKickstarterRouteImport.update({
+    id: '/agents-framework-kickstarter',
+    path: '/agents-framework-kickstarter',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +50,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -50,6 +58,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -58,6 +67,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -67,6 +77,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -74,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -81,6 +93,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -89,6 +102,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsFrameworkKickstarterRoute: typeof AgentsFrameworkKickstarterRoute
   CreateMarketplaceRoute: typeof CreateMarketplaceRoute
   CreatePluginRoute: typeof CreatePluginRoute
   CreateSkillRoute: typeof CreateSkillRoute
@@ -125,6 +139,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateMarketplaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents-framework-kickstarter': {
+      id: '/agents-framework-kickstarter'
+      path: '/agents-framework-kickstarter'
+      fullPath: '/agents-framework-kickstarter'
+      preLoaderRoute: typeof AgentsFrameworkKickstarterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -137,6 +158,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsFrameworkKickstarterRoute: AgentsFrameworkKickstarterRoute,
   CreateMarketplaceRoute: CreateMarketplaceRoute,
   CreatePluginRoute: CreatePluginRoute,
   CreateSkillRoute: CreateSkillRoute,
