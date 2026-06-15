@@ -31,10 +31,17 @@ trap 'docker compose -f "$COMPOSE_FILE" down > /dev/null 2>&1 || true; rm -f "$R
 
 # Pre-generate marketplace data on the host (container can't access host paths)
 # Also captures cwd so forms can use it as a default (e.g. targetDir in create-marketplace)
+# and the installable vibe-rules list (vibe-rules is a host CLI, absent in the container).
 node -e "
 const fs = require('fs'), path = require('path');
+const { execFileSync } = require('child_process');
 const home = process.env.HOME || '';
 const knownPath = path.join(home, '.claude', 'plugins', 'known_marketplaces.json');
+let vibeRules = [];
+try {
+  const out = execFileSync('vibe-rules', ['list'], { encoding: 'utf8' });
+  vibeRules = out.split(/\r?\n/).map(l => { const m = l.match(/^\s*-\s+(.+?)\s*\$/); return m ? m[1] : null; }).filter(Boolean);
+} catch {}
 try {
   const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'));
   const marketplaces = [], byMarketplace = {};
@@ -46,9 +53,9 @@ try {
       byMarketplace[name] = (mktJson.plugins || []).map(p => p.name);
     } catch { byMarketplace[name] = []; }
   }
-  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd()}));
-} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd()})); }
-" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":""}' > "$MARKETPLACE_FILE"
+  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules}));
+} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules})); }
+" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[]}' > "$MARKETPLACE_FILE"
 
 # Start the container (builds image if needed)
 docker compose -f "$COMPOSE_FILE" up -d --build >&2

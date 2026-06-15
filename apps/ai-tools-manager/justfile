@@ -1,0 +1,14 @@
+dev:
+    yarn dev
+
+build:
+    yarn build
+
+start:
+    yarn start
+
+lint:
+    yarn lint
+
+check:
+    yarn check

@@ -9,12 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as RulesRouteImport } from './routes/rules'
 import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
+import { Route as AgentsFrameworkKickstarterRouteImport } from './routes/agents-framework-kickstarter'
 import { Route as IndexRouteImport } from './routes/index'
 
+const WorkflowsRoute = WorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RulesRoute = RulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateSubagentRoute = CreateSubagentRouteImport.update({
   id: '/create-subagent',
   path: '/create-subagent',
@@ -35,6 +48,12 @@ const CreateMarketplaceRoute = CreateMarketplaceRouteImport.update({
   path: '/create-marketplace',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsFrameworkKickstarterRoute =
+  AgentsFrameworkKickstarterRouteImport.update({
+    id: '/agents-framework-kickstarter',
+    path: '/agents-framework-kickstarter',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,60 +62,95 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/rules': typeof RulesRoute
+  '/workflows': typeof WorkflowsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/rules': typeof RulesRoute
+  '/workflows': typeof WorkflowsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/rules': typeof RulesRoute
+  '/workflows': typeof WorkflowsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/rules'
+    | '/workflows'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/rules'
+    | '/workflows'
   id:
     | '__root__'
     | '/'
+    | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/rules'
+    | '/workflows'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsFrameworkKickstarterRoute: typeof AgentsFrameworkKickstarterRoute
   CreateMarketplaceRoute: typeof CreateMarketplaceRoute
   CreatePluginRoute: typeof CreatePluginRoute
   CreateSkillRoute: typeof CreateSkillRoute
   CreateSubagentRoute: typeof CreateSubagentRoute
+  RulesRoute: typeof RulesRoute
+  WorkflowsRoute: typeof WorkflowsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workflows': {
+      id: '/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rules': {
+      id: '/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/create-subagent': {
       id: '/create-subagent'
       path: '/create-subagent'
@@ -125,6 +179,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateMarketplaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents-framework-kickstarter': {
+      id: '/agents-framework-kickstarter'
+      path: '/agents-framework-kickstarter'
+      fullPath: '/agents-framework-kickstarter'
+      preLoaderRoute: typeof AgentsFrameworkKickstarterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -137,10 +198,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsFrameworkKickstarterRoute: AgentsFrameworkKickstarterRoute,
   CreateMarketplaceRoute: CreateMarketplaceRoute,
   CreatePluginRoute: CreatePluginRoute,
   CreateSkillRoute: CreateSkillRoute,
   CreateSubagentRoute: CreateSubagentRoute,
+  RulesRoute: RulesRoute,
+  WorkflowsRoute: WorkflowsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

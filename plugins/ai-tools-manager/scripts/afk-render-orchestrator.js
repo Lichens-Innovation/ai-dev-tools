@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+// Re-renders the generated regions of the project's AFK orchestrator agent
+// (.claude/agents/afk.md) from .claude/afk.json:
+//   - the frontmatter `skills:` array  ← main_session_loaded_skills
+//   - the <!-- AFK:HANDOFFS --> table   ← workflows + derived success paths
+//
+//   node afk-render-orchestrator.js [projectDir]
+//
+// Invoked by afk-install-orchestrator.js (on form save) and by the /afk-sync skill.
+
+const fs = require("fs");
+const path = require("path");
+const { readJson } = require("./lib/afk-session");
+
+// Derived success path (never stored in afk.json) for a single workflow.
+// NOTE: this is the plain-Node twin of `computeSuccessPath` in the app's
+// src/utils/agents-framework-kickstarter.ts. They can't share code (plugin vs app TS),
+// so their OUTPUT must stay byte-identical — keep the separator (" → ") and labels
+// ("@<instance>", "human review") in sync across both files.
+function successPath(wf, instances) {
+  const labelFor = (id) => {
+    if (id === "main-session") return "";
+    const n = (wf.nodes || []).find((x) => x.id === id);
+    if (!n) return id;
+    if (n.type === "agent") {
+      const inst = instances.find((i) => i.name === n.instance);
+      return "@" + ((inst && inst.name) || n.instance || n.id);
+    }
+    return "human review";
+  };
+  const out = [];
+  let cur = "main-session";
+  const seen = new Set();
+  while (!seen.has(cur)) {
+    seen.add(cur);
+    const next = (wf.edges || []).find((e) => e.from === cur && e.kind === "success");
+    if (!next) break;
+    const label = labelFor(next.to);
+    if (label) out.push(label);
+    cur = next.to;
+  }
+  return out.join(" → ");
+}
+
+function handoffTable(cfg) {
+  const instances = cfg.workflow_instances || [];
+  const workflows = cfg.workflows || [];
+  if (workflows.length === 0) {
+    return "# No workflows configured yet. Run /agents-framework-kickstarter to set up.";
+  }
+  const rows = workflows.map((wf) => {
+    const sp = successPath(wf, instances) || "(no steps configured)";
+    return `| ${wf.name || "unnamed"} | ${sp} |`;
+  });
+  return ["| Workflow | Success path |", "| --- | --- |", ...rows].join("\n");
+}
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function replaceRegion(text, start, end, replacement) {
+  const re = new RegExp(`${escapeRe(start)}[\\s\\S]*?${escapeRe(end)}`);
+  if (!re.test(text)) return text;
+  return text.replace(re, `${start}\n${replacement}\n${end}`);
+}
+
+function setFrontmatterSkills(text, skills) {
+  const fm = text.match(/^(---\s*\n)([\s\S]*?)(\n---)/);
+  if (!fm) return text;
+  const list = `[${skills.join(", ")}]`;
+  let body = fm[2];
+  if (/^skills:.*$/m.test(body)) {
+    body = body.replace(/^skills:.*$/m, `skills: ${list}`);
+  } else {
+    body = `${body}\nskills: ${list}`;
+  }
+  return fm[1] + body + fm[3] + text.slice(fm[0].length);
+}
+
+function render(projectDir) {
+  const cfg = readJson(path.join(projectDir, ".claude", "afk.json"));
+  if (!cfg) return { ok: false, reason: "afk.json not found" };
+  const agentPath = path.join(projectDir, ".claude", "agents", "afk.md");
+  if (!fs.existsSync(agentPath)) return { ok: false, reason: "afk.md not found" };
+
+  let text = fs.readFileSync(agentPath, "utf8");
+  text = setFrontmatterSkills(text, cfg.main_session_loaded_skills || []);
+  text = replaceRegion(text, "<!-- AFK:HANDOFFS:START -->", "<!-- AFK:HANDOFFS:END -->", handoffTable(cfg));
+  fs.writeFileSync(agentPath, text);
+  return { ok: true };
+}
+
+if (require.main === module) {
+  const dir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const r = render(dir);
+  if (!r.ok) {
+    process.stderr.write(`afk-render-orchestrator: ${r.reason}\n`);
+    process.exit(1);
+  }
+  process.stdout.write("AFK orchestrator re-rendered from .claude/afk.json\n");
+}
+
+module.exports = { render, successPath, handoffTable };
