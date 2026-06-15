@@ -1,9 +1,5 @@
 # Todo
 
-Add /confidence-check and /use-design-check
-
-In the workflow page, I would like the label input to be a large multiline input because the conditions may be long (e.g. 200 words). Make sure that in the diagram, the description is only one line with a max width and text ellipsis so it does not overflows or take too much space.
-
 Create a /session-log page to view the logs that are printed to `<cwd>/.claude/afk_session.log.jsonl`.
 On the right side of the page, the log is displayed (as readable text stripped from the json format if possible)
 On the left side is a vertical, horizontal «card diagram» where each card represents an instance (agent, main session). When an instance is clicked, the log on the right scrolls down to where this instances started. An instance can appear more than once in the card diagram, if it was called a second time after completing it’s first job. The instance card displays the name of the instance and if it’s job ended in a SUCCESS or a FAILURE.
