@@ -25,6 +25,8 @@ The reason marketplace data is pre-computed on the host: local marketplace `inst
 - `/create-subagent` — Subagent creation form
 - `/create-plugin` — Plugin creation form
 - `/create-marketplace` — Marketplace creation form
+- `/workflows` — Visual agent-workflow editor (React Flow canvas). Writes the workflow slice of `.claude/afk.json` (v3). See the `workflow-view` skill in `.claude/skills/`.
+- `/rules` — Assign rules (on-disk project rules + installable vibe-rules) to the project root and/or directory paths. Writes the `rules` slice of the same `afk.json`; on save the skill runs `afk-apply-rules.js` to move project rule files / `vibe-rules load` installable ones into their assigned `.claude/rules/`. See the `rule-view` skill.
 
 ## Form architecture
 
@@ -94,3 +96,26 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `plugins/ai-tools-manager/hooks/hooks.json` — hook registration for all four skills
 - `plugins/ai-tools-manager/skills/{create-skill,create-subagent,create-plugin,create-marketplace}/SKILL.md` — the prompts that consume the form result
 - `packages/claude-fs/src/index.ts` — shared `~/.claude/` reading utilities used by server functions
+
+### Agents-framework-kickstarter (workflows & rules)
+
+- `src/routes/workflows.tsx` — `/workflows` route: left agents/skills pane, save, workflow CRUD
+- `src/routes/rules.tsx` — `/rules` route: assign rules to project root / directory paths
+- `src/components/workflow-canvas.tsx` — the React Flow (`@xyflow/react`) canvas: nodes, edges, all graph interactions
+- `src/components/instance-picker.tsx` / `src/components/skill-checklist.tsx` — reuse/create instance picker and skill checkbox list shared by the canvas modals
+- `src/components/top-nav.tsx` — top bar: Workflows/Rules nav, workflow selector, YAML preview toggle
+- `src/components/afk-yaml-preview.tsx` — read-only `afk.yaml`, rendered via `afkConfigToYaml` from `AfkConfigV3`
+- `src/components/rule-tree.tsx` / `src/components/chip-multi-select.tsx` — `/rules` directory tree (per-path rule chips + add picker) and the left-pane rule selector
+- `src/utils/agents-framework-kickstarter.ts` — `AfkConfigV3` types, `getAfkConfig` loader, `submitAfkConfig` (slice merge into `.claude/afk.json`, also writes `afk.yaml`)
+- `src/utils/afk-yaml.ts` — `afkConfigToYaml` (the single afk.yaml serializer, using the `yaml` package; shared by preview + server)
+- `src/utils/afk-fs.ts` — shared `readCwd` + `parseFrontmatter` used by the AFK server fns
+- `src/utils/afk-tree.ts` / `src/utils/afk-rules.ts` / `src/utils/afk-vibe.ts` — `/rules` loaders: `getProjectTree` (directory walk), `getProjectRules` (scans every `<cwd>/**/.claude/rules/*.md`, returns each rule's current `dir`), and `getVibeRules` (`vibe-rules list`; reads the pre-computed list under Docker)
+- `plugins/ai-tools-manager/skills/agents-framework-kickstarter/SKILL.md` — consuming prompt: writes `afk.json` + `afk.yaml`, runs the orchestrator installer, then runs `afk-apply-rules.js`
+- `plugins/ai-tools-manager/scripts/afk-apply-rules.js` — host-side rule placement from the `afk.json` rules slice: **moves** `source: "project"` rule files into their assigned `.claude/rules/`, and installs `source: "vibe-rules"` rules with `vibe-rules load <id> claude-code -t …` (idempotent; never deletes files)
+- `plugins/ai-tools-manager/scripts/afk-install-orchestrator.js` / `afk-render-orchestrator.js` — install the `afk` agent + `agent: afk` setting, gitignore the ephemeral session files (`.claude/.gitignore`), and render its frontmatter skills + `AFK:HANDOFFS` table from `afk.json`
+- `plugins/ai-tools-manager/scripts/{inject-agent-skills.js,afk-session-log.js,afk-set-workflow.js,lib/afk-session.js}` — SubagentStart skill injection, PreToolUse session logging, active-workflow setter, shared helpers. `afk-session-log.js` appends to `.claude/afk_session.log.jsonl` (append-only, one line per tool call — avoids the read-modify-write race when subagents run in parallel); `afk_session.json` holds only `{workflow, generated_instances}`. Both are deleted at `SessionEnd`.
+- `plugins/ai-tools-manager/scripts/afk-uninstall.js` + `plugins/ai-tools-manager/skills/afk-uninstall/SKILL.md` — `/afk-uninstall`: remove `agent: afk` from `settings.json` (so new sessions stop adopting the orchestrator) and clear session files; `--purge` also removes the installed agent + copied scripts. Keeps `afk.json`/`afk.yaml`.
+- `plugins/ai-tools-manager/skills/afk-sync/SKILL.md` — `/afk-sync`: re-render the orchestrator from `afk.json`
+- `.claude/skills/workflow-view/SKILL.md` — architecture doc for the `/workflows` view, i.e. the authoring/UI side (this app's developer reference)
+- `.claude/skills/rule-view/SKILL.md` — architecture doc for the `/rules` view: the two rule selectors (project + vibe-rules), the directory tree, how assignments map to the `rules` slice of `afk.json`, and how `afk-apply-rules.js` moves/installs rule files on save (the rules counterpart to `workflow-view`)
+- `.claude/skills/afk-architecture/SKILL.md` — architecture doc for the AFK **runtime**: install pipeline, orchestrator + hook lifecycle, the four config/state files, and the HANDOFF routing contract (the runtime counterpart to `workflow-view`)

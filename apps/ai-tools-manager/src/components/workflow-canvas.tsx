@@ -1,0 +1,1241 @@
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import type { AfkWorkflowV3, AfkNodeV3, AfkEdgeV3, AfkInstanceV3 } from "../utils/agents-framework-kickstarter";
+import InstancePicker, {
+  blankInstancePicker,
+  resolveInstanceFromPicker,
+  type InstancePickerValue,
+} from "./instance-picker";
+import SkillChecklist from "./skill-checklist";
+
+// Static import — rendering is gated by `mounted` to avoid SSR issues.
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  Handle,
+  Position,
+  Panel,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  ConnectionMode,
+  applyNodeChanges,
+  applyEdgeChanges,
+  addEdge,
+  useReactFlow,
+  type Node,
+  type Edge,
+  type NodeProps,
+  type EdgeProps,
+  type Connection,
+  type NodeChange,
+  type EdgeChange,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import dagre from "dagre";
+
+interface WorkflowCanvasProps {
+  workflow: AfkWorkflowV3 | null;
+  availableAgents: string[];
+  availableSkills: string[];
+  mainSessionSkills: string[];
+  instances: AfkInstanceV3[];
+  onChange: (w: AfkWorkflowV3) => void;
+  onMainSessionSkillsChange: (skills: string[]) => void;
+  onInstancesChange: (instances: AfkInstanceV3[]) => void;
+}
+
+// ── Dagre layout ────────────────────────────────────────────────────
+
+function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: "TB", ranksep: 80, nodesep: 60 });
+  g.setDefaultEdgeLabel(() => ({}));
+  for (const n of nodes) g.setNode(n.id, { width: 180, height: 60 });
+  for (const e of edges) g.setEdge(e.source, e.target);
+  dagre.layout(g);
+  return nodes.map((n) => {
+    const pos = g.node(n.id);
+    return { ...n, position: { x: pos.x - 90, y: pos.y - 30 } };
+  });
+}
+
+// ── Helpers: AfkWorkflowV3 <-> React Flow ──────────────────────────
+
+function workflowToRfNodes(workflow: AfkWorkflowV3, instances: AfkInstanceV3[]): Node[] {
+  const nodes: Node[] = [
+    {
+      id: "main-session",
+      type: "mainSession",
+      position: { x: 0, y: 0 },
+      data: {},
+      deletable: false,
+    },
+  ];
+  for (const n of workflow.nodes) {
+    const instanceData = n.type === "agent" ? instances.find((i) => i.name === n.instance) : undefined;
+    nodes.push({
+      id: n.id,
+      type: n.type === "agent" ? "agentNode" : "humanStep",
+      position: n.position ?? { x: 0, y: 0 },
+      data: { afkNode: n, instanceData },
+    });
+  }
+  return nodes;
+}
+
+function workflowToRfEdges(workflow: AfkWorkflowV3): Edge[] {
+  return workflow.edges.map((e, i) => ({
+    id: `e-${e.from}-${e.to}-${i}`,
+    source: e.from,
+    sourceHandle: e.sourceHandle ?? (e.kind === "condition" ? "right" : "bottom"),
+    target: e.to,
+    targetHandle: e.targetHandle ?? "top",
+    type: e.kind === "condition" ? "conditionEdge" : "successEdge",
+    label: e.label,
+    animated: e.kind === "condition",
+    style: e.kind === "condition" ? { stroke: "#f97316", strokeDasharray: "5 4" } : undefined,
+    data: { afkEdge: e },
+  }));
+}
+
+function rfNodesToAfkNodes(nodes: Node[]): AfkNodeV3[] {
+  return nodes
+    .filter((n) => n.id !== "main-session")
+    .map((n) => {
+      const afk = n.data.afkNode as AfkNodeV3;
+      return { id: afk.id, type: afk.type, instance: afk.instance, position: n.position };
+    });
+}
+
+function rfEdgesToAfkEdges(edges: Edge[]): AfkEdgeV3[] {
+  return edges.map((e) => {
+    const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
+    return {
+      from: e.source,
+      to: e.target,
+      kind: (afk?.kind ?? (e.type === "conditionEdge" ? "condition" : "success")) as "success" | "condition",
+      label: typeof e.label === "string" ? e.label : afk?.label,
+      sourceHandle: e.sourceHandle ?? undefined,
+      targetHandle: e.targetHandle ?? undefined,
+    };
+  });
+}
+
+function isSuccessEdge(e: Edge): boolean {
+  return (
+    e.type === "successEdge" ||
+    ((e.data as Record<string, unknown> | undefined)?.afkEdge as AfkEdgeV3 | undefined)?.kind === "success"
+  );
+}
+
+// Walk the success path from main-session; the last node reached is the terminal
+function findSuccessTerminalId(edges: Edge[]): string {
+  let terminalId = "main-session";
+  const visited = new Set<string>();
+  while (!visited.has(terminalId)) {
+    visited.add(terminalId);
+    const next = edges.find((e) => e.source === terminalId && isSuccessEdge(e));
+    if (!next) break;
+    terminalId = next.target;
+  }
+  return terminalId;
+}
+
+// Strip any existing outgoing success edge from a given source node.
+// Enforces the "at most one success edge per node" constraint.
+function replaceSuccessEdgeFrom(edges: Edge[], sourceId: string): Edge[] {
+  return edges.filter((e) => !(e.source === sourceId && isSuccessEdge(e)));
+}
+
+// Generate a unique human-review node id of the form "human_review-N"
+function nextHumanId(nodes: Node[]): string {
+  let n = 1;
+  while (nodes.some((nd) => nd.id === `human_review-${n}`)) n++;
+  return `human_review-${n}`;
+}
+
+// ── Node components (defined outside — stable references for React Flow) ──
+
+function MainSessionNode({ data }: NodeProps & {
+  data: { skills?: string[]; onEditSkills?: (id: string) => void; onAddNext?: (id: string) => void };
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  return (
+    <>
+      <Handle type="target" position={Position.Top} id="top" />
+      <Handle type="source" position={Position.Left} id="left" style={{ top: "50%" }} />
+      <Handle type="source" position={Position.Right} id="right" style={{ top: "50%" }} />
+      <div className="relative select-none">
+        <div className="w-48 rounded-2xl border-2 border-green-400 bg-green-100 shadow-sm">
+          {/* Header row */}
+          <div className="flex items-center justify-between px-2.5 pt-2 pb-1">
+            <span className="text-green-800 text-[12px] font-semibold">Claude Main Session</span>
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                className="w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none text-green-600 hover:bg-green-200"
+              >
+                ⋮
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-6 z-50 w-36 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
+                    onClick={() => { data.onEditSkills?.("main-session"); setMenuOpen(false); }}
+                  >
+                    + Add Skill
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Skill chips */}
+          {data.skills && data.skills.length > 0 && (
+            <div className="px-2.5 pb-2 flex flex-wrap gap-1">
+              {data.skills.map((s) => (
+                <span key={s} className="px-1.5 py-0.5 rounded-full bg-green-200 border border-green-300 text-green-700 text-[10px] font-mono">
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Bottom "+" — add next step */}
+        <button
+          type="button"
+          style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
+          className="w-5 h-5 rounded-full bg-white border-2 border-green-400 text-green-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-green-50 focus:outline-none"
+          onClick={(e) => { e.stopPropagation(); data.onAddNext?.("main-session"); }}
+          title="Add next step"
+        >
+          +
+        </button>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="bottom" />
+    </>
+  );
+}
+
+function AgentNodeComponent({
+  data,
+  selected,
+}: NodeProps & {
+  data: {
+    afkNode: AfkNodeV3;
+    instanceData?: AfkInstanceV3;
+    onDelete?: (id: string) => void;
+    onEditInstance?: (instanceName: string) => void;
+    onAddConditionEdge?: (id: string) => void;
+    onAddNext?: (id: string) => void;
+    isPickingConditionSource?: boolean;
+    isTerminal?: boolean;
+  };
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const afk = data.afkNode;
+  const inst = data.instanceData;
+  const term = !!data.isTerminal;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const sideButtonClass = `w-5 h-5 rounded-full bg-white border-2 text-orange-500 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm focus:outline-none transition-all ${
+    data.isPickingConditionSource
+      ? "border-orange-500 animate-pulse scale-125"
+      : "border-orange-300 hover:bg-orange-50 hover:border-orange-500"
+  }`;
+
+  // Terminal node renders green (task-complete); others orange.
+  const cardClass = term
+    ? `bg-green-50 text-green-900 ${selected ? "border-green-500" : "border-green-300"}`
+    : `bg-orange-50 text-orange-900 ${selected ? "border-orange-500" : "border-orange-200"}`;
+  const nameClass = term ? "text-green-900" : "text-orange-900";
+  const subClass = term ? "text-green-600" : "text-orange-500";
+  const kebabClass = term ? "text-green-500 hover:bg-green-100" : "text-orange-400 hover:bg-orange-100";
+  const chipClass = term
+    ? "bg-green-100 border-green-300 text-green-700"
+    : "bg-orange-100 border-orange-200 text-orange-700";
+
+  return (
+    <>
+      <Handle type="target" position={Position.Top} id="top" />
+      <Handle type="source" position={Position.Left} id="left" style={{ top: "50%" }} />
+      <Handle type="source" position={Position.Right} id="right" style={{ top: "50%" }} />
+      <div className="relative">
+        {/* Left condition + button */}
+        <button
+          type="button"
+          style={{ position: "absolute", left: -10, top: "50%", transform: "translateY(-50%)" }}
+          className={sideButtonClass}
+          onClick={(e) => { e.stopPropagation(); data.onAddConditionEdge?.(afk.id); }}
+          title="Add condition from this node"
+        >
+          +
+        </button>
+
+        {/* Right condition + button */}
+        <button
+          type="button"
+          style={{ position: "absolute", right: -10, top: "50%", transform: "translateY(-50%)" }}
+          className={sideButtonClass}
+          onClick={(e) => { e.stopPropagation(); data.onAddConditionEdge?.(afk.id); }}
+          title="Add condition from this node"
+        >
+          +
+        </button>
+
+        <div className={`w-44 rounded-lg border-2 shadow-sm transition-colors ${cardClass}`}>
+          <div className="flex items-center justify-between px-2.5 pt-2 pb-1">
+            <div className="flex flex-col min-w-0 flex-1">
+              {/* Instance name (primary) */}
+              <span className={`font-mono text-[12px] font-semibold truncate ${nameClass}`}>
+                {afk.instance ?? afk.id}
+              </span>
+              {/* Agent name (secondary) */}
+              {inst && (
+                <span className={`text-[10px] truncate font-mono ${subClass}`}>@{inst.agent}</span>
+              )}
+            </div>
+            <div className="relative ml-1 shrink-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                className={`w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none ${kebabClass}`}
+              >
+                ⋮
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-6 z-50 w-40 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
+                    onClick={() => { data.onEditInstance?.(afk.instance ?? afk.id); setMenuOpen(false); }}
+                  >
+                    Edit instance
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
+                    onClick={() => { data.onDelete?.(afk.id); setMenuOpen(false); }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Skill chips from instance */}
+          {inst && inst.skills.length > 0 && (
+            <div className="px-2.5 pb-2 flex flex-wrap gap-1">
+              {inst.skills.map((s) => (
+                <span key={s} className={`px-1.5 py-0.5 rounded-full border text-[10px] font-mono ${chipClass}`}>{s}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Bottom "+" — add next step */}
+        <button
+          type="button"
+          style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
+          className={`w-5 h-5 rounded-full bg-white border-2 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:opacity-80 focus:outline-none ${term ? "border-green-400 text-green-600" : "border-orange-300 text-orange-500"}`}
+          onClick={(e) => { e.stopPropagation(); data.onAddNext?.(afk.id); }}
+          title="Add next step"
+        >
+          +
+        </button>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="bottom" />
+    </>
+  );
+}
+
+function HumanStepNode({ data, selected }: NodeProps & { data: { afkNode: AfkNodeV3; onAddNext?: (id: string) => void } }) {
+  const afk = data.afkNode;
+  return (
+    <>
+      <Handle type="target" position={Position.Top} id="top" />
+      <div className="relative" style={{ width: 120, height: 60 }}>
+        <div
+          className={`flex items-center justify-center border-2 bg-amber-50 text-amber-800 ${selected ? "border-amber-500" : "border-amber-300"}`}
+          style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", width: 120, height: 60 }}
+        >
+          <span className="text-[11px] font-medium text-amber-800">Review</span>
+        </div>
+        {/* Bottom "+" — add next step */}
+        <button
+          type="button"
+          style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
+          className="w-5 h-5 rounded-full bg-white border-2 border-amber-400 text-amber-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-amber-50 focus:outline-none"
+          onClick={(e) => { e.stopPropagation(); data.onAddNext?.(afk.id); }}
+          title="Add next step"
+        >
+          +
+        </button>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="bottom" />
+    </>
+  );
+}
+
+function SuccessEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd }: EdgeProps) {
+  const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  return <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={{ stroke: "#94a3b8", strokeWidth: 1.5 }} />;
+}
+
+function ConditionEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, data }: EdgeProps) {
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const onEditLabel = (data as { onEditLabel?: (id: string) => void } | undefined)?.onEditLabel;
+  const hasLabel = typeof label === "string" && label.length > 0;
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{ stroke: "#f97316", strokeWidth: 1.5, strokeDasharray: "5 4" }}
+      />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: "all",
+          }}
+          className="flex items-center gap-1 nodrag nopan"
+        >
+          {hasLabel ? (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 border border-orange-300 text-orange-700">
+              {String(label)}
+            </span>
+          ) : (
+            <span className="px-1.5 py-0.5 rounded text-[10px] italic bg-orange-50/70 border border-dashed border-orange-300 text-orange-400">
+              no label
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onEditLabel?.(id); }}
+            className="w-4 h-4 flex items-center justify-center rounded bg-white border border-orange-300 text-orange-500 text-[9px] leading-none hover:bg-orange-50 cursor-pointer focus:outline-none shadow-sm"
+            title="Edit label"
+          >
+            ✎
+          </button>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+// Re-fits the viewport whenever the active workflow changes (fitView prop only fires on mount).
+function FitViewEffect({ workflowName }: { workflowName: string | undefined }) {
+  const { fitView } = useReactFlow();
+  const prevRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (workflowName !== prevRef.current) {
+      prevRef.current = workflowName;
+      setTimeout(() => fitView({ padding: 0.4 }), 50);
+    }
+  }, [workflowName, fitView]);
+  return null;
+}
+
+// Stable module-level constants — never recreated, so React Flow never remounts nodes.
+const NODE_TYPES = {
+  mainSession: MainSessionNode,
+  agentNode: AgentNodeComponent,
+  humanStep: HumanStepNode,
+};
+const EDGE_TYPES = { successEdge: SuccessEdge, conditionEdge: ConditionEdge };
+
+// ── Main component ──────────────────────────────────────────────────
+
+export default function WorkflowCanvas({
+  workflow,
+  availableAgents,
+  availableSkills,
+  mainSessionSkills,
+  instances,
+  onChange,
+  onMainSessionSkillsChange,
+  onInstancesChange,
+}: WorkflowCanvasProps) {
+  const [mounted, setMounted] = useState(false);
+  const [rfNodes, setRfNodes] = useState<Node[]>([]);
+  const [rfEdges, setRfEdges] = useState<Edge[]>([]);
+  const rfNodesRef = useRef<Node[]>([]);
+  const rfEdgesRef = useRef<Edge[]>([]);
+  rfNodesRef.current = rfNodes;
+  rfEdgesRef.current = rfEdges;
+  // Tracks the last workflow object we emitted so the sync effect can ignore the echo
+  const lastEmittedRef = useRef<AfkWorkflowV3 | null>(null);
+  // Skill panel — only used for main-session
+  const [skillPanelNodeId, setSkillPanelNodeId] = useState<string | null>(null);
+
+  // Condition edge state machine
+  const [conditionSourceNodeId, setConditionSourceNodeId] = useState<string | null>(null);
+  const [conditionModalOpen, setConditionModalOpen] = useState(false);
+  const [conditionLabel, setConditionLabel] = useState("");
+  const [conditionTargetNodeId, setConditionTargetNodeId] = useState("");
+  const [conditionPicker, setConditionPicker] = useState<InstancePickerValue>(blankInstancePicker());
+
+  // Edit instance modal
+  const [editInstanceName, setEditInstanceName] = useState<string | null>(null);
+  const [editInstanceAgent, setEditInstanceAgent] = useState("");
+  const [editInstanceSkills, setEditInstanceSkills] = useState<string[]>([]);
+
+  // Edit condition-edge label modal
+  const [editLabelEdgeId, setEditLabelEdgeId] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
+
+  useEffect(() => { setMounted(true); }, []);
+
+  // Sync incoming workflow → RF state (always produces at least the main-session node)
+  useEffect(() => {
+    if (!workflow) return;
+    // Skip if this is the echo of our own pushChange — the canvas already has the right state
+    if (workflow === lastEmittedRef.current) return;
+    let nodes = workflowToRfNodes(workflow, instances);
+    const edges = workflowToRfEdges(workflow);
+    const hasPositions = workflow.nodes.length > 0 && workflow.nodes.every((n) => n.position != null);
+    if (!hasPositions) nodes = applyDagreLayout(nodes, edges);
+    setRfNodes(nodes);
+    setRfEdges(edges);
+  }, [workflow, instances]);
+
+  const pushChange = useCallback(
+    (nodes: Node[], edges: Edge[]) => {
+      if (!workflow) return;
+      const updated: AfkWorkflowV3 = { ...workflow, nodes: rfNodesToAfkNodes(nodes), edges: rfEdgesToAfkEdges(edges) };
+      lastEmittedRef.current = updated; // mark so the sync effect ignores the echo
+      onChange(updated);
+    },
+    [workflow, onChange],
+  );
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const next = applyNodeChanges(changes, rfNodesRef.current);
+      setRfNodes(next);
+      // Push only when there is a structural change worth saving:
+      // - position: only on drag-end (dragging === false) — not on every mousemove
+      // - dimensions / select: React Flow internal bookkeeping, never push
+      // - everything else (add, remove, reset): push immediately
+      const shouldPush = changes.some((c) =>
+        (c.type === "position" && c.dragging === false) ||
+        (c.type !== "position" && c.type !== "dimensions" && c.type !== "select")
+      );
+      if (shouldPush) pushChange(next, rfEdgesRef.current);
+    },
+    [pushChange],
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const next = applyEdgeChanges(changes, rfEdgesRef.current);
+      setRfEdges(next);
+      pushChange(rfNodesRef.current, next);
+    },
+    [pushChange],
+  );
+
+  const handleConnect = useCallback(
+    (params: Connection) => {
+      const isCondition = params.sourceHandle === "left" || params.sourceHandle === "right";
+      const newEdge: Partial<Edge> = {
+        ...params,
+        type: isCondition ? "conditionEdge" : "successEdge",
+        animated: isCondition,
+        style: isCondition ? { stroke: "#f97316", strokeDasharray: "5 4" } : undefined,
+        data: {
+          afkEdge: {
+            from: params.source,
+            to: params.target,
+            kind: isCondition ? "condition" : "success",
+            sourceHandle: params.sourceHandle ?? undefined,
+            targetHandle: params.targetHandle ?? undefined,
+          } as AfkEdgeV3,
+        },
+      };
+      setRfEdges((eds) => {
+        // Enforce single success edge per source node
+        const base = isCondition ? eds : replaceSuccessEdgeFrom(eds, params.source!);
+        const next = addEdge(newEdge as Edge, base);
+        pushChange(rfNodesRef.current, next);
+        return next;
+      });
+    },
+    [pushChange],
+  );
+
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      setRfNodes((nds) => {
+        const next = nds.filter((n) => n.id !== nodeId);
+        const nextEdges = rfEdgesRef.current.filter((e) => e.source !== nodeId && e.target !== nodeId);
+        setRfEdges(nextEdges);
+        pushChange(next, nextEdges);
+        return next;
+      });
+    },
+    [pushChange],
+  );
+
+  // Only used for main-session skill editing
+  const updateMainSessionSkills = useCallback(
+    (skills: string[]) => {
+      onMainSessionSkillsChange(skills);
+    },
+    [onMainSessionSkillsChange],
+  );
+
+  // ── Edit instance modal ──────────────────────────────────────────
+
+  const openEditInstance = useCallback(
+    (instanceName: string) => {
+      const inst = instances.find((i) => i.name === instanceName);
+      if (!inst) return;
+      setEditInstanceName(instanceName);
+      setEditInstanceAgent(inst.agent);
+      setEditInstanceSkills(inst.skills);
+    },
+    [instances],
+  );
+
+  const confirmEditInstance = useCallback(() => {
+    if (!editInstanceName) return;
+    onInstancesChange(
+      instances.map((i) =>
+        i.name === editInstanceName
+          ? { ...i, agent: editInstanceAgent, skills: editInstanceSkills }
+          : i,
+      ),
+    );
+    setEditInstanceName(null);
+  }, [editInstanceName, editInstanceAgent, editInstanceSkills, instances, onInstancesChange]);
+
+  // ── Edit condition-edge label ────────────────────────────────────
+
+  const openEditLabel = useCallback((edgeId: string) => {
+    const edge = rfEdgesRef.current.find((e) => e.id === edgeId);
+    setEditLabelEdgeId(edgeId);
+    setEditLabelValue(typeof edge?.label === "string" ? edge.label : "");
+  }, []);
+
+  const confirmEditLabel = useCallback(() => {
+    if (!editLabelEdgeId) return;
+    const trimmed = editLabelValue.trim();
+    const next = rfEdgesRef.current.map((e) => {
+      if (e.id !== editLabelEdgeId) return e;
+      const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
+      // Keep `e.label` and `afkEdge.label` in sync — rfEdgesToAfkEdges reads `e.label`
+      // first but falls back to afk.label, so both must be cleared when emptied.
+      return {
+        ...e,
+        label: trimmed || undefined,
+        data: { ...e.data, afkEdge: { ...(afk as AfkEdgeV3), label: trimmed || undefined } },
+      };
+    });
+    setRfEdges(next);
+    pushChange(rfNodesRef.current, next);
+    setEditLabelEdgeId(null);
+  }, [editLabelEdgeId, editLabelValue, pushChange]);
+
+  // Instances already placed in this workflow (for uniqueness enforcement)
+  const placedInstanceNames = useMemo(
+    () =>
+      new Set(
+        rfNodes
+          .filter((n) => n.id !== "main-session" && (n.data.afkNode as AfkNodeV3 | undefined)?.type === "agent")
+          .map((n) => (n.data.afkNode as AfkNodeV3).instance ?? "")
+          .filter(Boolean),
+      ),
+    [rfNodes],
+  );
+
+  // Subagents (agent types) already placed in this workflow. A subagent can only
+  // appear once per workflow — the SubagentStart hook keys off agent_type, so two
+  // instances of the same agent would merge. Used to hide already-used subagents.
+  const placedAgentTypes = useMemo(
+    () =>
+      new Set(
+        Array.from(placedInstanceNames)
+          .map((name) => instances.find((i) => i.name === name)?.agent)
+          .filter(Boolean) as string[],
+      ),
+    [placedInstanceNames, instances],
+  );
+
+  // ── Condition state machine ──────────────────────────────────────
+
+  const resetConditionState = useCallback(() => {
+    setConditionSourceNodeId(null);
+    setConditionModalOpen(false);
+    setConditionLabel("");
+    setConditionTargetNodeId("");
+    setConditionPicker(blankInstancePicker());
+  }, []);
+
+  const openConditionModal = useCallback(
+    (nodeId: string) => {
+      setSkillPanelNodeId(null);
+      setConditionSourceNodeId(nodeId);
+      setConditionModalOpen(true);
+      setConditionLabel("");
+      setConditionTargetNodeId("");
+      const firstFree = availableAgents.find((a) => !placedAgentTypes.has(a));
+      setConditionPicker(blankInstancePicker(firstFree ?? ""));
+    },
+    [availableAgents, placedAgentTypes],
+  );
+
+  const handleStartAddCondition = useCallback(() => {
+    if (conditionSourceNodeId === "__picking__") {
+      resetConditionState();
+    } else {
+      setConditionSourceNodeId("__picking__");
+    }
+  }, [conditionSourceNodeId, resetConditionState]);
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (conditionSourceNodeId === "__picking__" && node.id !== "main-session") {
+        openConditionModal(node.id);
+      }
+    },
+    [conditionSourceNodeId, openConditionModal],
+  );
+
+  const confirmAddCondition = useCallback(() => {
+    if (!conditionSourceNodeId || conditionSourceNodeId === "__picking__") return;
+
+    const nextNodes = [...rfNodes];
+    let targetId: string;
+
+    if (conditionTargetNodeId) {
+      // Targeting an existing node
+      targetId = conditionTargetNodeId;
+    } else {
+      // Creating / reusing a node via the instance picker
+      const resolved = resolveInstanceFromPicker(conditionPicker, {
+        instances,
+        placedNames: placedInstanceNames,
+        availableAgents,
+      });
+      if (!resolved) return;
+      const instanceName = resolved.instance.name;
+      if (resolved.isNew) onInstancesChange([...instances, resolved.instance]);
+      targetId = instanceName;
+      const sourceNode = rfNodes.find((n) => n.id === conditionSourceNodeId);
+      const position = {
+        x: (sourceNode?.position.x ?? 0) + 240,
+        y: sourceNode?.position.y ?? 0,
+      };
+      const newAfkNode: AfkNodeV3 = { id: instanceName, type: "agent", instance: instanceName, position };
+      nextNodes.push({
+        id: instanceName,
+        type: "agentNode",
+        position,
+        data: { afkNode: newAfkNode, instanceData: resolved.instance },
+      });
+    }
+
+    const newEdge: Edge = {
+      id: `e-cond-${conditionSourceNodeId}-${targetId}-${rfEdges.length}`,
+      source: conditionSourceNodeId,
+      sourceHandle: "right",
+      target: targetId,
+      targetHandle: "top",
+      type: "conditionEdge",
+      label: conditionLabel || undefined,
+      animated: true,
+      style: { stroke: "#f97316", strokeDasharray: "5 4" },
+      data: {
+        afkEdge: {
+          from: conditionSourceNodeId,
+          to: targetId,
+          kind: "condition",
+          label: conditionLabel || undefined,
+          sourceHandle: "right",
+          targetHandle: "top",
+        } as AfkEdgeV3,
+      },
+    };
+
+    const nextEdges = [...rfEdges, newEdge];
+    setRfNodes(nextNodes);
+    setRfEdges(nextEdges);
+    pushChange(nextNodes, nextEdges);
+    resetConditionState();
+  }, [
+    conditionSourceNodeId, conditionTargetNodeId, conditionPicker, conditionLabel,
+    rfNodes, rfEdges, instances, availableAgents, placedInstanceNames,
+    onInstancesChange, pushChange, resetConditionState,
+  ]);
+
+  // ── Add step (per-node "+" button) ──────────────────────────────
+
+  const [addStepSourceId, setAddStepSourceId] = useState<string | null>(null);
+  const [addStepType, setAddStepType] = useState<"agent" | "human_review">("agent");
+  const [addStepPicker, setAddStepPicker] = useState<InstancePickerValue>(blankInstancePicker());
+
+  const resetAddStep = useCallback(() => {
+    setAddStepSourceId(null);
+    setAddStepType("agent");
+    setAddStepPicker(blankInstancePicker());
+  }, []);
+
+  const openAddStep = useCallback(
+    (sourceId: string) => {
+      setAddStepSourceId(sourceId);
+      setAddStepType("agent");
+      const firstFree = availableAgents.find((a) => !placedAgentTypes.has(a));
+      setAddStepPicker(blankInstancePicker(firstFree ?? ""));
+    },
+    [availableAgents, placedAgentTypes],
+  );
+
+  const confirmAddStep = useCallback(() => {
+    if (!addStepSourceId || !workflow) return;
+
+    const sourceNode = rfNodes.find((n) => n.id === addStepSourceId);
+    const position = {
+      x: sourceNode?.position.x ?? 0,
+      y: (sourceNode?.position.y ?? 0) + 160,
+    };
+
+    let newRfNode: Node;
+    let nodeId: string;
+
+    if (addStepType === "agent") {
+      const resolved = resolveInstanceFromPicker(addStepPicker, {
+        instances,
+        placedNames: placedInstanceNames,
+        availableAgents,
+      });
+      if (!resolved) return;
+      nodeId = resolved.instance.name;
+      if (resolved.isNew) onInstancesChange([...instances, resolved.instance]);
+      const afkNode: AfkNodeV3 = { id: nodeId, type: "agent", instance: nodeId, position };
+      newRfNode = { id: nodeId, type: "agentNode", position, data: { afkNode, instanceData: resolved.instance } };
+    } else {
+      // human_review
+      nodeId = nextHumanId(rfNodes);
+      const afkNode: AfkNodeV3 = { id: nodeId, type: "human_review", position };
+      newRfNode = { id: nodeId, type: "humanStep", position, data: { afkNode } };
+    }
+
+    const newEdge: Edge = {
+      id: `e-${addStepSourceId}-${nodeId}`,
+      source: addStepSourceId,
+      sourceHandle: "bottom",
+      target: nodeId,
+      targetHandle: "top",
+      type: "successEdge",
+      data: {
+        afkEdge: { from: addStepSourceId, to: nodeId, kind: "success", sourceHandle: "bottom", targetHandle: "top" } as AfkEdgeV3,
+      },
+    };
+
+    const nextNodes = [...rfNodes, newRfNode];
+    // Enforce single success edge per source: replace any existing success edge from addStepSourceId
+    const nextEdges = [...replaceSuccessEdgeFrom(rfEdges, addStepSourceId), newEdge];
+    setRfNodes(nextNodes);
+    setRfEdges(nextEdges);
+    pushChange(nextNodes, nextEdges);
+    resetAddStep();
+  }, [
+    addStepSourceId, addStepType, addStepPicker,
+    workflow, rfNodes, rfEdges, instances, availableAgents, placedInstanceNames,
+    onInstancesChange, pushChange, resetAddStep,
+  ]);
+
+  // ── Add Agent (bottom bar) — routes through add-step modal at terminal ──
+
+  const handleAddAgent = useCallback(() => {
+    if (!workflow) return;
+    const terminalId = findSuccessTerminalId(rfEdges);
+    openAddStep(terminalId);
+  }, [workflow, rfEdges, openAddStep]);
+
+  // ── Enriched nodes ───────────────────────────────────────────────
+
+  const terminalId = useMemo(() => findSuccessTerminalId(rfEdges), [rfEdges]);
+
+  const enrichedNodes = useMemo(
+    () =>
+      rfNodes.map((n) => {
+        if (n.id === "main-session") {
+          return { ...n, data: { skills: mainSessionSkills, onEditSkills: setSkillPanelNodeId, onAddNext: openAddStep } };
+        }
+        const afkNode = n.data.afkNode as AfkNodeV3;
+        // Always resolve instanceData fresh from the instances prop so edit-instance updates are reflected immediately
+        const instanceData = afkNode.type === "agent" ? instances.find((i) => i.name === afkNode.instance) : undefined;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            instanceData,
+            onDelete: deleteNode,
+            onEditInstance: openEditInstance,
+            onAddConditionEdge: openConditionModal,
+            onAddNext: openAddStep,
+            isPickingConditionSource: conditionSourceNodeId === "__picking__",
+            isTerminal: n.id === terminalId,
+          },
+        };
+      }),
+    [rfNodes, mainSessionSkills, instances, deleteNode, openEditInstance, openConditionModal, openAddStep, conditionSourceNodeId, terminalId],
+  );
+
+  // Thread the label editor into condition edges (success edges have no label).
+  const enrichedEdges = useMemo(
+    () =>
+      rfEdges.map((e) =>
+        e.type === "conditionEdge" ? { ...e, data: { ...e.data, onEditLabel: openEditLabel } } : e,
+      ),
+    [rfEdges, openEditLabel],
+  );
+
+  if (!mounted) {
+    return <div className="flex-1 flex items-center justify-center text-(--ink-2) text-[13px]">Loading canvas…</div>;
+  }
+
+  const isPicking = conditionSourceNodeId === "__picking__";
+  // Available instances for reuse: exclude ones already placed in this workflow,
+  // and ones whose subagent is already used (a subagent appears at most once).
+  const availableForReuse = instances.filter(
+    (i) => !placedInstanceNames.has(i.name) && !placedAgentTypes.has(i.agent),
+  );
+  // Subagents still selectable when creating a new node here.
+  const availableAgentsForNew = availableAgents.filter((a) => !placedAgentTypes.has(a));
+  const existingInstanceNames = instances.map((i) => i.name);
+  // When editing an instance, keep its own subagent selectable but hide subagents
+  // already taken by other instances in this workflow.
+  const editInstanceOrigAgent = editInstanceName
+    ? instances.find((i) => i.name === editInstanceName)?.agent
+    : undefined;
+  const editAvailableAgents = availableAgents.filter(
+    (a) => a === editInstanceOrigAgent || !placedAgentTypes.has(a),
+  );
+
+  return (
+    <div
+      className={`flex-1 relative flex flex-col overflow-hidden ${isPicking ? "cursor-crosshair" : ""}`}
+      style={{ minHeight: 400 }}
+    >
+      <ReactFlowProvider>
+        <FitViewEffect workflowName={workflow?.name} />
+        <ReactFlow
+          nodes={enrichedNodes}
+          edges={enrichedEdges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          connectionMode={ConnectionMode.Loose}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={handleConnect}
+          onNodeClick={handleNodeClick}
+          fitView
+          fitViewOptions={{ padding: 0.4 }}
+          className="bg-(--bg)"
+        >
+          <Background />
+          <Controls />
+
+          {/* Bottom action bar */}
+          <Panel position="bottom-center" style={{ marginBottom: 16 }}>
+            <div className="flex items-center gap-2 bg-(--bg) border border-(--line) rounded-xl px-3 py-2 shadow-lg">
+              <button
+                type="button"
+                onClick={handleAddAgent}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 cursor-pointer focus:outline-none transition-colors"
+              >
+                <span className="text-[14px] leading-none">+</span> Add Agent
+              </button>
+              <div className="w-px h-4 bg-(--line)" />
+              <button
+                type="button"
+                onClick={handleStartAddCondition}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium border cursor-pointer focus:outline-none transition-colors ${
+                  isPicking
+                    ? "border-orange-500 bg-orange-500 text-white"
+                    : "border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                }`}
+              >
+                <span className="text-[14px] leading-none">+</span>{" "}
+                {isPicking ? "Click a node…" : "Add condition"}
+              </button>
+              {isPicking && (
+                <button
+                  type="button"
+                  onClick={resetConditionState}
+                  className="px-2 py-1 text-[12px] text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </Panel>
+        </ReactFlow>
+      </ReactFlowProvider>
+
+      {/* Condition modal */}
+      {conditionModalOpen && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">Add condition</div>
+
+            <input
+              type="text"
+              placeholder="Condition label (e.g. needs revision)"
+              value={conditionLabel}
+              autoFocus
+              onChange={(e) => setConditionLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") resetConditionState(); }}
+              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+            />
+
+            {/* Target: existing node or new instance */}
+            <select
+              value={conditionTargetNodeId}
+              onChange={(e) => setConditionTargetNodeId(e.target.value)}
+              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+            >
+              <option value="">New instance node…</option>
+              {rfNodes
+                .filter((n) => n.id !== conditionSourceNodeId && n.id !== "main-session")
+                .map((n) => {
+                  const afk = n.data.afkNode as AfkNodeV3 | undefined;
+                  const label = afk?.instance ?? afk?.id ?? n.id;
+                  return <option key={n.id} value={n.id}>{label}</option>;
+                })}
+            </select>
+
+            {/* When creating a new node: instance picker */}
+            {!conditionTargetNodeId && (
+              <InstancePicker
+                value={conditionPicker}
+                onChange={setConditionPicker}
+                availableAgents={availableAgentsForNew}
+                availableSkills={availableSkills}
+                reusableInstances={availableForReuse}
+                existingInstanceNames={existingInstanceNames}
+              />
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={resetConditionState}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmAddCondition}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add step modal */}
+      {addStepSourceId && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">Add step</div>
+
+            {/* Type picker */}
+            <div className="flex rounded-lg overflow-hidden border border-(--line)">
+              <button
+                type="button"
+                onClick={() => setAddStepType("agent")}
+                className={`flex-1 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none transition-colors ${addStepType === "agent" ? "bg-primary text-white" : "bg-(--bg-elev) text-(--ink-2) hover:bg-(--bg)"}`}
+              >
+                Agent
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddStepType("human_review")}
+                className={`flex-1 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none transition-colors ${addStepType === "human_review" ? "bg-primary text-white" : "bg-(--bg-elev) text-(--ink-2) hover:bg-(--bg)"}`}
+              >
+                Human Review
+              </button>
+            </div>
+
+            {/* Instance picker (only for agent type) */}
+            {addStepType === "agent" && (
+              <InstancePicker
+                value={addStepPicker}
+                onChange={setAddStepPicker}
+                availableAgents={availableAgentsForNew}
+                availableSkills={availableSkills}
+                reusableInstances={availableForReuse}
+                existingInstanceNames={existingInstanceNames}
+                onEnter={confirmAddStep}
+                onEscape={resetAddStep}
+              />
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={resetAddStep}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmAddStep}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit instance modal */}
+      {editInstanceName && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">
+              Edit instance: <span className="font-mono">{editInstanceName}</span>
+            </div>
+
+            <div>
+              <div className="text-[10px] text-subtle uppercase tracking-wide mb-1">Subagent</div>
+              <select
+                value={editInstanceAgent}
+                onChange={(e) => setEditInstanceAgent(e.target.value)}
+                className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+              >
+                {editAvailableAgents.map((a) => <option key={a} value={a}>{a}</option>)}
+                {/* Keep current agent even if not in availableAgents */}
+                {editInstanceAgent && !availableAgents.includes(editInstanceAgent) && (
+                  <option value={editInstanceAgent}>{editInstanceAgent} (not in list)</option>
+                )}
+              </select>
+            </div>
+
+            <SkillChecklist
+              skills={availableSkills}
+              value={editInstanceSkills}
+              onChange={setEditInstanceSkills}
+              maxHeight="max-h-48"
+              size="md"
+              emptyHint="No skills available. Add skills from the left panel first, then reopen this instance to assign them."
+            />
+
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setEditInstanceName(null)}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmEditInstance}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit condition-label modal */}
+      {editLabelEdgeId && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">Edit condition label</div>
+            <input
+              type="text"
+              placeholder="Condition label (e.g. needs revision)"
+              value={editLabelValue}
+              autoFocus
+              onChange={(e) => setEditLabelValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditLabelEdgeId(null);
+                if (e.key === "Enter") confirmEditLabel();
+              }}
+              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setEditLabelEdgeId(null)}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmEditLabel}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Skill attach modal — main-session only */}
+      {skillPanelNodeId === "main-session" && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-72 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">
+              Skills for <span className="font-mono">Claude Main Session</span>
+            </div>
+            {availableSkills.length === 0 ? (
+              <p className="text-[12px] text-subtle">No skills selected in the left panel.</p>
+            ) : (
+              <SkillChecklist
+                skills={availableSkills}
+                value={mainSessionSkills}
+                onChange={updateMainSessionSkills}
+                maxHeight="max-h-60"
+                size="md"
+              />
+            )}
+            <button type="button" onClick={() => setSkillPanelNodeId(null)} className="w-full py-1.5 text-[12px] bg-(--bg-elev) border border-(--line) rounded-lg cursor-pointer text-(--ink-2) hover:border-(--ink-4)">
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

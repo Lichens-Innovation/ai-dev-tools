@@ -1,8 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   component: Home,
 })
+
+const PAGES = [
+  { path: '/create-skill', label: 'Create Skill' },
+  { path: '/create-subagent', label: 'Create Subagent' },
+  { path: '/create-plugin', label: 'Create Plugin' },
+  { path: '/create-marketplace', label: 'Create Marketplace' },
+  { path: '/workflows', label: 'Workflows' },
+  { path: '/rules', label: 'Rules' },
+]
 
 function Home() {
   return (
@@ -17,6 +26,20 @@ function Home() {
           Use a skill in Claude Code to get started.
         </p>
       </div>
+      <ul className="flex flex-col gap-1 text-sm" style={{ color: 'var(--ink-3)' }}>
+        {PAGES.map(({ path, label }) => (
+          <li key={path}>
+            <Link
+              to={path}
+              className="hover:underline"
+              style={{ color: 'var(--accent)' }}
+            >
+              {path}
+            </Link>
+            <span className="ml-2">{label}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

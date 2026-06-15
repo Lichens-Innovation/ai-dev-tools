@@ -1,9 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
-import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import type { InstalledPlugin } from '@repo/claude-fs'
-import { getInstalledPlugins as getInstalledPluginsData, readJsonSafe } from '@repo/claude-fs'
-import { PLUGINS_DIR, MARKETPLACE_JSON, parseFrontmatter } from './helpers'
+import {
+  getInstalledPlugins as getInstalledPluginsData,
+  readJsonSafe,
+  readSkillsFromDir,
+  readAgentsFromDir,
+} from '@repo/claude-fs'
+import { PLUGINS_DIR, MARKETPLACE_JSON } from './helpers'
 
 export type { InstalledPlugin }
 
@@ -50,31 +54,10 @@ export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
         description?: string
       }>(path.join(pluginDir, '.claude-plugin', 'plugin.json'))
 
-      const skills: SkillInfo[] = []
-      const agents: SkillInfo[] = []
-
-      const skillsDir = path.join(pluginDir, 'skills')
-      try {
-        const skillDirs = await readdir(skillsDir)
-        for (const skillName of skillDirs) {
-          const skillMd = await readFile(path.join(skillsDir, skillName, 'SKILL.md'), 'utf-8').catch(() => null)
-          if (!skillMd) continue
-          const fm = parseFrontmatter(skillMd)
-          skills.push({ name: fm.name || skillName, description: fm.description || '' })
-        }
-      } catch {}
-
-      const agentsDir = path.join(pluginDir, 'agents')
-      try {
-        const agentDirs = await readdir(agentsDir)
-        for (const agentName of agentDirs) {
-          const agentMd = await readFile(path.join(agentsDir, agentName, 'AGENTS.md'), 'utf-8').catch(() => null)
-          if (!agentMd) continue
-          const fm = parseFrontmatter(agentMd)
-          const firstHeading = agentMd.match(/^#\s+(.+)/m)?.[1]?.trim() ?? agentName
-          agents.push({ name: fm.name || agentName, description: fm.description || firstHeading })
-        }
-      } catch {}
+      // Shared readers: skills from `<plugin>/skills/<id>/SKILL.md`, agents from
+      // `<plugin>/agents/` (flat `<name>.md` or `<name>/AGENTS.md`).
+      const skills: SkillInfo[] = await readSkillsFromDir(path.join(pluginDir, 'skills'))
+      const agents: SkillInfo[] = await readAgentsFromDir(path.join(pluginDir, 'agents'))
 
       const pluginKey = `${pluginEntry.name}@${marketplaceName}`
       results.push({

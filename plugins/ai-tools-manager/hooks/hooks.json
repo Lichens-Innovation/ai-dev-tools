@@ -1,5 +1,41 @@
 {
   "hooks": {
+    "SubagentStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/inject-agent-skills.js"]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-session-log.js"]
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-session-cleanup.sh"]
+          }
+        ]
+      }
+    ],
     "UserPromptExpansion": [
       {
         "matcher": "create-skill",
@@ -38,6 +74,16 @@
             "type": "command",
             "command": "bash",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-marketplace"]
+          }
+        ]
+      },
+      {
+        "matcher": "agents-framework-kickstarter",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "agents-framework-kickstarter"]
           }
         ]
       }
