@@ -426,7 +426,10 @@ function ConditionEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
           className="flex items-center gap-1 nodrag nopan"
         >
           {hasLabel ? (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 border border-orange-300 text-orange-700">
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 border border-orange-300 text-orange-700 block max-w-[140px] truncate"
+              title={String(label)}
+            >
               {String(label)}
             </span>
           ) : (
@@ -1004,17 +1007,17 @@ export default function WorkflowCanvas({
       {/* Condition modal */}
       {conditionModalOpen && (
         <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
-          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-[40rem] flex flex-col gap-3">
             <div className="text-[13px] font-semibold text-(--ink)">Add condition</div>
 
-            <input
-              type="text"
+            <textarea
               placeholder="Condition label (e.g. needs revision)"
               value={conditionLabel}
               autoFocus
+              rows={4}
               onChange={(e) => setConditionLabel(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") resetConditionState(); }}
-              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary resize-none"
             />
 
             {/* Target: existing node or new instance */}
@@ -1178,19 +1181,19 @@ export default function WorkflowCanvas({
       {/* Edit condition-label modal */}
       {editLabelEdgeId && (
         <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
-          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-[40rem] flex flex-col gap-3">
             <div className="text-[13px] font-semibold text-(--ink)">Edit condition label</div>
-            <input
-              type="text"
+            <textarea
               placeholder="Condition label (e.g. needs revision)"
               value={editLabelValue}
               autoFocus
+              rows={4}
               onChange={(e) => setEditLabelValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") setEditLabelEdgeId(null);
-                if (e.key === "Enter") confirmEditLabel();
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) confirmEditLabel();
               }}
-              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
