@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^20.5.0",
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "10.0.1",
     "@huggingface/hub": "^2.11.0",
     "@modelcontextprotocol/inspector": "^0.21.2",
     "@nestjs/cli": "^11",
@@ -64,7 +64,7 @@
     "commander": "^14.0.3",
     "commitlint": "^20.5.0",
     "dotenv": "^17.4.2",
-    "eslint": "^10.2.1",
+    "eslint": "10.2.1",
     "husky": "^9.1.7",
     "prettier": "^3.8.3",
     "tsx": "^4.21.0",
