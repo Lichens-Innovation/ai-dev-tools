@@ -4,6 +4,8 @@
 //   2. copies runtime scripts        → <project>/.claude/scripts/        (always refreshed)
 //   3. merges { "agent": "afk" } + the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
 //   4. ignores the ephemeral session files via <project>/.claude/.gitignore
+//   5. adds an `# AFK` section to the repo-root .gitignore ignoring every nested
+//      .claude/afk_session*.{json,jsonl} across the repo / monorepo
 //
 // Scaffolding only — it does NOT render afk.md's managed regions. Rendering needs
 // afk.json (written by the form) and is done afterwards by afk-render-orchestrator.js
@@ -16,9 +18,12 @@
 
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 const projectDir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const pluginRoot = path.resolve(__dirname, "..");
+
+const GITIGNORE_HEADER = "# AFK ephemeral session state — recreated each session, removed at SessionEnd";
 
 function ensureDir(d) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
@@ -30,25 +35,53 @@ function copyIfMissing(src, dest) {
   return true;
 }
 
-// Keep the ephemeral session state out of version control. The files are
-// recreated each session and removed at SessionEnd, but a crash (no SessionEnd)
-// can leave them behind as untracked noise in a consumer project.
-function ensureGitignore(claudeDir) {
-  const gitignorePath = path.join(claudeDir, ".gitignore");
-  const entries = ["afk_session.json", "afk_session.log.jsonl"];
+// Append any missing `entries` to the .gitignore at `gitignorePath`, under the
+// AFK header (added only if not already present). Returns true if it changed.
+function appendGitignoreEntries(gitignorePath, entries) {
   const existed = fs.existsSync(gitignorePath);
   const existing = existed ? fs.readFileSync(gitignorePath, "utf8") : "";
   const present = new Set(existing.split(/\r?\n/).map((l) => l.trim()));
   const missing = entries.filter((e) => !present.has(e));
   if (missing.length === 0) return false;
-  let block = missing.join("\n") + "\n";
-  if (!existed) {
-    block = "# AFK ephemeral session state — recreated each session, removed at SessionEnd\n" + block;
-  } else if (existing && !existing.endsWith("\n")) {
-    block = "\n" + block;
-  }
+  const needsHeader = !present.has(GITIGNORE_HEADER);
+  let block = (needsHeader ? GITIGNORE_HEADER + "\n" : "") + missing.join("\n") + "\n";
+  if (existed && existing && !existing.endsWith("\n")) block = "\n" + block;
+  ensureDir(path.dirname(gitignorePath));
   fs.appendFileSync(gitignorePath, block);
   return true;
+}
+
+// Keep the ephemeral session state out of version control. The files are
+// recreated each session and removed at SessionEnd, but a crash (no SessionEnd)
+// can leave them behind as untracked noise in a consumer project. The bare
+// filenames here are anchored to this one .claude/ dir.
+function ensureGitignore(claudeDir) {
+  return appendGitignoreEntries(path.join(claudeDir, ".gitignore"), ["afk_session.json", "afk_session.log.jsonl"]);
+}
+
+// Resolve the git toplevel from the project dir, or null if not a git repo.
+function findRepoRoot(startDir) {
+  try {
+    return execSync("git rev-parse --show-toplevel", {
+      cwd: startDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+// Belt-and-suspenders for monorepos: ignore EVERY nested .claude session file
+// across the whole tree from the repo-root .gitignore. The `**/` globs match
+// .claude/ at any depth (including the root), so a session log left behind in
+// any package is covered without a per-package .claude/.gitignore.
+function ensureRepoRootGitignore(repoRoot) {
+  if (!repoRoot) return false;
+  return appendGitignoreEntries(path.join(repoRoot, ".gitignore"), [
+    "**/.claude/afk_session.json",
+    "**/.claude/afk_session.log.jsonl",
+  ]);
 }
 
 const BASH_VALIDATION_COMMAND = "$CLAUDE_PROJECT_DIR/.claude/scripts/bash-validation.sh";
@@ -59,7 +92,7 @@ function ensureBashValidationHook(settings) {
   settings.hooks = settings.hooks || {};
   const pre = settings.hooks.PreToolUse || (settings.hooks.PreToolUse = []);
   const hasHook = pre.some(
-    (e) => e && Array.isArray(e.hooks) && e.hooks.some((h) => h && h.command === BASH_VALIDATION_COMMAND),
+    (e) => e && Array.isArray(e.hooks) && e.hooks.some((h) => h && h.command === BASH_VALIDATION_COMMAND)
   );
   if (hasHook) return false;
   let bashEntry = pre.find((e) => e && e.matcher === "Bash" && Array.isArray(e.hooks));
@@ -103,21 +136,21 @@ try {
   ensureDir(scriptsDir);
   ensureDir(path.join(scriptsDir, "lib"));
 
-  const installedAgent = copyIfMissing(
-    path.join(pluginRoot, "templates", "afk.md"),
-    path.join(agentsDir, "afk.md"),
-  );
+  const installedAgent = copyIfMissing(path.join(pluginRoot, "templates", "afk.md"), path.join(agentsDir, "afk.md"));
 
   // Runtime scripts the orchestrator / repo invoke via $CLAUDE_PROJECT_DIR.
   // Always refreshed so projects pick up plugin fixes.
-  fs.copyFileSync(path.join(pluginRoot, "scripts", "afk-set-session-workflow.js"), path.join(scriptsDir, "afk-set-session-workflow.js"));
+  fs.copyFileSync(
+    path.join(pluginRoot, "scripts", "afk-set-session-workflow.js"),
+    path.join(scriptsDir, "afk-set-session-workflow.js")
+  );
   fs.copyFileSync(
     path.join(pluginRoot, "scripts", "afk-render-orchestrator.js"),
-    path.join(scriptsDir, "afk-render-orchestrator.js"),
+    path.join(scriptsDir, "afk-render-orchestrator.js")
   );
   fs.copyFileSync(
     path.join(pluginRoot, "scripts", "lib", "afk-session.js"),
-    path.join(scriptsDir, "lib", "afk-session.js"),
+    path.join(scriptsDir, "lib", "afk-session.js")
   );
 
   // PreToolUse Bash guard that blocks reading .env secret files. Copied with its
@@ -128,6 +161,7 @@ try {
 
   const { setAgentSetting, setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
   const wroteGitignore = ensureGitignore(claudeDir);
+  const wroteRepoGitignore = ensureRepoRootGitignore(findRepoRoot(projectDir));
 
   process.stdout.write(
     JSON.stringify({
@@ -136,7 +170,8 @@ try {
       setAgentSetting,
       setBashHook,
       wroteGitignore,
-    }) + "\n",
+      wroteRepoGitignore,
+    }) + "\n"
   );
 } catch (err) {
   process.stderr.write(`afk-install: ${err.message}\n`);
