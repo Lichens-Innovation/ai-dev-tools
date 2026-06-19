@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Sets the active workflow name in <cwd>/.claude/afk_session.json.
 // Called by the AFK orchestrator at the start of each workflow execution:
-//   node afk-set-workflow.js "<workflow name>"
+//   node afk-set-session-workflow.js "<workflow name>"
 //
 // If no name is given, auto-resolves to the first configured workflow, else "default".
 // Creates the session file if absent; preserves existing generated_instances.
 //
-// Self-contained on purpose: afk-install-orchestrator.js copies this file into the
+// Self-contained on purpose: afk-install.js copies this file into the
 // project's .claude/scripts/ so the orchestrator agent can run it via $CLAUDE_PROJECT_DIR.
 
 const fs = require("fs");
@@ -54,6 +54,6 @@ try {
   process.stdout.write(`AFK session: active workflow set to "${resolvedName}"\n`);
   process.exit(0);
 } catch (err) {
-  process.stderr.write(`afk-set-workflow: ${err.message}\n`);
+  process.stderr.write(`afk-set-session-workflow: ${err.message}\n`);
   process.exit(1);
 }

@@ -44,7 +44,7 @@ function collect(cfg, sessionPath, agentType) {
 
   // Scope to the active workflow when it resolves; otherwise fall back to all
   // workflows but warn loudly, because a union across workflows can inject the
-  // wrong skills (e.g. the orchestrator forgot to run afk-set-workflow.js first).
+  // wrong skills (e.g. the orchestrator forgot to run afk-set-session-workflow.js first).
   const activeMatches = activeWorkflowName ? workflows.filter((w) => w.name === activeWorkflowName) : [];
   let warning = null;
   let searchList;
@@ -55,10 +55,10 @@ function collect(cfg, sessionPath, agentType) {
     if (activeWorkflowName) {
       warning =
         `The active workflow "${activeWorkflowName}" (from afk_session.json) matches no workflow in afk.json. ` +
-        `The skills below are unioned across all workflows and may be wrong — re-run afk-set-workflow.js with a valid workflow name.`;
+        `The skills below are unioned across all workflows and may be wrong — re-run afk-set-session-workflow.js with a valid workflow name.`;
     } else if (workflows.length > 1) {
       warning =
-        `No active workflow is set (afk-set-workflow.js was not run) and this project has ${workflows.length} workflows. ` +
+        `No active workflow is set (afk-set-session-workflow.js was not run) and this project has ${workflows.length} workflows. ` +
         `The skills below are unioned across all of them and may be wrong — the orchestrator should set the active workflow before invoking subagents.`;
     }
   }

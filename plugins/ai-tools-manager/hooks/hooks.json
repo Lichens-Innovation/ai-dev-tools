@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/inject-agent-skills.js"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-inject-agent-context.js"]
           },
           {
             "type": "command",
@@ -60,7 +60,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-skill"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-skill"]
           }
         ]
       },
@@ -70,7 +70,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-subagent"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-subagent"]
           }
         ]
       },
@@ -80,7 +80,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-plugin"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-plugin"]
           }
         ]
       },
@@ -90,7 +90,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "create-marketplace"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-marketplace"]
           }
         ]
       }

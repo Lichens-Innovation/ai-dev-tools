@@ -109,8 +109,9 @@ export interface AfkInstanceV3 {
 
 export interface AfkNodeV3 {
   id: string;
-  type: "agent" | "human_review";
+  type: "agent" | "human_review" | "skill";
   instance?: string; // agent nodes only; references AfkInstanceV3.name
+  skill?: string; // skill nodes only; the skill id run inline by the orchestrator
   position?: { x: number; y: number };
 }
 
@@ -280,7 +281,7 @@ function buildWorkflow(name: string, kind: "default" | "tdd", impl: string[]): A
 // Returned on first install (no afk.json yet). Seeds the bundled agents as reusable
 // instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
 // canvas isn't empty. `implAgents` is the repo-detected implementation agent chain in the
-// happy path (the kickstarter skill passes it via gather-info.sh); falls back to ["backend"].
+// happy path (the kickstarter skill passes it via launch-ai-tools-manager-app.sh); falls back to ["backend"].
 function defaultV3Config(implAgents: string[]): AfkConfigV3 {
   const impl = implAgents.length > 0 ? implAgents : ["backend"];
   const instances: AfkInstanceV3[] = [
@@ -301,7 +302,7 @@ function defaultV3Config(implAgents: string[]): AfkConfigV3 {
 
 // Implementation agent(s) for the seeded workflows' happy path. Under Docker the kickstarter
 // skill analyzes the repo and passes them through the marketplace precompute file (see
-// gather-info.sh's AFK_IMPL_AGENTS handling). Falls back to ["backend"].
+// launch-ai-tools-manager-app.sh's AFK_IMPL_AGENTS handling). Falls back to ["backend"].
 function readImplAgents(): string[] {
   if (process.env.RUNNING_IN_DOCKER === "true") {
     try {
@@ -339,6 +340,7 @@ export function computeSuccessPath(workflow: AfkWorkflowV3, instances: AfkInstan
       const inst = instances.find((i) => i.name === n.instance);
       return "@" + (inst?.name ?? n.instance ?? n.id);
     }
+    if (n.type === "skill") return "/" + (n.skill ?? n.id);
     return "human review";
   };
   const out: string[] = [];

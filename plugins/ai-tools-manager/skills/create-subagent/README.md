@@ -5,7 +5,7 @@ Scaffolds a new Claude Code subagent (AGENTS.md format) — either inside a mark
 ## How it works
 
 1. User invokes `/create-subagent`.
-2. `hooks.json` matches and runs `scripts/gather-info.sh create-subagent`, which opens the web form at `http://localhost:3009/create-subagent`.
+2. `hooks.json` matches and runs `scripts/launch-ai-tools-manager-app.sh create-subagent`, which opens the web form at `http://localhost:3009/create-subagent`.
 3. User fills the form (auto/manual mode, marketplace/project target, name, idea/description, triggers, tools, etc.) and submits.
 4. The form writes a JSON payload to `/tmp/result.json`.
 5. The hook unblocks and returns the payload to Claude as `additionalContext`. This file (`SKILL.md`) reads it and writes the new subagent file.

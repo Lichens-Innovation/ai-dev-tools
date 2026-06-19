@@ -1,17 +1,17 @@
 ---
 name: afk-uninstall
-description: "Disables the AFK orchestrator for this project — removes the `agent: afk` setting from .claude/settings.json (so new sessions stop adopting the orchestrator) and deletes the ephemeral session files. Pass --purge to also remove the installed orchestrator agent and runtime scripts. Keeps afk.json / afk.yaml. Use when the user wants to turn off AFK, stop the orchestrator, undo /agents-framework-kickstarter, or uninstall the subagents workflow."
+description: "Disables the AFK orchestrator for this project — removes the `agent: afk` setting from .claude/settings.json (so new sessions stop adopting the orchestrator) and deletes the ephemeral session files. Pass --purge to also remove the installed orchestrator agent and runtime scripts. Keeps afk.json / afk.yaml. Use when the user wants to turn off AFK, stop the orchestrator, undo /afk-install, or uninstall the subagents workflow."
 ---
 
 # AFK Uninstall
 
-Turn off the AFK orchestrator that `/agents-framework-kickstarter` installed. This is the inverse of the installer. By default it is conservative: it only stops new sessions from running as the orchestrator and clears ephemeral session state — your config (`afk.json` / `afk.yaml`) and any hand-edits to `afk.md` are kept.
+Turn off the AFK orchestrator that `/afk-install` installed. This is the inverse of the installer. By default it is conservative: it only stops new sessions from running as the orchestrator and clears ephemeral session state — your config (`afk.json` / `afk.yaml`) and any hand-edits to `afk.md` are kept.
 
 ## Workflow
 
 1. **Decide the scope.** Ask the user (or infer from their request):
-   - default — just disable the orchestrator (`agent: afk` removed, session files cleared)
-   - `--purge` — also delete `.claude/agents/afk.md` and the copied runtime scripts (`afk-set-workflow.js`, `afk-render-orchestrator.js`, `lib/afk-session.js`). Use this only when the user wants AFK fully gone.
+   - default — just disable the orchestrator (`agent: afk` and the bash-validation PreToolUse hook removed, session files cleared)
+   - `--purge` — also delete `.claude/agents/afk.md` and the copied runtime scripts (`afk-set-session-workflow.js`, `afk-render-orchestrator.js`, `bash-validation.sh`, `lib/afk-session.js`). Use this only when the user wants AFK fully gone.
 
 2. **Run the uninstaller** from the project root:
 
@@ -25,9 +25,9 @@ Turn off the AFK orchestrator that `/agents-framework-kickstarter` installed. Th
    node "${CLAUDE_SKILL_DIR}/../../scripts/afk-uninstall.js" "${CLAUDE_PROJECT_DIR:-.}" --purge
    ```
 
-   It prints a JSON summary (`removedAgentSetting`, `removedSession`, `purged`, `keptConfig`).
+   It prints a JSON summary (`removedAgentSetting`, `removedBashHook`, `removedSession`, `purged`, `keptConfig`).
 
-3. **Report** to the user: confirm whether `agent: afk` was removed from `settings.json`, whether session files were cleared, and (if `--purge`) which files were deleted. Note that `afk.json` / `afk.yaml` were kept, so they can re-enable AFK any time by re-running `/agents-framework-kickstarter` (or `/afk-sync` if the orchestrator is still present).
+3. **Report** to the user: confirm whether `agent: afk` and the bash-validation hook were removed from `settings.json`, whether session files were cleared, and (if `--purge`) which files were deleted. Note that `afk.json` / `afk.yaml` were kept, so they can re-enable AFK any time by re-running `/afk-install` (or `/afk-sync` if the orchestrator is still present).
 
 ## Notes
 

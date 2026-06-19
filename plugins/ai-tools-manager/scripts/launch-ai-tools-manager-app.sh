@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Usage: gather-info.sh <form-name>
-# e.g.   gather-info.sh create-skill
+# Usage: launch-ai-tools-manager-app.sh <form-name>
+# e.g.   launch-ai-tools-manager-app.sh create-skill
 set -euo pipefail
 
-FORM_NAME="${1:?Usage: gather-info.sh <form-name>}"
+FORM_NAME="${1:?Usage: launch-ai-tools-manager-app.sh <form-name>}"
 FORM_PATH="/$FORM_NAME"
 PORT=3009
 
@@ -37,8 +37,8 @@ const fs = require('fs'), path = require('path');
 const { execFileSync } = require('child_process');
 const home = process.env.HOME || '';
 const knownPath = path.join(home, '.claude', 'plugins', 'known_marketplaces.json');
-// Repo-detected implementation agent(s) for the AFK kickstarter happy path, passed by the
-// agents-framework-kickstarter skill (e.g. 'backend', 'frontend', 'backend,frontend').
+// Repo-detected implementation agent(s) for the AFK happy path, passed by the
+// afk-install / afk skills (e.g. 'backend', 'frontend', 'backend,frontend').
 const implAgents = (process.env.AFK_IMPL_AGENTS || '').split(',').map(s => s.trim()).filter(Boolean);
 let vibeRules = [];
 try {

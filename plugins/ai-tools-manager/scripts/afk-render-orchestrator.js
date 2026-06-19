@@ -6,7 +6,7 @@
 //
 //   node afk-render-orchestrator.js [projectDir]
 //
-// Invoked by afk-install-orchestrator.js (on form save) and by the /afk-sync skill.
+// Invoked by afk-install.js (on form save) and by the /afk-sync skill.
 
 const fs = require("fs");
 const path = require("path");
@@ -16,7 +16,7 @@ const { readJson } = require("./lib/afk-session");
 // NOTE: this is the plain-Node twin of `computeSuccessPath` in the app's
 // src/utils/agents-framework-kickstarter.ts. They can't share code (plugin vs app TS),
 // so their OUTPUT must stay byte-identical — keep the separator (" → ") and labels
-// ("@<instance>", "human review") in sync across both files.
+// ("@<instance>", "/<skill>", "human review") in sync across both files.
 function successPath(wf, instances) {
   const labelFor = (id) => {
     if (id === "main-session") return "";
@@ -26,6 +26,7 @@ function successPath(wf, instances) {
       const inst = instances.find((i) => i.name === n.instance);
       return "@" + ((inst && inst.name) || n.instance || n.id);
     }
+    if (n.type === "skill") return "/" + (n.skill || n.id);
     return "human review";
   };
   const out = [];
@@ -46,7 +47,7 @@ function handoffTable(cfg) {
   const instances = cfg.workflow_instances || [];
   const workflows = cfg.workflows || [];
   if (workflows.length === 0) {
-    return "# No workflows configured yet. Run /agents-framework-kickstarter to set up.";
+    return "# No workflows configured yet. Run /afk-install to set up.";
   }
   const rows = workflows.map((wf) => {
     const sp = successPath(wf, instances) || "(no steps configured)";

@@ -7,7 +7,7 @@ description: "Explains how the /rules view in ai-tools-manager is built end-to-e
 
 The `/rules` route (`src/routes/rules.tsx`) is a visual editor for assigning a project's **rules** to scopes — the project root and/or specific directory paths. The user picks which rules to work with (left pane), assigns each to a row of the project's directory tree (center), and watches the resulting `afk.yaml` render live (right pane). On save it persists the **rules slice** of `.claude/afk.json` (v3), and a host-side script then physically **moves or installs** each rule file into its assigned directory.
 
-It is the rules half of the `agents-framework-kickstarter` flow — the `/workflows` route owns the other half (workflows + instances), and the two share one `afk.json`. See the `workflow-view` skill for that side.
+It is the rules half of the `/afk` config flow — the `/workflows` route owns the other half (workflows + instances), and the two share one `afk.json`. See the `workflow-view` skill for that side.
 
 ## Layout
 
@@ -60,7 +60,7 @@ submitAfkConfig({ sliceType: "rules", slice: { cwd, rules: config.rules } })
   • writes <cwd>/.claude/afk.json AND <cwd>/afk.yaml
   • writes /tmp/result.json → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
         │
-        ▼ (host-side, run by the agents-framework-kickstarter skill — see "Runtime" below)
+        ▼ (host-side, run by the /afk skill — see "Runtime" below)
 afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installable rules
 ```
 
@@ -80,8 +80,8 @@ afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installabl
 | Installable-rule loader (`getVibeRules`, `vibe-rules list`) | `src/utils/afk-vibe.ts` |
 | Source of project rules | `<cwd>/**/.claude/rules/*.md` |
 | **Host-side apply step** (move project files / `vibe-rules load`) | `plugins/ai-tools-manager/scripts/afk-apply-rules.js` |
-| vibe-rules pre-compute for Docker (writes `vibeRules` into marketplace JSON) | `plugins/ai-tools-manager/scripts/gather-info.sh` |
-| Consuming prompt (writes afk.yaml, installs orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/agents-framework-kickstarter/SKILL.md` |
+| vibe-rules pre-compute for Docker (writes `vibeRules` into marketplace JSON) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` |
+| Consuming prompt (writes afk.yaml, renders orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/afk/SKILL.md` (scaffolding lives in `afk-install/SKILL.md`) |
 
 ## The data model (the `rules` slice)
 
@@ -139,7 +139,7 @@ Identical component to the `/workflows` preview: a **read-only** `FilePreview` r
 
 ## Persistence (submitAfkConfig)
 
-Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `afk.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/afk.json` + `afk.yaml`, and writes the result file with `additionalContext` = `AFK v3 config data: {…}` **plus the verbatim afk.yaml**. The consuming `agents-framework-kickstarter` SKILL.md writes those files on the host, runs the orchestrator installer, then runs the apply step below.
+Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `afk.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/afk.json` + `afk.yaml`, and writes the result file with `additionalContext` = `AFK v3 config data: {…}` **plus the verbatim afk.yaml**. The consuming `/afk` SKILL.md writes those files on the host, re-renders the orchestrator, then runs the apply step below (on a first run, `/afk-install` scaffolds the orchestrator first).
 
 ## Runtime — applying placements (afk-apply-rules.js)
 
@@ -151,7 +151,7 @@ Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules
 
 It is idempotent and prints a JSON summary: `{ moved, installed, unchanged, skipped, missing, errors }`. The editor token is `claude-code` (not `claude`), and `-t` takes a **file** path.
 
-Under Docker the UI can't call `vibe-rules` itself, so `gather-info.sh` pre-computes `vibe-rules list` on the host into `marketplace-data.json` (`vibeRules`), and `getVibeRules` reads it from there (mirroring `readCwd`).
+Under Docker the UI can't call `vibe-rules` itself, so `launch-ai-tools-manager-app.sh` pre-computes `vibe-rules list` on the host into `marketplace-data.json` (`vibeRules`), and `getVibeRules` reads it from there (mirroring `readCwd`).
 
 ## Things that bite
 

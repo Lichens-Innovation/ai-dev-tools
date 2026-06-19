@@ -11,7 +11,7 @@ The app communicates with the host via two `/tmp/` files mounted as Docker volum
 | `/tmp/ai-tools-result.json` | `/tmp/result.json` | app → hook | Form submission payload, read by hook after user submits |
 | `/tmp/ai-tools-marketplace.json` | `/tmp/marketplace-data.json` | hook → app | Pre-computed marketplace/plugin list for dropdowns |
 
-The hook script (`plugins/ai-tools-manager/scripts/gather-info.sh`) is responsible for:
+The hook script (`plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh`) is responsible for:
 1. Pre-generating `/tmp/ai-tools-marketplace.json` by reading `~/.claude/plugins/known_marketplaces.json` on the host (where all filesystem paths are accessible)
 2. Starting the container via `docker compose up -d --build`
 3. Blocking until `/tmp/ai-tools-result.json` is non-empty, then returning its contents to Claude
@@ -46,10 +46,10 @@ Per-route preview components live in `src/components/` and compose `FilePreview`
 1. Create `src/routes/<name>.tsx` mirroring the structure of `create-plugin.tsx` (no mode) or `create-skill.tsx` (auto/manual + target). Define the zod schema, wire `useForm` + `Controller`, render with `Field`/`Input`/`Select`/`ChipInput` from `@repo/ui`.
 2. Create `src/utils/<name>.ts` with two server fns: a `submit<X>Form` that writes a `UserPromptExpansion` result, and a `cancel<X>Form` that writes a `decision: "block"` result. Target dispatch (marketplace vs project) lives here.
 3. Create `src/components/<name>-preview.tsx` — render `FilePreview` with `lines={...}` describing the file the skill will generate.
-4. Register the hook in `plugins/ai-tools-manager/hooks/hooks.json` with matcher `<name>` and args `["${CLAUDE_PLUGIN_ROOT}/scripts/gather-info.sh", "<name>"]`.
+4. Register the hook in `plugins/ai-tools-manager/hooks/hooks.json` with matcher `<name>` and args `["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "<name>"]`.
 5. Write the consuming skill at `plugins/ai-tools-manager/skills/<name>/SKILL.md` documenting the JSON payload contract (mode, target, fields) and the file(s) Claude should write.
 
-The unified `plugins/ai-tools-manager/scripts/gather-info.sh` handles container orchestration — no new shell script needed.
+The unified `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` handles container orchestration — no new shell script needed.
 
 ## Result file format
 
@@ -93,12 +93,12 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/utils/text.ts` — shared text helpers (`buildDesc`, `firstSentence`, `joinOxford`, `clip`, `titleFromName`)
 - `src/components/{skill,subagent}-template-preview.tsx` and `{plugin,marketplace}-manifest-preview.tsx` — per-route `FilePreview` renderers
 - `packages/ui/src/` — shared primitives consumed by every form
-- `plugins/ai-tools-manager/scripts/gather-info.sh` — unified hook orchestration script (takes form name as argument)
+- `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` — unified hook orchestration script (takes form name as argument)
 - `plugins/ai-tools-manager/hooks/hooks.json` — hook registration for all four skills
 - `plugins/ai-tools-manager/skills/{create-skill,create-subagent,create-plugin,create-marketplace}/SKILL.md` — the prompts that consume the form result
 - `packages/claude-fs/src/index.ts` — shared `~/.claude/` reading utilities used by server functions
 
-### Agents-framework-kickstarter (workflows & rules)
+### AFK config editor (workflows & rules)
 
 - `src/routes/workflows.tsx` — `/workflows` route: left agents/skills pane, save, workflow CRUD
 - `src/routes/rules.tsx` — `/rules` route: assign rules to project root / directory paths
@@ -111,11 +111,14 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/utils/afk-yaml.ts` — `afkConfigToYaml` (the single afk.yaml serializer, using the `yaml` package; shared by preview + server)
 - `src/utils/afk-fs.ts` — shared `readCwd` + `parseFrontmatter` used by the AFK server fns
 - `src/utils/afk-tree.ts` / `src/utils/afk-rules.ts` / `src/utils/afk-vibe.ts` — `/rules` loaders: `getProjectTree` (directory walk), `getProjectRules` (scans every `<cwd>/**/.claude/rules/*.md`, returns each rule's current `dir`), and `getVibeRules` (`vibe-rules list`; reads the pre-computed list under Docker)
-- `plugins/ai-tools-manager/skills/agents-framework-kickstarter/SKILL.md` — consuming prompt: writes `afk.json` + `afk.yaml`, runs the orchestrator installer, then runs `afk-apply-rules.js`
+- `plugins/ai-tools-manager/skills/afk-install/SKILL.md` — `/afk-install`: analyzes the repo for impl agent(s), runs the (scaffold-only) orchestrator installer, then invokes the `/afk` skill to author the config
+- `plugins/ai-tools-manager/skills/afk/SKILL.md` — `/afk`: the visual-editor entry point (guards on the orchestrator being installed). Opens the form, writes `afk.json` + `afk.yaml`, re-renders the orchestrator (`afk-render-orchestrator.js`), then runs `afk-apply-rules.js`
 - `plugins/ai-tools-manager/scripts/afk-apply-rules.js` — host-side rule placement from the `afk.json` rules slice: **moves** `source: "project"` rule files into their assigned `.claude/rules/`, and installs `source: "vibe-rules"` rules with `vibe-rules load <id> claude-code -t …` (idempotent; never deletes files)
-- `plugins/ai-tools-manager/scripts/afk-install-orchestrator.js` / `afk-render-orchestrator.js` — install the `afk` agent + `agent: afk` setting, gitignore the ephemeral session files (`.claude/.gitignore`), and render its frontmatter skills + `AFK:HANDOFFS` table from `afk.json`
-- `plugins/ai-tools-manager/scripts/{inject-agent-skills.js,afk-session-log.js,afk-subagent-log.js,afk-set-workflow.js,lib/afk-session.js}` — SubagentStart skill injection, PreToolUse session logging (tool calls), SubagentStart/Stop inter-agent communication logging (dispatch + handoff entries with full input/output messages), active-workflow setter, shared helpers. `afk-session-log.js` appends one line per tool call; `afk-subagent-log.js` appends `kind:"dispatch"` on SubagentStart and `kind:"handoff"` on SubagentStop (with the HANDOFF outcome and full messages for `/session-log` debugging). All append to the same `afk_session.log.jsonl`; `afk_session.json` holds only `{workflow, generated_instances}`. Both files are deleted at `SessionEnd`.
-- `plugins/ai-tools-manager/scripts/afk-uninstall.js` + `plugins/ai-tools-manager/skills/afk-uninstall/SKILL.md` — `/afk-uninstall`: remove `agent: afk` from `settings.json` (so new sessions stop adopting the orchestrator) and clear session files; `--purge` also removes the installed agent + copied scripts. Keeps `afk.json`/`afk.yaml`.
+- `plugins/ai-tools-manager/scripts/afk-install.js` — **scaffold-only**: copies the `afk` agent, copies the runtime scripts, merges `agent: afk` + the `bash-validation.sh` PreToolUse Bash hook into `.claude/settings.json`, copies `bash-validation.sh` into the project, and gitignores the ephemeral session files (`.claude/.gitignore`). Does **not** render — that needs `afk.json` and is done afterward by `afk-render-orchestrator.js`
+- `plugins/ai-tools-manager/scripts/afk-render-orchestrator.js` — renders the orchestrator's frontmatter `skills:` + `AFK:HANDOFFS` table from `afk.json`. Run by `/afk` (after the form) and by `/afk-sync` (standalone, after a hand-edit)
+- `plugins/ai-tools-manager/scripts/bash-validation.sh` — PreToolUse Bash guard installed into `<cwd>/.claude/scripts/`: denies any Bash command that reads a `.env` secret file (only `.env.example` is allowed). Wired into the project's `.claude/settings.json` as a `PreToolUse` hook with matcher `Bash` by the install orchestrator; removed by `afk-uninstall.js`
+- `plugins/ai-tools-manager/scripts/{afk-inject-agent-context.js,afk-session-log.js,afk-subagent-log.js,afk-set-session-workflow.js,lib/afk-session.js}` — SubagentStart skill injection, PreToolUse session logging (tool calls), SubagentStart/Stop inter-agent communication logging (dispatch + handoff entries with full input/output messages), active-workflow setter, shared helpers. `afk-session-log.js` appends one line per tool call; `afk-subagent-log.js` appends `kind:"dispatch"` on SubagentStart and `kind:"handoff"` on SubagentStop (with the HANDOFF outcome and full messages for `/session-log` debugging). All append to the same `afk_session.log.jsonl`; `afk_session.json` holds only `{workflow, generated_instances}`. Both files are deleted at `SessionEnd`.
+- `plugins/ai-tools-manager/scripts/afk-uninstall.js` + `plugins/ai-tools-manager/skills/afk-uninstall/SKILL.md` — `/afk-uninstall`: remove `agent: afk` and the `bash-validation.sh` PreToolUse hook from `settings.json` (so new sessions stop adopting the orchestrator) and clear session files; `--purge` also removes the installed agent + copied scripts (including `bash-validation.sh`). Keeps `afk.json`/`afk.yaml`.
 - `plugins/ai-tools-manager/skills/afk-sync/SKILL.md` — `/afk-sync`: re-render the orchestrator from `afk.json`
 - `plugins/ai-tools-manager/skills/to-afk-tasks/SKILL.md` — `/to-afk-tasks`: turn a plan into a queue of ready-to-run prompt files under `<cwd>/.claude/afk-tasks/`. Composes a `/grilling` session (skippable) with the tracer-bullet vertical-slice decomposition of `to-issues`, then writes one numbered, **workflow-agnostic** prompt per slice (`NNN-kebab-slug.md`, append-only, topologically sorted). No agent, no GitHub publish — each file is a self-contained request the AFK orchestrator (`afk.md` Step 1) classifies and executes; `Blocked by` references sibling files as human-facing sequencing metadata.
 - `plugins/ai-tools-manager/scripts/afk-post-mortem.js` + `plugins/ai-tools-manager/skills/afk-post-mortem/SKILL.md` — `/afk-post-mortem`: read-only retrospective. The script condenses `afk_session.log.jsonl` into a digest (per-origin counts, dispatch↔handoff correlation by `agent_id`, heuristic flags for repeated reads / edit churn / typecheck-test-lint runs / `no-return` handoffs; `--json` for structured output). The skill couples that digest with the main session's own context to flag avoidable work, false checks, bad assumptions, and handoff issues, then proposes + applies fixes on confirmation. Read-side consumer of the same log `/session-log` displays; must run mid-session before `SessionEnd` wipes the log.

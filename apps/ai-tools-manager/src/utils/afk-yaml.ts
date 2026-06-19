@@ -29,6 +29,7 @@ export function afkConfigToYaml(config: AfkConfigV3): string {
           id: n.id,
           type: n.type,
           ...(n.type === "agent" && n.instance ? { instance: n.instance } : {}),
+          ...(n.type === "skill" && n.skill ? { skill: n.skill } : {}),
           ...(n.position ? { position: n.position } : {}),
         })),
         edges: w.edges.map((e) => ({

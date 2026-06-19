@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-// Installs the AFK orchestrator into a project. Idempotent — safe to re-run.
+// Scaffolds the AFK orchestrator into a project. Idempotent — safe to re-run.
 //   1. copies templates/afk.md      → <project>/.claude/agents/afk.md   (only if absent)
 //   2. copies runtime scripts        → <project>/.claude/scripts/        (always refreshed)
-//   3. merges { "agent": "afk" }     → <project>/.claude/settings.json   (preserves other keys)
+//   3. merges { "agent": "afk" } + the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
 //   4. ignores the ephemeral session files via <project>/.claude/.gitignore
-//   5. renders frontmatter skills + AFK:HANDOFFS table from .claude/afk.json
 //
-//   node afk-install-orchestrator.js [projectDir]
+// Scaffolding only — it does NOT render afk.md's managed regions. Rendering needs
+// afk.json (written by the form) and is done afterwards by afk-render-orchestrator.js
+// (the /afk skill runs it; /afk-sync wraps it standalone). The /afk-install skill
+// runs this first to lay down afk.md, then hands off to /afk to author + render.
 //
-// Run by the agents-framework-kickstarter skill after afk.json is written. Prints a
-// JSON summary to stdout.
+//   node afk-install.js [projectDir]
+//
+// Run by the afk-install skill before the config is authored. Prints a JSON summary to stdout.
 
 const fs = require("fs");
 const path = require("path");
-const { render } = require("./afk-render-orchestrator");
 
 const projectDir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const pluginRoot = path.resolve(__dirname, "..");
@@ -49,7 +51,29 @@ function ensureGitignore(claudeDir) {
   return true;
 }
 
-function mergeSettingsAgent(settingsPath) {
+const BASH_VALIDATION_COMMAND = "$CLAUDE_PROJECT_DIR/.claude/scripts/bash-validation.sh";
+
+// Register the .env-read guard as a PreToolUse hook on the Bash tool. Reuses an
+// existing Bash matcher when present so we don't clobber user-defined hooks.
+function ensureBashValidationHook(settings) {
+  settings.hooks = settings.hooks || {};
+  const pre = settings.hooks.PreToolUse || (settings.hooks.PreToolUse = []);
+  const hasHook = pre.some(
+    (e) => e && Array.isArray(e.hooks) && e.hooks.some((h) => h && h.command === BASH_VALIDATION_COMMAND),
+  );
+  if (hasHook) return false;
+  let bashEntry = pre.find((e) => e && e.matcher === "Bash" && Array.isArray(e.hooks));
+  if (!bashEntry) {
+    bashEntry = { matcher: "Bash", hooks: [] };
+    pre.push(bashEntry);
+  }
+  bashEntry.hooks.push({ type: "command", command: BASH_VALIDATION_COMMAND });
+  return true;
+}
+
+// Merge `agent: afk` and the bash-validation hook into settings.json in one
+// read/write, preserving all other keys.
+function mergeSettings(settingsPath) {
   let settings = {};
   if (fs.existsSync(settingsPath)) {
     try {
@@ -58,11 +82,17 @@ function mergeSettingsAgent(settingsPath) {
       settings = {};
     }
   }
-  if (settings.agent === "afk") return false;
-  settings.agent = "afk";
-  ensureDir(path.dirname(settingsPath));
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  return true;
+  let setAgentSetting = false;
+  if (settings.agent !== "afk") {
+    settings.agent = "afk";
+    setAgentSetting = true;
+  }
+  const setBashHook = ensureBashValidationHook(settings);
+  if (setAgentSetting || setBashHook) {
+    ensureDir(path.dirname(settingsPath));
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  }
+  return { setAgentSetting, setBashHook };
 }
 
 try {
@@ -80,7 +110,7 @@ try {
 
   // Runtime scripts the orchestrator / repo invoke via $CLAUDE_PROJECT_DIR.
   // Always refreshed so projects pick up plugin fixes.
-  fs.copyFileSync(path.join(pluginRoot, "scripts", "afk-set-workflow.js"), path.join(scriptsDir, "afk-set-workflow.js"));
+  fs.copyFileSync(path.join(pluginRoot, "scripts", "afk-set-session-workflow.js"), path.join(scriptsDir, "afk-set-session-workflow.js"));
   fs.copyFileSync(
     path.join(pluginRoot, "scripts", "afk-render-orchestrator.js"),
     path.join(scriptsDir, "afk-render-orchestrator.js"),
@@ -90,21 +120,25 @@ try {
     path.join(scriptsDir, "lib", "afk-session.js"),
   );
 
-  const setAgentSetting = mergeSettingsAgent(path.join(claudeDir, "settings.json"));
+  // PreToolUse Bash guard that blocks reading .env secret files. Copied with its
+  // executable bit so the hook can run it directly.
+  const bashValidationDest = path.join(scriptsDir, "bash-validation.sh");
+  fs.copyFileSync(path.join(pluginRoot, "scripts", "bash-validation.sh"), bashValidationDest);
+  fs.chmodSync(bashValidationDest, 0o755);
+
+  const { setAgentSetting, setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
   const wroteGitignore = ensureGitignore(claudeDir);
-  const r = render(projectDir);
 
   process.stdout.write(
     JSON.stringify({
       ok: true,
       installedAgent,
       setAgentSetting,
+      setBashHook,
       wroteGitignore,
-      rendered: r.ok,
-      renderReason: r.reason || null,
     }) + "\n",
   );
 } catch (err) {
-  process.stderr.write(`afk-install-orchestrator: ${err.message}\n`);
+  process.stderr.write(`afk-install: ${err.message}\n`);
   process.exit(1);
 }

@@ -14,9 +14,9 @@ User runs /create-skill
         │
         ▼
 plugins/ai-tools-manager/hooks/hooks.json matches "create-skill"
-        │  invokes scripts/gather-info.sh create-skill
+        │  invokes scripts/launch-ai-tools-manager-app.sh create-skill
         ▼
-gather-info.sh:
+launch-ai-tools-manager-app.sh:
   • Reads ~/.claude/plugins/known_marketplaces.json on the host
   • Writes /tmp/ai-tools-marketplace.json   (marketplaces, byMarketplace, cwd)
   • Starts/refreshes the docker container (apps/ai-tools-manager)
@@ -36,7 +36,7 @@ Server fn writes /tmp/result.json:
                             "additionalContext": "Skill form data: {JSON}" } }
         │
         ▼
-gather-info.sh unblocks, returns the result file contents to Claude Code,
+launch-ai-tools-manager-app.sh unblocks, returns the result file contents to Claude Code,
 which then runs the matching SKILL.md prompt with the JSON injected as context.
 ```
 
@@ -47,7 +47,7 @@ The two `/tmp` files are Docker volume mounts — they are how the host and cont
 | Concern | File |
 |---|---|
 | Hook registration | `plugins/ai-tools-manager/hooks/hooks.json` |
-| Hook orchestration (all 4 skills) | `plugins/ai-tools-manager/scripts/gather-info.sh` |
+| Hook orchestration (all 4 skills) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` |
 | Form (route) | `apps/ai-tools-manager/src/routes/create-<name>.tsx` |
 | Form server fns (submit/cancel + payload shape) | `apps/ai-tools-manager/src/utils/create-<name>.ts` |
 | Marketplace/cwd loader | `apps/ai-tools-manager/src/utils/marketplace.ts` |
@@ -80,7 +80,7 @@ The `target` ModePill changes where the file lands:
 - `target: "marketplace"` — server fn includes `{ marketplacePath, plugin }`. The prompt writes `<marketplacePath>/plugins/<plugin>/{skills,agents}/<name>/...`.
 - `target: "project"` — server fn includes `{ projectPath: cwd }`. The prompt writes `<projectPath>/.claude/skills/<name>/SKILL.md` (skill) or `<projectPath>/.claude/agents/<name>.md` (subagent — single file, no enclosing directory).
 
-The form already has `cwd` from the loader (originally set by `gather-info.sh`'s node-side block). Submit forwards it to the server fn.
+The form already has `cwd` from the loader (originally set by `launch-ai-tools-manager-app.sh`'s node-side block). Submit forwards it to the server fn.
 
 ## Result file contract
 
@@ -116,5 +116,5 @@ The matching prompt in `plugins/ai-tools-manager/skills/create-<name>/SKILL.md` 
 - **Don't change the payload in just one place.** A field rename must hit the form schema, the server fn payload, *and* the consuming SKILL.md prompt — otherwise data silently drops.
 - **Server fn dependency hoisting.** `submitSkillForm` and `submitSubagentForm` only call `getKnownMarketplaces()` when `target === "marketplace"`; if you refactor, keep the call inside the marketplace branch.
 - **Docker volume gotcha.** If you change the result-file path on either side, update both `compose.yml` and the server fn's `process.env.RESULT_FILE` default.
-- **`/tmp/result.json` must exist as a *file*, not a directory** before the container starts — `gather-info.sh` enforces this with `[[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"`.
-- **`cwd` semantics.** Locally (no Docker), `getMarketplaceDefaults`/`getMarketplaceData` returns `process.cwd()` of the dev server. When the hook fires, `gather-info.sh` writes the user's actual cwd into the marketplace file before launching the container — so `cwd` in the form reflects the user's project, not the container.
+- **`/tmp/result.json` must exist as a *file*, not a directory** before the container starts — `launch-ai-tools-manager-app.sh` enforces this with `[[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"`.
+- **`cwd` semantics.** Locally (no Docker), `getMarketplaceDefaults`/`getMarketplaceData` returns `process.cwd()` of the dev server. When the hook fires, `launch-ai-tools-manager-app.sh` writes the user's actual cwd into the marketplace file before launching the container — so `cwd` in the form reflects the user's project, not the container.
