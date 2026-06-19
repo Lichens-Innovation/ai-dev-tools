@@ -37,7 +37,8 @@ The grid is `280px 1fr 460px` with the preview open, `280px 1fr` when closed (`w
 
 ```
 Route loader: getAfkConfig()                    (src/utils/agents-framework-kickstarter.ts)
-  • reads <cwd>/.claude/afk.json → AfkConfigV3  (or blankV3Config())
+  • reads <cwd>/.claude/afk.json → AfkConfigV3
+      first install (no file): seeded defaultV3Config(implAgents); corrupt/old: blankV3Config()
   • also returns cwd, bundledAgents, projectSkills
         │
         ▼
@@ -58,6 +59,8 @@ submitAfkConfig({ sliceType: "workflows", slice })
   • writes <cwd>/.claude/afk.json AND <cwd>/afk.yaml (via afkConfigToYaml)
   • writes /tmp/result.json  → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
 ```
+
+**First-install seed.** When no `afk.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `agents-framework-kickstarter` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
 
 ## File-by-file map
 

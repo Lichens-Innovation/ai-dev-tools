@@ -32,6 +32,7 @@ function WorkflowsPage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState("");
+  const [newWorkflowSource, setNewWorkflowSource] = useState<number | null>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
   const allAgents = bundledAgents;
@@ -55,13 +56,20 @@ function WorkflowsPage() {
 
   const addWorkflow = () => {
     setNewWorkflowName("");
+    setNewWorkflowSource(null);
     setCreatingWorkflow(true);
     setTimeout(() => createInputRef.current?.focus(), 0);
   };
 
   const confirmCreateWorkflow = () => {
-    const name = newWorkflowName.trim() || `Workflow ${config.workflows.length + 1}`;
-    const newWf: AfkWorkflowV3 = { name, nodes: [], edges: [] };
+    const source =
+      newWorkflowSource !== null ? config.workflows[newWorkflowSource] : null;
+    const name =
+      newWorkflowName.trim() ||
+      (source ? `Copy of ${source.name}` : `Workflow ${config.workflows.length + 1}`);
+    const newWf: AfkWorkflowV3 = source
+      ? { name, nodes: structuredClone(source.nodes), edges: structuredClone(source.edges) }
+      : { name, nodes: [], edges: [] };
     const next = [...config.workflows, newWf];
     setConfig((c) => ({ ...c, workflows: next }));
     setActiveWorkflowIdx(next.length - 1);
@@ -247,6 +255,21 @@ function WorkflowsPage() {
             <div className="flex-1 flex items-center justify-center">
               <div className="bg-(--bg) border border-(--line) rounded-xl p-6 shadow-lg w-80 flex flex-col gap-4">
                 <h2 className="text-[15px] font-semibold text-(--ink) m-0">New workflow</h2>
+                {config.workflows.length > 0 && (
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold text-subtle uppercase tracking-wide">Start from</span>
+                    <select
+                      value={newWorkflowSource ?? ""}
+                      onChange={(e) => setNewWorkflowSource(e.target.value === "" ? null : Number(e.target.value))}
+                      className="w-full text-[13px] bg-(--bg-elev) border border-(--line) rounded-md px-3 py-2 text-(--ink) focus:outline-none focus:border-primary cursor-pointer"
+                    >
+                      <option value="">Empty workflow</option>
+                      {config.workflows.map((wf, i) => (
+                        <option key={i} value={i}>Copy of {wf.name || `Workflow ${i + 1}`}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <input
                   ref={createInputRef}
                   type="text"

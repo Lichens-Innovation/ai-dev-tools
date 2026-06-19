@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as SessionLogRouteImport } from './routes/session-log'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
@@ -17,10 +18,16 @@ import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as AgentsFrameworkKickstarterRouteImport } from './routes/agents-framework-kickstarter'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSessionLogStreamRouteImport } from './routes/api/session-log-stream'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
   id: '/workflows',
   path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionLogRoute = SessionLogRouteImport.update({
+  id: '/session-log',
+  path: '/session-log',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RulesRoute = RulesRouteImport.update({
@@ -59,6 +66,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionLogStreamRoute = ApiSessionLogStreamRouteImport.update({
+  id: '/api/session-log-stream',
+  path: '/api/session-log-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,7 +80,9 @@ export interface FileRoutesByFullPath {
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
   '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
   '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,7 +92,9 @@ export interface FileRoutesByTo {
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
   '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
   '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,7 +105,9 @@ export interface FileRoutesById {
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
   '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
   '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,7 +119,9 @@ export interface FileRouteTypes {
     | '/create-skill'
     | '/create-subagent'
     | '/rules'
+    | '/session-log'
     | '/workflows'
+    | '/api/session-log-stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,7 +131,9 @@ export interface FileRouteTypes {
     | '/create-skill'
     | '/create-subagent'
     | '/rules'
+    | '/session-log'
     | '/workflows'
+    | '/api/session-log-stream'
   id:
     | '__root__'
     | '/'
@@ -121,7 +143,9 @@ export interface FileRouteTypes {
     | '/create-skill'
     | '/create-subagent'
     | '/rules'
+    | '/session-log'
     | '/workflows'
+    | '/api/session-log-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,7 +156,9 @@ export interface RootRouteChildren {
   CreateSkillRoute: typeof CreateSkillRoute
   CreateSubagentRoute: typeof CreateSubagentRoute
   RulesRoute: typeof RulesRoute
+  SessionLogRoute: typeof SessionLogRoute
   WorkflowsRoute: typeof WorkflowsRoute
+  ApiSessionLogStreamRoute: typeof ApiSessionLogStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -142,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/workflows'
       fullPath: '/workflows'
       preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session-log': {
+      id: '/session-log'
+      path: '/session-log'
+      fullPath: '/session-log'
+      preLoaderRoute: typeof SessionLogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rules': {
@@ -193,6 +226,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-log-stream': {
+      id: '/api/session-log-stream'
+      path: '/api/session-log-stream'
+      fullPath: '/api/session-log-stream'
+      preLoaderRoute: typeof ApiSessionLogStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,7 +244,9 @@ const rootRouteChildren: RootRouteChildren = {
   CreateSkillRoute: CreateSkillRoute,
   CreateSubagentRoute: CreateSubagentRoute,
   RulesRoute: RulesRoute,
+  SessionLogRoute: SessionLogRoute,
   WorkflowsRoute: WorkflowsRoute,
+  ApiSessionLogStreamRoute: ApiSessionLogStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

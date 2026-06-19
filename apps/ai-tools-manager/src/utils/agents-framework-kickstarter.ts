@@ -183,8 +183,139 @@ function blankV3Config(): AfkConfigV3 {
   };
 }
 
-function readConfig(jsonPath: string): AfkConfigV3 {
-  if (!fs.existsSync(jsonPath)) return blankV3Config();
+// The non-implementation agents every seeded workflow shares.
+const CORE_INSTANCES: AfkInstanceV3[] = [
+  { name: "test", agent: "test", skills: [] },
+  { name: "reviewer", agent: "reviewer", skills: [] },
+  { name: "refactor", agent: "refactor", skills: [] },
+  { name: "scribe", agent: "scribe", skills: [] },
+];
+
+const succ = (from: string, to: string): AfkEdgeV3 => ({
+  from,
+  to,
+  kind: "success",
+  sourceHandle: "bottom",
+  targetHandle: "top",
+});
+
+const cond = (from: string, to: string, label: string): AfkEdgeV3 => ({
+  from,
+  to,
+  kind: "condition",
+  label,
+  sourceHandle: "right",
+  targetHandle: "top",
+});
+
+// Lay out a vertical column of nodes (x:0, y stepping by 140). `human_review-1` becomes
+// a human_review node; every other id becomes an agent node whose instance == its id.
+function columnNodes(ids: string[]): AfkNodeV3[] {
+  return ids.map((id, i): AfkNodeV3 => {
+    const position = { x: 0, y: 140 + i * 140 };
+    if (id === "human_review-1") return { id, type: "human_review", position };
+    return { id, type: "agent", instance: id, position };
+  });
+}
+
+// Build a seeded workflow. `impl` is the implementation-agent chain inserted into the
+// happy path (e.g. ["backend"], ["frontend"], or ["backend","frontend"] for fullstack).
+//   kind "default": impl runs first — main-session → [impl] → human review → test → reviewer → scribe.
+//     Reviewer/refactor code FAILs route to the impl agent(s); split per-agent when impl.length > 1.
+//   kind "tdd": tests first — main-session → test → human review → [impl] → reviewer → scribe.
+//     Code FAILs always route to @test (failures drive more tests), so impl never changes the conditions.
+function buildWorkflow(name: string, kind: "default" | "tdd", impl: string[]): AfkWorkflowV3 {
+  const column =
+    kind === "tdd"
+      ? ["test", "human_review-1", ...impl, "reviewer", "scribe"]
+      : [...impl, "human_review-1", "test", "reviewer", "scribe"];
+  const reviewerIdx = column.indexOf("reviewer");
+  const nodes: AfkNodeV3[] = [
+    ...columnNodes(column),
+    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: 140 + reviewerIdx * 140 } },
+  ];
+
+  // Success chain: main-session through the whole happy-path column.
+  const seq = ["main-session", ...column];
+  const edges: AfkEdgeV3[] = [];
+  for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
+
+  // Code-issue routes vary by workflow kind and impl-agent count.
+  const reviewerCode: AfkEdgeV3[] = [];
+  const refactorCode: AfkEdgeV3[] = [];
+  if (kind === "tdd") {
+    reviewerCode.push(cond("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(cond("refactor", "test", "finding requires code changes"));
+  } else if (impl.length === 1) {
+    reviewerCode.push(cond("reviewer", impl[0], "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(cond("refactor", impl[0], "finding requires code changes"));
+  } else {
+    // Fullstack / multi-agent: split the code FAIL and code-change routes per impl agent.
+    for (const a of impl) {
+      reviewerCode.push(
+        cond("reviewer", a, `FAIL: ${a} code (style, data layer, error handling, security, or persistence)`)
+      );
+    }
+    for (const a of impl) {
+      refactorCode.push(cond("refactor", a, `finding requires ${a} code changes`));
+    }
+  }
+
+  edges.push(
+    cond("reviewer", "refactor", "FAIL: code pattern violation or code redundancy"),
+    cond("reviewer", "test", "FAIL: a test"),
+    ...reviewerCode,
+    cond("refactor", "scribe", "finding is a recurring pattern an agent should know going forward"),
+    ...refactorCode,
+    cond(
+      "refactor",
+      "reviewer",
+      "triggered by reviewer on a systemic FAIL; notify when delegation is complete so it can re-review"
+    )
+  );
+
+  return { name, nodes, edges };
+}
+
+// Returned on first install (no afk.json yet). Seeds the bundled agents as reusable
+// instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
+// canvas isn't empty. `implAgents` is the repo-detected implementation agent chain in the
+// happy path (the kickstarter skill passes it via gather-info.sh); falls back to ["backend"].
+function defaultV3Config(implAgents: string[]): AfkConfigV3 {
+  const impl = implAgents.length > 0 ? implAgents : ["backend"];
+  const instances: AfkInstanceV3[] = [
+    ...impl.map((a) => ({ name: a, agent: a, skills: [] as string[] })),
+    ...CORE_INSTANCES,
+  ];
+  const agentsAvailable = Array.from(new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
+  return {
+    version: 3,
+    agents_available: agentsAvailable,
+    skills_available: [],
+    main_session_loaded_skills: [],
+    workflow_instances: instances,
+    workflows: [buildWorkflow("default", "default", impl), buildWorkflow("tdd", "tdd", impl)],
+    rules: [],
+  };
+}
+
+// Implementation agent(s) for the seeded workflows' happy path. Under Docker the kickstarter
+// skill analyzes the repo and passes them through the marketplace precompute file (see
+// gather-info.sh's AFK_IMPL_AGENTS handling). Falls back to ["backend"].
+function readImplAgents(): string[] {
+  if (process.env.RUNNING_IN_DOCKER === "true") {
+    try {
+      const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as { implAgents?: string[] };
+      if (Array.isArray(data.implAgents) && data.implAgents.length > 0) return data.implAgents;
+    } catch {
+      // fall through to the default
+    }
+  }
+  return ["backend"];
+}
+
+function readConfig(jsonPath: string, implAgents: string[] = ["backend"]): AfkConfigV3 {
+  if (!fs.existsSync(jsonPath)) return defaultV3Config(implAgents);
   try {
     const parsed = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as AfkConfigV3;
     return parsed.version === 3 ? parsed : blankV3Config();
@@ -226,14 +357,15 @@ export function computeSuccessPath(workflow: AfkWorkflowV3, instances: AfkInstan
 
 export const getAfkConfig = createServerFn({ method: "GET" }).handler(async (): Promise<AfkConfigResult> => {
   const cwd = readCwd();
-  const config = readConfig(path.join(mountedProjectPath(cwd), ".claude", "afk.json"));
+  const config = readConfig(path.join(mountedProjectPath(cwd), ".claude", "afk.json"), readImplAgents());
   const [bundledAgents, projectSkills] = await Promise.all([discoverAgents(cwd), discoverSkills(cwd)]);
   return { config, cwd, bundledAgents, projectSkills };
 });
 
 export const submitAfkConfig = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: unknown) => data as { cwd: string; slice: AfkWorkflowsSlice | AfkRulesSlice; sliceType: "workflows" | "rules" },
+    (data: unknown) =>
+      data as { cwd: string; slice: AfkWorkflowsSlice | AfkRulesSlice; sliceType: "workflows" | "rules" }
   )
   .handler(async ({ data }) => {
     const claudeDir = path.join(data.cwd, ".claude");
@@ -275,7 +407,7 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
             `AFK v3 config data: ${JSON.stringify({ projectPath: data.cwd, config: current })}\n\n` +
             `Canonical afk.yaml to write verbatim to <projectPath>/afk.yaml:\n\`\`\`yaml\n${afkYaml}\`\`\``,
         },
-      }),
+      })
     );
     return { ok: true };
   });

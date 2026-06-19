@@ -11,6 +11,7 @@ const PAGES = [
   { path: '/create-marketplace', label: 'Create Marketplace' },
   { path: '/workflows', label: 'Workflows' },
   { path: '/rules', label: 'Rules' },
+  { path: '/session-log', label: 'Session Log' },
 ]
 
 function Home() {

@@ -17,9 +17,25 @@ $ARGUMENTS
 
 ## Workflow
 
-1. **Read the form payload.** The `UserPromptExpansion` hook injected an `additionalContext` string containing two things:
+1. **Analyze the repository to pick the implementation agent(s).** Before launching the form, inspect the project to decide which bundled agent(s) build the application code in the seeded workflows' happy path. Read `package.json` (plus framework configs and directory layout — `src/components`, `src/routes`, `server/`, `api/`, `requirements.txt`, `go.mod`, `Cargo.toml`, etc.) and classify:
+   - **Backend** (APIs, services, DB access, no UI framework) → `backend`
+   - **Frontend** (React/Vue/Svelte/Angular/Next/etc., UI-focused) → `frontend`
+   - **Fullstack** (both a UI framework *and* server/API code) → `backend,frontend` — the happy path's implementation step becomes `@backend → @frontend`
+   - **Non-web** (CLI, library, data pipeline, mobile, …) → there is no obvious bundled implementation agent. **Ask the user** which agent(s) they use to implement code. If none is suitable, suggest they run `/create-subagent` to make one, then re-run `/agents-framework-kickstarter`.
+
+   The result is a comma-separated `implAgents` list (e.g. `backend`, `frontend`, or `backend,frontend`). This only sets the *starting* default on the canvas — the user can still adjust it before submitting.
+
+2. **Launch the form and read the payload.** Run the form launcher, passing the detected agents so the canvas opens already seeded for this project. Run it in the **background** — the user fills the form interactively, which can take a while:
+
+   ```bash
+   AFK_IMPL_AGENTS="<implAgents>" bash "${CLAUDE_SKILL_DIR}/../../scripts/gather-info.sh" agents-framework-kickstarter
+   ```
+
+   `gather-info.sh` folds `implAgents` into the pre-computed marketplace data the container reads, builds the image, opens the browser, and blocks until the user submits. When it completes, **its stdout is the form result** — a string containing two things:
    - a line beginning `AFK v3 config data:` followed by a JSON object `{ "projectPath": "<absolute cwd>", "config": { …AfkConfigV3… } }`
    - a fenced ```` ```yaml ```` block labelled "Canonical afk.yaml to write verbatim" — the exact text to write to `afk.yaml`.
+
+   If the user cancels, the result is a `{ "decision": "block", "reason": … }` payload — stop and report the reason instead of writing anything.
 
    The v3 `config` shape:
 
@@ -63,13 +79,13 @@ $ARGUMENTS
    - `success_path` is **derived** by the UI (and rendered into `afk.yaml` for humans); it is never stored in `afk.json`.
    - each `rules` entry is **one assignment of a rule to one location** (`scope: "project"` for the root, or `paths: ["<dir>/**"]` for a directory) with a `source` of `"project"` (on-disk rule file, moved into place) or `"vibe-rules"` (installed via `vibe-rules load`). A rule id appears at most once. Step 4 applies these to the filesystem.
 
-2. **Write the two config files** under `projectPath`:
+3. **Write the two config files** under `projectPath`:
    - `<projectPath>/.claude/afk.json` — the `config` object serialized with `JSON.stringify(config, null, 2)`: 2-space indent and **no trailing newline**. This must be byte-identical to what the app writes, so a double-write in local dev produces no git diff. This is the source of truth the hooks read. Create `.claude/` if needed.
    - `<projectPath>/afk.yaml` — **the verbatim YAML block** from the payload. Do not reformat or regenerate it; write it exactly as given.
 
    (In local dev the app already wrote both; writing them here makes the skill correct under Docker too, where the container can't reach the host project path.)
 
-3. **Install / refresh the orchestrator.** Run:
+4. **Install / refresh the orchestrator.** Run:
 
    ```bash
    node "${CLAUDE_SKILL_DIR}/../../scripts/afk-install-orchestrator.js" "<projectPath>"
@@ -84,7 +100,7 @@ $ARGUMENTS
 
    The script prints a JSON summary (`installedAgent`, `setAgentSetting`, `wroteGitignore`, `rendered`).
 
-4. **Apply rule placements.** Run:
+5. **Apply rule placements.** Run:
 
    ```bash
    node "${CLAUDE_SKILL_DIR}/../../scripts/afk-apply-rules.js" "<projectPath>"
@@ -97,7 +113,7 @@ $ARGUMENTS
 
    It is idempotent and prints a JSON summary (`moved`, `installed`, `unchanged`, `skipped`, `missing`, `errors`). `missing` lists project rules whose file wasn't found; `errors` includes any failed `vibe-rules load` (e.g. vibe-rules not installed) — surface these to the user but don't treat them as fatal.
 
-5. **Report to the user.** Confirm the files written and summarise:
+6. **Report to the user.** Confirm the files written and summarise:
    - counts of agents, instances, workflows, and rules saved,
    - which rule files were moved or installed (from the apply-rules summary), and any `missing`/`errors`,
    - whether the orchestrator was newly installed and whether `agent: afk` was set in `settings.json`,
