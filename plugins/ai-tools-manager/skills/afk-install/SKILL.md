@@ -36,9 +36,10 @@ $ARGUMENTS
    - copies the `afk` orchestrator agent to `<projectPath>/.claude/agents/afk.md` (only if absent — your edits are preserved on re-runs),
    - copies the runtime scripts (`afk-set-session-workflow.js`, `afk-render-orchestrator.js`, `bash-validation.sh`, `lib/afk-session.js`) into `<projectPath>/.claude/scripts/`,
    - merges `"agent": "afk"` and the `bash-validation.sh` PreToolUse Bash hook into `<projectPath>/.claude/settings.json` (preserving other keys), so new sessions adopt the orchestrator and `.env` reads are blocked,
-   - ensures `<projectPath>/.claude/.gitignore` ignores the ephemeral session files (`afk_session.json`, `afk_session.log.jsonl`).
+   - ensures `<projectPath>/.claude/.gitignore` ignores the ephemeral session files (`afk_session.json`, `afk_session.log.jsonl`),
+   - adds an `# AFK` section to the repo-root `.gitignore` (`git rev-parse --show-toplevel`) ignoring every nested session file across the repo / monorepo via `**/.claude/afk_session.json` and `**/.claude/afk_session.log.jsonl`.
 
-   It prints a JSON summary (`installedAgent`, `setAgentSetting`, `setBashHook`, `wroteGitignore`). It does **not** render `afk.md`'s managed regions — that needs `afk.json`, which the next step produces.
+   It prints a JSON summary (`installedAgent`, `setAgentSetting`, `setBashHook`, `wroteGitignore`, `wroteRepoGitignore`). It does **not** render `afk.md`'s managed regions — that needs `afk.json`, which the next step produces.
 
    Note the `installedAgent` flag: `true` means a fresh `afk.md` was written; `false` means one was already present and was left untouched.
 

@@ -28,6 +28,7 @@ afk-install.js   (scaffold-only, idempotent)
   2. runtime scripts             → .claude/scripts/{afk-set-session-workflow.js, afk-render-orchestrator.js, bash-validation.sh, lib/afk-session.js}  (always refreshed)
   3. merge { "agent": "afk" } + PreToolUse Bash hook (bash-validation.sh) → .claude/settings.json  (preserves other keys)
   4. ensure                       .claude/.gitignore             (ignores afk_session.json + afk_session.log.jsonl)
+  5. ensure repo-root             .gitignore  `# AFK` section     (**/.claude/afk_session.{json,log.jsonl} — covers every nested .claude/ in a monorepo)
         │  afk-install then invokes the /afk skill, seeded with the detected impl agents
         ▼
 /afk skill   (also the standalone re-edit entry point — guards on afk.md existing, else points to /afk-install)

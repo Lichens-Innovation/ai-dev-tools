@@ -8,11 +8,13 @@
 //   from <project>/.claude/settings.json (only the keys AFK added; all other keys
 //   are preserved), and deletes the ephemeral session files. New sessions stop
 //   adopting the orchestrator.
-// --purge: additionally removes the installed orchestrator agent and the
-//   project-copied runtime scripts.
+// --purge: additionally removes the installed orchestrator agent, the
+//   project-copied runtime scripts, and the user-authored config
+//   (afk.json / afk.yaml) — i.e. everything the install pipeline produced.
 //
-// Never touches afk.json / afk.yaml — that is the user-authored config and is
-// kept so a later /afk-install or /afk-sync can restore things.
+// Default (no --purge): never touches afk.json / afk.yaml — that is the
+// user-authored config and is kept so a later /afk-install or /afk-sync can
+// restore things.
 // Prints a JSON summary to stdout.
 
 const fs = require("fs");
@@ -37,7 +39,9 @@ function removeBashValidationHook(settings) {
     if (entry.hooks.length !== before) changed = true;
   }
   if (changed) {
-    settings.hooks.PreToolUse = pre.filter((e) => !(e && e.matcher === "Bash" && Array.isArray(e.hooks) && e.hooks.length === 0));
+    settings.hooks.PreToolUse = pre.filter(
+      (e) => !(e && e.matcher === "Bash" && Array.isArray(e.hooks) && e.hooks.length === 0)
+    );
   }
   return changed;
 }
@@ -74,11 +78,10 @@ try {
   const claudeDir = path.join(projectDir, ".claude");
 
   const { removedAgentSetting, removedBashHook } = cleanSettings(path.join(claudeDir, "settings.json"));
-  const removedSession =
-    [
-      removeIfPresent(path.join(claudeDir, "afk_session.json")),
-      removeIfPresent(path.join(claudeDir, "afk_session.log.jsonl")),
-    ].some(Boolean);
+  const removedSession = [
+    removeIfPresent(path.join(claudeDir, "afk_session.json")),
+    removeIfPresent(path.join(claudeDir, "afk_session.log.jsonl")),
+  ].some(Boolean);
 
   const purged = [];
   if (purge) {
@@ -88,6 +91,8 @@ try {
       path.join(claudeDir, "scripts", "afk-render-orchestrator.js"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
       path.join(claudeDir, "scripts", "lib", "afk-session.js"),
+      path.join(claudeDir, "afk.json"),
+      path.join(projectDir, "afk.yaml"),
     ];
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));
   }
@@ -99,8 +104,8 @@ try {
       removedBashHook,
       removedSession,
       purged: purge ? purged : null,
-      keptConfig: true,
-    }) + "\n",
+      keptConfig: !purge,
+    }) + "\n"
   );
 } catch (err) {
   process.stderr.write(`afk-uninstall: ${err.message}\n`);
