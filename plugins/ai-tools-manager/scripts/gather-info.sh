@@ -37,6 +37,9 @@ const fs = require('fs'), path = require('path');
 const { execFileSync } = require('child_process');
 const home = process.env.HOME || '';
 const knownPath = path.join(home, '.claude', 'plugins', 'known_marketplaces.json');
+// Repo-detected implementation agent(s) for the AFK kickstarter happy path, passed by the
+// agents-framework-kickstarter skill (e.g. 'backend', 'frontend', 'backend,frontend').
+const implAgents = (process.env.AFK_IMPL_AGENTS || '').split(',').map(s => s.trim()).filter(Boolean);
 let vibeRules = [];
 try {
   const out = execFileSync('vibe-rules', ['list'], { encoding: 'utf8' });
@@ -53,9 +56,9 @@ try {
       byMarketplace[name] = (mktJson.plugins || []).map(p => p.name);
     } catch { byMarketplace[name] = []; }
   }
-  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules}));
-} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules})); }
-" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[]}' > "$MARKETPLACE_FILE"
+  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents}));
+} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents})); }
+" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[],"implAgents":[]}' > "$MARKETPLACE_FILE"
 
 # Start the container (builds image if needed)
 docker compose -f "$COMPOSE_FILE" up -d --build >&2

@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, Plus, X, Pencil, Check, ChevronDown, Trash2 } from "lucide-react";
+import { Workflow, BookOpenCheck, ScrollText, Plus, X, Pencil, Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useSessionLog } from "../utils/session-log-context";
 
 interface WorkflowSelectorProps {
   workflows: string[];
@@ -21,6 +22,7 @@ export default function TopNav({
   onPreviewToggle?: () => void;
   workflowSelector?: WorkflowSelectorProps;
 }) {
+  const { connected } = useSessionLog();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +87,19 @@ export default function TopNav({
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
       >
         <BookOpenCheck size={13} /> Rules
+      </Link>
+      <Link
+        to="/session-log"
+        activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
+      >
+        <ScrollText size={13} /> Session Log
+        <span
+          title={connected ? "Live" : "Connecting…"}
+          className={`text-[7px] leading-none ${connected ? "text-(--green)" : "text-(--ink-3)"}`}
+        >
+          ●
+        </span>
       </Link>
 
       {/* Centered workflow selector */}

@@ -80,7 +80,7 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 | `afk.yaml` | `<project>/afk.yaml` | Human-readable rendering of the config; includes the **derived** `success_path` per workflow. Not read at runtime. | App (`afkConfigToYaml`) + skill (verbatim) | Committed; regenerated on save |
 | `afk.json` | `<project>/.claude/afk.json` | **Source of truth** (`version: 3`). Every hook + the renderer read this. `success_path` is **not** stored here. | App + skill (byte-identical) | Committed; edited via canvas or by hand (+ `/afk-sync`) |
 | `afk_session.json` | `<project>/.claude/afk_session.json` | Ephemeral session state: `{ workflow, generated_instances }`. Tells `inject-agent-skills.js` which workflow is active. | `afk-set-workflow.js`, `inject-agent-skills.js` | Ephemeral; **gitignored**; deleted at `SessionEnd` |
-| `afk_session.log.jsonl` | `<project>/.claude/afk_session.log.jsonl` | Ephemeral **append-only** tool-call log, one JSON object per line (`{ts, origin, log}`). Append-only so parallel subagents don't race. | `afk-session-log.js` (PreToolUse) | Ephemeral; **gitignored**; deleted at `SessionEnd` |
+| `afk_session.log.jsonl` | `<project>/.claude/afk_session.log.jsonl` | Ephemeral **append-only** log. Three entry kinds: (1) plain tool-call `{ts, origin, log}` (PreToolUse); (2) `kind:"dispatch"` `{ts, origin:"main_session", agent, agent_id, input, log}` (SubagentStart); (3) `kind:"handoff"` `{ts, origin, agent_id, status, label, output, log}` (SubagentStop). Append-only so parallel subagents don't race. The ai-tools-manager app **live-tails** this file over SSE (`src/routes/api/session-log-stream.ts`) — hooks remain append-only and network-free; the SSE tail is read-only and separate from the write path. | `afk-session-log.js` (PreToolUse) + `afk-subagent-log.js` (SubagentStart/Stop) | Ephemeral; **gitignored**; deleted at `SessionEnd` |
 
 `success_path` is derived (by `computeSuccessPath` in the app and the twin `successPath` in `afk-render-orchestrator.js`) — never persisted in `afk.json`, only rendered into `afk.yaml` and the orchestrator's table. Both renderers must emit identical output (` → ` separator, `human review` label).
 
@@ -89,9 +89,11 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 | Event | Matcher | Script | Effect |
 |---|---|---|---|
 | `SubagentStart` | `.*` | `inject-agent-skills.js` | Inject the matched instance's skills, its `HANDOFF:` routing lines (success + condition labels), and the per-route `handoff_details` payload protocol (from `templates/handoffs/<sender>/<receiver>.md`). No-op when the agent maps to no instance, so a broad matcher safely covers custom agents too. |
+| `SubagentStart` | `.*` | `afk-subagent-log.js` | Append a `kind:"dispatch"` entry to `afk_session.log.jsonl`: the subagent's `agent_type`, `agent_id`, and the full spawning message (`input`). Runs alongside `inject-agent-skills.js`; order irrelevant. No-op when `afk.json` is absent. |
+| `SubagentStop` | `.*` | `afk-subagent-log.js` | Append a `kind:"handoff"` entry: parses the subagent's `HANDOFF:` label from `last_assistant_message` → `status` (`"success"` / `"condition"` / `"unknown"`), stores the full final message as `output`. Correlated to the dispatch entry by `agent_id`. No-op when `afk.json` is absent. |
 | `PreToolUse` | `.*` | `afk-session-log.js` | Append a tool-call line to `afk_session.log.jsonl`. No-op when `afk.json` is absent. |
 | `SessionEnd` | `` | `afk-session-cleanup.sh` | Delete both ephemeral session files. |
-| `UserPromptExpansion` | `agents-framework-kickstarter` (+ create-*) | `gather-info.sh` | Launch the Docker form for the install flow. |
+| `UserPromptExpansion` | `create-*` | `gather-info.sh` | Launch the Docker form for the `create-{skill,subagent,plugin,marketplace}` flows. (The `agents-framework-kickstarter` skill is **not** wired here — it runs `gather-info.sh` itself after analyzing the repo to seed the canvas with the detected implementation agent(s); see its SKILL.md.) |
 
 `inject-agent-skills.js` and `afk-session-log.js` run from `${CLAUDE_PLUGIN_ROOT}/scripts/` — edits to them take effect immediately for every project. `afk-set-workflow.js` and `afk-render-orchestrator.js` run from the **project copy** in `.claude/scripts/`, so changes to them only reach a project on (re)install. `templates/afk.md` is copied only if absent, so template changes reach **new installs only**.
 
@@ -116,6 +118,7 @@ Note: protocol templates live **only** in the agent template files, never in `af
 | How do I change the orchestrator's behavior? | edit `.claude/agents/afk.md` — everything outside the generated frontmatter `skills:` and the `AFK:HANDOFFS` region is yours |
 | The handoff table is stale | run `/afk-sync` (re-renders from `afk.json`) |
 | How do I turn AFK off? | `/afk-uninstall` (removes `agent: afk`); `--purge` to also remove the agent + scripts |
+| How did this session go / what could have gone better? | `/afk-post-mortem` — `afk-post-mortem.js` digests `afk_session.log.jsonl` (read-only) and the skill couples it with the main session's context to flag avoidable work, false checks, bad assumptions, and handoff issues, then proposes fixes. Run mid-session (the log is wiped at `SessionEnd`). |
 | Where's the install logic? | `plugins/ai-tools-manager/scripts/afk-install-orchestrator.js` |
 
 ## Things that bite
