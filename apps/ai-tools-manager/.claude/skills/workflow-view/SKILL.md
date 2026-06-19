@@ -7,7 +7,7 @@ description: "Explains how the /workflows view in ai-tools-manager is built end-
 
 The `/workflows` route (`src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas), and watches the resulting `afk.yaml` render live (right pane). On save it persists the workflow slice of `.claude/afk.json` (v3).
 
-It is the workflow half of the `agents-framework-kickstarter` flow — the `/rules` route owns the other half (rules), and the two share one `afk.json`.
+It is the workflow half of the `/afk` config flow — the `/rules` route owns the other half (rules), and the two share one `afk.json`.
 
 ## Layout
 
@@ -60,7 +60,7 @@ submitAfkConfig({ sliceType: "workflows", slice })
   • writes /tmp/result.json  → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
 ```
 
-**First-install seed.** When no `afk.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `agents-framework-kickstarter` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
+**First-install seed.** When no `afk.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `/afk-install` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
 
 ## File-by-file map
 
@@ -76,7 +76,7 @@ submitAfkConfig({ sliceType: "workflows", slice })
 | Shared `readCwd` + `parseFrontmatter`                                    | `src/utils/afk-fs.ts`                                                      |
 | Bundled subagents (source of the Agents list)                            | `plugins/ai-tools-manager/agents/*.md`                                     |
 | Project skills (source of the Skills list)                               | `<cwd>/.claude/skills/*/SKILL.md`                                          |
-| Consuming prompt (writes afk.yaml)                                       | `plugins/ai-tools-manager/skills/agents-framework-kickstarter/SKILL.md`    |
+| Consuming prompt (writes afk.yaml)                                       | `plugins/ai-tools-manager/skills/afk/SKILL.md`                             |
 
 ## The data model (AfkConfigV3)
 
@@ -95,7 +95,7 @@ AfkConfigV3 {
 
 AfkInstanceV3 { name, agent, skills: string[] }            // referenced by name from agent nodes
 AfkWorkflowV3 { name, nodes: AfkNodeV3[], edges: AfkEdgeV3[] }   // success_path is DERIVED, never stored
-AfkNodeV3     { id, type: "agent"|"human_review", instance?, position? }
+AfkNodeV3     { id, type: "agent"|"human_review"|"skill", instance?, skill?, position? }
 AfkEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, targetHandle? }
 ```
 
@@ -114,13 +114,14 @@ Key points:
 
 ## Center canvas (workflow-canvas.tsx)
 
-Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SSR. Three node types and two edge types are registered as **module-level constants** (`NODE_TYPES`/`EDGE_TYPES`) so React Flow never remounts nodes.
+Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SSR. Four node types and two edge types are registered as **module-level constants** (`NODE_TYPES`/`EDGE_TYPES`) so React Flow never remounts nodes.
 
 **Nodes**
 
 - `mainSession` — green rounded card (`w-48 rounded-2xl border-2 border-green-400`), `deletable: false`. Has a `⋮` kebab (Add Skill) in the header and skill chips inside the card body. A bottom-center `+` button (`onAddNext`) opens the "Add step" modal. Handles (`left`, `right`, `bottom`) are fragment siblings of the card div — **not inside it** — so they anchor to the node bounding box, not to the card's flex flow.
 - `agentNode` — card showing the instance name (primary) and `@agent` (secondary), skill chips from the referenced instance, side `+` buttons (left/right) for conditions, a bottom-center `+` button (`onAddNext`) for adding the next step, and a `⋮` kebab menu (Edit instance / Delete). Orange normally; **green when it is the success-path terminal** (see `findSuccessTerminalId`).
 - `humanStep` — amber diamond rendering "Review" (`human_review`). Wrapped in a `relative` div so the bottom-center `+` button (`onAddNext`) can be absolutely positioned below the diamond.
+- `skillNode` — violet card rendering `/<skill>` for a standalone **skill step** (`type: "skill"`, carries a `skill` id, no instance). A `⋮` kebab offers **Change skill** / **Delete**, plus the bottom-center `+` (`onAddNext`). Like `human_review` it is a non-agent node: it carries no instance, is excluded from `placedInstanceNames`, renders in the success path as `/<skill>`, and at runtime the orchestrator runs it inline via the `Skill` tool (no subagent dispatch — see the `afk-architecture` skill).
 
 **Edges**
 
@@ -172,7 +173,7 @@ A **read-only** `FilePreview`. It calls `afkConfigToYaml(config)` (`src/utils/af
 
 ## Persistence (submitAfkConfig)
 
-Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` and `afk.yaml` (via `afkConfigToYaml`), and writes the result file with `additionalContext` containing `AFK v3 config data: {…}` **plus the verbatim afk.yaml text**. The consuming `agents-framework-kickstarter` SKILL.md writes those files on the host and runs `afk-install-orchestrator.js`. The `SubagentStart` hook (`inject-agent-skills.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
+Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` and `afk.yaml` (via `afkConfigToYaml`), and writes the result file with `additionalContext` containing `AFK v3 config data: {…}` **plus the verbatim afk.yaml text**. The consuming `/afk` SKILL.md writes those files on the host and re-renders the orchestrator (`afk-render-orchestrator.js`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
 
 ## Things that bite
 

@@ -10,7 +10,7 @@
 //
 //   node afk-apply-rules.js [projectDir]
 //
-// Run by the agents-framework-kickstarter skill after afk.json is written (host-side —
+// Run by the afk skill after afk.json is written (host-side —
 // the container can't reach project paths and vibe-rules is a host CLI). Idempotent.
 // Prints a JSON summary to stdout.
 

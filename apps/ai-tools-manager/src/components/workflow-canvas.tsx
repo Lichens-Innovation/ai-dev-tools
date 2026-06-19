@@ -75,9 +75,10 @@ function workflowToRfNodes(workflow: AfkWorkflowV3, instances: AfkInstanceV3[]):
   ];
   for (const n of workflow.nodes) {
     const instanceData = n.type === "agent" ? instances.find((i) => i.name === n.instance) : undefined;
+    const rfType = n.type === "agent" ? "agentNode" : n.type === "skill" ? "skillNode" : "humanStep";
     nodes.push({
       id: n.id,
-      type: n.type === "agent" ? "agentNode" : "humanStep",
+      type: rfType,
       position: n.position ?? { x: 0, y: 0 },
       data: { afkNode: n, instanceData },
     });
@@ -105,7 +106,7 @@ function rfNodesToAfkNodes(nodes: Node[]): AfkNodeV3[] {
     .filter((n) => n.id !== "main-session")
     .map((n) => {
       const afk = n.data.afkNode as AfkNodeV3;
-      return { id: afk.id, type: afk.type, instance: afk.instance, position: n.position };
+      return { id: afk.id, type: afk.type, instance: afk.instance, skill: afk.skill, position: n.position };
     });
 }
 
@@ -156,9 +157,18 @@ function nextHumanId(nodes: Node[]): string {
   return `human_review-${n}`;
 }
 
+// Generate a unique skill-step node id of the form "skill-N"
+function nextSkillId(nodes: Node[]): string {
+  let n = 1;
+  while (nodes.some((nd) => nd.id === `skill-${n}`)) n++;
+  return `skill-${n}`;
+}
+
 // ── Node components (defined outside — stable references for React Flow) ──
 
-function MainSessionNode({ data }: NodeProps & {
+function MainSessionNode({
+  data,
+}: NodeProps & {
   data: { skills?: string[]; onEditSkills?: (id: string) => void; onAddNext?: (id: string) => void };
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -186,7 +196,10 @@ function MainSessionNode({ data }: NodeProps & {
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen((v) => !v);
+                }}
                 className="w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none text-green-600 hover:bg-green-200"
               >
                 ⋮
@@ -196,7 +209,10 @@ function MainSessionNode({ data }: NodeProps & {
                   <button
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => { data.onEditSkills?.("main-session"); setMenuOpen(false); }}
+                    onClick={() => {
+                      data.onEditSkills?.("main-session");
+                      setMenuOpen(false);
+                    }}
                   >
                     + Add Skill
                   </button>
@@ -208,7 +224,10 @@ function MainSessionNode({ data }: NodeProps & {
           {data.skills && data.skills.length > 0 && (
             <div className="px-2.5 pb-2 flex flex-wrap gap-1">
               {data.skills.map((s) => (
-                <span key={s} className="px-1.5 py-0.5 rounded-full bg-green-200 border border-green-300 text-green-700 text-[10px] font-mono">
+                <span
+                  key={s}
+                  className="px-1.5 py-0.5 rounded-full bg-green-200 border border-green-300 text-green-700 text-[10px] font-mono"
+                >
                   {s}
                 </span>
               ))}
@@ -220,7 +239,10 @@ function MainSessionNode({ data }: NodeProps & {
           type="button"
           style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
           className="w-5 h-5 rounded-full bg-white border-2 border-green-400 text-green-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-green-50 focus:outline-none"
-          onClick={(e) => { e.stopPropagation(); data.onAddNext?.("main-session"); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddNext?.("main-session");
+          }}
           title="Add next step"
         >
           +
@@ -289,7 +311,10 @@ function AgentNodeComponent({
           type="button"
           style={{ position: "absolute", left: -10, top: "50%", transform: "translateY(-50%)" }}
           className={sideButtonClass}
-          onClick={(e) => { e.stopPropagation(); data.onAddConditionEdge?.(afk.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddConditionEdge?.(afk.id);
+          }}
           title="Add condition from this node"
         >
           +
@@ -300,7 +325,10 @@ function AgentNodeComponent({
           type="button"
           style={{ position: "absolute", right: -10, top: "50%", transform: "translateY(-50%)" }}
           className={sideButtonClass}
-          onClick={(e) => { e.stopPropagation(); data.onAddConditionEdge?.(afk.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddConditionEdge?.(afk.id);
+          }}
           title="Add condition from this node"
         >
           +
@@ -314,14 +342,15 @@ function AgentNodeComponent({
                 {afk.instance ?? afk.id}
               </span>
               {/* Agent name (secondary) */}
-              {inst && (
-                <span className={`text-[10px] truncate font-mono ${subClass}`}>@{inst.agent}</span>
-              )}
+              {inst && <span className={`text-[10px] truncate font-mono ${subClass}`}>@{inst.agent}</span>}
             </div>
             <div className="relative ml-1 shrink-0" ref={menuRef}>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen((v) => !v);
+                }}
                 className={`w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none ${kebabClass}`}
               >
                 ⋮
@@ -331,14 +360,20 @@ function AgentNodeComponent({
                   <button
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => { data.onEditInstance?.(afk.instance ?? afk.id); setMenuOpen(false); }}
+                    onClick={() => {
+                      data.onEditInstance?.(afk.instance ?? afk.id);
+                      setMenuOpen(false);
+                    }}
                   >
                     Edit instance
                   </button>
                   <button
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => { data.onDelete?.(afk.id); setMenuOpen(false); }}
+                    onClick={() => {
+                      data.onDelete?.(afk.id);
+                      setMenuOpen(false);
+                    }}
                   >
                     Delete
                   </button>
@@ -350,7 +385,9 @@ function AgentNodeComponent({
           {inst && inst.skills.length > 0 && (
             <div className="px-2.5 pb-2 flex flex-wrap gap-1">
               {inst.skills.map((s) => (
-                <span key={s} className={`px-1.5 py-0.5 rounded-full border text-[10px] font-mono ${chipClass}`}>{s}</span>
+                <span key={s} className={`px-1.5 py-0.5 rounded-full border text-[10px] font-mono ${chipClass}`}>
+                  {s}
+                </span>
               ))}
             </div>
           )}
@@ -360,7 +397,10 @@ function AgentNodeComponent({
           type="button"
           style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
           className={`w-5 h-5 rounded-full bg-white border-2 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:opacity-80 focus:outline-none ${term ? "border-green-400 text-green-600" : "border-orange-300 text-orange-500"}`}
-          onClick={(e) => { e.stopPropagation(); data.onAddNext?.(afk.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddNext?.(afk.id);
+          }}
           title="Add next step"
         >
           +
@@ -371,7 +411,10 @@ function AgentNodeComponent({
   );
 }
 
-function HumanStepNode({ data, selected }: NodeProps & { data: { afkNode: AfkNodeV3; onAddNext?: (id: string) => void } }) {
+function HumanStepNode({
+  data,
+  selected,
+}: NodeProps & { data: { afkNode: AfkNodeV3; onAddNext?: (id: string) => void } }) {
   const afk = data.afkNode;
   return (
     <>
@@ -388,7 +431,100 @@ function HumanStepNode({ data, selected }: NodeProps & { data: { afkNode: AfkNod
           type="button"
           style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
           className="w-5 h-5 rounded-full bg-white border-2 border-amber-400 text-amber-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-amber-50 focus:outline-none"
-          onClick={(e) => { e.stopPropagation(); data.onAddNext?.(afk.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddNext?.(afk.id);
+          }}
+          title="Add next step"
+        >
+          +
+        </button>
+      </div>
+      <Handle type="source" position={Position.Bottom} id="bottom" />
+    </>
+  );
+}
+
+function SkillNodeComponent({
+  data,
+  selected,
+}: NodeProps & {
+  data: {
+    afkNode: AfkNodeV3;
+    onDelete?: (id: string) => void;
+    onChangeSkill?: (id: string) => void;
+    onAddNext?: (id: string) => void;
+  };
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const afk = data.afkNode;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  return (
+    <>
+      <Handle type="target" position={Position.Top} id="top" />
+      <div className="relative">
+        <div
+          className={`w-44 rounded-lg border-2 shadow-sm bg-violet-50 text-violet-900 ${selected ? "border-violet-500" : "border-violet-300"}`}
+        >
+          <div className="flex items-center justify-between px-2.5 py-2">
+            <span className="font-mono text-[12px] font-semibold truncate text-violet-800">/{afk.skill ?? afk.id}</span>
+            <div className="relative ml-1 shrink-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen((v) => !v);
+                }}
+                className="w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none text-violet-400 hover:bg-violet-100"
+              >
+                ⋮
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-6 z-50 w-40 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
+                    onClick={() => {
+                      data.onChangeSkill?.(afk.id);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Change skill
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
+                    onClick={() => {
+                      data.onDelete?.(afk.id);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Bottom "+" — add next step */}
+        <button
+          type="button"
+          style={{ position: "absolute", bottom: -10, left: "50%", transform: "translateX(-50%)" }}
+          className="w-5 h-5 rounded-full bg-white border-2 border-violet-400 text-violet-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-violet-50 focus:outline-none"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddNext?.(afk.id);
+          }}
           title="Add next step"
         >
           +
@@ -404,8 +540,26 @@ function SuccessEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, t
   return <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={{ stroke: "#94a3b8", strokeWidth: 1.5 }} />;
 }
 
-function ConditionEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, markerEnd, data }: EdgeProps) {
-  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+function ConditionEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  label,
+  markerEnd,
+  data,
+}: EdgeProps) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
   const onEditLabel = (data as { onEditLabel?: (id: string) => void } | undefined)?.onEditLabel;
   const hasLabel = typeof label === "string" && label.length > 0;
   return (
@@ -439,7 +593,10 @@ function ConditionEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
           )}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onEditLabel?.(id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditLabel?.(id);
+            }}
             className="w-4 h-4 flex items-center justify-center rounded bg-white border border-orange-300 text-orange-500 text-[9px] leading-none hover:bg-orange-50 cursor-pointer focus:outline-none shadow-sm"
             title="Edit label"
           >
@@ -469,6 +626,7 @@ const NODE_TYPES = {
   mainSession: MainSessionNode,
   agentNode: AgentNodeComponent,
   humanStep: HumanStepNode,
+  skillNode: SkillNodeComponent,
 };
 const EDGE_TYPES = { successEdge: SuccessEdge, conditionEdge: ConditionEdge };
 
@@ -512,7 +670,13 @@ export default function WorkflowCanvas({
   const [editLabelEdgeId, setEditLabelEdgeId] = useState<string | null>(null);
   const [editLabelValue, setEditLabelValue] = useState("");
 
-  useEffect(() => { setMounted(true); }, []);
+  // Change-skill modal (skill nodes)
+  const [changeSkillNodeId, setChangeSkillNodeId] = useState<string | null>(null);
+  const [changeSkillValue, setChangeSkillValue] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sync incoming workflow → RF state (always produces at least the main-session node)
   useEffect(() => {
@@ -534,7 +698,7 @@ export default function WorkflowCanvas({
       lastEmittedRef.current = updated; // mark so the sync effect ignores the echo
       onChange(updated);
     },
-    [workflow, onChange],
+    [workflow, onChange]
   );
 
   const handleNodesChange = useCallback(
@@ -545,13 +709,14 @@ export default function WorkflowCanvas({
       // - position: only on drag-end (dragging === false) — not on every mousemove
       // - dimensions / select: React Flow internal bookkeeping, never push
       // - everything else (add, remove, reset): push immediately
-      const shouldPush = changes.some((c) =>
-        (c.type === "position" && c.dragging === false) ||
-        (c.type !== "position" && c.type !== "dimensions" && c.type !== "select")
+      const shouldPush = changes.some(
+        (c) =>
+          (c.type === "position" && c.dragging === false) ||
+          (c.type !== "position" && c.type !== "dimensions" && c.type !== "select")
       );
       if (shouldPush) pushChange(next, rfEdgesRef.current);
     },
-    [pushChange],
+    [pushChange]
   );
 
   const handleEdgesChange = useCallback(
@@ -560,7 +725,7 @@ export default function WorkflowCanvas({
       setRfEdges(next);
       pushChange(rfNodesRef.current, next);
     },
-    [pushChange],
+    [pushChange]
   );
 
   const handleConnect = useCallback(
@@ -589,7 +754,7 @@ export default function WorkflowCanvas({
         return next;
       });
     },
-    [pushChange],
+    [pushChange]
   );
 
   const deleteNode = useCallback(
@@ -602,7 +767,7 @@ export default function WorkflowCanvas({
         return next;
       });
     },
-    [pushChange],
+    [pushChange]
   );
 
   // Only used for main-session skill editing
@@ -610,7 +775,7 @@ export default function WorkflowCanvas({
     (skills: string[]) => {
       onMainSessionSkillsChange(skills);
     },
-    [onMainSessionSkillsChange],
+    [onMainSessionSkillsChange]
   );
 
   // ── Edit instance modal ──────────────────────────────────────────
@@ -623,17 +788,15 @@ export default function WorkflowCanvas({
       setEditInstanceAgent(inst.agent);
       setEditInstanceSkills(inst.skills);
     },
-    [instances],
+    [instances]
   );
 
   const confirmEditInstance = useCallback(() => {
     if (!editInstanceName) return;
     onInstancesChange(
       instances.map((i) =>
-        i.name === editInstanceName
-          ? { ...i, agent: editInstanceAgent, skills: editInstanceSkills }
-          : i,
-      ),
+        i.name === editInstanceName ? { ...i, agent: editInstanceAgent, skills: editInstanceSkills } : i
+      )
     );
     setEditInstanceName(null);
   }, [editInstanceName, editInstanceAgent, editInstanceSkills, instances, onInstancesChange]);
@@ -665,6 +828,30 @@ export default function WorkflowCanvas({
     setEditLabelEdgeId(null);
   }, [editLabelEdgeId, editLabelValue, pushChange]);
 
+  // ── Change-skill modal (skill nodes) ────────────────────────────
+
+  const openChangeSkill = useCallback(
+    (nodeId: string) => {
+      const node = rfNodesRef.current.find((n) => n.id === nodeId);
+      const afk = node?.data.afkNode as AfkNodeV3 | undefined;
+      setChangeSkillNodeId(nodeId);
+      setChangeSkillValue(afk?.skill ?? availableSkills[0] ?? "");
+    },
+    [availableSkills]
+  );
+
+  const confirmChangeSkill = useCallback(() => {
+    if (!changeSkillNodeId || !changeSkillValue) return;
+    const next = rfNodesRef.current.map((n) => {
+      if (n.id !== changeSkillNodeId) return n;
+      const afk = n.data.afkNode as AfkNodeV3;
+      return { ...n, data: { ...n.data, afkNode: { ...afk, skill: changeSkillValue } } };
+    });
+    setRfNodes(next);
+    pushChange(next, rfEdgesRef.current);
+    setChangeSkillNodeId(null);
+  }, [changeSkillNodeId, changeSkillValue, pushChange]);
+
   // Instances already placed in this workflow (for uniqueness enforcement)
   const placedInstanceNames = useMemo(
     () =>
@@ -672,9 +859,9 @@ export default function WorkflowCanvas({
         rfNodes
           .filter((n) => n.id !== "main-session" && (n.data.afkNode as AfkNodeV3 | undefined)?.type === "agent")
           .map((n) => (n.data.afkNode as AfkNodeV3).instance ?? "")
-          .filter(Boolean),
+          .filter(Boolean)
       ),
-    [rfNodes],
+    [rfNodes]
   );
 
   // Subagents (agent types) already placed in this workflow. A subagent can only
@@ -685,9 +872,9 @@ export default function WorkflowCanvas({
       new Set(
         Array.from(placedInstanceNames)
           .map((name) => instances.find((i) => i.name === name)?.agent)
-          .filter(Boolean) as string[],
+          .filter(Boolean) as string[]
       ),
-    [placedInstanceNames, instances],
+    [placedInstanceNames, instances]
   );
 
   // ── Condition state machine ──────────────────────────────────────
@@ -710,7 +897,7 @@ export default function WorkflowCanvas({
       const firstFree = availableAgents.find((a) => !placedAgentTypes.has(a));
       setConditionPicker(blankInstancePicker(firstFree ?? ""));
     },
-    [availableAgents, placedAgentTypes],
+    [availableAgents, placedAgentTypes]
   );
 
   const handleStartAddCondition = useCallback(() => {
@@ -727,7 +914,7 @@ export default function WorkflowCanvas({
         openConditionModal(node.id);
       }
     },
-    [conditionSourceNodeId, openConditionModal],
+    [conditionSourceNodeId, openConditionModal]
   );
 
   const confirmAddCondition = useCallback(() => {
@@ -792,21 +979,32 @@ export default function WorkflowCanvas({
     pushChange(nextNodes, nextEdges);
     resetConditionState();
   }, [
-    conditionSourceNodeId, conditionTargetNodeId, conditionPicker, conditionLabel,
-    rfNodes, rfEdges, instances, availableAgents, placedInstanceNames,
-    onInstancesChange, pushChange, resetConditionState,
+    conditionSourceNodeId,
+    conditionTargetNodeId,
+    conditionPicker,
+    conditionLabel,
+    rfNodes,
+    rfEdges,
+    instances,
+    availableAgents,
+    placedInstanceNames,
+    onInstancesChange,
+    pushChange,
+    resetConditionState,
   ]);
 
   // ── Add step (per-node "+" button) ──────────────────────────────
 
   const [addStepSourceId, setAddStepSourceId] = useState<string | null>(null);
-  const [addStepType, setAddStepType] = useState<"agent" | "human_review">("agent");
+  const [addStepType, setAddStepType] = useState<"agent" | "human_review" | "skill">("agent");
   const [addStepPicker, setAddStepPicker] = useState<InstancePickerValue>(blankInstancePicker());
+  const [addStepSkill, setAddStepSkill] = useState("");
 
   const resetAddStep = useCallback(() => {
     setAddStepSourceId(null);
     setAddStepType("agent");
     setAddStepPicker(blankInstancePicker());
+    setAddStepSkill("");
   }, []);
 
   const openAddStep = useCallback(
@@ -815,8 +1013,9 @@ export default function WorkflowCanvas({
       setAddStepType("agent");
       const firstFree = availableAgents.find((a) => !placedAgentTypes.has(a));
       setAddStepPicker(blankInstancePicker(firstFree ?? ""));
+      setAddStepSkill(availableSkills[0] ?? "");
     },
-    [availableAgents, placedAgentTypes],
+    [availableAgents, placedAgentTypes, availableSkills]
   );
 
   const confirmAddStep = useCallback(() => {
@@ -842,6 +1041,11 @@ export default function WorkflowCanvas({
       if (resolved.isNew) onInstancesChange([...instances, resolved.instance]);
       const afkNode: AfkNodeV3 = { id: nodeId, type: "agent", instance: nodeId, position };
       newRfNode = { id: nodeId, type: "agentNode", position, data: { afkNode, instanceData: resolved.instance } };
+    } else if (addStepType === "skill") {
+      if (!addStepSkill) return;
+      nodeId = nextSkillId(rfNodes);
+      const afkNode: AfkNodeV3 = { id: nodeId, type: "skill", skill: addStepSkill, position };
+      newRfNode = { id: nodeId, type: "skillNode", position, data: { afkNode } };
     } else {
       // human_review
       nodeId = nextHumanId(rfNodes);
@@ -857,7 +1061,13 @@ export default function WorkflowCanvas({
       targetHandle: "top",
       type: "successEdge",
       data: {
-        afkEdge: { from: addStepSourceId, to: nodeId, kind: "success", sourceHandle: "bottom", targetHandle: "top" } as AfkEdgeV3,
+        afkEdge: {
+          from: addStepSourceId,
+          to: nodeId,
+          kind: "success",
+          sourceHandle: "bottom",
+          targetHandle: "top",
+        } as AfkEdgeV3,
       },
     };
 
@@ -869,9 +1079,19 @@ export default function WorkflowCanvas({
     pushChange(nextNodes, nextEdges);
     resetAddStep();
   }, [
-    addStepSourceId, addStepType, addStepPicker,
-    workflow, rfNodes, rfEdges, instances, availableAgents, placedInstanceNames,
-    onInstancesChange, pushChange, resetAddStep,
+    addStepSourceId,
+    addStepType,
+    addStepPicker,
+    addStepSkill,
+    workflow,
+    rfNodes,
+    rfEdges,
+    instances,
+    availableAgents,
+    placedInstanceNames,
+    onInstancesChange,
+    pushChange,
+    resetAddStep,
   ]);
 
   // ── Add Agent (bottom bar) — routes through add-step modal at terminal ──
@@ -890,7 +1110,10 @@ export default function WorkflowCanvas({
     () =>
       rfNodes.map((n) => {
         if (n.id === "main-session") {
-          return { ...n, data: { skills: mainSessionSkills, onEditSkills: setSkillPanelNodeId, onAddNext: openAddStep } };
+          return {
+            ...n,
+            data: { skills: mainSessionSkills, onEditSkills: setSkillPanelNodeId, onAddNext: openAddStep },
+          };
         }
         const afkNode = n.data.afkNode as AfkNodeV3;
         // Always resolve instanceData fresh from the instances prop so edit-instance updates are reflected immediately
@@ -902,6 +1125,7 @@ export default function WorkflowCanvas({
             instanceData,
             onDelete: deleteNode,
             onEditInstance: openEditInstance,
+            onChangeSkill: openChangeSkill,
             onAddConditionEdge: openConditionModal,
             onAddNext: openAddStep,
             isPickingConditionSource: conditionSourceNodeId === "__picking__",
@@ -909,16 +1133,25 @@ export default function WorkflowCanvas({
           },
         };
       }),
-    [rfNodes, mainSessionSkills, instances, deleteNode, openEditInstance, openConditionModal, openAddStep, conditionSourceNodeId, terminalId],
+    [
+      rfNodes,
+      mainSessionSkills,
+      instances,
+      deleteNode,
+      openEditInstance,
+      openChangeSkill,
+      openConditionModal,
+      openAddStep,
+      conditionSourceNodeId,
+      terminalId,
+    ]
   );
 
   // Thread the label editor into condition edges (success edges have no label).
   const enrichedEdges = useMemo(
     () =>
-      rfEdges.map((e) =>
-        e.type === "conditionEdge" ? { ...e, data: { ...e.data, onEditLabel: openEditLabel } } : e,
-      ),
-    [rfEdges, openEditLabel],
+      rfEdges.map((e) => (e.type === "conditionEdge" ? { ...e, data: { ...e.data, onEditLabel: openEditLabel } } : e)),
+    [rfEdges, openEditLabel]
   );
 
   if (!mounted) {
@@ -928,9 +1161,7 @@ export default function WorkflowCanvas({
   const isPicking = conditionSourceNodeId === "__picking__";
   // Available instances for reuse: exclude ones already placed in this workflow,
   // and ones whose subagent is already used (a subagent appears at most once).
-  const availableForReuse = instances.filter(
-    (i) => !placedInstanceNames.has(i.name) && !placedAgentTypes.has(i.agent),
-  );
+  const availableForReuse = instances.filter((i) => !placedInstanceNames.has(i.name) && !placedAgentTypes.has(i.agent));
   // Subagents still selectable when creating a new node here.
   const availableAgentsForNew = availableAgents.filter((a) => !placedAgentTypes.has(a));
   const existingInstanceNames = instances.map((i) => i.name);
@@ -939,9 +1170,7 @@ export default function WorkflowCanvas({
   const editInstanceOrigAgent = editInstanceName
     ? instances.find((i) => i.name === editInstanceName)?.agent
     : undefined;
-  const editAvailableAgents = availableAgents.filter(
-    (a) => a === editInstanceOrigAgent || !placedAgentTypes.has(a),
-  );
+  const editAvailableAgents = availableAgents.filter((a) => a === editInstanceOrigAgent || !placedAgentTypes.has(a));
 
   return (
     <div
@@ -987,8 +1216,7 @@ export default function WorkflowCanvas({
                     : "border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100"
                 }`}
               >
-                <span className="text-[14px] leading-none">+</span>{" "}
-                {isPicking ? "Click a node…" : "Add condition"}
+                <span className="text-[14px] leading-none">+</span> {isPicking ? "Click a node…" : "Add condition"}
               </button>
               {isPicking && (
                 <button
@@ -1016,7 +1244,9 @@ export default function WorkflowCanvas({
               autoFocus
               rows={4}
               onChange={(e) => setConditionLabel(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Escape") resetConditionState(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") resetConditionState();
+              }}
               className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary resize-none"
             />
 
@@ -1031,8 +1261,12 @@ export default function WorkflowCanvas({
                 .filter((n) => n.id !== conditionSourceNodeId && n.id !== "main-session")
                 .map((n) => {
                   const afk = n.data.afkNode as AfkNodeV3 | undefined;
-                  const label = afk?.instance ?? afk?.id ?? n.id;
-                  return <option key={n.id} value={n.id}>{label}</option>;
+                  const label = afk?.type === "skill" ? `/${afk.skill ?? afk.id}` : (afk?.instance ?? afk?.id ?? n.id);
+                  return (
+                    <option key={n.id} value={n.id}>
+                      {label}
+                    </option>
+                  );
                 })}
             </select>
 
@@ -1085,6 +1319,13 @@ export default function WorkflowCanvas({
               </button>
               <button
                 type="button"
+                onClick={() => setAddStepType("skill")}
+                className={`flex-1 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none transition-colors ${addStepType === "skill" ? "bg-primary text-white" : "bg-(--bg-elev) text-(--ink-2) hover:bg-(--bg)"}`}
+              >
+                Skill
+              </button>
+              <button
+                type="button"
                 onClick={() => setAddStepType("human_review")}
                 className={`flex-1 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none transition-colors ${addStepType === "human_review" ? "bg-primary text-white" : "bg-(--bg-elev) text-(--ink-2) hover:bg-(--bg)"}`}
               >
@@ -1104,6 +1345,33 @@ export default function WorkflowCanvas({
                 onEnter={confirmAddStep}
                 onEscape={resetAddStep}
               />
+            )}
+
+            {/* Skill picker (only for skill type) — runs inline in the main session */}
+            {addStepType === "skill" && (
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[10px] text-subtle uppercase tracking-wide">Skill</div>
+                {availableSkills.length === 0 ? (
+                  <p className="text-[12px] text-subtle m-0">
+                    No skills selected in the left panel. Add skills there first.
+                  </p>
+                ) : (
+                  <select
+                    value={addStepSkill}
+                    onChange={(e) => setAddStepSkill(e.target.value)}
+                    className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+                  >
+                    {availableSkills.map((s) => (
+                      <option key={s} value={s}>
+                        /{s}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-[11px] text-subtle m-0">
+                  The orchestrator runs this skill inline, between agent steps.
+                </p>
+              </div>
             )}
 
             <div className="flex gap-2 justify-end">
@@ -1141,7 +1409,11 @@ export default function WorkflowCanvas({
                 onChange={(e) => setEditInstanceAgent(e.target.value)}
                 className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
               >
-                {editAvailableAgents.map((a) => <option key={a} value={a}>{a}</option>)}
+                {editAvailableAgents.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
                 {/* Keep current agent even if not in availableAgents */}
                 {editInstanceAgent && !availableAgents.includes(editInstanceAgent) && (
                   <option value={editInstanceAgent}>{editInstanceAgent} (not in list)</option>
@@ -1169,6 +1441,51 @@ export default function WorkflowCanvas({
               <button
                 type="button"
                 onClick={confirmEditInstance}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change-skill modal (skill nodes) */}
+      {changeSkillNodeId && (
+        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
+          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-72 flex flex-col gap-3">
+            <div className="text-[13px] font-semibold text-(--ink)">Change skill</div>
+            {availableSkills.length === 0 ? (
+              <p className="text-[12px] text-subtle m-0">No skills selected in the left panel.</p>
+            ) : (
+              <select
+                value={changeSkillValue}
+                autoFocus
+                onChange={(e) => setChangeSkillValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setChangeSkillNodeId(null);
+                  if (e.key === "Enter") confirmChangeSkill();
+                }}
+                className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
+              >
+                {availableSkills.map((s) => (
+                  <option key={s} value={s}>
+                    /{s}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setChangeSkillNodeId(null)}
+                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmChangeSkill}
                 className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
               >
                 Save
@@ -1233,7 +1550,11 @@ export default function WorkflowCanvas({
                 size="md"
               />
             )}
-            <button type="button" onClick={() => setSkillPanelNodeId(null)} className="w-full py-1.5 text-[12px] bg-(--bg-elev) border border-(--line) rounded-lg cursor-pointer text-(--ink-2) hover:border-(--ink-4)">
+            <button
+              type="button"
+              onClick={() => setSkillPanelNodeId(null)}
+              className="w-full py-1.5 text-[12px] bg-(--bg-elev) border border-(--line) rounded-lg cursor-pointer text-(--ink-2) hover:border-(--ink-4)"
+            >
               Done
             </button>
           </div>

@@ -1,4 +1,4 @@
-// Shared helpers for the AFK hook scripts (inject-agent-skills.js, afk-session-log.js).
+// Shared helpers for the AFK hook scripts (afk-inject-agent-context.js, afk-session-log.js).
 // Plain Node built-ins only — plugins ship without node_modules.
 
 const fs = require("fs");

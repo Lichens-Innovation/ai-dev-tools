@@ -233,7 +233,7 @@ This is the relationship between the page and the custom hooks/scripts.
 
 ```json
 "SubagentStart": [{ "matcher": ".*", "hooks": [
-  { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/inject-agent-skills.js"] },
+  { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-inject-agent-context.js"] },
   { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-subagent-log.js"] }
 ]}],
 "SubagentStop": [{ "matcher": ".*", "hooks": [
@@ -244,7 +244,7 @@ This is the relationship between the page and the custom hooks/scripts.
 ]}]
 ```
 
-`inject-agent-skills.js` and `afk-subagent-log.js` are both registered under SubagentStart — order is irrelevant since they write to different logical concerns (additionalContext vs. the log file). `afk-subagent-log.js` runs from the plugin dir (not the project copy), so edits to it are immediate.
+`afk-inject-agent-context.js` and `afk-subagent-log.js` are both registered under SubagentStart — order is irrelevant since they write to different logical concerns (additionalContext vs. the log file). `afk-subagent-log.js` runs from the plugin dir (not the project copy), so edits to it are immediate.
 
 ### SessionEnd cleanup
 
@@ -267,6 +267,6 @@ The plain tool-call log from `afk-session-log.js` has **no outcome data** — it
 - **Instances segment by origin change.** The same agent appearing twice in the log produces two cards — that's intentional (second run = second card). Parallel subagents would interleave their tool-call lines, fragmenting into many cards. AFK runs subagents sequentially, so this is normally not an issue in practice. `agent_id` correlation keeps input↔output paired correctly even in edge-case interleaving.
 - **`humanizeLog` returns `null` for bare `Agent`/`Task(...)` lines.** These PreToolUse entries capture the tool dispatch from the main session, but the richer `kind:"dispatch"` entry from `afk-subagent-log.js` covers the same event more informatively. The nulls are intentionally filtered in `session-log-view.tsx`. Do not "fix" them.
 - **`session-log.ts` must remain node-free.** It is imported client-side by the route. All `fs`/`path` usage belongs in `afk-session-log.ts` (the server fn). Adding a Node import to `session-log.ts` will cause a client-bundle error.
-- **`afk-subagent-log.js` runs from the plugin dir, not the project copy.** Unlike `afk-set-workflow.js` and `afk-render-orchestrator.js` (which are copied into `.claude/scripts/` at install time), the SubagentStart/Stop scripts run directly from `${CLAUDE_PLUGIN_ROOT}/scripts/`. Editing `afk-subagent-log.js` takes effect immediately for all projects. Adding or removing the hook registration in `hooks.json` requires a new Claude session to pick up.
+- **`afk-subagent-log.js` runs from the plugin dir, not the project copy.** Unlike `afk-set-session-workflow.js` and `afk-render-orchestrator.js` (which are copied into `.claude/scripts/` at install time), the SubagentStart/Stop scripts run directly from `${CLAUDE_PLUGIN_ROOT}/scripts/`. Editing `afk-subagent-log.js` takes effect immediately for all projects. Adding or removing the hook registration in `hooks.json` requires a new Claude session to pick up.
 - **The hover popup uses `onMouseEnter`/`onMouseLeave` state, not CSS `group-hover`.** Pure CSS `group-hover` loses the popup when the pointer briefly leaves the card on its way to the popup. The React state approach (`hoveredId`) keeps it open through that gap.
 - **Large messages in `input`/`output`.** A spawning message that includes injected skills + handoff templates can be several kilobytes. The hover popup has `max-h-[80vh] overflow-y-auto` — scroll within the popup to read it all. The JSONL file stores the full messages; that's intentional for debugging fidelity.
