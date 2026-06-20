@@ -333,21 +333,31 @@ function buildTestsWorkflow(name: string, impl: string[]): AfkWorkflowV3 {
   return { name, nodes, edges };
 }
 
+// Best-fit project-skill → seeded-agent assignments discovered at install time by the
+// afk-install skill (one entry per agent the user checked skills for). Passed through the
+// precompute file; see readSkillAssignments. Empty when no skills were found/selected.
+export type SkillMap = Record<string, string[]>;
+
 // Returned on first install (no afk.json yet). Seeds the bundled agents as reusable
 // instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
 // canvas isn't empty. `implAgents` is the repo-detected implementation agent chain in the
 // happy path (the kickstarter skill passes it via launch-ai-tools-manager-app.sh); falls back to ["backend"].
-function defaultV3Config(implAgents: string[]): AfkConfigV3 {
+// `skillMap` attaches the install-time discovered project skills to their best-fit instance.
+function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConfigV3 {
   const impl = implAgents.length > 0 ? implAgents : ["backend"];
+  // Defensive: only attach skills to instances that actually exist in this seed.
+  const skillsFor = (agent: string): string[] => Array.from(new Set(skillMap[agent] ?? [])).filter(Boolean);
   const instances: AfkInstanceV3[] = [
-    ...impl.map((a) => ({ name: a, agent: a, skills: [] as string[] })),
-    ...CORE_INSTANCES,
+    ...impl.map((a) => ({ name: a, agent: a, skills: skillsFor(a) })),
+    ...CORE_INSTANCES.map((i) => ({ ...i, skills: skillsFor(i.name) })),
   ];
   const agentsAvailable = Array.from(new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
+  // skills_available = the always-present gate skill + every skill assigned to an instance.
+  const skillsAvailable = Array.from(new Set(["use-design-check", ...instances.flatMap((i) => i.skills)]));
   return {
     version: 3,
     agents_available: agentsAvailable,
-    skills_available: ["use-design-check"],
+    skills_available: skillsAvailable,
     main_session_loaded_skills: [],
     workflow_instances: instances,
     workflows: [
@@ -377,8 +387,23 @@ function readImplAgents(): string[] {
   return ["backend"];
 }
 
-function readConfig(jsonPath: string, implAgents: string[] = ["backend"]): AfkConfigV3 {
-  if (!fs.existsSync(jsonPath)) return defaultV3Config(implAgents);
+// Install-time project-skill → seeded-agent assignments, mirroring readImplAgents: the
+// afk-install skill discovers/maps them and passes a JSON object via AFK_SKILL_MAP, which
+// launch-ai-tools-manager-app.sh writes into the precompute file as `skillMap`. Empty by default.
+function readSkillAssignments(): SkillMap {
+  if (process.env.RUNNING_IN_DOCKER === "true") {
+    try {
+      const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as { skillMap?: SkillMap };
+      if (data.skillMap && typeof data.skillMap === "object") return data.skillMap;
+    } catch {
+      // fall through to the default
+    }
+  }
+  return {};
+}
+
+function readConfig(jsonPath: string, implAgents: string[] = ["backend"], skillMap: SkillMap = {}): AfkConfigV3 {
+  if (!fs.existsSync(jsonPath)) return defaultV3Config(implAgents, skillMap);
   try {
     const parsed = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as AfkConfigV3;
     return parsed.version === 3 ? parsed : blankV3Config();
@@ -421,7 +446,11 @@ export function computeSuccessPath(workflow: AfkWorkflowV3, instances: AfkInstan
 
 export const getAfkConfig = createServerFn({ method: "GET" }).handler(async (): Promise<AfkConfigResult> => {
   const cwd = readCwd();
-  const config = readConfig(path.join(mountedProjectPath(cwd), ".claude", "afk.json"), readImplAgents());
+  const config = readConfig(
+    path.join(mountedProjectPath(cwd), ".claude", "afk.json"),
+    readImplAgents(),
+    readSkillAssignments()
+  );
   const [bundledAgents, projectSkills] = await Promise.all([discoverAgents(cwd), discoverSkills(cwd)]);
   return { config, cwd, bundledAgents, projectSkills };
 });

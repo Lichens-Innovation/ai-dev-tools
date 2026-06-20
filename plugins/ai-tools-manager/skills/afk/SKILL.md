@@ -33,6 +33,13 @@ $ARGUMENTS
 
    If `$ARGUMENTS` contains a comma-separated list of implementation agents to seed the canvas (passed by `/afk-install` on a fresh install — e.g. `backend`, `frontend`, `backend,frontend`), prefix the command with `AFK_IMPL_AGENTS="<list>"`. On a standalone `/afk` run leave it unset; the canvas pre-populates from the existing `afk.json`.
 
+   `/afk-install` may also pass a **skill map** — best-fit project-skill→agent assignments the user confirmed at install time. When present in `$ARGUMENTS`, also prefix the command with `AFK_SKILL_MAP='<json>'` (a JSON object like `{"frontend":["react"],"test":["component-test"]}`). It seeds the matching seeded instances' `skills[]` so the canvas opens pre-populated. Only meaningful on a fresh install (no `afk.json`); leave it unset on a standalone `/afk` run. Example combined prefix:
+
+   ```bash
+   AFK_IMPL_AGENTS="frontend" AFK_SKILL_MAP='{"frontend":["react"],"test":["component-test"]}' \
+     bash "${CLAUDE_SKILL_DIR}/../../scripts/launch-ai-tools-manager-app.sh" agents-framework-kickstarter
+   ```
+
    `launch-ai-tools-manager-app.sh` builds the image, opens the browser, and blocks until the user submits. When it completes, **its stdout is the form result** — a string containing two things:
    - a line beginning `AFK v3 config data:` followed by a JSON object `{ "projectPath": "<absolute cwd>", "config": { …AfkConfigV3… } }`
    - a fenced ```` ```yaml ```` block labelled "Canonical afk.yaml to write verbatim" — the exact text to write to `afk.yaml`.

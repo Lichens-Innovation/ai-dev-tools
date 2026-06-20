@@ -40,6 +40,10 @@ const knownPath = path.join(home, '.claude', 'plugins', 'known_marketplaces.json
 // Repo-detected implementation agent(s) for the AFK happy path, passed by the
 // afk-install / afk skills (e.g. 'backend', 'frontend', 'backend,frontend').
 const implAgents = (process.env.AFK_IMPL_AGENTS || '').split(',').map(s => s.trim()).filter(Boolean);
+// Install-time best-fit project-skill to seeded-agent assignments (JSON object),
+// set by the afk-install skill; empty object otherwise.
+let skillMap = {};
+try { const m = JSON.parse(process.env.AFK_SKILL_MAP || '{}'); if (m && typeof m === 'object') skillMap = m; } catch {}
 let vibeRules = [];
 try {
   const out = execFileSync('vibe-rules', ['list'], { encoding: 'utf8' });
@@ -56,9 +60,9 @@ try {
       byMarketplace[name] = (mktJson.plugins || []).map(p => p.name);
     } catch { byMarketplace[name] = []; }
   }
-  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents}));
-} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents})); }
-" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[],"implAgents":[]}' > "$MARKETPLACE_FILE"
+  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents, skillMap}));
+} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents, skillMap})); }
+" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[],"implAgents":[],"skillMap":{}}' > "$MARKETPLACE_FILE"
 
 # Start the container (builds image if needed)
 docker compose -f "$COMPOSE_FILE" up -d --build >&2

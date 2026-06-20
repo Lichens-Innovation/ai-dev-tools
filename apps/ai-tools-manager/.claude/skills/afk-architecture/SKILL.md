@@ -22,6 +22,9 @@ The setup is split across two skills that meet at `afk.json`: **`/afk-install`**
 ```
 User runs /afk-install
         │  Step 1: analyze repo → implementation agent(s)
+        │  Step 2 (fresh install only): scan .claude/skills/ → best-fit map each project skill to a
+        │          seeded agent (impl + test/reviewer/refactor/scribe) → per-agent AskUserQuestion
+        │          checklist → skill map {agent: [skillId]}  (empty / skipped on re-install)
         ▼
 afk-install.js   (scaffold-only, idempotent)
   1. templates/afk.md            → .claude/agents/afk.md         (only if absent — edits preserved)
@@ -29,10 +32,12 @@ afk-install.js   (scaffold-only, idempotent)
   3. merge { "agent": "afk" } + PreToolUse Bash hook (bash-validation.sh) → .claude/settings.json  (preserves other keys)
   4. ensure                       .claude/.gitignore             (ignores afk_session.json + afk_session.log.jsonl)
   5. ensure repo-root             .gitignore  `# AFK` section     (**/.claude/afk_session.{json,log.jsonl} — covers every nested .claude/ in a monorepo)
-        │  afk-install then invokes the /afk skill, seeded with the detected impl agents
+        │  afk-install then invokes the /afk skill, seeded with the detected impl agents (+ skill map)
         ▼
 /afk skill   (also the standalone re-edit entry point — guards on afk.md existing, else points to /afk-install)
-        │  launch-ai-tools-manager-app.sh → Docker app → user edits canvas
+        │  launch-ai-tools-manager-app.sh (AFK_IMPL_AGENTS + AFK_SKILL_MAP) → Docker app → user edits canvas
+        │  └─ on a fresh install (no afk.json) defaultV3Config seeds the workflows from AFK_IMPL_AGENTS
+        │     and attaches AFK_SKILL_MAP's skills to the matching seeded instances' skills[]
         ▼
 App (submitAfkConfig) writes .claude/afk.json + afk.yaml, and a result file
         │  result = "AFK v3 config data: {JSON}" + verbatim afk.yaml
@@ -102,7 +107,7 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 | `SubagentStop` | `.*` | `afk-subagent-log.js` | Append a `kind:"handoff"` entry: parses the subagent's `HANDOFF:` label from `last_assistant_message` → `status` (`"success"` / `"condition"` / `"unknown"`), stores the full final message as `output`. Correlated to the dispatch entry by `agent_id`. No-op when `afk.json` is absent. |
 | `PreToolUse` | `.*` | `afk-session-log.js` | Append a tool-call line to `afk_session.log.jsonl`. No-op when `afk.json` is absent. |
 | `SessionEnd` | `` | `afk-session-cleanup.sh` | Delete both ephemeral session files. |
-| `UserPromptExpansion` | `create-*` | `launch-ai-tools-manager-app.sh` | Launch the Docker form for the `create-{skill,subagent,plugin,marketplace}` flows. (The `afk` / `afk-install` skills are **not** wired here — they run `launch-ai-tools-manager-app.sh` themselves; `afk-install` first analyzes the repo to seed the canvas with the detected implementation agent(s); see their SKILL.md.) |
+| `UserPromptExpansion` | `create-*` | `launch-ai-tools-manager-app.sh` | Launch the Docker form for the `create-{skill,subagent,plugin,marketplace}` flows. (The `afk` / `afk-install` skills are **not** wired here — they run `launch-ai-tools-manager-app.sh` themselves; `afk-install` first analyzes the repo to seed the canvas with the detected implementation agent(s) and offers a checklist to attach the repo's local skills to the seeded agents; see their SKILL.md.) |
 
 `afk-inject-agent-context.js` and `afk-session-log.js` run from `${CLAUDE_PLUGIN_ROOT}/scripts/` — edits to them take effect immediately for every project. `afk-set-session-workflow.js` and `afk-render-orchestrator.js` run from the **project copy** in `.claude/scripts/`, so changes to them only reach a project on (re)install. `templates/afk.md` is copied only if absent, so template changes reach **new installs only**.
 
