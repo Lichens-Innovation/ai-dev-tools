@@ -278,6 +278,61 @@ function buildWorkflow(name: string, kind: "default" | "tdd", impl: string[]): A
   return { name, nodes, edges };
 }
 
+// Build a simple linear happy-path workflow: main-session → each step in order, success edges only.
+// Step ids: "human_review-1" → human_review node; "skill:<id>" → skill node (run inline by the
+// orchestrator); anything else → an agent node whose instance == the id.
+function linearWorkflow(name: string, steps: string[]): AfkWorkflowV3 {
+  const nodes: AfkNodeV3[] = steps.map((step, i): AfkNodeV3 => {
+    const position = { x: 0, y: 140 + i * 140 };
+    if (step === "human_review-1") return { id: step, type: "human_review", position };
+    if (step.startsWith("skill:")) {
+      const skill = step.slice("skill:".length);
+      return { id: skill, type: "skill", skill, position };
+    }
+    return { id: step, type: "agent", instance: step, position };
+  });
+  const seq = ["main-session", ...nodes.map((n) => n.id)];
+  const edges: AfkEdgeV3[] = [];
+  for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
+  return { name, nodes, edges };
+}
+
+// "Tests" workflow: happy path @test → @reviewer → @scribe, plus two reviewer fix routes through
+// the implementation agent(s), both of which re-run @test once the code changes land:
+//   • simple fix: @reviewer → @<impl> directly;
+//   • bigger finding: @reviewer → @refactor → @<impl> (delegate the refactor before re-testing).
+// Splits per-agent when impl.length > 1 (fullstack).
+function buildTestsWorkflow(name: string, impl: string[]): AfkWorkflowV3 {
+  const column = ["test", "reviewer", "scribe"];
+  const reviewerIdx = column.indexOf("reviewer");
+  const nodes: AfkNodeV3[] = [
+    ...columnNodes(column),
+    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: 140 + reviewerIdx * 140 } },
+    ...impl.map(
+      (a, i): AfkNodeV3 => ({ id: a, type: "agent", instance: a, position: { x: 720, y: 140 + (reviewerIdx + i) * 140 } })
+    ),
+  ];
+
+  const seq = ["main-session", ...column];
+  const edges: AfkEdgeV3[] = [];
+  for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
+
+  // Bigger finding: reviewer delegates to refactor before the impl agent(s) re-do the code.
+  edges.push(cond("reviewer", "refactor", "FAIL: a finding big enough to delegate to the refactor agent"));
+
+  if (impl.length === 1) {
+    edges.push(cond("reviewer", impl[0], "FAIL: a simple code fix found while testing"));
+    edges.push(cond("refactor", impl[0], "finding requires code changes"));
+    edges.push(cond(impl[0], "test", "fix applied; re-run the tests"));
+  } else {
+    for (const a of impl) edges.push(cond("reviewer", a, `FAIL: a simple ${a} code fix found while testing`));
+    for (const a of impl) edges.push(cond("refactor", a, `finding requires ${a} code changes`));
+    for (const a of impl) edges.push(cond(a, "test", `${a} fix applied; re-run the tests`));
+  }
+
+  return { name, nodes, edges };
+}
+
 // Returned on first install (no afk.json yet). Seeds the bundled agents as reusable
 // instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
 // canvas isn't empty. `implAgents` is the repo-detected implementation agent chain in the
@@ -292,10 +347,17 @@ function defaultV3Config(implAgents: string[]): AfkConfigV3 {
   return {
     version: 3,
     agents_available: agentsAvailable,
-    skills_available: [],
+    skills_available: ["use-design-check"],
     main_session_loaded_skills: [],
     workflow_instances: instances,
-    workflows: [buildWorkflow("default", "default", impl), buildWorkflow("tdd", "tdd", impl)],
+    workflows: [
+      buildWorkflow("default", "default", impl),
+      buildWorkflow("tdd", "tdd", impl),
+      linearWorkflow("Refactor", ["skill:use-design-check", "human_review-1", "refactor"]),
+      linearWorkflow("Documentation", ["scribe"]),
+      linearWorkflow("Review", ["reviewer"]),
+      buildTestsWorkflow("Tests", impl),
+    ],
     rules: [],
   };
 }
