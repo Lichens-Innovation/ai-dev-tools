@@ -42,24 +42,30 @@ function collect(cfg, sessionPath, agentType) {
   const session = readSession(sessionPath);
   const activeWorkflowName = session.workflow || null;
 
-  // Scope to the active workflow when it resolves; otherwise fall back to all
-  // workflows but warn loudly, because a union across workflows can inject the
-  // wrong skills (e.g. the orchestrator forgot to run afk-set-session-workflow.js first).
+  // Scope to the active workflow when it resolves. When no workflow is set yet —
+  // e.g. the user invoked an agent on the first prompt, before the orchestrator
+  // classified the request and ran afk-set-session-workflow.js — fall back to the
+  // default workflow (resolveWorkflowName → first configured workflow, i.e. "default")
+  // rather than unioning across every workflow, which can inject the wrong routes/skills.
+  // A genuinely broken active name (set but unknown) still unions + warns loudly.
   const activeMatches = activeWorkflowName ? workflows.filter((w) => w.name === activeWorkflowName) : [];
   let warning = null;
   let searchList;
   if (activeWorkflowName && activeMatches.length > 0) {
     searchList = activeMatches;
-  } else {
+  } else if (activeWorkflowName) {
     searchList = workflows;
-    if (activeWorkflowName) {
+    warning =
+      `The active workflow "${activeWorkflowName}" (from afk_session.json) matches no workflow in afk.json. ` +
+      `The skills below are unioned across all workflows and may be wrong — re-run afk-set-session-workflow.js with a valid workflow name.`;
+  } else {
+    const fallbackName = resolveWorkflowName(cfg);
+    const fallbackMatches = workflows.filter((w) => w.name === fallbackName);
+    searchList = fallbackMatches.length > 0 ? fallbackMatches : workflows;
+    if (workflows.length > 1) {
       warning =
-        `The active workflow "${activeWorkflowName}" (from afk_session.json) matches no workflow in afk.json. ` +
-        `The skills below are unioned across all workflows and may be wrong — re-run afk-set-session-workflow.js with a valid workflow name.`;
-    } else if (workflows.length > 1) {
-      warning =
-        `No active workflow is set (afk-set-session-workflow.js was not run) and this project has ${workflows.length} workflows. ` +
-        `The skills below are unioned across all of them and may be wrong — the orchestrator should set the active workflow before invoking subagents.`;
+        `No active workflow is set (afk-set-session-workflow.js was not run); falling back to the "${fallbackName}" workflow. ` +
+        `If you intended a different workflow, the orchestrator should set it before invoking subagents.`;
     }
   }
 
