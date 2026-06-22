@@ -104,7 +104,11 @@ async function discoverSkills(cwd: string): Promise<ProjectSkill[]> {
 export interface AfkInstanceV3 {
   name: string;
   agent: string;
-  skills: string[];
+  // Skills the SubagentStart hook auto-loads (Skill tool) before the agent starts working.
+  loaded_skills: string[];
+  // Skills surfaced to the agent as available — it loads one only if the task involves the
+  // logic that skill describes. Defaults are referenced; promote to loaded in the canvas.
+  referenced_skills: string[];
 }
 
 export interface AfkNodeV3 {
@@ -186,10 +190,10 @@ function blankV3Config(): AfkConfigV3 {
 
 // The non-implementation agents every seeded workflow shares.
 const CORE_INSTANCES: AfkInstanceV3[] = [
-  { name: "test", agent: "test", skills: [] },
-  { name: "reviewer", agent: "reviewer", skills: [] },
-  { name: "refactor", agent: "refactor", skills: [] },
-  { name: "scribe", agent: "scribe", skills: [] },
+  { name: "test", agent: "test", loaded_skills: [], referenced_skills: [] },
+  { name: "reviewer", agent: "reviewer", loaded_skills: [], referenced_skills: [] },
+  { name: "refactor", agent: "refactor", loaded_skills: [], referenced_skills: [] },
+  { name: "scribe", agent: "scribe", loaded_skills: [], referenced_skills: [] },
 ];
 
 const succ = (from: string, to: string): AfkEdgeV3 => ({
@@ -209,13 +213,29 @@ const cond = (from: string, to: string, label: string): AfkEdgeV3 => ({
   targetHandle: "top",
 });
 
-// Lay out a vertical column of nodes (x:0, y stepping by 140). `human_review-1` becomes
-// a human_review node; every other id becomes an agent node whose instance == its id.
-function columnNodes(ids: string[]): AfkNodeV3[] {
-  return ids.map((id, i): AfkNodeV3 => {
-    const position = { x: 0, y: 140 + i * 140 };
-    if (id === "human_review-1") return { id, type: "human_review", position };
-    return { id, type: "agent", instance: id, position };
+// Vertical rhythm for the seeded layout. A skill-less node gets BASE_STEP of room; each
+// attached skill chip wraps onto ~its own row in the canvas, so we add PER_SKILL_STEP per
+// skill to keep a tall (many-skill) node from overlapping the one below it.
+const BASE_STEP = 140;
+const PER_SKILL_STEP = 30;
+
+// Number of skills attached to a seeded instance — used only to size vertical spacing.
+type SkillCount = (instanceName: string) => number;
+
+// Lay out a vertical column of nodes at x:0, each node's y offset by the cumulative height
+// of the nodes above it (taller when an instance carries skills). `human_review-1` becomes a
+// human_review node; every other id becomes an agent node whose instance == its id.
+function columnNodes(ids: string[], skillCount: SkillCount = () => 0): AfkNodeV3[] {
+  let y = BASE_STEP;
+  return ids.map((id): AfkNodeV3 => {
+    const position = { x: 0, y };
+    const node: AfkNodeV3 =
+      id === "human_review-1"
+        ? { id, type: "human_review", position }
+        : { id, type: "agent", instance: id, position };
+    const skills = id === "human_review-1" ? 0 : skillCount(id);
+    y += BASE_STEP + skills * PER_SKILL_STEP;
+    return node;
   });
 }
 
@@ -225,15 +245,21 @@ function columnNodes(ids: string[]): AfkNodeV3[] {
 //     Reviewer/refactor code FAILs route to the impl agent(s); split per-agent when impl.length > 1.
 //   kind "tdd": tests first — main-session → test → human review → [impl] → reviewer → scribe.
 //     Code FAILs always route to @test (failures drive more tests), so impl never changes the conditions.
-function buildWorkflow(name: string, kind: "default" | "tdd", impl: string[]): AfkWorkflowV3 {
+function buildWorkflow(
+  name: string,
+  kind: "default" | "tdd",
+  impl: string[],
+  skillCount: SkillCount = () => 0
+): AfkWorkflowV3 {
   const column =
     kind === "tdd"
       ? ["test", "human_review-1", ...impl, "reviewer", "scribe"]
       : [...impl, "human_review-1", "test", "reviewer", "scribe"];
-  const reviewerIdx = column.indexOf("reviewer");
+  const colNodes = columnNodes(column, skillCount);
+  const reviewerY = colNodes.find((n) => n.id === "reviewer")?.position?.y ?? BASE_STEP;
   const nodes: AfkNodeV3[] = [
-    ...columnNodes(column),
-    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: 140 + reviewerIdx * 140 } },
+    ...colNodes,
+    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: reviewerY } },
   ];
 
   // Success chain: main-session through the whole happy-path column.
@@ -281,15 +307,23 @@ function buildWorkflow(name: string, kind: "default" | "tdd", impl: string[]): A
 // Build a simple linear happy-path workflow: main-session → each step in order, success edges only.
 // Step ids: "human_review-1" → human_review node; "skill:<id>" → skill node (run inline by the
 // orchestrator); anything else → an agent node whose instance == the id.
-function linearWorkflow(name: string, steps: string[]): AfkWorkflowV3 {
-  const nodes: AfkNodeV3[] = steps.map((step, i): AfkNodeV3 => {
-    const position = { x: 0, y: 140 + i * 140 };
-    if (step === "human_review-1") return { id: step, type: "human_review", position };
-    if (step.startsWith("skill:")) {
+function linearWorkflow(name: string, steps: string[], skillCount: SkillCount = () => 0): AfkWorkflowV3 {
+  let y = BASE_STEP;
+  const nodes: AfkNodeV3[] = steps.map((step): AfkNodeV3 => {
+    const position = { x: 0, y };
+    let node: AfkNodeV3;
+    let skills = 0;
+    if (step === "human_review-1") {
+      node = { id: step, type: "human_review", position };
+    } else if (step.startsWith("skill:")) {
       const skill = step.slice("skill:".length);
-      return { id: skill, type: "skill", skill, position };
+      node = { id: skill, type: "skill", skill, position };
+    } else {
+      node = { id: step, type: "agent", instance: step, position };
+      skills = skillCount(step);
     }
-    return { id: step, type: "agent", instance: step, position };
+    y += BASE_STEP + skills * PER_SKILL_STEP;
+    return node;
   });
   const seq = ["main-session", ...nodes.map((n) => n.id)];
   const edges: AfkEdgeV3[] = [];
@@ -302,16 +336,21 @@ function linearWorkflow(name: string, steps: string[]): AfkWorkflowV3 {
 //   • simple fix: @reviewer → @<impl> directly;
 //   • bigger finding: @reviewer → @refactor → @<impl> (delegate the refactor before re-testing).
 // Splits per-agent when impl.length > 1 (fullstack).
-function buildTestsWorkflow(name: string, impl: string[]): AfkWorkflowV3 {
+function buildTestsWorkflow(name: string, impl: string[], skillCount: SkillCount = () => 0): AfkWorkflowV3 {
   const column = ["test", "reviewer", "scribe"];
-  const reviewerIdx = column.indexOf("reviewer");
-  const nodes: AfkNodeV3[] = [
-    ...columnNodes(column),
-    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: 140 + reviewerIdx * 140 } },
-    ...impl.map(
-      (a, i): AfkNodeV3 => ({ id: a, type: "agent", instance: a, position: { x: 720, y: 140 + (reviewerIdx + i) * 140 } })
-    ),
+  const colNodes = columnNodes(column, skillCount);
+  const reviewerY = colNodes.find((n) => n.id === "reviewer")?.position?.y ?? BASE_STEP;
+  // Side column: refactor on the reviewer's row, then the impl agent(s) stacked below it,
+  // each offset by its own skill height so a tall impl node doesn't overlap the next.
+  const sideNodes: AfkNodeV3[] = [
+    { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: reviewerY } },
   ];
+  let implY = reviewerY;
+  for (const a of impl) {
+    sideNodes.push({ id: a, type: "agent", instance: a, position: { x: 720, y: implY } });
+    implY += BASE_STEP + skillCount(a) * PER_SKILL_STEP;
+  }
+  const nodes: AfkNodeV3[] = [...colNodes, ...sideNodes];
 
   const seq = ["main-session", ...column];
   const edges: AfkEdgeV3[] = [];
@@ -347,13 +386,18 @@ function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConf
   const impl = implAgents.length > 0 ? implAgents : ["backend"];
   // Defensive: only attach skills to instances that actually exist in this seed.
   const skillsFor = (agent: string): string[] => Array.from(new Set(skillMap[agent] ?? [])).filter(Boolean);
+  // Install-time discovered skills seed as referenced (the default mode); promote in the canvas.
   const instances: AfkInstanceV3[] = [
-    ...impl.map((a) => ({ name: a, agent: a, skills: skillsFor(a) })),
-    ...CORE_INSTANCES.map((i) => ({ ...i, skills: skillsFor(i.name) })),
+    ...impl.map((a) => ({ name: a, agent: a, loaded_skills: [], referenced_skills: skillsFor(a) })),
+    ...CORE_INSTANCES.map((i) => ({ ...i, referenced_skills: skillsFor(i.name) })),
   ];
   const agentsAvailable = Array.from(new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
   // skills_available = the always-present gate skill + every skill assigned to an instance.
-  const skillsAvailable = Array.from(new Set(["use-design-check", ...instances.flatMap((i) => i.skills)]));
+  const skillsAvailable = Array.from(
+    new Set(["use-design-check", ...instances.flatMap((i) => [...i.loaded_skills, ...i.referenced_skills])])
+  );
+  // Vertical spacing in the seeded layout grows with each instance's skill count.
+  const skillCount: SkillCount = (name) => skillsFor(name).length;
   return {
     version: 3,
     agents_available: agentsAvailable,
@@ -361,12 +405,12 @@ function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConf
     main_session_loaded_skills: [],
     workflow_instances: instances,
     workflows: [
-      buildWorkflow("default", "default", impl),
-      buildWorkflow("tdd", "tdd", impl),
-      linearWorkflow("Refactor", ["skill:use-design-check", "human_review-1", "refactor"]),
-      linearWorkflow("Documentation", ["scribe"]),
-      linearWorkflow("Review", ["reviewer"]),
-      buildTestsWorkflow("Tests", impl),
+      buildWorkflow("default", "default", impl, skillCount),
+      buildWorkflow("tdd", "tdd", impl, skillCount),
+      linearWorkflow("Refactor", ["skill:use-design-check", "human_review-1", "refactor"], skillCount),
+      linearWorkflow("Documentation", ["scribe"], skillCount),
+      linearWorkflow("Review", ["reviewer"], skillCount),
+      buildTestsWorkflow("Tests", impl, skillCount),
     ],
     rules: [],
   };

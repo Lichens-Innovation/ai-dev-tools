@@ -1,16 +1,16 @@
 import type { AfkInstanceV3 } from "../utils/agents-framework-kickstarter";
-import SkillChecklist from "./skill-checklist";
+import InstanceSkillPicker, { emptySelection, type SkillSelection } from "./instance-skill-picker";
 
 export interface InstancePickerValue {
   mode: "reuse" | "create";
   reuseInstanceName: string;
   newAgent: string;
   newName: string;
-  newSkills: string[];
+  newSkills: SkillSelection;
 }
 
 export function blankInstancePicker(defaultAgent = ""): InstancePickerValue {
-  return { mode: "reuse", reuseInstanceName: "", newAgent: defaultAgent, newName: "", newSkills: [] };
+  return { mode: "reuse", reuseInstanceName: "", newAgent: defaultAgent, newName: "", newSkills: emptySelection() };
 }
 
 // Resolve the picker into an instance to place. Returns null when the selection
@@ -29,7 +29,12 @@ export function resolveInstanceFromPicker(
   if (!name) return null;
   if (opts.instances.some((i) => i.name === name)) return null; // name already used
   return {
-    instance: { name, agent: v.newAgent || opts.availableAgents[0] || "agent", skills: v.newSkills },
+    instance: {
+      name,
+      agent: v.newAgent || opts.availableAgents[0] || "agent",
+      loaded_skills: v.newSkills.loaded,
+      referenced_skills: v.newSkills.referenced,
+    },
     isNew: true,
   };
 }
@@ -128,7 +133,11 @@ export default function InstancePicker({
               An instance named “{trimmedName}” already exists. Pick a different name or reuse it instead.
             </p>
           )}
-          <SkillChecklist skills={availableSkills} value={value.newSkills} onChange={(newSkills) => set({ newSkills })} />
+          <InstanceSkillPicker
+            skills={availableSkills}
+            value={value.newSkills}
+            onChange={(newSkills) => set({ newSkills })}
+          />
         </>
       )}
     </div>

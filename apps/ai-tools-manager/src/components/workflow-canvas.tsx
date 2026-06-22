@@ -6,6 +6,7 @@ import InstancePicker, {
   type InstancePickerValue,
 } from "./instance-picker";
 import SkillChecklist from "./skill-checklist";
+import InstanceSkillPicker, { emptySelection, type SkillSelection } from "./instance-skill-picker";
 
 // Static import — rendering is gated by `mounted` to avoid SSR issues.
 import {
@@ -48,16 +49,24 @@ interface WorkflowCanvasProps {
 
 // ── Dagre layout ────────────────────────────────────────────────────
 
+// Estimated rendered height of a node, so dagre spaces skill-heavy agent nodes apart
+// instead of overlapping them. Each skill chip wraps onto ~its own row (~30px).
+function dagreNodeHeight(n: Node): number {
+  const inst = n.data?.instanceData as AfkInstanceV3 | undefined;
+  const skills = (inst?.loaded_skills?.length ?? 0) + (inst?.referenced_skills?.length ?? 0);
+  return 60 + skills * 30;
+}
+
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir: "TB", ranksep: 80, nodesep: 60 });
   g.setDefaultEdgeLabel(() => ({}));
-  for (const n of nodes) g.setNode(n.id, { width: 180, height: 60 });
+  for (const n of nodes) g.setNode(n.id, { width: 180, height: dagreNodeHeight(n) });
   for (const e of edges) g.setEdge(e.source, e.target);
   dagre.layout(g);
   return nodes.map((n) => {
     const pos = g.node(n.id);
-    return { ...n, position: { x: pos.x - 90, y: pos.y - 30 } };
+    return { ...n, position: { x: pos.x - 90, y: pos.y - dagreNodeHeight(n) / 2 } };
   });
 }
 
@@ -381,11 +390,20 @@ function AgentNodeComponent({
               )}
             </div>
           </div>
-          {/* Skill chips from instance */}
-          {inst && inst.skills.length > 0 && (
+          {/* Skill chips from instance: loaded (solid) auto-load at start; referenced (dashed) are available on demand. */}
+          {inst && inst.loaded_skills.length + inst.referenced_skills.length > 0 && (
             <div className="px-2.5 pb-2 flex flex-wrap gap-1">
-              {inst.skills.map((s) => (
+              {inst.loaded_skills.map((s) => (
                 <span key={s} className={`px-1.5 py-0.5 rounded-full border text-[10px] font-mono ${chipClass}`}>
+                  {s}
+                </span>
+              ))}
+              {inst.referenced_skills.map((s) => (
+                <span
+                  key={s}
+                  title="Referenced — loaded only if the task needs it"
+                  className={`px-1.5 py-0.5 rounded-full border border-dashed text-[10px] font-mono opacity-70 ${chipClass}`}
+                >
                   {s}
                 </span>
               ))}
@@ -664,7 +682,7 @@ export default function WorkflowCanvas({
   // Edit instance modal
   const [editInstanceName, setEditInstanceName] = useState<string | null>(null);
   const [editInstanceAgent, setEditInstanceAgent] = useState("");
-  const [editInstanceSkills, setEditInstanceSkills] = useState<string[]>([]);
+  const [editInstanceSkills, setEditInstanceSkills] = useState<SkillSelection>(emptySelection());
 
   // Edit condition-edge label modal
   const [editLabelEdgeId, setEditLabelEdgeId] = useState<string | null>(null);
@@ -786,7 +804,7 @@ export default function WorkflowCanvas({
       if (!inst) return;
       setEditInstanceName(instanceName);
       setEditInstanceAgent(inst.agent);
-      setEditInstanceSkills(inst.skills);
+      setEditInstanceSkills({ loaded: inst.loaded_skills, referenced: inst.referenced_skills });
     },
     [instances]
   );
@@ -795,7 +813,14 @@ export default function WorkflowCanvas({
     if (!editInstanceName) return;
     onInstancesChange(
       instances.map((i) =>
-        i.name === editInstanceName ? { ...i, agent: editInstanceAgent, skills: editInstanceSkills } : i
+        i.name === editInstanceName
+          ? {
+              ...i,
+              agent: editInstanceAgent,
+              loaded_skills: editInstanceSkills.loaded,
+              referenced_skills: editInstanceSkills.referenced,
+            }
+          : i
       )
     );
     setEditInstanceName(null);
@@ -1421,7 +1446,7 @@ export default function WorkflowCanvas({
               </select>
             </div>
 
-            <SkillChecklist
+            <InstanceSkillPicker
               skills={availableSkills}
               value={editInstanceSkills}
               onChange={setEditInstanceSkills}

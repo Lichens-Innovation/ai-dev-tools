@@ -17,6 +17,7 @@ import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as AgentsFrameworkKickstarterRouteImport } from './routes/agents-framework-kickstarter'
+import { Route as AfkTasksRouteImport } from './routes/afk-tasks'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSessionLogStreamRouteImport } from './routes/api/session-log-stream'
 
@@ -61,6 +62,11 @@ const AgentsFrameworkKickstarterRoute =
     path: '/agents-framework-kickstarter',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AfkTasksRoute = AfkTasksRouteImport.update({
+  id: '/afk-tasks',
+  path: '/afk-tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -74,6 +80,7 @@ const ApiSessionLogStreamRoute = ApiSessionLogStreamRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/afk-tasks': typeof AfkTasksRoute
   '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/afk-tasks': typeof AfkTasksRoute
   '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
@@ -99,6 +107,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/afk-tasks': typeof AfkTasksRoute
   '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/afk-tasks'
     | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/afk-tasks'
     | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/afk-tasks'
     | '/agents-framework-kickstarter'
     | '/create-marketplace'
     | '/create-plugin'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AfkTasksRoute: typeof AfkTasksRoute
   AgentsFrameworkKickstarterRoute: typeof AgentsFrameworkKickstarterRoute
   CreateMarketplaceRoute: typeof CreateMarketplaceRoute
   CreatePluginRoute: typeof CreatePluginRoute
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsFrameworkKickstarterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/afk-tasks': {
+      id: '/afk-tasks'
+      path: '/afk-tasks'
+      fullPath: '/afk-tasks'
+      preLoaderRoute: typeof AfkTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AfkTasksRoute: AfkTasksRoute,
   AgentsFrameworkKickstarterRoute: AgentsFrameworkKickstarterRoute,
   CreateMarketplaceRoute: CreateMarketplaceRoute,
   CreatePluginRoute: CreatePluginRoute,

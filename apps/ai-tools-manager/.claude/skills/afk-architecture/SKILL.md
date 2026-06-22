@@ -22,9 +22,10 @@ The setup is split across two skills that meet at `afk.json`: **`/afk-install`**
 ```
 User runs /afk-install
         │  Step 1: analyze repo → implementation agent(s)
-        │  Step 2 (fresh install only): scan .claude/skills/ → best-fit map each project skill to a
-        │          seeded agent (impl + test/reviewer/refactor/scribe) → per-agent AskUserQuestion
-        │          checklist → skill map {agent: [skillId]}  (empty / skipped on re-install)
+        │  Step 2 (fresh install only): scan .claude/skills/ (skill id = dir name; frontmatter
+        │          optional) → best-fit map each project skill to a seeded agent (impl +
+        │          test/reviewer/refactor/scribe) → single AskUserQuestion consent prompt →
+        │          skill map {agent: [skillId]}  (empty / skipped on re-install)
         ▼
 afk-install.js   (scaffold-only, idempotent)
   1. templates/afk.md            → .claude/agents/afk.md         (only if absent — edits preserved)
@@ -37,7 +38,7 @@ afk-install.js   (scaffold-only, idempotent)
 /afk skill   (also the standalone re-edit entry point — guards on afk.md existing, else points to /afk-install)
         │  launch-ai-tools-manager-app.sh (AFK_IMPL_AGENTS + AFK_SKILL_MAP) → Docker app → user edits canvas
         │  └─ on a fresh install (no afk.json) defaultV3Config seeds the workflows from AFK_IMPL_AGENTS
-        │     and attaches AFK_SKILL_MAP's skills to the matching seeded instances' skills[]
+        │     and attaches AFK_SKILL_MAP's skills to the matching seeded instances' referenced_skills[] (default mode)
         ▼
 App (submitAfkConfig) writes .claude/afk.json + afk.yaml, and a result file
         │  result = "AFK v3 config data: {JSON}" + verbatim afk.yaml
@@ -69,7 +70,7 @@ Orchestrator (.claude/agents/afk.md):
         ▼ (each Task → subagent)
 SubagentStart hook  (matcher ".*")  → afk-inject-agent-context.js
   • reads active workflow from afk_session.json + the instance from afk.json
-  • injects additionalContext: the instance's skills + condition-edge labels
+  • injects additionalContext: the instance's loaded_skills (auto-load first) + referenced_skills (load only if relevant) + condition-edge labels
   • condition edges → tells the subagent to end with a `HANDOFF: <label>` / `HANDOFF: success` line
   • if the active workflow can't be resolved → prepends a ⚠️ warning (skills may be unioned/wrong)
         │
@@ -102,7 +103,7 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 
 | Event | Matcher | Script | Effect |
 |---|---|---|---|
-| `SubagentStart` | `.*` | `afk-inject-agent-context.js` | Inject the matched instance's skills, its `HANDOFF:` routing lines (success + condition labels), and the per-route `handoff_details` payload protocol (from `templates/handoffs/<sender>/<receiver>.md`). No-op when the agent maps to no instance, so a broad matcher safely covers custom agents too. |
+| `SubagentStart` | `.*` | `afk-inject-agent-context.js` | Inject the matched instance's skills (two blocks: `loaded_skills` to auto-load + `referenced_skills` to load only if relevant), its `HANDOFF:` routing lines (success + condition labels), and the per-route `handoff_details` payload protocol (from `templates/handoffs/<sender>/<receiver>.md`). No-op when the agent maps to no instance, so a broad matcher safely covers custom agents too. |
 | `SubagentStart` | `.*` | `afk-subagent-log.js` | Append a `kind:"dispatch"` entry to `afk_session.log.jsonl`: the subagent's `agent_type`, `agent_id`, and the full spawning message (`input`). Runs alongside `afk-inject-agent-context.js`; order irrelevant. No-op when `afk.json` is absent. |
 | `SubagentStop` | `.*` | `afk-subagent-log.js` | Append a `kind:"handoff"` entry: parses the subagent's `HANDOFF:` label from `last_assistant_message` → `status` (`"success"` / `"condition"` / `"unknown"`), stores the full final message as `output`. Correlated to the dispatch entry by `agent_id`. No-op when `afk.json` is absent. |
 | `PreToolUse` | `.*` | `afk-session-log.js` | Append a tool-call line to `afk_session.log.jsonl`. No-op when `afk.json` is absent. |
@@ -114,7 +115,7 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 ## The HANDOFF contract
 
 The subagent has no static knowledge of its handoffs — the `SubagentStart` hook injects, per its active-workflow instance:
-1. **Skills** to load (`Skill` tool) before working.
+1. **Skills**, in two kinds. `loaded_skills` are auto-loaded (`Skill` tool) before working — the imperative "load each one first" block. `referenced_skills` are surfaced as *available*: the agent loads one only if the task involves the logic that skill describes (it reads each skill's description to decide), otherwise ignores it. A skill that is `loaded` for any matched instance is dropped from the referenced list (loaded wins).
 2. **Routing lines** — the `HANDOFF:` labels this node may emit: `success` (when a success edge leaves the node, resolved *through* non-agent nodes like `human review` to the next agent) plus each labeled `condition` edge. Unlabeled condition edges are skipped — they aren't routable.
 3. An instruction to **end its final message with exactly one `HANDOFF: <label>`** (`success`, or the exact condition label).
 4. **The `handoff_details` payload protocol per route** — the JSON shape the receiving agent expects, read from `templates/handoffs/<sender>/<receiver>.md` (dir names = agent `name`; project-local `.claude/handoffs/<sender>/<receiver>.md` overrides the bundled copy). These live **outside** the `agents/` tree on purpose (see Things that bite). This is the whole communication layer: agent files no longer carry their own handoff shapes. A route with no matching template just gets the routing line, no payload.

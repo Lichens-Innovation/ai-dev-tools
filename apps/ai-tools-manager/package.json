@@ -22,6 +22,8 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.76.0",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
     "tailwindcss": "4.1.18",
     "yaml": "^2.6.1",
     "zod": "4.3.6"

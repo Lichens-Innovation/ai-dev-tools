@@ -68,7 +68,7 @@ submitAfkConfig({ sliceType: "workflows", slice })
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | Route, left pane, save, workflow CRUD                                    | `src/routes/workflows.tsx`                                                 |
 | The canvas (React Flow nodes/edges, all interactions)                    | `src/components/workflow-canvas.tsx`                                       |
-| Reuse/create instance picker + skill checklist (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/skill-checklist.tsx` |
+| Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/instance-skill-picker.tsx` (loaded/referenced toggle), `src/components/skill-checklist.tsx` (plain list, main-session only) |
 | Top bar — nav links, workflow selector, preview toggle                   | `src/components/top-nav.tsx`                                               |
 | Live afk.yaml render (read-only)                                         | `src/components/afk-yaml-preview.tsx`                                      |
 | The single afk.yaml serializer (`yaml` package)                          | `src/utils/afk-yaml.ts`                                                    |
@@ -93,7 +93,7 @@ AfkConfigV3 {
   rules: AfkRuleV3[]                           // NOT edited here — owned by /rules
 }
 
-AfkInstanceV3 { name, agent, skills: string[] }            // referenced by name from agent nodes
+AfkInstanceV3 { name, agent, loaded_skills: string[], referenced_skills: string[] }   // referenced by name from agent nodes; loaded = auto-load at start, referenced = load only if relevant
 AfkWorkflowV3 { name, nodes: AfkNodeV3[], edges: AfkEdgeV3[] }   // success_path is DERIVED, never stored
 AfkNodeV3     { id, type: "agent"|"human_review"|"skill", instance?, skill?, position? }
 AfkEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, targetHandle? }
@@ -101,7 +101,7 @@ AfkEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, ta
 
 Key points:
 
-- **Instances carry the agent + skills, nodes just reference them.** An agent node's `instance` field (and its `id`, which equals the instance name) points at a `workflow_instances` entry. Skills are stored once per instance, not per node — so the same instance reused across workflows shares one skill list. Editing an instance updates every placement.
+- **Instances carry the agent + skills, nodes just reference them.** An agent node's `instance` field (and its `id`, which equals the instance name) points at a `workflow_instances` entry. Skills are stored once per instance, not per node — so the same instance reused across workflows shares one skill list. Editing an instance updates every placement. Each instance keeps two skill lists: `loaded_skills` (auto-loaded by the `SubagentStart` hook before the agent works) and `referenced_skills` (surfaced as available; the agent loads one only if the task needs it). The canvas chips render loaded skills solid and referenced skills dashed/muted.
 - **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToAfkNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToAfkEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete. Main-session's skills live in `config.main_session_loaded_skills`, not on a node.
 - **`success_path` is derived, never stored.** `computeSuccessPath` walks the success edges from `main-session`; `afkConfigToYaml` renders it into afk.yaml for humans, but it is absent from `afk.json`.
 
@@ -141,13 +141,13 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
 ### Interactions
 
 - **Add Agent** (bottom Panel bar) — walks the success path from `main-session` to the terminal node (`findSuccessTerminalId`), then opens the Add step modal anchored at the terminal so the new step extends the path.
-- **Add step** (bottom `+` on every node) — every node has a bottom-center `+` button that calls `openAddStep(nodeId)`. This opens the **Add step modal**: a segmented **Agent / Human Review** picker. For Agent it renders the shared `InstancePicker` (`src/components/instance-picker.tsx`) — a **Reuse instance / New instance** toggle. Reuse lists unplaced instances; New takes a subagent + instance name + a `SkillChecklist`. Human Review needs no extra input. Confirming calls `confirmAddStep()` → `resolveInstanceFromPicker` to get/create the instance, places the node at `y + 160` below the source, and adds a `success` edge `source.bottom → new.top`. State: `addStepSourceId`, `addStepType`, `addStepPicker`; reset by `resetAddStep()`.
+- **Add step** (bottom `+` on every node) — every node has a bottom-center `+` button that calls `openAddStep(nodeId)`. This opens the **Add step modal**: a segmented **Agent / Human Review** picker. For Agent it renders the shared `InstancePicker` (`src/components/instance-picker.tsx`) — a **Reuse instance / New instance** toggle. Reuse lists unplaced instances; New takes a subagent + instance name + an `InstanceSkillPicker` (check to select a skill — referenced by default — then a per-row Loaded/Ref toggle). Human Review needs no extra input. Confirming calls `confirmAddStep()` → `resolveInstanceFromPicker` to get/create the instance, places the node at `y + 160` below the source, and adds a `success` edge `source.bottom → new.top`. State: `addStepSourceId`, `addStepType`, `addStepPicker`; reset by `resetAddStep()`.
 - **Add condition** — two entry points, both opening the condition modal:
   1. Bottom-bar "Add condition" enters `__picking__` mode (crosshair cursor, source `+` buttons pulse); click a node to pick the source.
   2. A node's own left/right `+` button opens the modal for that node directly.
      The modal takes a label and a target — an existing node, or (via the same `InstancePicker`) a reused/new instance to seed a node. Confirm creates a `condition` edge from the source's `right` handle → target `top`.
 - **Edit condition label** — every condition edge renders an inline `✎` button beside its label (threaded in via `enrichedEdges`, which injects `onEditLabel` into each `conditionEdge`'s `data`). Clicking opens the edit-label modal (`openEditLabel` → `confirmEditLabel`, state `editLabelEdgeId`/`editLabelValue`); Enter saves, Esc cancels. Saving keeps `e.label` and `data.afkEdge.label` in sync — `rfEdgesToAfkEdges` reads `e.label` first but falls back to `afk.label`, so both must be set, and an emptied label clears both (reverting to the `no label` placeholder).
-- **Attach skills per instance** — agent node `⋮` → Edit instance opens a modal with a subagent `<select>` and a `SkillChecklist` (drawn from `availableSkills`). Saving rewrites that `workflow_instances` entry via `onInstancesChange`, so all placements update. The main-session node's `⋮` → Add Skill edits `main_session_loaded_skills` via the same `SkillChecklist`.
+- **Attach skills per instance** — agent node `⋮` → Edit instance opens a modal with a subagent `<select>` and an `InstanceSkillPicker` (drawn from `availableSkills`): check a skill to attach it (referenced by default), then flip its per-row Loaded/Ref toggle. Saving rewrites that `workflow_instances` entry's `loaded_skills` / `referenced_skills` via `onInstancesChange`, so all placements update. The main-session node's `⋮` → Add Skill edits `main_session_loaded_skills` via a plain `SkillChecklist` (those are always loaded — no toggle).
 - **Edit instance** — agent node `⋮` → Edit instance (see above) is how you change an instance's agent or skills; the node id stays the instance name.
 - **Single success edge per node** — `replaceSuccessEdgeFrom` strips any existing outgoing success edge before adding a new one (in `onConnect` and `confirmAddStep`), enforcing one success successor per node.
 - **Instance placed once per workflow** — `placedInstanceNames` (memoised from the canvas) gates the reuse list and `resolveInstanceFromPicker`, so an instance can't appear twice in the same diagram.

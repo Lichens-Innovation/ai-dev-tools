@@ -28,6 +28,7 @@ The reason marketplace data is pre-computed on the host: local marketplace `inst
 - `/workflows` — Visual agent-workflow editor (React Flow canvas). Writes the workflow slice of `.claude/afk.json` (v3). See the `workflow-view` skill in `.claude/skills/`.
 - `/rules` — Assign rules (on-disk project rules + installable vibe-rules) to the project root and/or directory paths. Writes the `rules` slice of the same `afk.json`; on save the skill runs `afk-apply-rules.js` to move project rule files / `vibe-rules load` installable ones into their assigned `.claude/rules/`. See the `rule-view` skill.
 - `/session-log` — Read-only view of `<cwd>/.claude/afk_session.log.jsonl`. Left pane: vertical card diagram (one card per instance occurrence, with SUCCESS/FAILURE badge). Right pane: humanized log text. Clicking a card scrolls the log to that instance's section. Hover a subagent card to see the full input/output messages for debugging. Refreshes on demand (the file is ephemeral — cleared at SessionEnd).
+- `/afk-tasks` — Read-only list of the task prompt files `/to-afk-tasks` writes under `<cwd>/.claude/afk-tasks/*.md`. Left pane: one selectable card per task (filename, title, `Blocked by` badges). Right pane: the task markdown rendered via `react-markdown` + `remark-gfm` inside `prose prose-neutral` (the typography plugin + token-themed `.prose` from the shared `@repo/tailwind-config`, same as help-server's doc reader), with a `CopyableText` "Copy prompt" button (`@repo/ui/copyable-text`) that copies `Do the task described in file <relativePath>` to paste into an `agent: afk` session.
 
 ## Form architecture
 
@@ -103,7 +104,7 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/routes/workflows.tsx` — `/workflows` route: left agents/skills pane, save, workflow CRUD
 - `src/routes/rules.tsx` — `/rules` route: assign rules to project root / directory paths
 - `src/components/workflow-canvas.tsx` — the React Flow (`@xyflow/react`) canvas: nodes, edges, all graph interactions
-- `src/components/instance-picker.tsx` / `src/components/skill-checklist.tsx` — reuse/create instance picker and skill checkbox list shared by the canvas modals
+- `src/components/instance-picker.tsx` / `src/components/instance-skill-picker.tsx` / `src/components/skill-checklist.tsx` — reuse/create instance picker; the per-instance skill picker with a Loaded/Referenced toggle (default referenced); and the plain skill checkbox list (main-session skills only) shared by the canvas modals
 - `src/components/top-nav.tsx` — top bar: Workflows/Rules nav, workflow selector, YAML preview toggle
 - `src/components/afk-yaml-preview.tsx` — read-only `afk.yaml`, rendered via `afkConfigToYaml` from `AfkConfigV3`
 - `src/components/rule-tree.tsx` / `src/components/chip-multi-select.tsx` — `/rules` directory tree (per-path rule chips + add picker) and the left-pane rule selector
@@ -136,3 +137,8 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/utils/session-log-context.tsx` — `SessionLogProvider` (mounted in `__root.tsx`): one app-wide `EventSource`, exposes `{ entries, connected }` via `useSessionLog()`
 - `src/utils/afk-session-log.ts` — `getAfkSessionLog` server fn + `resolveLogFile` + `parseLogLines` helpers (shared by server fn and SSE route)
 - `src/utils/session-log.ts` — pure client-safe helpers: `buildInstances` (segments entries by origin change, correlates input/output via agent_id), `humanizeLog` (tool name → readable verb)
+
+### AFK Tasks (`/afk-tasks`)
+
+- `src/routes/afk-tasks.tsx` — route: loader calls `getAfkTasks`, two-pane list/reader layout, renders the selected task with `react-markdown`, copy-prompt button via `@repo/ui/copyable-text`
+- `src/utils/afk-tasks.ts` — `getAfkTasks` server fn: lists/sorts `<cwd>/.claude/afk-tasks/*.md`, parses each file's title (first `# ` heading) and `Blocked by` sibling references, returns `{ filename, relativePath, title, blockedBy, content }[]`
