@@ -18,7 +18,8 @@ export function afkConfigToYaml(config: AfkConfigV3): string {
     workflow_instances: config.workflow_instances.map((i) => ({
       name: i.name,
       agent: i.agent,
-      skills: i.skills,
+      loaded_skills: i.loaded_skills,
+      referenced_skills: i.referenced_skills,
     })),
     workflows: config.workflows.map((w) => {
       const successPath = computeSuccessPath(w, config.workflow_instances);

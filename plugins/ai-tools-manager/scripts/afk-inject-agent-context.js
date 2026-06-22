@@ -2,7 +2,8 @@
 // SubagentStart hook for worker subagents.
 // Reads <cwd>/.claude/afk.json (v3), looks up the invoked agent type's instance
 // in the active workflow, and emits as additionalContext:
-//   1. the instance's configured skills,
+//   1a. loaded_skills     — skills to load (Skill tool) before working,
+//   1b. referenced_skills — skills available, loaded only if the task needs them,
 //   2. the HANDOFF routing lines this agent may emit (success + condition labels),
 //   3. the per-route handoff_details payload protocol (from the
 //      templates/handoffs/<sender>/<target>.md template) so the whole
@@ -71,7 +72,9 @@ function collect(cfg, sessionPath, agentType) {
 
   const instByName = (name) => instances.find((i) => i.name === name);
 
-  const skillSet = new Set();
+  // loaded = auto-load before working; referenced = available, load only if the task needs it.
+  const loadedSet = new Set();
+  const referencedSet = new Set();
   const matchedInstances = [];
   // routeKey ("success" | condition label) -> target agent name (may be null)
   const routes = new Map();
@@ -98,7 +101,8 @@ function collect(cfg, sessionPath, agentType) {
       const inst = instByName(node.instance);
       if (!inst || inst.agent !== agentType) continue;
       matchedInstances.push(node.instance);
-      for (const s of inst.skills || []) skillSet.add(s);
+      for (const s of inst.loaded_skills || []) loadedSet.add(s);
+      for (const s of inst.referenced_skills || []) referencedSet.add(s);
       for (const edge of wf.edges || []) {
         if (edge.from !== node.id) continue;
         if (edge.kind === "success") {
@@ -127,8 +131,13 @@ function collect(cfg, sessionPath, agentType) {
     // Don't fail the hook on session write errors.
   }
 
+  // A skill auto-loaded by one instance shouldn't also be listed as merely "available"
+  // (loaded wins) when the same agent has multiple instances in the workflow.
+  for (const s of loadedSet) referencedSet.delete(s);
+
   return {
-    skills: Array.from(skillSet),
+    loadedSkills: Array.from(loadedSet),
+    referencedSkills: Array.from(referencedSet),
     routes: Array.from(routes, ([label, target]) => ({ label, target })),
     warning,
   };
@@ -158,10 +167,18 @@ function collect(cfg, sessionPath, agentType) {
   if (result.warning) {
     parts.push(`⚠️ AFK warning: ${result.warning}`);
   }
-  if (result.skills.length > 0) {
+  if (result.loadedSkills.length > 0) {
     parts.push(
-      `Skills configured for the \`${agentType}\` agent instance in this project's afk.yaml (v3): ${result.skills.join(", ")}.\n\n` +
+      `Skills to load for the \`${agentType}\` agent instance (afk.yaml v3, loaded_skills): ${result.loadedSkills.join(", ")}.\n\n` +
         `Load each one with the Skill tool before starting your work, then follow your agent file as written.`
+    );
+  }
+
+  if (result.referencedSkills.length > 0) {
+    parts.push(
+      `Skills available to the \`${agentType}\` agent instance (afk.yaml v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
+        `Do NOT load these up front. Load one with the Skill tool only if the task at hand involves the logic that ` +
+        `skill describes (check each skill's description to decide); otherwise ignore it.`
     );
   }
 

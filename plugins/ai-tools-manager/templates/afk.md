@@ -50,7 +50,7 @@ The success path mixes three kinds of step:
 - `/<skill>` — a **skill step**: run that skill **yourself, inline, in your own context** via the `Skill` tool (just as you ran the gate skills in Steps 2–3). Do **not** dispatch a subagent for it. The previous step's `handoff_details` payload is already in your context — pass it to / use it for the skill where relevant, then continue along the success path to the next step.
 - `human review` — a hard stop: surface the work to the user (see Principles).
 
-For each agent step, use `Task` to invoke the corresponding subagent. The `SubagentStart` hook will automatically inject that instance's skills, its `HANDOFF:` routing options, and the `handoff_details` payload shape for each route at the start of each invocation.
+For each agent step, use `Task` to invoke the corresponding subagent. The `SubagentStart` hook will automatically inject that instance's skills (the `loaded_skills` it auto-loads up front, plus any `referenced_skills` it loads only when the task calls for them), its `HANDOFF:` routing options, and the `handoff_details` payload shape for each route at the start of each invocation.
 
 Each subagent ends its final message with a `HANDOFF:` line. Read it to decide routing:
 - `HANDOFF: success` → continue along the workflow's success path to the next node.

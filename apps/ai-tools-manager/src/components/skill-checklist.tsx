@@ -1,5 +1,6 @@
-// Scrollable checkbox list of skill ids. Shared by the workflow-canvas modals
-// (add-step, condition, edit-instance) to attach skills to an instance.
+// Scrollable checkbox list of skill ids. Used by the main-session skill modal, where
+// every selected skill is simply loaded (no loaded/referenced distinction). Instances
+// use InstanceSkillPicker instead, which adds the per-skill Loaded/Referenced toggle.
 export default function SkillChecklist({
   skills,
   value,

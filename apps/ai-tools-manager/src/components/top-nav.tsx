@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, ScrollText, Plus, X, Pencil, Check, ChevronDown, Trash2 } from "lucide-react";
+import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSessionLog } from "../utils/session-log-context";
 
@@ -100,6 +100,13 @@ export default function TopNav({
         >
           ●
         </span>
+      </Link>
+      <Link
+        to="/afk-tasks"
+        activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
+      >
+        <ListChecks size={13} /> AFK Tasks
       </Link>
 
       {/* Centered workflow selector */}

@@ -33,7 +33,7 @@ $ARGUMENTS
 
    If `$ARGUMENTS` contains a comma-separated list of implementation agents to seed the canvas (passed by `/afk-install` on a fresh install — e.g. `backend`, `frontend`, `backend,frontend`), prefix the command with `AFK_IMPL_AGENTS="<list>"`. On a standalone `/afk` run leave it unset; the canvas pre-populates from the existing `afk.json`.
 
-   `/afk-install` may also pass a **skill map** — best-fit project-skill→agent assignments the user confirmed at install time. When present in `$ARGUMENTS`, also prefix the command with `AFK_SKILL_MAP='<json>'` (a JSON object like `{"frontend":["react"],"test":["component-test"]}`). It seeds the matching seeded instances' `skills[]` so the canvas opens pre-populated. Only meaningful on a fresh install (no `afk.json`); leave it unset on a standalone `/afk` run. Example combined prefix:
+   `/afk-install` may also pass a **skill map** — best-fit project-skill→agent assignments the user confirmed at install time. When present in `$ARGUMENTS`, also prefix the command with `AFK_SKILL_MAP='<json>'` (a JSON object like `{"frontend":["react"],"test":["component-test"]}`). It seeds the matching seeded instances' `referenced_skills[]` (referenced is the default mode; promote to loaded in the canvas) so the canvas opens pre-populated. Only meaningful on a fresh install (no `afk.json`); leave it unset on a standalone `/afk` run. Example combined prefix:
 
    ```bash
    AFK_IMPL_AGENTS="frontend" AFK_SKILL_MAP='{"frontend":["react"],"test":["component-test"]}' \
@@ -82,7 +82,7 @@ $ARGUMENTS
 
    Notes on the model:
    - `skills_available` and `main_session_loaded_skills` are plain string arrays of skill ids.
-   - `workflow_instances` is the project-scoped array of named `{ name, agent, skills[] }` records. Nodes reference an instance by name; an agent node's `id` equals its instance name.
+   - `workflow_instances` is the project-scoped array of named `{ name, agent, loaded_skills[], referenced_skills[] }` records. `loaded_skills` are auto-loaded by the `SubagentStart` hook before the agent works; `referenced_skills` are surfaced as available and loaded only if the task needs them. Nodes reference an instance by name; an agent node's `id` equals its instance name.
    - `main-session` is the implicit entry point — it appears only in `edges` (`from: "main-session"`), never in `nodes`.
    - Node types are `agent`, `human_review`, and `skill`. A `skill` node carries a `skill` id (the skill-node analog of an agent node's `instance`) and renders in the success path as `/<skill>`; the orchestrator runs it inline via the `Skill` tool rather than dispatching a subagent.
    - `success_path` is **derived** by the UI (and rendered into `afk.yaml` for humans); it is never stored in `afk.json`.
@@ -119,12 +119,12 @@ $ARGUMENTS
    - counts of agents, instances, workflows, and rules saved,
    - the current main-session skills and the workflow → success-path rows now in the orchestrator table (from the render),
    - which rule files were moved or installed (from the apply-rules summary), and any `missing`/`errors`,
-   - that the `SubagentStart` hook now injects each instance's skills + condition-edge handoff rules automatically, and
+   - that the `SubagentStart` hook now injects each instance's skills (auto-loaded `loaded_skills` + available-on-demand `referenced_skills`) + condition-edge handoff rules automatically, and
    - that `/afk-uninstall` disables the orchestrator if they want to turn AFK off later.
 
 ## Notes
 
 - This skill assumes the orchestrator is already scaffolded (Step 0). The one-time scaffolding — copying `afk.md`, the runtime scripts, `agent: afk`, the bash-validation hook, and the gitignore — is done by **`/afk-install`**, which then invokes this skill to author + render the config.
 - `/afk-sync` is the lighter cousin: it re-renders the orchestrator from the current `afk.json` **without** opening the form, for when you've hand-edited `afk.json`/`afk.yaml`.
-- Skills referenced in instance `skills` arrays must exist as project skills (`<projectPath>/.claude/skills/<id>/SKILL.md`).
+- Skills referenced in instance `loaded_skills` / `referenced_skills` arrays must exist as project skills (`<projectPath>/.claude/skills/<id>/SKILL.md`).
 - The bundled subagents live at `plugins/ai-tools-manager/agents/`. Their frontmatter has no `skills:` array — that list comes from `afk.json` at runtime via the hook. (The `afk` **orchestrator** is the exception: its frontmatter `skills:` is materialised from `main_session_loaded_skills` because it runs as the main session, not as a SubagentStart-hooked worker.)

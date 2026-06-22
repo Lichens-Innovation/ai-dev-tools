@@ -9,7 +9,7 @@ One-time setup of AFK for a project: lay down the orchestrator scaffolding, then
 
 ```
 afk-install:  analyze repo → offer local skills → scaffold orchestrator → run /afk (form + write + render + rules) → report
-              (impl agents)   (best-fit checklist)                          └── /afk needs afk.md to exist; the scaffold step creates it
+              (impl agents)   (best-fit + consent)                         └── /afk needs afk.md to exist; the scaffold step creates it
 ```
 
 ## User's intention
@@ -29,10 +29,24 @@ $ARGUMENTS
 2. **Offer to attach the repo's local skills to the seeded agents.** This pre-populates the canvas so the user doesn't have to hunt for relevant skills. **Skip this step entirely** if `${CLAUDE_PROJECT_DIR:-.}/.claude/afk.json` already exists — that's a re-install, and the canvas already owns the user's skill assignments (the seed only applies on a fresh install).
 
    On a fresh install:
-   - **Discover** the project-local skills: list `${CLAUDE_PROJECT_DIR:-.}/.claude/skills/*/SKILL.md` and read each one's `name` + `description` frontmatter. Ignore user (`~/.claude`) and plugin skills — only the repo's own skills are in scope.
-   - **Best-fit map** each skill to the single seeded agent it most helps, choosing among the seeded agents only: the detected `implAgents` plus `test`, `reviewer`, `refactor`, `scribe`. **Drop** any skill that isn't clearly relevant to one of them (don't force a match). Example: a `react` skill → `frontend`; a `component-test` skill → `test`; a `changelog` skill → `scribe`.
-   - **Confirm with the user**, grouped by agent: for each agent that has candidate skills, ask **one `AskUserQuestion` multi-select** listing that agent's candidate skills (recommend selecting all in the prompt). `AskUserQuestion` takes up to 4 questions per call — if more than 4 agents have candidates, send a second call. If **no** project skills exist or none are relevant, skip the questions silently.
-   - **Assemble the skill map**: a JSON object of `{ "<agent>": ["<skillId>", …] }` from the user's selections, omitting agents with no selected skills. Example: `{"frontend":["react"],"test":["component-test"]}`. If empty, there's nothing to pass. The skill ids must be the exact skill `name`s (so they line up with what the canvas lists).
+   - **Discover** the project-local skills: each subdirectory of `${CLAUDE_PROJECT_DIR:-.}/.claude/skills/` that contains a `SKILL.md` is one skill. A skill's **id is its directory name**, unless its `SKILL.md` has a frontmatter `name:` field, in which case that wins — this matches exactly how the canvas lists them (`name = frontmatter.name || directory`). **Many project skills are plain-Markdown docs with no YAML frontmatter at all — that is normal; do not skip them.** For relevance, read a short description from the frontmatter `description:` if present, otherwise from the SKILL.md's first heading / first sentence. Ignore user (`~/.claude`) and plugin skills — only the repo's own skills are in scope.
+
+     List the directories with a command that tolerates missing frontmatter (do **not** pipe through `grep` for `name:`/`description:` — it exits non-zero and aborts the moment a skill has no frontmatter, which silently drops every doc-style skill). For example list the skill dirs, then `Read` each `SKILL.md` you need a description for:
+
+     ```bash
+     ls -1 "${CLAUDE_PROJECT_DIR:-.}/.claude/skills" 2>/dev/null
+     ```
+
+   - **Best-fit map** each skill to the single seeded agent it most helps, choosing among the seeded agents only: the detected `implAgents` plus `test`, `reviewer`, `refactor`, `scribe`. **Drop** any skill that isn't clearly relevant to one of them (don't force a match). Example: a `react`/`styling`/`gantt-render` skill → `frontend`; a `react-testing-library` skill → `test`; a `changelog` skill → `scribe`.
+   - **Confirm with the user.** First print the proposed mapping as a plain written list grouped by agent, one line per skill with a short why, e.g.:
+
+     ```
+     @frontend ← react, styling, gantt-render, shift-logic, workorder-store
+     @test     ← react-testing-library
+     ```
+
+     Then ask a **single `AskUserQuestion`** for consent (do **not** put individual skills as the options — `AskUserQuestion` requires 2–4 options per question, so a per-skill checklist breaks the moment an agent has 1 or 5+ skills). Use coarse options like: `Attach all (Recommended)`, `Let me drop some`, `Skip — I'll assign on the canvas`. If the user picks "drop some", let them reply in plain text with the skill ids (or skill→agent pairs) to remove, and drop those. If **no** project skills exist or none are relevant, skip the question silently. The canvas remains the fine-grained editor — the user can always add/move/remove skill assignments there before submitting, so this prompt only needs coarse consent.
+   - **Assemble the skill map**: a JSON object of `{ "<agent>": ["<skillId>", …] }` from the confirmed mapping, omitting agents with no skills. Example: `{"frontend":["react","styling"],"test":["react-testing-library"]}`. If empty, there's nothing to pass. Each `skillId` is the skill's canonical id from the discover step (frontmatter `name` if present, else the directory name) so it lines up with what the canvas lists.
 
 3. **Scaffold the orchestrator.** Run the installer:
 
@@ -69,13 +83,13 @@ $ARGUMENTS
 1. Reads `<cwd>/.claude/afk_session.json` to find the active workflow name (set by `afk-set-session-workflow.js`).
 2. Reads `<cwd>/.claude/afk.json` (requires `version: 3`).
 3. Finds workflow nodes whose resolved instance's `agent === agent_type`.
-4. Emits `hookSpecificOutput { hookEventName: "SubagentStart", additionalContext }` listing the instance's skills and condition-edge labels. When a condition edge exists, the subagent is told to end its final message with a `HANDOFF: <label>` line (or `HANDOFF: success`) so the orchestrator can route deterministically.
+4. Emits `hookSpecificOutput { hookEventName: "SubagentStart", additionalContext }` listing the instance's skills in two blocks — `loaded_skills` (auto-load with the `Skill` tool before working) and `referenced_skills` (available; load only if the task involves the logic that skill describes) — plus the condition-edge labels. When a condition edge exists, the subagent is told to end its final message with a `HANDOFF: <label>` line (or `HANDOFF: success`) so the orchestrator can route deterministically.
 
 If `afk.json` is absent, not v3, or the agent type is unmapped (no matching instance in any workflow), the hook exits silently.
 
 If the active workflow can't be resolved — the recorded name matches no workflow, or none is set while the project has more than one workflow — the hook still injects (unioned across all workflows) but **prepends a `⚠️ AFK warning`** to the context telling the orchestrator to run `afk-set-session-workflow.js` first, since the unioned skills may be wrong.
 
-Known limitation: if two instances of the same agent appear in one workflow, the hook can only key off `agent_type` and merges (unions) both instances' skills and conditions. Prefer one instance per agent type per workflow.
+Known limitation: if two instances of the same agent appear in one workflow, the hook can only key off `agent_type` and merges (unions) both instances' skills and conditions (a skill that is `loaded` in either instance wins over being merely `referenced`). Prefer one instance per agent type per workflow.
 
 ## Notes
 
