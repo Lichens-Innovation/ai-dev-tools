@@ -13,7 +13,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, appendSessionLog } = require("./lib/afk-session");
+const { readStdin, appendSessionLog } = require("./lib/afk-session.cjs");
 
 // Parse the HANDOFF: label from the agent's final message.
 // Tolerates backticks, asterisks, and surrounding whitespace, e.g.:

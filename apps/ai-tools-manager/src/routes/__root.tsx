@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router'
+import { Toaster } from '@repo/ui/toast'
 import appCss from '../styles.css?url'
 import { SessionLogProvider } from '../utils/session-log-context'
 
@@ -20,6 +21,7 @@ function RootLayout() {
   return (
     <SessionLogProvider>
       <Outlet />
+      <Toaster />
     </SessionLogProvider>
   )
 }

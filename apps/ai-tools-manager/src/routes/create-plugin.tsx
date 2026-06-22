@@ -8,9 +8,9 @@ import { Field, Input } from "@repo/ui/field";
 import ChipInput from "@repo/ui/chip-input";
 import Select from "@repo/ui/select";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import SuccessState from "@repo/ui/success-state";
+import { toast } from "@repo/ui/toast";
 import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
-import { Sparkles, Keyboard, Check } from "lucide-react";
+import { Sparkles, Keyboard } from "lucide-react";
 import { getMarketplaceList } from "../utils/marketplace";
 import { submitPluginForm, cancelPluginForm } from "../utils/create-plugin";
 import PluginManifestPreview from "../components/plugin-manifest-preview";
@@ -28,7 +28,7 @@ const pluginSchema = z.object({
 });
 
 type PluginForm = z.infer<typeof pluginSchema>;
-type Phase = "idle" | "creating" | "done" | "cancelled";
+type Phase = "idle" | "creating" | "cancelled";
 
 export const Route = createFileRoute("/create-plugin")({
   loader: () => getMarketplaceList(),
@@ -65,6 +65,7 @@ function CreatePlugin() {
     control,
     handleSubmit,
     watch,
+    reset,
     formState: { errors },
   } = useForm<PluginForm>({
     resolver: zodResolver(pluginSchema),
@@ -97,7 +98,13 @@ function CreatePlugin() {
   const onSubmit = async (values: PluginForm) => {
     setPhase("creating");
     await submitPluginForm({ data: values });
-    setPhase("done");
+    toast(
+      <>
+        Plugin <span className="font-mono text-(--ink)">{values.name || "my-plugin"}</span> submitted — generating now.
+      </>,
+    );
+    reset();
+    setPhase("idle");
   };
 
   const onError = (errs: typeof errors) => {
@@ -142,25 +149,12 @@ function CreatePlugin() {
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden">
       <div
-        className="h-full grid transition-[grid-template-columns] duration-300 ease-out"
-        style={{ gridTemplateColumns: phase === "done" ? "1fr" : "minmax(0, 1fr) 460px" }}
+        className="h-full grid"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) 460px" }}
       >
         <div className="overflow-y-auto px-10 py-8">
           <div className="max-w-155 mx-auto">
-            {phase === "done" ? (
-              <SuccessState
-                icon={<Check size={28} strokeWidth={2.4} />}
-                title="Your plugin is being created"
-                description={
-                  <>
-                    The repository is generating it now. You can close this page — you'll find{" "}
-                    <span className="font-mono text-(--ink-2)">{name || "my-plugin"}</span> registered in your
-                    marketplace when it's ready.
-                  </>
-                }
-              />
-            ) : (
-              <>
+            <>
                 <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                   <h1 className="m-0 text-2xl font-bold text-(--ink) tracking-[-0.5px]">New plugin</h1>
                   <div className="flex-1" />
@@ -270,21 +264,18 @@ function CreatePlugin() {
                     {phase === "creating" ? "Creating…" : "Create plugin"}
                   </Button>
                 </div>
-              </>
-            )}
+            </>
           </div>
         </div>
 
-        {phase !== "done" && (
-          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
-            <PluginManifestPreview
-              name={name}
-              description={description}
-              keywords={keywords}
-              marketplace={marketplace}
-            />
-          </div>
-        )}
+        <div className="border-l border-(--line) overflow-y-auto flex flex-col">
+          <PluginManifestPreview
+            name={name}
+            description={description}
+            keywords={keywords}
+            marketplace={marketplace}
+          />
+        </div>
       </div>
       <ShortcutsDialog
         open={helpOpen}

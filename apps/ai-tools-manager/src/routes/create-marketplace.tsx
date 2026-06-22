@@ -6,9 +6,9 @@ import { z } from "zod";
 import Button from "@repo/ui/button";
 import { Field, Input } from "@repo/ui/field";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import SuccessState from "@repo/ui/success-state";
+import { toast } from "@repo/ui/toast";
 import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
-import { Sparkles, Keyboard, Check } from "lucide-react";
+import { Sparkles, Keyboard } from "lucide-react";
 import { getMarketplaceDefaults } from "../utils/marketplace";
 import { submitMarketplaceForm, cancelMarketplaceForm } from "../utils/create-marketplace";
 import MarketplaceManifestPreview from "../components/marketplace-manifest-preview";
@@ -29,7 +29,7 @@ const marketplaceSchema = z.object({
 });
 
 type MarketplaceForm = z.infer<typeof marketplaceSchema>;
-type Phase = "idle" | "creating" | "done" | "cancelled";
+type Phase = "idle" | "creating" | "cancelled";
 
 export const Route = createFileRoute("/create-marketplace")({
   loader: () => getMarketplaceDefaults(),
@@ -66,6 +66,7 @@ function CreateMarketplace() {
     control,
     handleSubmit,
     watch,
+    reset,
     formState: { errors },
   } = useForm<MarketplaceForm>({
     resolver: zodResolver(marketplaceSchema),
@@ -101,7 +102,14 @@ function CreateMarketplace() {
   const onSubmit = async (values: MarketplaceForm) => {
     setPhase("creating");
     await submitMarketplaceForm({ data: values });
-    setPhase("done");
+    toast(
+      <>
+        Marketplace <span className="font-mono text-(--ink)">{values.name || "my-tools"}</span> submitted — scaffolding
+        now.
+      </>,
+    );
+    reset();
+    setPhase("idle");
   };
 
   const onError = (errs: typeof errors) => {
@@ -149,25 +157,12 @@ function CreateMarketplace() {
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden">
       <div
-        className="h-full grid transition-[grid-template-columns] duration-300 ease-out"
-        style={{ gridTemplateColumns: phase === "done" ? "1fr" : "minmax(0, 1fr) 460px" }}
+        className="h-full grid"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) 460px" }}
       >
         <div className="overflow-y-auto px-10 py-8">
           <div className="max-w-155 mx-auto">
-            {phase === "done" ? (
-              <SuccessState
-                icon={<Check size={28} strokeWidth={2.4} />}
-                title="Your marketplace is being created"
-                description={
-                  <>
-                    The repository is generating it now. You can close this page — you'll find{" "}
-                    <span className="font-mono text-(--ink-2)">{name || "my-tools"}</span> scaffolded at{" "}
-                    <span className="font-mono text-(--ink-2)">{targetDir || "<target/dir>"}</span> when it's ready.
-                  </>
-                }
-              />
-            ) : (
-              <>
+            <>
                 <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                   <h1 className="m-0 text-2xl font-bold text-(--ink) tracking-[-0.5px]">New marketplace</h1>
                   <div className="flex-1" />
@@ -322,23 +317,20 @@ function CreateMarketplace() {
                     {phase === "creating" ? "Creating…" : "Create marketplace"}
                   </Button>
                 </div>
-              </>
-            )}
+            </>
           </div>
         </div>
 
-        {phase !== "done" && (
-          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
-            <MarketplaceManifestPreview
-              name={name}
-              description={description}
-              ownerName={ownerName}
-              ownerEmail={ownerEmail}
-              homepage={homepage}
-              targetDir={targetDir}
-            />
-          </div>
-        )}
+        <div className="border-l border-(--line) overflow-y-auto flex flex-col">
+          <MarketplaceManifestPreview
+            name={name}
+            description={description}
+            ownerName={ownerName}
+            ownerEmail={ownerEmail}
+            homepage={homepage}
+            targetDir={targetDir}
+          />
+        </div>
       </div>
       <ShortcutsDialog
         open={helpOpen}

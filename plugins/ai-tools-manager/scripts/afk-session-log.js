@@ -9,7 +9,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, appendSessionLog } = require("./lib/afk-session");
+const { readStdin, appendSessionLog } = require("./lib/afk-session.cjs");
 
 // Short, human-readable summary of a tool call for the session log.
 function summarize(toolName, ti) {

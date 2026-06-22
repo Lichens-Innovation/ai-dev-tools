@@ -9,12 +9,11 @@
 //   are preserved), and deletes the ephemeral session files. New sessions stop
 //   adopting the orchestrator.
 // --purge: additionally removes the installed orchestrator agent, the
-//   project-copied runtime scripts, and the user-authored config
-//   (afk.json / afk.yaml) — i.e. everything the install pipeline produced.
+//   project-copied runtime scripts, and the user-authored config (afk.json) —
+//   i.e. everything the install pipeline produced.
 //
-// Default (no --purge): never touches afk.json / afk.yaml — that is the
-// user-authored config and is kept so a later /afk-install or /afk-sync can
-// restore things.
+// Default (no --purge): never touches afk.json — that is the user-authored
+// config and is kept so a later /afk-install or /afk-sync can restore things.
 // Prints a JSON summary to stdout.
 
 const fs = require("fs");
@@ -87,12 +86,11 @@ try {
   if (purge) {
     const targets = [
       path.join(claudeDir, "agents", "afk.md"),
-      path.join(claudeDir, "scripts", "afk-set-session-workflow.js"),
-      path.join(claudeDir, "scripts", "afk-render-orchestrator.js"),
+      path.join(claudeDir, "scripts", "afk-set-session-workflow.cjs"),
+      path.join(claudeDir, "scripts", "afk-render-orchestrator.cjs"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
-      path.join(claudeDir, "scripts", "lib", "afk-session.js"),
+      path.join(claudeDir, "scripts", "lib", "afk-session.cjs"),
       path.join(claudeDir, "afk.json"),
-      path.join(projectDir, "afk.yaml"),
     ];
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));
   }

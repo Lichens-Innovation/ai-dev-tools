@@ -4,19 +4,19 @@
 //   - the frontmatter `skills:` array  ← main_session_loaded_skills
 //   - the <!-- AFK:HANDOFFS --> table   ← workflows + derived success paths
 //
-//   node afk-render-orchestrator.js [projectDir]
+//   node afk-render-orchestrator.cjs [projectDir]
 //
-// Invoked by afk-install.js (on form save) and by the /afk-sync skill.
+// Invoked by the /afk skill (on form save) and by the /afk-sync skill.
 
 const fs = require("fs");
 const path = require("path");
-const { readJson } = require("./lib/afk-session");
+const { readJson } = require("./lib/afk-session.cjs");
 
 // Derived success path (never stored in afk.json) for a single workflow.
-// NOTE: this is the plain-Node twin of `computeSuccessPath` in the app's
-// src/utils/agents-framework-kickstarter.ts. They can't share code (plugin vs app TS),
-// so their OUTPUT must stay byte-identical — keep the separator (" → ") and labels
-// ("@<instance>", "/<skill>", "human review") in sync across both files.
+// This is the SOLE implementation — the success path is computed here at render
+// time and written into the orchestrator's AFK:HANDOFFS table. Labels: "@<instance>"
+// for agent nodes, "/<skill>" for skill nodes, "human review" for review nodes,
+// joined by " → ".
 function successPath(wf, instances) {
   const labelFor = (id) => {
     if (id === "main-session") return "";

@@ -64,7 +64,7 @@ Repeat until you break out:
    | `create-subagent` | Invoke the **create-subagent** skill with the payload. |
    | `create-plugin` | Invoke the **create-plugin** skill with the payload. Usually the scaffold already wrote the manifest + registration; just verify and report. |
    | `create-marketplace` | Invoke the **create-marketplace** skill with the payload. |
-   | `afk-config` | Run the **afk** skill's processing path (write `afk.json`/`afk.yaml` from the payload, re-render the orchestrator, apply rules). Tell it the payload is already supplied so it **skips launching the form** (its Step 1). `sliceType` tells you whether the save was workflows or rules. |
+   | `afk-config` | Run the **afk** skill's processing path (write `afk.json` from the payload, re-render the orchestrator, apply rules). Tell it the payload is already supplied so it **skips launching the form** (its Step 1). `sliceType` tells you whether the save was workflows or rules. |
 
 4. **Clear the result file**, then loop back to step 2.1 to wait for the next event:
 

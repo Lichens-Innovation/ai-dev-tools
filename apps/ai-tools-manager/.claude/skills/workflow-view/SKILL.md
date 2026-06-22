@@ -1,11 +1,11 @@
 ---
 name: workflow-view
-description: "Explains how the /workflows view in ai-tools-manager is built end-to-end: the React Flow canvas (workflow-canvas.tsx), the left agents/skills pane and top workflow selector, the live afk.yaml preview, and how the diagram maps to the AfkConfigV3 model written to .claude/afk.json. Use when the user is working inside apps/ai-tools-manager and asks how the workflow view/canvas works, how nodes and edges map to afk.yaml, how the success vs condition paths are built, how workflow instances and per-instance skills work, or why a workflow change isn't reaching the YAML."
+description: "Explains how the /workflows view in ai-tools-manager is built end-to-end: the React Flow canvas (workflow-canvas.tsx), the left agents/skills pane and top workflow selector, and how the diagram maps to the AfkConfigV3 model written to .claude/afk.json. Use when the user is working inside apps/ai-tools-manager and asks how the workflow view/canvas works, how nodes and edges map to afk.json, how the success vs condition paths are built, how workflow instances and per-instance skills work, or why a workflow change isn't reaching the config."
 ---
 
 # Workflow View
 
-The `/workflows` route (`src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas), and watches the resulting `afk.yaml` render live (right pane). On save it persists the workflow slice of `.claude/afk.json` (v3).
+The `/workflows` route (`src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), then wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas). On save it persists the workflow slice of `.claude/afk.json` (v3).
 
 It is the workflow half of the `/afk` config flow — the `/rules` route owns the other half (rules), and the two share one `afk.json`.
 
@@ -13,25 +13,25 @@ It is the workflow half of the `/afk` config flow — the `/rules` route owns th
 
 ```
 ┌──────────────────────────── TopNav (top-nav.tsx) ───────────────────────────┐
-│ Workflows | Rules        ◀ workflow selector (name + ✎ + ＋ + ✕) ▶      <> ☀│
-├───────────────┬────────────────────────────────────────────┬────────────────┤
-│ Left pane     │ Center — WorkflowCanvas                    │ Right —        │
-│ (workflows    │ (workflow-canvas.tsx, @xyflow/react)       │ afk.yaml       │
-│  .tsx)        │                                            │ preview        │
-│               │   ● Claude Main Session  (synthetic)       │ (afk-yaml-     │
-│  Agents ☑     │        │ success (bottom→top)              │  preview.tsx)  │
-│   backend     │   ▭ agent node  + skill chips + ⋮          │                │
-│   test …      │        ◇ human step (Review)               │ derived live   │
-│  ＋ Agent     │        ⋯ condition edges (orange dashed)   │ from config,   │
-│               │                                            │ read-only      │
-│  Skills ☑     │   [ ＋ Add Agent | ＋ Add condition ] panel │                │
-│  ＋ Skill     │                                             │               │
-│  [Save]       │                                            │                │
-└───────────────┴────────────────────────────────────────────┴────────────────┘
-   280px                          1fr                              460px
+│ Workflows | Rules        ◀ workflow selector (name + ✎ + ＋ + ✕) ▶         ☀│
+├───────────────┬─────────────────────────────────────────────────────────────┤
+│ Left pane     │ Center — WorkflowCanvas                                     │
+│ (workflows    │ (workflow-canvas.tsx, @xyflow/react)                        │
+│  .tsx)        │                                                             │
+│               │   ● Claude Main Session  (synthetic)                        │
+│  Agents ☑     │        │ success (bottom→top)                              │
+│   backend     │   ▭ agent node  + skill chips + ⋮                          │
+│   test …      │        ◇ human step (Review)                                │
+│  ＋ Agent     │        ⋯ condition edges (orange dashed)                    │
+│               │                                                             │
+│  Skills ☑     │   [ ＋ Add Agent | ＋ Add condition ] panel                 │
+│  ＋ Skill     │                                                             │
+│  [Save]       │                                                             │
+└───────────────┴─────────────────────────────────────────────────────────────┘
+   280px                          1fr
 ```
 
-The grid is `280px 1fr 460px` with the preview open, `280px 1fr` when closed (`workflows.tsx`, `gridTemplateColumns`). The `<>` button in TopNav toggles `previewOpen`.
+The grid is a fixed `280px 1fr` (left pane + center; `workflows.tsx`, `gridTemplateColumns`).
 
 ## Data flow
 
@@ -50,14 +50,11 @@ WorkflowCanvas mirrors the active workflow into React Flow state (rfNodes/rfEdge
   • rfNodesToAfkNodes / rfEdgesToAfkEdges  on the way out → onChange(workflow)
         │   every edit calls onChange → updateWorkflow → setConfig
         │   instance + main-session edits go via onInstancesChange / onMainSessionSkillsChange
-        ▼
-AfkYamlPreview renders afk.yaml from `config` via afkConfigToYaml() (derived, read-only)
-        │
         ▼ (Save workflows)
 submitAfkConfig({ sliceType: "workflows", slice })
   • merges the workflow slice into existing afk.json (preserves `rules`)
-  • writes <cwd>/.claude/afk.json AND <cwd>/afk.yaml (via afkConfigToYaml)
-  • writes /tmp/result.json  → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
+  • writes <cwd>/.claude/afk.json
+  • writes /tmp/result.json  → "AFK v3 config data: {JSON}"  for the skill
 ```
 
 **First-install seed.** When no `afk.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `/afk-install` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
@@ -69,14 +66,12 @@ submitAfkConfig({ sliceType: "workflows", slice })
 | Route, left pane, save, workflow CRUD                                    | `src/routes/workflows.tsx`                                                 |
 | The canvas (React Flow nodes/edges, all interactions)                    | `src/components/workflow-canvas.tsx`                                       |
 | Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/instance-skill-picker.tsx` (loaded/referenced toggle), `src/components/skill-checklist.tsx` (plain list, main-session only) |
-| Top bar — nav links, workflow selector, preview toggle                   | `src/components/top-nav.tsx`                                               |
-| Live afk.yaml render (read-only)                                         | `src/components/afk-yaml-preview.tsx`                                      |
-| The single afk.yaml serializer (`yaml` package)                          | `src/utils/afk-yaml.ts`                                                    |
+| Top bar — nav links, workflow selector                                   | `src/components/top-nav.tsx`                                               |
 | Types + loader + submit server fns                                       | `src/utils/agents-framework-kickstarter.ts`                                |
 | Shared `readCwd` + `parseFrontmatter`                                    | `src/utils/afk-fs.ts`                                                      |
 | Bundled subagents (source of the Agents list)                            | `plugins/ai-tools-manager/agents/*.md`                                     |
 | Project skills (source of the Skills list)                               | `<cwd>/.claude/skills/*/SKILL.md`                                          |
-| Consuming prompt (writes afk.yaml)                                       | `plugins/ai-tools-manager/skills/afk/SKILL.md`                             |
+| Consuming prompt (writes afk.json, renders orchestrator)                 | `plugins/ai-tools-manager/skills/afk/SKILL.md`                             |
 
 ## The data model (AfkConfigV3)
 
@@ -103,14 +98,14 @@ Key points:
 
 - **Instances carry the agent + skills, nodes just reference them.** An agent node's `instance` field (and its `id`, which equals the instance name) points at a `workflow_instances` entry. Skills are stored once per instance, not per node — so the same instance reused across workflows shares one skill list. Editing an instance updates every placement. Each instance keeps two skill lists: `loaded_skills` (auto-loaded by the `SubagentStart` hook before the agent works) and `referenced_skills` (surfaced as available; the agent loads one only if the task needs it). The canvas chips render loaded skills solid and referenced skills dashed/muted.
 - **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToAfkNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToAfkEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete. Main-session's skills live in `config.main_session_loaded_skills`, not on a node.
-- **`success_path` is derived, never stored.** `computeSuccessPath` walks the success edges from `main-session`; `afkConfigToYaml` renders it into afk.yaml for humans, but it is absent from `afk.json`.
+- **`success_path` is derived, never stored.** It is computed by the plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) from the success edges and rendered into the orchestrator's `AFK:HANDOFFS` table, but it is absent from `afk.json`.
 
 ## Left pane (workflows.tsx)
 
 - **Agents** checkboxes come from `bundledAgents` — read from `plugins/ai-tools-manager/agents/*.md` frontmatter by `readBundledAgents()`. Toggling edits `config.agents_available`. `＋ Agent` `window.prompt`s for a manual id (for agents not bundled).
 - **Skills** checkboxes come from `projectSkills` — read from `<cwd>/.claude/skills/*/SKILL.md` by `readProjectSkills()`. Toggling edits `config.skills_available` (a plain `string[]` of skill ids). `＋ Skill` prompts for a manual id.
 - `skills_available` is the menu of skills the canvas can attach to instances and the main session — only a skill checked here can be attached.
-- **Save workflows** → `handleSubmit` → `submitAfkConfig`.
+- **Save workflows** → `handleSubmit` → `submitAfkConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
 
 ## Center canvas (workflow-canvas.tsx)
 
@@ -154,7 +149,7 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
 - **Manual wiring** — `onConnect`: dragging from a `left`/`right` handle makes a condition edge; from `bottom` makes a success edge.
 - **Delete** — kebab → Delete removes the node and every incident edge (the instance definition stays in `workflow_instances`).
 
-Each of these computes the next nodes/edges and calls `pushChange` → `onChange` → `setConfig`, so the YAML preview and persisted model stay in lockstep.
+Each of these computes the next nodes/edges and calls `pushChange` → `onChange` → `setConfig`, so the persisted model stays in lockstep with the canvas.
 
 ## Top selector (top-nav.tsx)
 
@@ -167,22 +162,17 @@ The centered control drives `config.workflows` through a custom dropdown (hand-r
 
 `WorkflowSelectorProps` is unchanged — `onRemove(i)` deletes the clicked row (not necessarily the active one). One workflow is edited at a time.
 
-## Right pane — afk.yaml preview (afk-yaml-preview.tsx)
-
-A **read-only** `FilePreview`. It calls `afkConfigToYaml(config)` (`src/utils/afk-yaml.ts`, backed by the `yaml` package) and splits the result into lines — a derived view, never an editor, and the _exact_ text the skill writes to `afk.yaml`. It shows the _full_ config including `rules` (even though rules are edited on `/rules`) and the derived `success_path` per workflow, at the target path `<cwd>/afk.yaml`. Empty sections render as empty YAML lists.
-
 ## Persistence (submitAfkConfig)
 
-Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` and `afk.yaml` (via `afkConfigToYaml`), and writes the result file with `additionalContext` containing `AFK v3 config data: {…}` **plus the verbatim afk.yaml text**. The consuming `/afk` SKILL.md writes those files on the host and re-renders the orchestrator (`afk-render-orchestrator.js`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
+Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json`, and writes the result file with `additionalContext` of exactly `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host and re-renders the orchestrator (`afk-render-orchestrator.cjs`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
 
 The save result also carries `aiToolsAction: "afk-config"` + `sliceType` so the persistent **`/ai-tools`** dispatcher can route it without re-launching the app — in that mode `/afk` runs its processing path (write → render → apply) on the supplied payload and skips opening the form. See `afk-architecture` (runtime) and `apps/ai-tools-manager/CLAUDE.md` (Lifecycle / Dispatcher).
 
 ## Things that bite
 
-- **The YAML pane is derived, not editable.** To change what it shows, change `config` (or the rendering in `afk-yaml-preview.tsx`) — typing into it is impossible by design.
 - **`main-session` lives in edges but not nodes.** Code that consumes `workflows[].edges` must treat `"main-session"` as a valid `from` that has no matching entry in `nodes[]`. Filtering edges by "node exists" will silently drop the entry edge.
 - **Skills live on the instance, not the node.** A node only stores `instance` (+ id + position); the agent and skills come from the `workflow_instances` entry. Editing an instance updates every node that references it across all workflows.
-- **`success_path` is derived — never write it to `afk.json`.** It's computed by `computeSuccessPath` and only emitted into `afk.yaml`. Persisting it would duplicate state that can drift from the edges.
+- **`success_path` is derived — never write it to `afk.json`.** The plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) computes it from the edges and emits it into the orchestrator's `AFK:HANDOFFS` table. Persisting it would duplicate state that can drift from the edges.
 - **Save only touches the workflow slice.** Don't widen `submitAfkConfig`'s workflow branch to write `rules` — that's the `/rules` route's slice, and a stray write will clobber it.
 - **An instance can only hold skills that are checked in the left pane.** The skill checklist lists `availableSkills` (= `skills_available` ids). Unchecking a skill in the left pane after attaching it leaves a dangling id on the instance.
 - **`NODE_TYPES`/`EDGE_TYPES` must stay module-level.** Moving them inside the component recreates the maps each render and React Flow remounts every node (loses selection, flickers).

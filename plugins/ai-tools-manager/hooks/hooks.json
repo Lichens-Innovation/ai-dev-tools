@@ -41,6 +41,18 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-app-session-register.sh"]
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "",

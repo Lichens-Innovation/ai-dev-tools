@@ -24,9 +24,9 @@ Shared React component library for the monorepo. Consumed by `apps/ai-tools-mana
 | `select` | Styled Base UI Select with `{ id, name }[]` options | `value`, `options`, `onChange` |
 | `shortcuts-dialog` | Pre-built dialog rendering `{ title, items: [label, keys][] }[]` sections | `sections`, optional `title`, `titleIcon` |
 | `slide-panel` | Right-side slide-out panel | — |
-| `success-state` | Centered success affordance (round icon + title + description) | `icon`, `title`, `description` |
 | `syntax-line` | Renders a single line of YAML or JSON with key-highlighting; used by `file-preview` | `raw` |
 | `theme-toggle` | Light/dark theme switcher | — |
+| `toast` | Transient bottom-right notifications. Named exports (not a default): imperative `toast(message, { variant?, duration? })` + a `<Toaster />` portal mounted once at the app root | `message`, `variant`, `duration` |
 
 ## Adding a new component
 

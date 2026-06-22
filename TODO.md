@@ -1,3 +1,9 @@
 # Todo
 
-Now that there is a to-afk-task skills that generate tasks, I would like to be able to see them in the ai-tools-manager app in a new page at the afk-tasks route. I have already used a markdown reader in the help-server app from /Users/samueldaigle/Documents/gits/ai-dev-tools/apps/help-server. Reuse it to create a list view of task. Also reuse the copy paste component from /Users/samueldaigle/Documents/gits/ai-dev-tools/packages/ui/src/copyable-text.tsx to copy paste a short prompt to tell claude code to implement this task. E.g. "Do the task described in file ..."
+Workflow-view bug: Toggle between workflows in the app does not works, changes, but then stays the same if try to go back. Unsave changes are removed. Maybe we should use a state manager like zustand to save the client side afk.yaml version to save ?
+
+Workflow-view bug: Local skills are correctly discovered on install, and are prensent in the instances, but not in the left sidebar even if they are correctly listed in the preview of the afk.yaml file in the skills_available section.
+
+Why do the scripts afk-render-orchestrator, afk-set-session-workflow and bash-validation and afk-session need to be copied in the project on installation ? If the afk project is updated, how can the scripts be updated as well ? For example if I were to add a validation step in the afk project.
+
+Is the `.claude/.gitignore` file added on project installation necessary since the root `.gitignore` is already updated ? I don’t think so ?
