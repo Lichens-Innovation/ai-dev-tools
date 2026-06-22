@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2 } from "lucide-react";
+import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, CircleStop } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSessionLog } from "../utils/session-log-context";
+import { shutdownAppSession } from "../utils/ai-tools-session";
 
 interface WorkflowSelectorProps {
   workflows: string[];
@@ -29,6 +30,16 @@ export default function TopNav({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [stopped, setStopped] = useState(false);
+
+  const handleStop = async () => {
+    try {
+      await shutdownAppSession();
+    } catch {
+      // best-effort; the listen-loop also ends on Esc / SessionEnd
+    }
+    setStopped(true);
+  };
 
   // Reset editing + close menu when active workflow changes
   useEffect(() => { setEditing(false); setMenuOpen(false); }, [workflowSelector?.activeIndex]);
@@ -213,6 +224,19 @@ export default function TopNav({
           {"<>"}
         </button>
       )}
+      <button
+        type="button"
+        onClick={handleStop}
+        disabled={stopped}
+        title={stopped ? "Session stopped — you can close this tab" : "Stop the AFK app session (the dispatcher stops listening)"}
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] border cursor-pointer focus:outline-none ${
+          stopped
+            ? "bg-(--bg-elev) border-(--line) text-(--ink-3) cursor-default"
+            : "bg-(--bg-elev) border-(--line) text-(--ink-2) hover:text-red-500 hover:border-red-500"
+        }`}
+      >
+        <CircleStop size={13} /> {stopped ? "Stopped" : "Stop"}
+      </button>
       <ThemeToggle />
 
       {/* Delete-confirmation modal */}

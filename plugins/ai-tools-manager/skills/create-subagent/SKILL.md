@@ -13,24 +13,13 @@ For Claude Code, subagents are distributed via plugins. The AGENTS.md format is 
 
 $ARGUMENTS
 
-## References
+## References & shared contract
 
-Consult the relevant doc(s) before generating subagent content in auto mode or before making structural decisions in manual mode:
-
-- [`docs/subagents.md`](${CLAUDE_SKILL_DIR}/../../../../docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
-- [`docs/plugins.md`](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md) — plugin structure, manifest, hooks and relative paths
-- [`docs/hooks.md`](${CLAUDE_SKILL_DIR}/../../../../docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
-- [`docs/skills.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills.md) — skill format, popular repositories, skills CLI
-- [`docs/marketplace.md`](${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
-- [`docs/rules.md`](${CLAUDE_SKILL_DIR}/../../../../docs/rules.md) — rules format and scope
-- [`docs/mcp.md`](${CLAUDE_SKILL_DIR}/../../../../docs/mcp.md) — MCP server configuration
-- [`docs/memory.md`](${CLAUDE_SKILL_DIR}/../../../../docs/memory.md) — memory system, persistent memory for subagents
-- [`docs/skills-cli.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills-cli.md) — skills CLI commands
-- [`docs/claude-code.md`](${CLAUDE_SKILL_DIR}/../../../../docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (subagents, plugins, hooks, marketplace, …), where the form payload comes from, and the **scaffold-finishing contract** (`scaffolded: true` → finish the `remaining` work in place at `path`, don't recreate; `scaffolded: false` → create from scratch).
 
 ## Workflow
 
-1. **Create agent file** — the form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. It is a JSON object with `mode` and `target` fields.
+1. **Create agent file** — parse the form payload (a JSON object with `mode` and `target` fields; see the shared contract above for its source and the scaffold-finishing rules).
 
    **Target dispatch** — the JSON includes a `target` field that determines where the subagent lives:
    - `target: "marketplace"` — the JSON has `marketplacePath` and `plugin`. Write to `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md`.

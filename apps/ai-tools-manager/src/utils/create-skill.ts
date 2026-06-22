@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import fs from "fs";
 import { getKnownMarketplaces } from "@repo/claude-fs";
+import { scaffoldSkill } from "./scaffold";
+import { writeCreateResult, writeCancelResult } from "./create-result";
+import { titleFromName } from "./text";
 
 interface FormPayload {
   mode: "auto" | "manual";
@@ -16,7 +18,6 @@ interface FormPayload {
 export const submitSkillForm = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => data as FormPayload)
   .handler(async ({ data }) => {
-    const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
     const destination =
       data.target === "project"
         ? { projectPath: data.cwd }
@@ -25,6 +26,7 @@ export const submitSkillForm = createServerFn({ method: "POST" })
               (await getKnownMarketplaces())[data.marketplace]?.installLocation ?? "",
             plugin: data.plugin,
           };
+    const name = data.name?.trim() || titleFromName(data.idea ?? "").split(" ")[0]?.toLowerCase() || "new-skill";
     const formData = JSON.stringify({
       mode: data.mode,
       target: data.target,
@@ -34,17 +36,24 @@ export const submitSkillForm = createServerFn({ method: "POST" })
         : { description: data.idea?.trim(), triggers: data.useWhen }),
       ...destination,
     });
-    fs.writeFileSync(resultFile, JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "UserPromptExpansion",
-        additionalContext: `Skill form data: ${formData}`,
-      },
-    }));
+
+    // Deterministic pre-scaffold: write the dir + frontmatter (+ skeleton for manual mode) now.
+    const scaffold = scaffoldSkill({
+      target: data.target,
+      name,
+      mode: data.mode,
+      idea: data.idea?.trim() ?? "",
+      triggers: data.useWhen ?? [],
+      projectPath: "projectPath" in destination ? destination.projectPath : undefined,
+      marketplacePath: "marketplacePath" in destination ? destination.marketplacePath : undefined,
+      plugin: "plugin" in destination ? destination.plugin : undefined,
+    });
+
+    writeCreateResult({ action: "create-skill", label: "Skill", formData, scaffold });
     return { ok: true };
   });
 
 export const cancelSkillForm = createServerFn({ method: "POST" }).handler(async () => {
-  const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-  fs.writeFileSync(resultFile, JSON.stringify({ decision: "block", reason: "Skill creation cancelled." }));
+  writeCancelResult("create-skill", "Skill creation cancelled.");
   return { ok: true };
 });
