@@ -15,12 +15,8 @@ interface WorkflowSelectorProps {
 }
 
 export default function TopNav({
-  previewOpen,
-  onPreviewToggle,
   workflowSelector,
 }: {
-  previewOpen?: boolean;
-  onPreviewToggle?: () => void;
   workflowSelector?: WorkflowSelectorProps;
 }) {
   const { connected } = useSessionLog();
@@ -210,20 +206,6 @@ export default function TopNav({
         )}
       </div>
 
-      {onPreviewToggle && (
-        <button
-          type="button"
-          onClick={onPreviewToggle}
-          title="Toggle YAML preview"
-          className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-mono border cursor-pointer focus:outline-none ${
-            previewOpen
-              ? "bg-(--primary-dim) border-primary text-(--ink)"
-              : "bg-(--bg-elev) border-(--line) text-(--ink-2)"
-          }`}
-        >
-          {"<>"}
-        </button>
-      )}
       <button
         type="button"
         onClick={handleStop}

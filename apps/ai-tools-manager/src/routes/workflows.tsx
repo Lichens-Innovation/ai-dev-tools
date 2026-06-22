@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import Button from "@repo/ui/button";
-import { Check, Plus, Sparkles } from "lucide-react";
-import SuccessState from "@repo/ui/success-state";
+import { Plus, Sparkles } from "lucide-react";
+import { toast } from "@repo/ui/toast";
 import TopNav from "../components/top-nav";
 import WorkflowCanvas from "../components/workflow-canvas";
-import AfkYamlPreview from "../components/afk-yaml-preview";
 import {
   getAfkConfig,
   submitAfkConfig,
@@ -20,7 +19,7 @@ export const Route = createFileRoute("/workflows")({
   component: WorkflowsPage,
 });
 
-type Phase = "idle" | "saving" | "done";
+type Phase = "idle" | "saving";
 
 function WorkflowsPage() {
   const loaderData = Route.useLoaderData() as AfkConfigResult;
@@ -28,7 +27,6 @@ function WorkflowsPage() {
 
   const [config, setConfig] = useState<AfkConfigV3>(loaderData.config);
   const [activeWorkflowIdx, setActiveWorkflowIdx] = useState<number>(0);
-  const [previewOpen, setPreviewOpen] = useState(true);
   const [phase, setPhase] = useState<Phase>("idle");
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState("");
@@ -121,28 +119,14 @@ function WorkflowsPage() {
         },
       },
     });
-    setPhase("done");
-  };
-
-  if (phase === "done") {
-    return (
-      <div className="w-full h-screen bg-(--bg) font-sans flex flex-col">
-        <TopNav />
-        <div className="flex-1 flex items-center justify-center">
-          <SuccessState
-            icon={<Check size={28} strokeWidth={2.4} />}
-            title="Workflows saved"
-            description={
-              <>
-                afk.yaml will be written to{" "}
-                <span className="font-mono text-(--ink-2)">{(cwd || "<cwd>").replace(/\/+$/, "")}/afk.yaml</span>.
-              </>
-            }
-          />
-        </div>
-      </div>
+    toast(
+      <>
+        Workflows saved to{" "}
+        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/afk.json</span>.
+      </>,
     );
-  }
+    setPhase("idle");
+  };
 
   const activeWorkflow = config.workflows[activeWorkflowIdx] ?? null;
   const availableSkillIds = config.skills_available;
@@ -150,8 +134,6 @@ function WorkflowsPage() {
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden flex flex-col">
       <TopNav
-        previewOpen={previewOpen}
-        onPreviewToggle={() => setPreviewOpen((v) => !v)}
         workflowSelector={{
           workflows: config.workflows.map((wf, i) => wf.name || `Workflow ${i + 1}`),
           activeIndex: activeWorkflowIdx,
@@ -163,10 +145,8 @@ function WorkflowsPage() {
       />
 
       <div
-        className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-300 ease-out"
-        style={{
-          gridTemplateColumns: previewOpen ? "280px 1fr 460px" : "280px 1fr",
-        }}
+        className="flex-1 grid overflow-hidden"
+        style={{ gridTemplateColumns: "280px 1fr" }}
       >
         {/* Left pane */}
         <div className="border-r border-(--line) overflow-y-auto flex flex-col p-4 gap-4">
@@ -313,13 +293,6 @@ function WorkflowsPage() {
             </div>
           )}
         </div>
-
-        {/* Right — YAML preview */}
-        {previewOpen && (
-          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
-            <AfkYamlPreview config={config} cwd={cwd} />
-          </div>
-        )}
       </div>
     </div>
   );

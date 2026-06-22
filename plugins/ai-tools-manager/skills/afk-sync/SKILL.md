@@ -1,6 +1,6 @@
 ---
 name: afk-sync
-description: "Re-renders the AFK orchestrator agent (.claude/agents/afk.md) from .claude/afk.json — refreshes the main-session skills (frontmatter) and the AFK:HANDOFFS workflow table. Use after hand-editing afk.json or afk.yaml, or when the orchestrator's handoff table looks out of date. Run /afk instead if you want to edit the config visually."
+description: "Re-renders the AFK orchestrator agent (.claude/agents/afk.md) from .claude/afk.json — refreshes the main-session skills (frontmatter) and the AFK:HANDOFFS workflow table. Use after hand-editing afk.json, or when the orchestrator's handoff table looks out of date. Run /afk instead if you want to edit the config visually."
 ---
 
 # AFK Sync
@@ -12,7 +12,7 @@ Regenerate the managed regions of the project's AFK orchestrator from the curren
 1. **Run the renderer** from the project root:
 
    ```bash
-   node "${CLAUDE_PROJECT_DIR:-.}/.claude/scripts/afk-render-orchestrator.js"
+   node "${CLAUDE_PROJECT_DIR:-.}/.claude/scripts/afk-render-orchestrator.cjs"
    ```
 
    This rewrites two regions of `.claude/agents/afk.md`:
@@ -27,5 +27,5 @@ Regenerate the managed regions of the project's AFK orchestrator from the curren
 
 ## Notes
 
-- The renderer is copied into `.claude/scripts/` by `/afk-install` at install time, alongside `afk-set-session-workflow.js` and `lib/afk-session.js`. If it is missing, re-run `/afk-install` to reinstall the runtime scripts.
+- The renderer is copied into `.claude/scripts/` by `/afk-install` at install time, alongside `afk-set-session-workflow.cjs` and `lib/afk-session.cjs`. If it is missing, re-run `/afk-install` to reinstall the runtime scripts.
 - `afk.json` is the source of truth. The `SubagentStart` hook reads it directly at runtime, so subagent skill injection is always current even between `/afk-sync` runs — only the orchestrator's own frontmatter/table need this manual refresh.

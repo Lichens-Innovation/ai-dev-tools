@@ -1,11 +1,11 @@
 ---
 name: rule-view
-description: "Explains how the /rules view in ai-tools-manager is built end-to-end: the left rule selectors (on-disk project rules + installable vibe-rules), the center directory tree (rule-tree.tsx), the live afk.yaml preview, how assignments map to the AfkConfigV3 `rules` slice in .claude/afk.json, and how afk-apply-rules.js moves/installs the rule files on save. Use when the user is working inside apps/ai-tools-manager and asks how the rules view works, how rules get assigned to the project root or directory paths, how rule files get moved or installed, how vibe-rules integrate, why a rule isn't showing up, or why a rule assignment isn't reaching the YAML."
+description: "Explains how the /rules view in ai-tools-manager is built end-to-end: the left rule selectors (on-disk project rules + installable vibe-rules), the center directory tree (rule-tree.tsx), how assignments map to the AfkConfigV3 `rules` slice in .claude/afk.json, and how afk-apply-rules.js moves/installs the rule files on save. Use when the user is working inside apps/ai-tools-manager and asks how the rules view works, how rules get assigned to the project root or directory paths, how rule files get moved or installed, how vibe-rules integrate, why a rule isn't showing up, or why a rule assignment isn't reaching the config."
 ---
 
 # Rule View
 
-The `/rules` route (`src/routes/rules.tsx`) is a visual editor for assigning a project's **rules** to scopes — the project root and/or specific directory paths. The user picks which rules to work with (left pane), assigns each to a row of the project's directory tree (center), and watches the resulting `afk.yaml` render live (right pane). On save it persists the **rules slice** of `.claude/afk.json` (v3), and a host-side script then physically **moves or installs** each rule file into its assigned directory.
+The `/rules` route (`src/routes/rules.tsx`) is a visual editor for assigning a project's **rules** to scopes — the project root and/or specific directory paths. The user picks which rules to work with (left pane), assigns each to a row of the project's directory tree (center). On save it persists the **rules slice** of `.claude/afk.json` (v3), and a host-side script then physically **moves or installs** each rule file into its assigned directory.
 
 It is the rules half of the `/afk` config flow — the `/workflows` route owns the other half (workflows + instances), and the two share one `afk.json`. See the `workflow-view` skill for that side.
 
@@ -13,24 +13,24 @@ It is the rules half of the `/afk` config flow — the `/workflows` route owns t
 
 ```
 ┌──────────────────────────── TopNav (top-nav.tsx) ────────────────────────────┐
-│ Workflows | Rules        (no workflow selector on this route)          <>  ☀ │
-├───────────────┬────────────────────────────────────────────┬────────────────┤
-│ Left pane     │ Center — RuleTree                           │ Right —        │
-│ (rules.tsx)   │ (rule-tree.tsx)                             │ afk.yaml       │
-│               │                                             │ preview        │
-│ Available     │   ⊟ (project root)     [chip ×] [chip ×] +  │ (afk-yaml-     │
-│  rules:       │   ▸ src               [chip ×]           +  │  preview.tsx)  │
-│  [chips]      │   ▸ src/backend       [vibe chip ×]      +  │                │
-│               │   ▸ apps               …                 +  │ derived live   │
-│ Installable   │                                             │ from config,   │
-│ (vibe-rules): │   (rows from getProjectTree)                │ read-only      │
-│  [chips]      │                                             │                │
-│  [Save rules] │                                             │                │
-└───────────────┴────────────────────────────────────────────┴────────────────┘
-   280px                          1fr                              460px
+│ Workflows | Rules        (no workflow selector on this route)              ☀ │
+├───────────────┬──────────────────────────────────────────────────────────────┤
+│ Left pane     │ Center — RuleTree                                            │
+│ (rules.tsx)   │ (rule-tree.tsx)                                              │
+│               │                                                              │
+│ Available     │   ⊟ (project root)     [chip ×] [chip ×] +                   │
+│  rules:       │   ▸ src               [chip ×]           +                   │
+│  [chips]      │   ▸ src/backend       [vibe chip ×]      +                   │
+│               │   ▸ apps               …                 +                   │
+│ Installable   │                                                              │
+│ (vibe-rules): │   (rows from getProjectTree)                                 │
+│  [chips]      │                                                              │
+│  [Save rules] │                                                              │
+└───────────────┴──────────────────────────────────────────────────────────────┘
+   280px                          1fr
 ```
 
-The grid is `280px 1fr 460px` with the preview open, `280px 1fr` when closed. The `<>` button in TopNav toggles `previewOpen`. The TopNav is shared with `/workflows` but rendered here **without** a `workflowSelector`, so the centered selector is absent.
+The grid is a fixed `280px 1fr` (left pane + center). The TopNav is shared with `/workflows` but rendered here **without** a `workflowSelector`, so the centered selector is absent.
 
 ## Data flow
 
@@ -51,14 +51,11 @@ RulesPage holds `config: AfkConfigV3` (source of truth for the YAML)
 RuleTree renders the project-root row + one row per tree dir; each row shows the
   assignment for its path and a hover "+" picker to assign a selected rule (one per rule)
         │   onAssign / onUnassign → setConfig (mutates config.rules only)
-        ▼
-AfkYamlPreview renders afk.yaml from `config` via afkConfigToYaml() (derived, read-only)
-        │
         ▼ (Save rules)
 submitAfkConfig({ sliceType: "rules", slice: { cwd, rules: config.rules } })
   • merges the rules slice into afk.json (preserves workflows/instances)
-  • writes <cwd>/.claude/afk.json AND <cwd>/afk.yaml
-  • writes /tmp/result.json → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
+  • writes <cwd>/.claude/afk.json
+  • writes /tmp/result.json → "AFK v3 config data: {JSON}"  for the skill
     (with aiToolsAction:"afk-config", sliceType:"rules" so the /ai-tools dispatcher can route it)
         │
         ▼ (host-side, run by the /afk skill — directly, or via the /ai-tools dispatcher loop)
@@ -72,9 +69,7 @@ afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installabl
 | Route, both rule selectors, save, assign/unassign handlers | `src/routes/rules.tsx` |
 | The directory tree + per-row chips + add-rule picker | `src/components/rule-tree.tsx` |
 | Rule chip multi-select (used by both left-pane sections) | `src/components/chip-multi-select.tsx` |
-| Top bar — nav links, preview toggle (no workflow selector here) | `src/components/top-nav.tsx` |
-| Live afk.yaml render (read-only, shared with /workflows) | `src/components/afk-yaml-preview.tsx` |
-| The single afk.yaml serializer (`yaml` package) | `src/utils/afk-yaml.ts` |
+| Top bar — nav links (no workflow selector here) | `src/components/top-nav.tsx` |
 | Types + `getAfkConfig` loader + `submitAfkConfig` server fn | `src/utils/agents-framework-kickstarter.ts` |
 | Directory tree loader (`getProjectTree`, walkDir) | `src/utils/afk-tree.ts` |
 | Project-rule loader (`getProjectRules`, scans every `.claude/rules/`) | `src/utils/afk-rules.ts` |
@@ -82,7 +77,7 @@ afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installabl
 | Source of project rules | `<cwd>/**/.claude/rules/*.md` |
 | **Host-side apply step** (move project files / `vibe-rules load`) | `plugins/ai-tools-manager/scripts/afk-apply-rules.js` |
 | vibe-rules pre-compute for Docker (writes `vibeRules` into marketplace JSON) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` |
-| Consuming prompt (writes afk.yaml, renders orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/afk/SKILL.md` (scaffolding lives in `afk-install/SKILL.md`) |
+| Consuming prompt (writes afk.json, renders orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/afk/SKILL.md` (scaffolding lives in `afk-install/SKILL.md`) |
 
 ## The data model (the `rules` slice)
 
@@ -121,7 +116,7 @@ Source bookkeeping:
 - `setGroupSelection(groupIds, next)` toggles selection within one section while leaving the other's intact, and **prunes `config.rules`** to the still-selected ids — so de-selecting a chip unassigns that rule everywhere.
 - `selectedRuleIds` is **seeded** on mount from `config.rules.map(r => r.id)`.
 
-**Save rules** → `handleSubmit` → `submitAfkConfig`. On success the page swaps to a `SuccessState`.
+**Save rules** → `handleSubmit` → `submitAfkConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
 
 ## Center — directory tree (rule-tree.tsx)
 
@@ -134,13 +129,9 @@ Each `TreeRow`:
 
 **One location per rule.** `handleAssign` (in `rules.tsx`) removes **every** prior assignment of that id before appending the new one (and stamps `source` from `ruleSource`). So a rule assigned to the root and then added to a directory **moves** — the root chip disappears and the directory chip appears. `handleUnassign` filters purely by id. The glob convention `"<dirPath>/**"` is written in `rule-tree.tsx`'s `handleAdd` and read back by `pathAssignments`; the two must stay in lockstep.
 
-## Right pane — afk.yaml preview (afk-yaml-preview.tsx)
-
-Identical component to the `/workflows` preview: a **read-only** `FilePreview` rendering `afkConfigToYaml(config)` (`src/utils/afk-yaml.ts`) at `<cwd>/afk.yaml`. The `rules` block renders each `AfkRuleV3` as `{ id, scope?, paths?, source? }`, omitting empty fields.
-
 ## Persistence (submitAfkConfig)
 
-Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `afk.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/afk.json` + `afk.yaml`, and writes the result file with `additionalContext` = `AFK v3 config data: {…}` **plus the verbatim afk.yaml**. The consuming `/afk` SKILL.md writes those files on the host, re-renders the orchestrator, then runs the apply step below (on a first run, `/afk-install` scaffolds the orchestrator first).
+Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `afk.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/afk.json`, and writes the result file with `additionalContext` = `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host, re-renders the orchestrator, then runs the apply step below (on a first run, `/afk-install` scaffolds the orchestrator first).
 
 ## Runtime — applying placements (afk-apply-rules.js)
 
@@ -166,4 +157,3 @@ Under Docker the UI can't call `vibe-rules` itself, so `launch-ai-tools-manager-
 - **A rule assigned in afk.json but missing from disk is stranded.** `selectedRuleIds` is seeded from `config.rules`, but the chips only render ids the loaders return. If the file was deleted (project) or removed from the store (vibe-rules), the chip can't render, yet the assignment persists until something prunes it — and `afk-apply-rules.js` reports it under `missing`/`errors`.
 - **Name collisions resolve to project.** If the same id exists both on disk and in `vibe-rules list`, `ruleSource` calls it `"project"` and the vibe section hides it. The on-disk file is moved; the vibe-rules version is ignored.
 - **Re-assigning a vibe-rule leaves the old install behind.** Project rules are *moved* (single file follows the assignment); vibe-rules are *installed* at the assigned path. The config holds one location per rule, but since the apply step never deletes, moving a vibe-rule to a new directory installs a fresh copy there and leaves the previous `.claude/rules/<id>.md` in place — by design (cleanup is the user's call).
-- **The YAML pane is derived, not editable.** To change what it shows, change `config` (or the rendering in `afk-yaml-preview.tsx`).

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Sets the active workflow name in <cwd>/.claude/afk_session.json.
 // Called by the AFK orchestrator at the start of each workflow execution:
-//   node afk-set-session-workflow.js "<workflow name>"
+//   node afk-set-session-workflow.cjs "<workflow name>"
 //
 // If no name is given, auto-resolves to the first configured workflow, else "default".
 // Creates the session file if absent; preserves existing generated_instances.

@@ -8,7 +8,7 @@
 //      .claude/afk_session*.{json,jsonl} across the repo / monorepo
 //
 // Scaffolding only — it does NOT render afk.md's managed regions. Rendering needs
-// afk.json (written by the form) and is done afterwards by afk-render-orchestrator.js
+// afk.json (written by the form) and is done afterwards by afk-render-orchestrator.cjs
 // (the /afk skill runs it; /afk-sync wraps it standalone). The /afk-install skill
 // runs this first to lay down afk.md, then hands off to /afk to author + render.
 //
@@ -139,18 +139,20 @@ try {
   const installedAgent = copyIfMissing(path.join(pluginRoot, "templates", "afk.md"), path.join(agentsDir, "afk.md"));
 
   // Runtime scripts the orchestrator / repo invoke via $CLAUDE_PROJECT_DIR.
+  // They run in-place inside the project, whose package.json may declare
+  // "type": "module" — so they must be .cjs to stay CommonJS regardless.
   // Always refreshed so projects pick up plugin fixes.
   fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "afk-set-session-workflow.js"),
-    path.join(scriptsDir, "afk-set-session-workflow.js")
+    path.join(pluginRoot, "scripts", "afk-set-session-workflow.cjs"),
+    path.join(scriptsDir, "afk-set-session-workflow.cjs")
   );
   fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "afk-render-orchestrator.js"),
-    path.join(scriptsDir, "afk-render-orchestrator.js")
+    path.join(pluginRoot, "scripts", "afk-render-orchestrator.cjs"),
+    path.join(scriptsDir, "afk-render-orchestrator.cjs")
   );
   fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "lib", "afk-session.js"),
-    path.join(scriptsDir, "lib", "afk-session.js")
+    path.join(pluginRoot, "scripts", "lib", "afk-session.cjs"),
+    path.join(scriptsDir, "lib", "afk-session.cjs")
   );
 
   // PreToolUse Bash guard that blocks reading .env secret files. Copied with its

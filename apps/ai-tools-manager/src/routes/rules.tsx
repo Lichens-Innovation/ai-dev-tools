@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import Button from "@repo/ui/button";
-import { Check, Sparkles } from "lucide-react";
-import SuccessState from "@repo/ui/success-state";
+import { Sparkles } from "lucide-react";
+import { toast } from "@repo/ui/toast";
 import TopNav from "../components/top-nav";
 import RuleTree from "../components/rule-tree";
-import AfkYamlPreview from "../components/afk-yaml-preview";
 import ChipMultiSelect from "../components/chip-multi-select";
 import {
   getAfkConfig,
@@ -39,14 +38,13 @@ export const Route = createFileRoute("/rules")({
   component: RulesPage,
 });
 
-type Phase = "idle" | "saving" | "done";
+type Phase = "idle" | "saving";
 
 function RulesPage() {
   const loaderData = Route.useLoaderData() as RulesLoaderData;
   const { cwd, tree, availableRules, vibeRules } = loaderData;
 
   const [config, setConfig] = useState<AfkConfigV3>(loaderData.config);
-  const [previewOpen, setPreviewOpen] = useState(true);
   const [phase, setPhase] = useState<Phase>("idle");
 
   // IDs of rules the user has "selected" (toggled on) — the pool the tree can assign.
@@ -110,39 +108,23 @@ function RulesPage() {
         slice: { cwd, rules: config.rules },
       },
     });
-    setPhase("done");
-  };
-
-  if (phase === "done") {
-    return (
-      <div className="w-full h-screen bg-(--bg) font-sans flex flex-col">
-        <TopNav />
-        <div className="flex-1 flex items-center justify-center">
-          <SuccessState
-            icon={<Check size={28} strokeWidth={2.4} />}
-            title="Rules saved"
-            description={
-              <>
-                afk.yaml will be written to{" "}
-                <span className="font-mono text-(--ink-2)">{(cwd || "<cwd>").replace(/\/+$/, "")}/afk.yaml</span>, and
-                selected rules moved / installed into their assigned directories.
-              </>
-            }
-          />
-        </div>
-      </div>
+    toast(
+      <>
+        Rules saved to{" "}
+        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/afk.json</span> and moved
+        into their assigned directories.
+      </>,
     );
-  }
+    setPhase("idle");
+  };
 
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden flex flex-col">
-      <TopNav previewOpen={previewOpen} onPreviewToggle={() => setPreviewOpen((v) => !v)} />
+      <TopNav />
 
       <div
-        className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-300 ease-out"
-        style={{
-          gridTemplateColumns: previewOpen ? "280px 1fr 460px" : "280px 1fr",
-        }}
+        className="flex-1 grid overflow-hidden"
+        style={{ gridTemplateColumns: "280px 1fr" }}
       >
         {/* Left pane */}
         <div className="border-r border-(--line) overflow-y-auto flex flex-col p-4 gap-4">
@@ -222,13 +204,6 @@ function RulesPage() {
             />
           )}
         </div>
-
-        {/* Right — YAML preview */}
-        {previewOpen && (
-          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
-            <AfkYamlPreview config={config} cwd={cwd} />
-          </div>
-        )}
       </div>
     </div>
   );

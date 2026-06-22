@@ -13,7 +13,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, readJson, resolveWorkflowName, readSession, writeSession } = require("./lib/afk-session");
+const { readStdin, readJson, resolveWorkflowName, readSession, writeSession } = require("./lib/afk-session.cjs");
 
 // Read the handoff_details payload template for a sender -> receiver edge.
 // Convention: handoffs/<sender>/<receiver>.md (dir names === agent `name`). Kept
@@ -169,14 +169,14 @@ function collect(cfg, sessionPath, agentType) {
   }
   if (result.loadedSkills.length > 0) {
     parts.push(
-      `Skills to load for the \`${agentType}\` agent instance (afk.yaml v3, loaded_skills): ${result.loadedSkills.join(", ")}.\n\n` +
+      `Skills to load for the \`${agentType}\` agent instance (afk.json v3, loaded_skills): ${result.loadedSkills.join(", ")}.\n\n` +
         `Load each one with the Skill tool before starting your work, then follow your agent file as written.`
     );
   }
 
   if (result.referencedSkills.length > 0) {
     parts.push(
-      `Skills available to the \`${agentType}\` agent instance (afk.yaml v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
+      `Skills available to the \`${agentType}\` agent instance (afk.json v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
         `Do NOT load these up front. Load one with the Skill tool only if the task at hand involves the logic that ` +
         `skill describes (check each skill's description to decide); otherwise ignore it.`
     );

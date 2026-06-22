@@ -17,7 +17,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readJson, sessionLogPath } = require("./lib/afk-session");
+const { readJson, sessionLogPath } = require("./lib/afk-session.cjs");
 
 // --- tuning knobs (candidate thresholds, intentionally loose) -----------------
 const REPEAT_READ_MIN = 3; // same file Read this many times → flag

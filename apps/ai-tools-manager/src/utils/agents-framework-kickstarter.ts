@@ -10,7 +10,6 @@ import {
   getInstalledPluginSkills,
 } from "@repo/claude-fs";
 import { readCwd, mountedProjectPath } from "./afk-fs";
-import { afkConfigToYaml } from "./afk-yaml";
 
 // `source` records where the agent/skill was discovered: "project" (the project's
 // own .claude/), "user" (the global ~/.claude/), the bundled AFK plugin, or an
@@ -124,6 +123,7 @@ export interface AfkEdgeV3 {
   to: string;
   kind: "success" | "condition";
   label?: string;
+  label_offset?: { x: number; y: number };
   sourceHandle?: string;
   targetHandle?: string;
 }
@@ -456,38 +456,6 @@ function readConfig(jsonPath: string, implAgents: string[] = ["backend"], skillM
   }
 }
 
-// NOTE: this is the TS twin of `successPath` in the plugin's
-// scripts/afk-render-orchestrator.js. They can't share code (app TS vs plain-Node
-// plugin), so their OUTPUT must stay byte-identical — afk.yaml's `success_path`
-// (rendered here) and the orchestrator's AFK:HANDOFFS table (rendered there) describe
-// the same path. Keep the separator (" → ") and labels ("@<instance>", "human review")
-// in sync across both files.
-export function computeSuccessPath(workflow: AfkWorkflowV3, instances: AfkInstanceV3[]): string {
-  const labelFor = (nodeId: string): string => {
-    if (nodeId === "main-session") return "";
-    const n = workflow.nodes.find((x) => x.id === nodeId);
-    if (!n) return nodeId;
-    if (n.type === "agent") {
-      const inst = instances.find((i) => i.name === n.instance);
-      return "@" + (inst?.name ?? n.instance ?? n.id);
-    }
-    if (n.type === "skill") return "/" + (n.skill ?? n.id);
-    return "human review";
-  };
-  const out: string[] = [];
-  let cur = "main-session";
-  const seen = new Set<string>();
-  while (!seen.has(cur)) {
-    seen.add(cur);
-    const next = workflow.edges.find((e) => e.from === cur && e.kind === "success");
-    if (!next) break;
-    const label = labelFor(next.to);
-    if (label) out.push(label);
-    cur = next.to;
-  }
-  return out.join(" → ");
-}
-
 export const getAfkConfig = createServerFn({ method: "GET" }).handler(async (): Promise<AfkConfigResult> => {
   const cwd = readCwd();
   const config = readConfig(
@@ -522,17 +490,11 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
       current.rules = s.rules;
     }
 
-    // afk.json is the source of truth (read by the SubagentStart hook). afk.yaml is
-    // the human-readable rendering. Both are written here for local dev; the skill
-    // re-writes them verbatim from additionalContext so Docker runs work too.
-    const afkYaml = afkConfigToYaml(current);
+    // afk.json is the single source of truth (read by the SubagentStart hook and the
+    // orchestrator renderer). Written here for local dev; the skill re-writes it
+    // verbatim from additionalContext so Docker runs work too.
     if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
     fs.writeFileSync(jsonPath, JSON.stringify(current, null, 2));
-    try {
-      fs.writeFileSync(path.join(data.cwd, "afk.yaml"), afkYaml);
-    } catch {
-      // In Docker the host cwd may not be mounted; the skill writes afk.yaml instead.
-    }
 
     const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
     fs.writeFileSync(
@@ -545,8 +507,7 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
         hookSpecificOutput: {
           hookEventName: "UserPromptExpansion",
           additionalContext:
-            `AFK v3 config data: ${JSON.stringify({ projectPath: data.cwd, config: current })}\n\n` +
-            `Canonical afk.yaml to write verbatim to <projectPath>/afk.yaml:\n\`\`\`yaml\n${afkYaml}\`\`\``,
+            `AFK v3 config data: ${JSON.stringify({ projectPath: data.cwd, config: current })}`,
         },
       })
     );

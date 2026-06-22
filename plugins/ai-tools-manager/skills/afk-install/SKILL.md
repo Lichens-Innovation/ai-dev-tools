@@ -1,11 +1,11 @@
 ---
 name: afk-install
-description: "Installs the AFK orchestrator into this project, then opens the visual editor to author the config. Detects the implementation agent(s) from the repo, scaffolds the afk orchestrator agent + runtime scripts + settings (agent: afk, bash-validation hook) + gitignore, then hands off to the /afk skill to fill the canvas, write afk.json/afk.yaml, render the orchestrator, and place rules. Use when the user runs /afk-install, or asks to set up / scaffold / install the AFK subagents workflow for this project. To re-edit an already-installed project, use /afk instead."
+description: "Installs the AFK orchestrator into this project, then opens the visual editor to author the config. Detects the implementation agent(s) from the repo, scaffolds the afk orchestrator agent + runtime scripts + settings (agent: afk, bash-validation hook) + gitignore, then hands off to the /afk skill to fill the canvas, write afk.json, render the orchestrator, and place rules. Use when the user runs /afk-install, or asks to set up / scaffold / install the AFK subagents workflow for this project. To re-edit an already-installed project, use /afk instead."
 ---
 
 # AFK Install
 
-One-time setup of AFK for a project: lay down the orchestrator scaffolding, then open the visual editor to author the config. The heavy lifting of the config itself (form → `afk.json`/`afk.yaml` → render → rules) is delegated to the **`/afk`** skill, so this skill only does the parts `/afk` can't: detecting the project's implementation agent(s) and scaffolding the orchestrator the editor needs.
+One-time setup of AFK for a project: lay down the orchestrator scaffolding, then open the visual editor to author the config. The heavy lifting of the config itself (form → `afk.json` → render → rules) is delegated to the **`/afk`** skill, so this skill only does the parts `/afk` can't: detecting the project's implementation agent(s) and scaffolding the orchestrator the editor needs.
 
 ```
 afk-install:  analyze repo → offer local skills → scaffold orchestrator → run /afk (form + write + render + rules) → report
@@ -56,7 +56,7 @@ $ARGUMENTS
 
    This is idempotent and:
    - copies the `afk` orchestrator agent to `<projectPath>/.claude/agents/afk.md` (only if absent — your edits are preserved on re-runs),
-   - copies the runtime scripts (`afk-set-session-workflow.js`, `afk-render-orchestrator.js`, `bash-validation.sh`, `lib/afk-session.js`) into `<projectPath>/.claude/scripts/`,
+   - copies the runtime scripts (`afk-set-session-workflow.cjs`, `afk-render-orchestrator.cjs`, `bash-validation.sh`, `lib/afk-session.cjs`) into `<projectPath>/.claude/scripts/`,
    - merges `"agent": "afk"` and the `bash-validation.sh` PreToolUse Bash hook into `<projectPath>/.claude/settings.json` (preserving other keys), so new sessions adopt the orchestrator and `.env` reads are blocked,
    - ensures `<projectPath>/.claude/.gitignore` ignores the ephemeral session files (`afk_session.json`, `afk_session.log.jsonl`),
    - adds an `# AFK` section to the repo-root `.gitignore` (`git rev-parse --show-toplevel`) ignoring every nested session file across the repo / monorepo via `**/.claude/afk_session.json` and `**/.claude/afk_session.log.jsonl`.
@@ -69,7 +69,7 @@ $ARGUMENTS
 
    > Run the `afk` skill with arguments: `<implAgents>` (e.g. `backend,frontend`), and the skill map `<json>` (e.g. `{"frontend":["react"],"test":["component-test"]}`) when non-empty.
 
-   `/afk` turns these into `AFK_IMPL_AGENTS` / `AFK_SKILL_MAP` on the launcher (see its SKILL.md). It opens the visual editor, writes `afk.json` + `afk.yaml`, re-renders the orchestrator from the new config, and applies rule placements — and reports those details. If the user cancels the form, `/afk` stops and reports the reason; nothing further to do here.
+   `/afk` turns these into `AFK_IMPL_AGENTS` / `AFK_SKILL_MAP` on the launcher (see its SKILL.md). It opens the visual editor, writes `afk.json`, re-renders the orchestrator from the new config, and applies rule placements — and reports those details. If the user cancels the form, `/afk` stops and reports the reason; nothing further to do here.
 
 5. **Confirm the install.** After `/afk` returns, add a short scaffold-level summary on top of what it already reported:
    - whether the orchestrator was newly installed (`installedAgent`) and whether `agent: afk` / the bash-validation hook were added to `settings.json`,
@@ -80,19 +80,19 @@ $ARGUMENTS
 
 `afk-inject-agent-context.js` runs on `SubagentStart` for **every** subagent (the hook matcher is `.*`), so custom user/project/plugin agents mapped on the canvas get injected too, not just the bundled workers. It receives `agent_type` and `cwd` from stdin, then:
 
-1. Reads `<cwd>/.claude/afk_session.json` to find the active workflow name (set by `afk-set-session-workflow.js`).
+1. Reads `<cwd>/.claude/afk_session.json` to find the active workflow name (set by `afk-set-session-workflow.cjs`).
 2. Reads `<cwd>/.claude/afk.json` (requires `version: 3`).
 3. Finds workflow nodes whose resolved instance's `agent === agent_type`.
 4. Emits `hookSpecificOutput { hookEventName: "SubagentStart", additionalContext }` listing the instance's skills in two blocks — `loaded_skills` (auto-load with the `Skill` tool before working) and `referenced_skills` (available; load only if the task involves the logic that skill describes) — plus the condition-edge labels. When a condition edge exists, the subagent is told to end its final message with a `HANDOFF: <label>` line (or `HANDOFF: success`) so the orchestrator can route deterministically.
 
 If `afk.json` is absent, not v3, or the agent type is unmapped (no matching instance in any workflow), the hook exits silently.
 
-If the active workflow can't be resolved — the recorded name matches no workflow, or none is set while the project has more than one workflow — the hook still injects (unioned across all workflows) but **prepends a `⚠️ AFK warning`** to the context telling the orchestrator to run `afk-set-session-workflow.js` first, since the unioned skills may be wrong.
+If the active workflow can't be resolved — the recorded name matches no workflow, or none is set while the project has more than one workflow — the hook still injects (unioned across all workflows) but **prepends a `⚠️ AFK warning`** to the context telling the orchestrator to run `afk-set-session-workflow.cjs` first, since the unioned skills may be wrong.
 
 Known limitation: if two instances of the same agent appear in one workflow, the hook can only key off `agent_type` and merges (unions) both instances' skills and conditions (a skill that is `loaded` in either instance wins over being merely `referenced`). Prefer one instance per agent type per workflow.
 
 ## Notes
 
-- This skill is the **scaffold + delegate** entry point; the config materialisation (form → `afk.json`/`afk.yaml` → render → rules) lives entirely in the `/afk` skill so there is one place that owns it.
+- This skill is the **scaffold + delegate** entry point; the config materialisation (form → `afk.json` → render → rules) lives entirely in the `/afk` skill so there is one place that owns it.
 - Re-running `/afk-install` is safe: scaffolding is idempotent, and a present `afk.md` is never overwritten. To just re-edit config on an installed project, prefer `/afk` (it skips the scaffold step).
 - Instances are project-scoped and may appear in multiple workflows; the hook uses the active workflow from `afk_session.json`. An unplaced instance is harmless.

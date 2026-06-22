@@ -18,7 +18,7 @@ You are the AFK orchestrator for this project. Your role is to classify incoming
 Before doing anything else, identify the workflow that matches the user's request, then record it so the `SubagentStart` hook can inject the correct skills and handoff rules into each subagent:
 
 ```bash
-node "$CLAUDE_PROJECT_DIR/.claude/scripts/afk-set-session-workflow.js" "<workflow name>"
+node "$CLAUDE_PROJECT_DIR/.claude/scripts/afk-set-session-workflow.cjs" "<workflow name>"
 ```
 
 ### Step 1 — Classify the request
@@ -62,7 +62,7 @@ If the line is missing or the label doesn't match any known condition, treat it 
 
 ## Principles
 
-- **One workflow at a time.** Set the active workflow via `afk-set-session-workflow.js` before invoking any subagents.
+- **One workflow at a time.** Set the active workflow via `afk-set-session-workflow.cjs` before invoking any subagents.
 - **Trust the success path.** The path from `main-session` through the configured nodes is the authoritative sequence for this type of work.
 - **Human reviews are hard stops.** Never bypass a `human review` step. Stop and surface the work to the user.
 - **Skill steps run inline.** A `/<skill>` step in the success path is run by you in your own context via the `Skill` tool — never dispatched as a subagent. Feed it the prior step's handoff payload where relevant, then continue.

@@ -1,6 +1,6 @@
 ---
 name: afk
-description: "Opens the AFK visual editor (web form) for an already-installed project, then materialises the edited config: writes .claude/afk.json + afk.yaml, re-renders the orchestrator agent, and applies rule placements. Use when the user runs /afk, or asks to edit the AFK workflow/agents/skills/rules visually, open the AFK canvas, or change agent↔skill mappings. Requires AFK to already be installed — if it is not, this skill stops and points the user at /afk-install."
+description: "Opens the AFK visual editor (web form) for an already-installed project, then materialises the edited config: writes .claude/afk.json, re-renders the orchestrator agent, and applies rule placements. Use when the user runs /afk, or asks to edit the AFK workflow/agents/skills/rules visually, open the AFK canvas, or change agent↔skill mappings. Requires AFK to already be installed — if it is not, this skill stops and points the user at /afk-install."
 ---
 
 # AFK (edit + sync)
@@ -25,7 +25,7 @@ $ARGUMENTS
 
    If it prints `missing`, **stop without launching the form**. The orchestrator hasn't been installed, so editing config now would leave an unwired `afk.json`. Tell the user to run **`/afk-install`** first (it scaffolds the orchestrator and then opens this same editor), then stop.
 
-> **Dispatcher path.** When invoked by the `/ai-tools` dispatcher, the form payload (the `AFK v3 config data:` block + verbatim `afk.yaml`) is already supplied to you and the app already wrote `.claude/afk.json`. In that case **skip Step 1** (do not launch the form) and go straight to Step 2 with the supplied payload; Steps 2–5 are unchanged. Step 0's precondition still applies.
+> **Dispatcher path.** When invoked by the `/ai-tools` dispatcher, the form payload (the `AFK v3 config data:` block) is already supplied to you and the app already wrote `.claude/afk.json`. In that case **skip Step 1** (do not launch the form) and go straight to Step 2 with the supplied payload; Steps 2–5 are unchanged. Step 0's precondition still applies.
 
 1. **Launch the form and read the payload.** Run the form launcher in the **background** — the user fills the form interactively, which can take a while:
 
@@ -42,9 +42,7 @@ $ARGUMENTS
      bash "${CLAUDE_SKILL_DIR}/../../scripts/launch-ai-tools-manager-app.sh" agents-framework-kickstarter
    ```
 
-   `launch-ai-tools-manager-app.sh` builds the image, opens the browser, and blocks until the user submits. When it completes, **its stdout is the form result** — a string containing two things:
-   - a line beginning `AFK v3 config data:` followed by a JSON object `{ "projectPath": "<absolute cwd>", "config": { …AfkConfigV3… } }`
-   - a fenced ```` ```yaml ```` block labelled "Canonical afk.yaml to write verbatim" — the exact text to write to `afk.yaml`.
+   `launch-ai-tools-manager-app.sh` builds the image, opens the browser, and blocks until the user submits. When it completes, **its stdout is the form result** — a line beginning `AFK v3 config data:` followed by a JSON object `{ "projectPath": "<absolute cwd>", "config": { …AfkConfigV3… } }`.
 
    If the user cancels, the result is a `{ "decision": "block", "reason": … }` payload — stop and report the reason instead of writing anything.
 
@@ -87,19 +85,18 @@ $ARGUMENTS
    - `workflow_instances` is the project-scoped array of named `{ name, agent, loaded_skills[], referenced_skills[] }` records. `loaded_skills` are auto-loaded by the `SubagentStart` hook before the agent works; `referenced_skills` are surfaced as available and loaded only if the task needs them. Nodes reference an instance by name; an agent node's `id` equals its instance name.
    - `main-session` is the implicit entry point — it appears only in `edges` (`from: "main-session"`), never in `nodes`.
    - Node types are `agent`, `human_review`, and `skill`. A `skill` node carries a `skill` id (the skill-node analog of an agent node's `instance`) and renders in the success path as `/<skill>`; the orchestrator runs it inline via the `Skill` tool rather than dispatching a subagent.
-   - `success_path` is **derived** by the UI (and rendered into `afk.yaml` for humans); it is never stored in `afk.json`.
+   - `success_path` is **derived** (the orchestrator renderer computes it for the `AFK:HANDOFFS` table); it is never stored in `afk.json`.
    - each `rules` entry is **one assignment of a rule to one location** (`scope: "project"` for the root, or `paths: ["<dir>/**"]` for a directory) with a `source` of `"project"` (on-disk rule file, moved into place) or `"vibe-rules"` (installed via `vibe-rules load`). A rule id appears at most once. Step 4 applies these to the filesystem.
 
-2. **Write the two config files** under `projectPath`:
+2. **Write the config file** under `projectPath`:
    - `<projectPath>/.claude/afk.json` — the `config` object serialized with `JSON.stringify(config, null, 2)`: 2-space indent and **no trailing newline**. This must be byte-identical to what the app writes, so a double-write in local dev produces no git diff. This is the source of truth the hooks read. Create `.claude/` if needed.
-   - `<projectPath>/afk.yaml` — **the verbatim YAML block** from the payload. Do not reformat or regenerate it; write it exactly as given.
 
-   (In local dev the app already wrote both; writing them here makes the skill correct under Docker too, where the container can't reach the host project path.)
+   (In local dev the app already wrote it; writing it here makes the skill correct under Docker too, where the container can't reach the host project path.)
 
 3. **Re-render the orchestrator** from the new `afk.json`:
 
    ```bash
-   node "${CLAUDE_PROJECT_DIR:-.}/.claude/scripts/afk-render-orchestrator.js" "<projectPath>"
+   node "${CLAUDE_PROJECT_DIR:-.}/.claude/scripts/afk-render-orchestrator.cjs" "<projectPath>"
    ```
 
    This rewrites the managed regions of `<projectPath>/.claude/agents/afk.md` — the frontmatter `skills:` array (from `main_session_loaded_skills`) and the `<!-- AFK:HANDOFFS -->` table (from each workflow's derived success path). Everything else in `afk.md` (custom orchestration prose) is preserved. This is the same renderer `/afk-sync` runs. If it reports `afk.md not found`, the precondition in Step 0 was bypassed — stop and tell the user to run `/afk-install`.
@@ -127,6 +124,6 @@ $ARGUMENTS
 ## Notes
 
 - This skill assumes the orchestrator is already scaffolded (Step 0). The one-time scaffolding — copying `afk.md`, the runtime scripts, `agent: afk`, the bash-validation hook, and the gitignore — is done by **`/afk-install`**, which then invokes this skill to author + render the config.
-- `/afk-sync` is the lighter cousin: it re-renders the orchestrator from the current `afk.json` **without** opening the form, for when you've hand-edited `afk.json`/`afk.yaml`.
+- `/afk-sync` is the lighter cousin: it re-renders the orchestrator from the current `afk.json` **without** opening the form, for when you've hand-edited `afk.json`.
 - Skills referenced in instance `loaded_skills` / `referenced_skills` arrays must exist as project skills (`<projectPath>/.claude/skills/<id>/SKILL.md`).
 - The bundled subagents live at `plugins/ai-tools-manager/agents/`. Their frontmatter has no `skills:` array — that list comes from `afk.json` at runtime via the hook. (The `afk` **orchestrator** is the exception: its frontmatter `skills:` is materialised from `main_session_loaded_skills` because it runs as the main session, not as a SubagentStart-hooked worker.)

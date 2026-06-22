@@ -9,9 +9,9 @@ import ChipInput from "@repo/ui/chip-input";
 import Select from "@repo/ui/select";
 import ModePill from "@repo/ui/mode-pill";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import SuccessState from "@repo/ui/success-state";
+import { toast } from "@repo/ui/toast";
 import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
-import { Sparkles, Pencil, Keyboard, Check, Store, Folder } from "lucide-react";
+import { Sparkles, Pencil, Keyboard, Store, Folder } from "lucide-react";
 import { getMarketplaceData } from "../utils/marketplace";
 import { submitSubagentForm, cancelSubagentForm } from "../utils/create-subagent";
 import SubagentTemplatePreview from "../components/subagent-template-preview";
@@ -44,7 +44,7 @@ const subagentSchema = z
   });
 
 type SubagentForm = z.infer<typeof subagentSchema>;
-type Phase = "idle" | "creating" | "done" | "cancelled";
+type Phase = "idle" | "creating" | "cancelled";
 
 export const Route = createFileRoute("/create-subagent")({
   loader: () => getMarketplaceData(),
@@ -84,6 +84,7 @@ function CreateSubagent() {
     watch,
     setValue,
     getValues,
+    reset,
     formState: { errors },
   } = useForm<SubagentForm>({
     resolver: zodResolver(subagentSchema),
@@ -127,7 +128,13 @@ function CreateSubagent() {
   const onSubmit = async (values: SubagentForm) => {
     setPhase("creating");
     await submitSubagentForm({ data: { ...values, cwd } });
-    setPhase("done");
+    toast(
+      <>
+        Subagent <span className="font-mono text-(--ink)">{values.name || "my-agent"}</span> submitted — generating now.
+      </>,
+    );
+    reset();
+    setPhase("idle");
   };
 
   const onError = (errs: typeof errors) => {
@@ -175,25 +182,12 @@ function CreateSubagent() {
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden">
       <div
-        className="h-full grid transition-[grid-template-columns] duration-300 ease-out"
-        style={{ gridTemplateColumns: phase === "done" ? "1fr" : "minmax(0, 1fr) 460px" }}
+        className="h-full grid"
+        style={{ gridTemplateColumns: "minmax(0, 1fr) 460px" }}
       >
         <div className="overflow-y-auto px-10 py-8">
           <div className="max-w-155 mx-auto">
-            {phase === "done" ? (
-              <SuccessState
-                icon={<Check size={28} strokeWidth={2.4} />}
-                title="Your subagent is being created"
-                description={
-                  <>
-                    The repository is generating it now. You can close this page — you'll find{" "}
-                    <span className="font-mono text-(--ink-2)">{name || "my-agent"}</span> in your marketplace when it's
-                    ready.
-                  </>
-                }
-              />
-            ) : (
-              <>
+            <>
                 <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                   <h1 className="m-0 text-2xl font-bold text-(--ink) tracking-[-0.5px]">New subagent</h1>
                   <Controller
@@ -416,27 +410,24 @@ function CreateSubagent() {
                     {phase === "creating" ? "Creating…" : "Create subagent"}
                   </Button>
                 </div>
-              </>
-            )}
+            </>
           </div>
         </div>
 
-        {phase !== "done" && (
-          <div className="border-l border-(--line) overflow-y-auto flex flex-col">
-            <SubagentTemplatePreview
-              mode={mode}
-              target={target}
-              name={name}
-              idea={idea}
-              description={description}
-              triggers={triggers}
-              tools={tools}
-              marketplace={marketplace}
-              plugin={plugin}
-              cwd={cwd}
-            />
-          </div>
-        )}
+        <div className="border-l border-(--line) overflow-y-auto flex flex-col">
+          <SubagentTemplatePreview
+            mode={mode}
+            target={target}
+            name={name}
+            idea={idea}
+            description={description}
+            triggers={triggers}
+            tools={tools}
+            marketplace={marketplace}
+            plugin={plugin}
+            cwd={cwd}
+          />
+        </div>
       </div>
       <ShortcutsDialog
         open={helpOpen}

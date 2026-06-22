@@ -127,6 +127,7 @@ function rfEdgesToAfkEdges(edges: Edge[]): AfkEdgeV3[] {
       to: e.target,
       kind: (afk?.kind ?? (e.type === "conditionEdge" ? "condition" : "success")) as "success" | "condition",
       label: typeof e.label === "string" ? e.label : afk?.label,
+      label_offset: afk?.label_offset,
       sourceHandle: e.sourceHandle ?? undefined,
       targetHandle: e.targetHandle ?? undefined,
     };
@@ -578,13 +579,69 @@ function ConditionEdge({
     targetY,
     targetPosition,
   });
-  const onEditLabel = (data as { onEditLabel?: (id: string) => void } | undefined)?.onEditLabel;
+  const typedData = data as { onEditLabel?: (id: string) => void; onLabelMove?: (id: string, offset: { x: number; y: number }) => void; afkEdge?: AfkEdgeV3 } | undefined;
+  const onEditLabel = typedData?.onEditLabel;
+  const onLabelMove = typedData?.onLabelMove;
+  const storedOffset = typedData?.afkEdge?.label_offset;
+
+  const { getViewport } = useReactFlow();
+  const localOffsetRef = useRef<{ x: number; y: number }>(storedOffset ?? { x: 0, y: 0 });
+  const [displayOffset, setDisplayOffset] = useState<{ x: number; y: number }>(storedOffset ?? { x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null);
+
+  // Sync display when stored offset changes (e.g. on save/load)
+  useEffect(() => {
+    const off = storedOffset ?? { x: 0, y: 0 };
+    localOffsetRef.current = off;
+    setDisplayOffset(off);
+  }, [storedOffset?.x, storedOffset?.y]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragStartRef.current = { mx: e.clientX, my: e.clientY, ox: localOffsetRef.current.x, oy: localOffsetRef.current.y };
+    setIsDragging(true);
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStartRef.current) return;
+    const { zoom } = getViewport();
+    const dx = (e.clientX - dragStartRef.current.mx) / zoom;
+    const dy = (e.clientY - dragStartRef.current.my) / zoom;
+    const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
+    localOffsetRef.current = next;
+    setDisplayOffset(next);
+  }, [getViewport]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStartRef.current) return;
+    const { zoom } = getViewport();
+    const dx = (e.clientX - dragStartRef.current.mx) / zoom;
+    const dy = (e.clientY - dragStartRef.current.my) / zoom;
+    const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
+    localOffsetRef.current = next;
+    dragStartRef.current = null;
+    setIsDragging(false);
+    onLabelMove?.(id, next);
+  }, [id, getViewport, onLabelMove]);
+
   const hasLabel = typeof label === "string" && label.length > 0;
+  const finalX = labelX + displayOffset.x;
+  const finalY = labelY + displayOffset.y;
+
+  // When the label has been repositioned, draw a quadratic bezier that passes through
+  // the label position at t=0.5: CP = 2·label − (source+target)/2
+  const hasOffset = displayOffset.x !== 0 || displayOffset.y !== 0;
+  const activePath = hasOffset
+    ? `M ${sourceX},${sourceY} Q ${2 * finalX - (sourceX + targetX) / 2},${2 * finalY - (sourceY + targetY) / 2} ${targetX},${targetY}`
+    : edgePath;
+
   return (
     <>
       <BaseEdge
         id={id}
-        path={edgePath}
+        path={activePath}
         markerEnd={markerEnd}
         style={{ stroke: "#f97316", strokeWidth: 1.5, strokeDasharray: "5 4" }}
       />
@@ -592,10 +649,15 @@ function ConditionEdge({
         <div
           style={{
             position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            transform: `translate(-50%, -50%) translate(${finalX}px,${finalY}px)`,
             pointerEvents: "all",
+            cursor: isDragging ? "grabbing" : "grab",
+            userSelect: "none",
           }}
           className="flex items-center gap-1 nodrag nopan"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
         >
           {hasLabel ? (
             <span
@@ -615,6 +677,7 @@ function ConditionEdge({
               e.stopPropagation();
               onEditLabel?.(id);
             }}
+            onPointerDown={(e) => e.stopPropagation()}
             className="w-4 h-4 flex items-center justify-center rounded bg-white border border-orange-300 text-orange-500 text-[9px] leading-none hover:bg-orange-50 cursor-pointer focus:outline-none shadow-sm"
             title="Edit label"
           >
@@ -794,6 +857,26 @@ export default function WorkflowCanvas({
       onMainSessionSkillsChange(skills);
     },
     [onMainSessionSkillsChange]
+  );
+
+  // ── Move condition-edge label ────────────────────────────────────
+
+  const moveLabelOffset = useCallback(
+    (edgeId: string, offset: { x: number; y: number }) => {
+      const next = rfEdgesRef.current.map((e) => {
+        if (e.id !== edgeId) return e;
+        const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
+        // Round near-zero offsets back to undefined to keep afk.json clean
+        const cleanOffset = Math.abs(offset.x) < 0.5 && Math.abs(offset.y) < 0.5 ? undefined : offset;
+        return {
+          ...e,
+          data: { ...e.data, afkEdge: { ...(afk as AfkEdgeV3), label_offset: cleanOffset } },
+        };
+      });
+      setRfEdges(next);
+      pushChange(rfNodesRef.current, next);
+    },
+    [pushChange]
   );
 
   // ── Edit instance modal ──────────────────────────────────────────
@@ -1172,11 +1255,15 @@ export default function WorkflowCanvas({
     ]
   );
 
-  // Thread the label editor into condition edges (success edges have no label).
+  // Thread the label editor and label-move handler into condition edges.
   const enrichedEdges = useMemo(
     () =>
-      rfEdges.map((e) => (e.type === "conditionEdge" ? { ...e, data: { ...e.data, onEditLabel: openEditLabel } } : e)),
-    [rfEdges, openEditLabel]
+      rfEdges.map((e) =>
+        e.type === "conditionEdge"
+          ? { ...e, data: { ...e.data, onEditLabel: openEditLabel, onLabelMove: moveLabelOffset } }
+          : e
+      ),
+    [rfEdges, openEditLabel, moveLabelOffset]
   );
 
   if (!mounted) {
