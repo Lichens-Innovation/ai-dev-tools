@@ -1,3 +1,4 @@
+name: ai-tools-manager
 services:
   app:
     build:

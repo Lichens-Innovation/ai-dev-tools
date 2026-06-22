@@ -16,12 +16,12 @@ User runs /create-skill
 plugins/ai-tools-manager/hooks/hooks.json matches "create-skill"
         │  invokes scripts/launch-ai-tools-manager-app.sh create-skill
         ▼
-launch-ai-tools-manager-app.sh:
-  • Reads ~/.claude/plugins/known_marketplaces.json on the host
-  • Writes /tmp/ai-tools-marketplace.json   (marketplaces, byMarketplace, cwd)
-  • Starts/refreshes the docker container (apps/ai-tools-manager)
-  • Opens http://localhost:3009/create-skill in the browser
-  • Blocks until /tmp/ai-tools-result.json is non-empty
+launch-ai-tools-manager-app.sh  (thin wrapper: ensure-ai-tools-app.sh + wait-ai-tools-result.sh)
+  • ensure: reads ~/.claude/plugins/known_marketplaces.json, writes /tmp/ai-tools-marketplace.json
+            (marketplaces, byMarketplace, cwd, repoRoot), starts the container ONLY if not already
+            up, opens http://localhost:3009/create-skill, writes /tmp/ai-tools-app.state
+  • wait:   truncates /tmp/ai-tools-result.json, blocks until non-empty
+  • NO EXIT-trap teardown — the container persists; SessionEnd (afk-session-cleanup.sh) tears it down
         │
         ▼
 React form (apps/ai-tools-manager/src/routes/create-skill.tsx)
@@ -31,23 +31,31 @@ React form (apps/ai-tools-manager/src/routes/create-skill.tsx)
   • On submit, calls server fn in src/utils/create-skill.ts
         │
         ▼
-Server fn writes /tmp/result.json:
-  { "hookSpecificOutput": { "hookEventName": "UserPromptExpansion",
-                            "additionalContext": "Skill form data: {JSON}" } }
+Server fn PRE-SCAFFOLDS (src/utils/scaffold.ts: dir + frontmatter/skeleton), then writes /tmp/result.json:
+  { "aiToolsAction": "create-skill",
+    "scaffold": { "scaffolded": true, "path": "…/SKILL.md", "remaining": "author the body" },
+    "hookSpecificOutput": { "hookEventName": "UserPromptExpansion",
+                            "additionalContext": "Skill form data: {JSON}\n\nDeterministic scaffold: {…}" } }
         │
         ▼
 launch-ai-tools-manager-app.sh unblocks, returns the result file contents to Claude Code,
-which then runs the matching SKILL.md prompt with the JSON injected as context.
+which then runs the matching SKILL.md prompt — now scaffold-aware: it finishes only the
+remaining content (e.g. authoring the body in place) when scaffolded:true.
 ```
 
 The two `/tmp` files are Docker volume mounts — they are how the host and container exchange data without the container needing host filesystem access.
+
+**Persistent lifecycle + dispatcher.** The container is no longer one-shot: it starts once and is reused across submits, torn down at `SessionEnd`. The `/ai-tools` dispatcher skill is the unified entry point — it `ensure`s the app up, then loops (`wait` → route on the top-level `aiToolsAction` → repeat) applying every submit until a `shutdown` result (in-app **Stop** button), Esc, or session end. The four `create-*` `UserPromptExpansion` hooks still work standalone and now reuse the same persistent container. See `apps/ai-tools-manager/CLAUDE.md` (Architecture → Lifecycle / Dispatcher) for the full picture.
 
 ## File-by-file map
 
 | Concern | File |
 |---|---|
 | Hook registration | `plugins/ai-tools-manager/hooks/hooks.json` |
-| Hook orchestration (all 4 skills) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` |
+| Hook orchestration (all 4 skills) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` (wraps `ensure-ai-tools-app.sh` + `wait-ai-tools-result.sh`) |
+| Persistent lifecycle (ensure / wait / teardown) | `ensure-ai-tools-app.sh`, `wait-ai-tools-result.sh`, `afk-session-cleanup.sh` |
+| Unified dispatcher (listen-loop) | `plugins/ai-tools-manager/skills/ai-tools/SKILL.md` |
+| Deterministic pre-scaffold | `apps/ai-tools-manager/src/utils/scaffold.ts` |
 | Form (route) | `apps/ai-tools-manager/src/routes/create-<name>.tsx` |
 | Form server fns (submit/cancel + payload shape) | `apps/ai-tools-manager/src/utils/create-<name>.ts` |
 | Marketplace/cwd loader | `apps/ai-tools-manager/src/utils/marketplace.ts` |
@@ -116,5 +124,7 @@ The matching prompt in `plugins/ai-tools-manager/skills/create-<name>/SKILL.md` 
 - **Don't change the payload in just one place.** A field rename must hit the form schema, the server fn payload, *and* the consuming SKILL.md prompt — otherwise data silently drops.
 - **Server fn dependency hoisting.** `submitSkillForm` and `submitSubagentForm` only call `getKnownMarketplaces()` when `target === "marketplace"`; if you refactor, keep the call inside the marketplace branch.
 - **Docker volume gotcha.** If you change the result-file path on either side, update both `compose.yml` and the server fn's `process.env.RESULT_FILE` default.
-- **`/tmp/result.json` must exist as a *file*, not a directory** before the container starts — `launch-ai-tools-manager-app.sh` enforces this with `[[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"`.
-- **`cwd` semantics.** Locally (no Docker), `getMarketplaceDefaults`/`getMarketplaceData` returns `process.cwd()` of the dev server. When the hook fires, `launch-ai-tools-manager-app.sh` writes the user's actual cwd into the marketplace file before launching the container — so `cwd` in the form reflects the user's project, not the container.
+- **`/tmp/result.json` must exist as a *file*, not a directory** before the container starts — `ensure-ai-tools-app.sh` / `wait-ai-tools-result.sh` enforce this with `[[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"`.
+- **`cwd` semantics.** Locally (no Docker), `getMarketplaceDefaults`/`getMarketplaceData` returns `process.cwd()` of the dev server. `ensure-ai-tools-app.sh` writes the user's actual cwd into the marketplace file **on every ensure** (even when the container is already up) — so `cwd` in the form reflects the current session's project, not the container or a stale prior session.
+- **The container persists across submits and sessions.** It is torn down at `SessionEnd` (or manually from Docker Desktop), not on form submit. If you see a stale app, it's the previous session's container — the next `ensure` rebuilds/reuses it. Don't re-add an `EXIT`-trap teardown to the launcher.
+- **Pre-scaffold can degrade.** Under Docker the app can only write paths under the mounted repo; an out-of-repo target yields `scaffold.scaffolded: false` and the consuming skill must create the file itself. Always branch on the `scaffold` object, don't assume the file exists.

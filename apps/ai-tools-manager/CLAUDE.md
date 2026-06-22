@@ -11,12 +11,21 @@ The app communicates with the host via two `/tmp/` files mounted as Docker volum
 | `/tmp/ai-tools-result.json` | `/tmp/result.json` | app → hook | Form submission payload, read by hook after user submits |
 | `/tmp/ai-tools-marketplace.json` | `/tmp/marketplace-data.json` | hook → app | Pre-computed marketplace/plugin list for dropdowns |
 
-The hook script (`plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh`) is responsible for:
-1. Pre-generating `/tmp/ai-tools-marketplace.json` by reading `~/.claude/plugins/known_marketplaces.json` on the host (where all filesystem paths are accessible)
-2. Starting the container via `docker compose up -d --build`
-3. Blocking until `/tmp/ai-tools-result.json` is non-empty, then returning its contents to Claude
+The reason marketplace data is pre-computed on the host: local marketplace `installLocation` paths in `known_marketplaces.json` are host paths — they don't exist inside the container. The file also includes `cwd` (the Claude working directory at hook time) so forms can use it as a default (e.g. `targetDir` in `create-marketplace`) and so the app can write project-scoped files back.
 
-The reason marketplace data is pre-computed on the host: local marketplace `installLocation` paths in `known_marketplaces.json` are host paths — they don't exist inside the container. The file also includes `cwd` (the Claude working directory at hook time) so forms can use it as a default (e.g. `targetDir` in `create-marketplace`).
+### Lifecycle — persistent, session-scoped (not one-shot)
+
+The container is a **persistent, session-scoped service**, started once and reused across many submits, torn down at `SessionEnd`. The launch logic is split into two primitives plus a compat wrapper:
+
+- `ensure-ai-tools-app.sh [route]` — idempotent: regenerates `/tmp/ai-tools-marketplace.json` (so `cwd`/`repoRoot` stay current), starts the container only if it isn't already serving on :3009, opens the browser, and writes `/tmp/ai-tools-app.state` (the compose path — a "this session owns teardown" flag). **No blocking, no teardown.**
+- `wait-ai-tools-result.sh` — truncates `/tmp/ai-tools-result.json`, blocks until it's non-empty, prints it. Called once per submit.
+- `launch-ai-tools-manager-app.sh <form-name>` — the legacy one-shot entry point used by the four `create-*` `UserPromptExpansion` hooks and by `/afk`; now just `ensure` + `wait` with **no `EXIT`-trap teardown**.
+
+Teardown lives in the `SessionEnd` hook (`afk-session-cleanup.sh`): if `/tmp/ai-tools-app.state` is present it runs `docker compose -p ai-tools-manager down` and removes the tmp files. The user can also stop the container manually from Docker Desktop (`restart: unless-stopped` honors a manual stop; the next `ensure` restarts it).
+
+### Dispatcher (`/ai-tools`) and deterministic pre-scaffold
+
+The `/ai-tools` skill brings the app up once and **listens in a loop** (`wait` → route → repeat) until a `shutdown` result (in-app **Stop** button), Esc, or `SessionEnd`. Each submit carries a top-level `aiToolsAction` discriminator the dispatcher routes on. On submit the app does the **deterministic part immediately** — `submitAfkConfig` writes `afk.json`/`afk.yaml`, and the `create-*` submit fns pre-scaffold files via `src/utils/scaffold.ts` (dir + frontmatter/skeleton, plugin manifest + registration) — reporting a `scaffold { scaffolded, path, remaining, reason }` object; Claude then finishes only the intelligent part (authoring a body, enriching a README). In-app writes go through `mountedProjectPath`, so targets outside the mounted repo degrade to `scaffolded: false` and the dispatcher creates them host-side.
 
 ## Routes
 
@@ -69,6 +78,8 @@ On submit, write one of:
 { "decision": "block", "reason": "..." }
 ```
 
+Every result also carries a **top-level `aiToolsAction`** discriminator (`create-skill` | `create-subagent` | `create-plugin` | `create-marketplace` | `afk-config` | `shutdown`) that the `/ai-tools` dispatcher routes on; it sits alongside `hookSpecificOutput`, so the legacy hook contract is untouched. `afk-config` results also include `sliceType` (`workflows` | `rules`); `create-*` results include a `scaffold` object describing what the app already wrote; the in-app **Stop** button writes `{ "aiToolsAction": "shutdown" }`.
+
 ## Dev
 
 ```bash
@@ -89,14 +100,21 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 ## Key files
 
 - `src/routes/create-{skill,subagent,plugin,marketplace}.tsx` — creation forms
-- `src/utils/create-{skill,subagent,plugin,marketplace}.ts` — submit/cancel server fns and the form→hook payload shape
+- `src/utils/create-{skill,subagent,plugin,marketplace}.ts` — submit/cancel server fns: pre-scaffold via `scaffold.ts`, then write the result via the shared `create-result.ts` helpers
+- `src/utils/create-result.ts` — shared `writeCreateResult` / `writeCancelResult` for the four create flows (single source of the `aiToolsAction` + `scaffold` + `additionalContext` result shape, so they can't drift)
+- `src/utils/scaffold.ts` — deterministic pre-scaffold helpers (`scaffoldSkill/Subagent/Plugin/Marketplace`); reuses `text.ts` + `mountedProjectPath`, degrades gracefully for unreachable targets
+- `docs/ai-tools-create-shared.md` (repo root) — shared reference doc the four `create-*` `SKILL.md` link to: the reference-doc list, where the form payload comes from, and the scaffold-finishing contract (replaces the boilerplate each skill used to repeat)
+- `src/utils/ai-tools-session.ts` — `shutdownAppSession` server fn (writes `aiToolsAction: "shutdown"`), wired to the top-nav **Stop** button
 - `src/utils/marketplace.ts` — loader server fns (`getMarketplaceData`, `getMarketplaceList`, `getMarketplaceDefaults`). Returns `cwd` so target=project can write under the user's working directory.
 - `src/utils/text.ts` — shared text helpers (`buildDesc`, `firstSentence`, `joinOxford`, `clip`, `titleFromName`)
 - `src/components/{skill,subagent}-template-preview.tsx` and `{plugin,marketplace}-manifest-preview.tsx` — per-route `FilePreview` renderers
 - `packages/ui/src/` — shared primitives consumed by every form
-- `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` — unified hook orchestration script (takes form name as argument)
-- `plugins/ai-tools-manager/hooks/hooks.json` — hook registration for all four skills
-- `plugins/ai-tools-manager/skills/{create-skill,create-subagent,create-plugin,create-marketplace}/SKILL.md` — the prompts that consume the form result
+- `plugins/ai-tools-manager/scripts/ensure-ai-tools-app.sh` — idempotent container start + browser open + precompute + state file (no blocking, no teardown)
+- `plugins/ai-tools-manager/scripts/wait-ai-tools-result.sh` — truncate + block for one result + print (one per submit / loop iteration)
+- `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` — legacy one-shot wrapper (`ensure` + `wait`, no teardown); used by the `create-*` hooks and `/afk`
+- `plugins/ai-tools-manager/hooks/hooks.json` — hook registration (SubagentStart/Stop, PreToolUse, SessionEnd, the four `create-*` `UserPromptExpansion`)
+- `plugins/ai-tools-manager/skills/ai-tools/SKILL.md` — `/ai-tools` dispatcher: ensure-up + listen-loop routing every submit by `aiToolsAction` until shutdown/SessionEnd
+- `plugins/ai-tools-manager/skills/{create-skill,create-subagent,create-plugin,create-marketplace}/SKILL.md` — the prompts that consume the form result (now scaffold-aware: finish only the remaining content when `scaffolded: true`)
 - `packages/claude-fs/src/index.ts` — shared `~/.claude/` reading utilities used by server functions
 
 ### AFK config editor (workflows & rules)

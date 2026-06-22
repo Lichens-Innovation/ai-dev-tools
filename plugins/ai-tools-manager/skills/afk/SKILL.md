@@ -25,6 +25,8 @@ $ARGUMENTS
 
    If it prints `missing`, **stop without launching the form**. The orchestrator hasn't been installed, so editing config now would leave an unwired `afk.json`. Tell the user to run **`/afk-install`** first (it scaffolds the orchestrator and then opens this same editor), then stop.
 
+> **Dispatcher path.** When invoked by the `/ai-tools` dispatcher, the form payload (the `AFK v3 config data:` block + verbatim `afk.yaml`) is already supplied to you and the app already wrote `.claude/afk.json`. In that case **skip Step 1** (do not launch the form) and go straight to Step 2 with the supplied payload; Steps 2–5 are unchanged. Step 0's precondition still applies.
+
 1. **Launch the form and read the payload.** Run the form launcher in the **background** — the user fills the form interactively, which can take a while:
 
    ```bash

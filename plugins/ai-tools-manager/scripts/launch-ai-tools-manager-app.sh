@@ -1,92 +1,21 @@
 #!/usr/bin/env bash
 # Usage: launch-ai-tools-manager-app.sh <form-name>
 # e.g.   launch-ai-tools-manager-app.sh create-skill
+#
+# Backward-compatible one-shot entry point used by the legacy create-* UserPromptExpansion
+# hooks and by /afk: bring the app up at the given route, then block for a single result and
+# print it. It is now a thin wrapper over the two lifecycle primitives:
+#   ensure-ai-tools-app.sh  — idempotent start + open browser (NO teardown)
+#   wait-ai-tools-result.sh — truncate + block for one result + print
+#
+# Unlike the previous version there is NO EXIT trap: the container persists after this returns
+# and is torn down at SessionEnd (afk-session-cleanup.sh) or manually from Docker Desktop. The
+# AFK_IMPL_AGENTS / AFK_SKILL_MAP env vars are read by ensure's precompute, so /afk + /afk-install
+# keep seeding the canvas exactly as before.
 set -euo pipefail
 
 FORM_NAME="${1:?Usage: launch-ai-tools-manager-app.sh <form-name>}"
-FORM_PATH="/$FORM_NAME"
-PORT=3009
-
-# Find repo root (directory containing turbo.json)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$SCRIPT_DIR"
-while [[ "$REPO_ROOT" != "/" && ! -f "$REPO_ROOT/turbo.json" ]]; do
-  REPO_ROOT="$(dirname "$REPO_ROOT")"
-done
 
-if [[ ! -f "$REPO_ROOT/turbo.json" ]]; then
-  echo '{"decision":"block","reason":"Could not locate repo root (no turbo.json found)."}'
-  exit 0
-fi
-
-COMPOSE_FILE="$REPO_ROOT/apps/ai-tools-manager/docker-compose.yml"
-RESULT_FILE="/tmp/ai-tools-result.json"
-MARKETPLACE_FILE="/tmp/ai-tools-marketplace.json"
-
-# Ensure the result file exists as a file (Docker won't create a dir in its place)
-[[ -d "$RESULT_FILE" ]] && rm -rf "$RESULT_FILE"
-[[ -d "$MARKETPLACE_FILE" ]] && rm -rf "$MARKETPLACE_FILE"
-> "$RESULT_FILE"
-trap 'docker compose -f "$COMPOSE_FILE" down > /dev/null 2>&1 || true; rm -f "$RESULT_FILE" "$MARKETPLACE_FILE"' EXIT
-
-# Pre-generate marketplace data on the host (container can't access host paths)
-# Also captures cwd so forms can use it as a default (e.g. targetDir in create-marketplace)
-# and the installable vibe-rules list (vibe-rules is a host CLI, absent in the container).
-node -e "
-const fs = require('fs'), path = require('path');
-const { execFileSync } = require('child_process');
-const home = process.env.HOME || '';
-const knownPath = path.join(home, '.claude', 'plugins', 'known_marketplaces.json');
-// Repo-detected implementation agent(s) for the AFK happy path, passed by the
-// afk-install / afk skills (e.g. 'backend', 'frontend', 'backend,frontend').
-const implAgents = (process.env.AFK_IMPL_AGENTS || '').split(',').map(s => s.trim()).filter(Boolean);
-// Install-time best-fit project-skill to seeded-agent assignments (JSON object),
-// set by the afk-install skill; empty object otherwise.
-let skillMap = {};
-try { const m = JSON.parse(process.env.AFK_SKILL_MAP || '{}'); if (m && typeof m === 'object') skillMap = m; } catch {}
-let vibeRules = [];
-try {
-  const out = execFileSync('vibe-rules', ['list'], { encoding: 'utf8' });
-  vibeRules = out.split(/\r?\n/).map(l => { const m = l.match(/^\s*-\s+(.+?)\s*\$/); return m ? m[1] : null; }).filter(Boolean);
-} catch {}
-try {
-  const known = JSON.parse(fs.readFileSync(knownPath, 'utf8'));
-  const marketplaces = [], byMarketplace = {};
-  for (const [name, mkt] of Object.entries(known)) {
-    if (mkt.source?.source !== 'directory') continue;
-    marketplaces.push(name);
-    try {
-      const mktJson = JSON.parse(fs.readFileSync(path.join(mkt.installLocation, '.claude-plugin', 'marketplace.json'), 'utf8'));
-      byMarketplace[name] = (mktJson.plugins || []).map(p => p.name);
-    } catch { byMarketplace[name] = []; }
-  }
-  fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces, byMarketplace, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents, skillMap}));
-} catch { fs.writeFileSync('$MARKETPLACE_FILE', JSON.stringify({marketplaces:[], byMarketplace:{}, cwd: process.cwd(), repoRoot: '$REPO_ROOT', vibeRules, implAgents, skillMap})); }
-" 2>/dev/null || echo '{"marketplaces":[],"byMarketplace":{},"cwd":"","repoRoot":"","vibeRules":[],"implAgents":[],"skillMap":{}}' > "$MARKETPLACE_FILE"
-
-# Start the container (builds image if needed)
-docker compose -f "$COMPOSE_FILE" up -d --build >&2
-
-# Wait for the server to be ready
-DEADLINE=$(( $(date +%s) + 60 ))
-until curl -sf "http://localhost:${PORT}/" > /dev/null 2>&1; do
-  if [[ $(date +%s) -gt $DEADLINE ]]; then
-    echo '{"decision":"block","reason":"Forms container did not start in time."}'
-    exit 0
-  fi
-  sleep 0.2
-done
-
-# Open the browser
-case "$(uname)" in
-  Darwin) open "http://localhost:${PORT}${FORM_PATH}" ;;
-  Linux)  xdg-open "http://localhost:${PORT}${FORM_PATH}" 2>/dev/null || true ;;
-  MINGW*|CYGWIN*) start "http://localhost:${PORT}${FORM_PATH}" ;;
-esac
-
-# Wait for the result file to be populated
-until [[ -s "$RESULT_FILE" ]]; do
-  sleep 0.2
-done
-
-cat "$RESULT_FILE"
+bash "$SCRIPT_DIR/ensure-ai-tools-app.sh" "$FORM_NAME"
+bash "$SCRIPT_DIR/wait-ai-tools-result.sh"

@@ -175,6 +175,8 @@ A **read-only** `FilePreview`. It calls `afkConfigToYaml(config)` (`src/utils/af
 
 Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` and `afk.yaml` (via `afkConfigToYaml`), and writes the result file with `additionalContext` containing `AFK v3 config data: {…}` **plus the verbatim afk.yaml text**. The consuming `/afk` SKILL.md writes those files on the host and re-renders the orchestrator (`afk-render-orchestrator.js`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
 
+The save result also carries `aiToolsAction: "afk-config"` + `sliceType` so the persistent **`/ai-tools`** dispatcher can route it without re-launching the app — in that mode `/afk` runs its processing path (write → render → apply) on the supplied payload and skips opening the form. See `afk-architecture` (runtime) and `apps/ai-tools-manager/CLAUDE.md` (Lifecycle / Dispatcher).
+
 ## Things that bite
 
 - **The YAML pane is derived, not editable.** To change what it shows, change `config` (or the rendering in `afk-yaml-preview.tsx`) — typing into it is impossible by design.

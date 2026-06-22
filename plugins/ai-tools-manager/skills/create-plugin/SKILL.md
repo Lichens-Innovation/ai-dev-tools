@@ -11,24 +11,15 @@ Scaffold a new plugin in a local marketplace and register it.
 
 $ARGUMENTS
 
-## References
+## References & shared contract
 
-Consult the relevant doc(s) before making structural decisions:
-
-- [`docs/plugins.md`](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md) — plugin structure, manifest, hooks and relative paths
-- [`docs/marketplace.md`](${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
-- [`docs/skills.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills.md) — skill format, popular repositories, skills CLI
-- [`docs/subagents.md`](${CLAUDE_SKILL_DIR}/../../../../docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
-- [`docs/hooks.md`](${CLAUDE_SKILL_DIR}/../../../../docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
-- [`docs/rules.md`](${CLAUDE_SKILL_DIR}/../../../../docs/rules.md) — rules format and scope
-- [`docs/mcp.md`](${CLAUDE_SKILL_DIR}/../../../../docs/mcp.md) — MCP server configuration
-- [`docs/memory.md`](${CLAUDE_SKILL_DIR}/../../../../docs/memory.md) — memory system, persistent memory for subagents
-- [`docs/skills-cli.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills-cli.md) — skills CLI commands
-- [`docs/claude-code.md`](${CLAUDE_SKILL_DIR}/../../../../docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (plugins, marketplace, skills, …), where the form payload comes from, and the **scaffold-finishing contract**.
 
 ## Workflow
 
-The form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. Parse the JSON object `{ name, description, keywords, marketplacePath }` and proceed:
+Parse the form payload — the JSON object `{ name, description, keywords, marketplacePath }` (see the shared contract above for its source) — and proceed.
+
+**Applying the scaffold contract here:** when `scaffolded: true`, the app has **already** written `plugin.json` (author inherited from the marketplace owner), created `skills/`, and registered the plugin in `marketplace.json` — verify those (steps 1–2, 4) and skip recreating them; you may still add the README (step 3) and any hooks. When `scaffolded: false` (`reason` says why), perform all steps below from scratch.
 
 1. **Create plugin directory structure**
    ```

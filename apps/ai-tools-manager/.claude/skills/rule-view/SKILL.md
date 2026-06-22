@@ -59,8 +59,9 @@ submitAfkConfig({ sliceType: "rules", slice: { cwd, rules: config.rules } })
   • merges the rules slice into afk.json (preserves workflows/instances)
   • writes <cwd>/.claude/afk.json AND <cwd>/afk.yaml
   • writes /tmp/result.json → "AFK v3 config data: {JSON}" + verbatim afk.yaml  for the skill
+    (with aiToolsAction:"afk-config", sliceType:"rules" so the /ai-tools dispatcher can route it)
         │
-        ▼ (host-side, run by the /afk skill — see "Runtime" below)
+        ▼ (host-side, run by the /afk skill — directly, or via the /ai-tools dispatcher loop)
 afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installable rules
 ```
 

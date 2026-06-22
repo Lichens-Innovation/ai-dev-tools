@@ -256,7 +256,7 @@ The plain tool-call log from `afk-session-log.js` has **no outcome data** — it
 
 ## Things that bite
 
-- **The log is ephemeral.** Deleted at SessionEnd by `afk-session-cleanup.sh`. An empty page is the normal between-sessions state, not an error. The file only exists during and immediately after an active AFK session.
+- **The log is ephemeral.** Deleted at SessionEnd by `afk-session-cleanup.sh` (the same hook now also tears down the persistent ai-tools-manager container — so this view, like the app, is up only for the session). An empty page is the normal between-sessions state, not an error. The file only exists during and immediately after an active AFK session.
 - **Status comes exclusively from the SubagentStop handoff entry.** If `afk-subagent-log.js` is not registered, all cards will have `status: null` and no badge. If a subagent exits without a parseable `HANDOFF:` line (crash, force-stop, no AFK contract), the status will be `"unknown"` (shown as "—").
 - **Reads use `mountedProjectPath(readCwd())`**, not `process.cwd()`. Inside Docker, `readCwd()` returns the host path from `/tmp/marketplace-data.json`; `mountedProjectPath` maps it to the container-visible `/app/…` path. Pattern is shared with `afk-tree.ts` and `afk-rules.ts`.
 - **The SSE route polls server-side, not with `fs.watch`.** `inotify`/FSEvents is unreliable across Docker Desktop bind mounts on macOS. The route uses `setInterval` + `fs.readFileSync` + line-count diff instead. Each open browser connection runs its own poll loop; close the tab to kill the loop (the `request.signal` abort cleans up).

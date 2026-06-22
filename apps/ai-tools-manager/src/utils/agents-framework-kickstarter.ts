@@ -538,6 +538,10 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
     fs.writeFileSync(
       resultFile,
       JSON.stringify({
+        // Top-level discriminator read by the /ai-tools dispatcher to route this submit.
+        // Left alongside hookSpecificOutput so the legacy hook contract is untouched.
+        aiToolsAction: "afk-config",
+        sliceType: data.sliceType,
         hookSpecificOutput: {
           hookEventName: "UserPromptExpansion",
           additionalContext:

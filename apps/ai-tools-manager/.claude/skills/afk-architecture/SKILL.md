@@ -85,7 +85,9 @@ Orchestrator reads HANDOFF:  → `success` continues the success path; a matchin
 PreToolUse hook (matcher ".*") → afk-session-log.js → appends one line to afk_session.log.jsonl
         │
         ▼
-SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_session.log.jsonl
+SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_session.log.jsonl,
+                                            AND tears down the persistent ai-tools-manager
+                                            container if /tmp/ai-tools-app.state is present
 ```
 
 ## The four files
@@ -107,8 +109,8 @@ SessionEnd hook → afk-session-cleanup.sh → deletes afk_session.json + afk_se
 | `SubagentStart` | `.*` | `afk-subagent-log.js` | Append a `kind:"dispatch"` entry to `afk_session.log.jsonl`: the subagent's `agent_type`, `agent_id`, and the full spawning message (`input`). Runs alongside `afk-inject-agent-context.js`; order irrelevant. No-op when `afk.json` is absent. |
 | `SubagentStop` | `.*` | `afk-subagent-log.js` | Append a `kind:"handoff"` entry: parses the subagent's `HANDOFF:` label from `last_assistant_message` → `status` (`"success"` / `"condition"` / `"unknown"`), stores the full final message as `output`. Correlated to the dispatch entry by `agent_id`. No-op when `afk.json` is absent. |
 | `PreToolUse` | `.*` | `afk-session-log.js` | Append a tool-call line to `afk_session.log.jsonl`. No-op when `afk.json` is absent. |
-| `SessionEnd` | `` | `afk-session-cleanup.sh` | Delete both ephemeral session files. |
-| `UserPromptExpansion` | `create-*` | `launch-ai-tools-manager-app.sh` | Launch the Docker form for the `create-{skill,subagent,plugin,marketplace}` flows. (The `afk` / `afk-install` skills are **not** wired here — they run `launch-ai-tools-manager-app.sh` themselves; `afk-install` first analyzes the repo to seed the canvas with the detected implementation agent(s) and offers a checklist to attach the repo's local skills to the seeded agents; see their SKILL.md.) |
+| `SessionEnd` | `` | `afk-session-cleanup.sh` | Delete both ephemeral session files **and** tear down the persistent ai-tools-manager container when `/tmp/ai-tools-app.state` is present (the launcher no longer tears down on form submit). |
+| `UserPromptExpansion` | `create-*` | `launch-ai-tools-manager-app.sh` | Launch the Docker form for the `create-{skill,subagent,plugin,marketplace}` flows. The launcher is now a thin `ensure-ai-tools-app.sh` + `wait-ai-tools-result.sh` wrapper over a **persistent, session-scoped** container (no teardown on exit). The `/ai-tools` dispatcher skill is the unified entry point that brings the app up once and listens for every submit; `afk` / `afk-install` still run the launcher themselves (`afk-install` first analyzes the repo to seed the canvas and offers to attach local skills — see their SKILL.md). |
 
 `afk-inject-agent-context.js` and `afk-session-log.js` run from `${CLAUDE_PLUGIN_ROOT}/scripts/` — edits to them take effect immediately for every project. `afk-set-session-workflow.js` and `afk-render-orchestrator.js` run from the **project copy** in `.claude/scripts/`, so changes to them only reach a project on (re)install. `templates/afk.md` is copied only if absent, so template changes reach **new installs only**.
 
