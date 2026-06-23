@@ -41,6 +41,18 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "TaskCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-validate-tasks.js"]
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",

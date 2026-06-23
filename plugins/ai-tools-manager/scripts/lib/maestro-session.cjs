@@ -39,6 +39,51 @@ function writeSession(p, session) {
   fs.renameSync(tmp, p);
 }
 
+// ---------------------------------------------------------------------------
+// Success-path helpers — shared between the renderer and the validation hook.
+// ---------------------------------------------------------------------------
+
+// Human-readable label for a single workflow node.
+function nodeLabel(id, wf, instances) {
+  if (id === "main-session") return "";
+  const n = (wf.nodes || []).find((x) => x.id === id);
+  if (!n) return id;
+  if (n.type === "agent") {
+    const inst = (instances || []).find((i) => i.name === n.instance);
+    return "@" + ((inst && inst.name) || n.instance || n.id);
+  }
+  if (n.type === "skill") return "/" + (n.skill || n.id);
+  return "human review";
+}
+
+// Ordered array of step labels along the success path of a workflow.
+// This is the SOLE source of truth for "what steps the workflow has in order".
+function successPathSteps(wf, instances) {
+  const out = [];
+  let cur = "main-session";
+  const seen = new Set();
+  while (!seen.has(cur)) {
+    seen.add(cur);
+    const next = (wf.edges || []).find((e) => e.from === cur && e.kind === "success");
+    if (!next) break;
+    const label = nodeLabel(next.to, wf, instances);
+    if (label) out.push(label);
+    cur = next.to;
+  }
+  return out;
+}
+
+// Set of ALL node labels in the workflow (success path + condition targets).
+// Used to distinguish "valid node, just off the success path" from "not in this workflow at all".
+function workflowNodeLabels(wf, instances) {
+  const labels = new Set();
+  for (const n of wf.nodes || []) {
+    const l = nodeLabel(n.id, wf, instances);
+    if (l) labels.add(l);
+  }
+  return labels;
+}
+
 // Tool-call logs are append-only (one JSON object per line) so concurrent
 // writers — e.g. parallel subagents firing PreToolUse — can't clobber each
 // other the way a read-modify-write of a shared JSON array would.
@@ -61,4 +106,7 @@ module.exports = {
   appendSessionLog,
   sessionLogPath,
   SESSION_LOG_FILE,
+  nodeLabel,
+  successPathSteps,
+  workflowNodeLabels,
 };

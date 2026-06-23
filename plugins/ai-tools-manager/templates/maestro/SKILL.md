@@ -41,7 +41,7 @@ Based on the classification, pick the success path to execute from the configure
 
 ### Step 5 — Execute the workflow
 
-Create tasks for each step in the success path using `TaskCreate`. Wire dependencies with `TaskUpdate addBlockedBy`. Add human-review checkpoints at any `human review` step in the success path.
+Create tasks for each step in the success path using `TaskCreate`. Wire dependencies with `TaskUpdate addBlockedBy`. Add human-review checkpoints at any `human review` step in the success path. Tag every task with `metadata: { maestro_step: "<label>" }` using the exact success-path label (`@<instance>`, `/<skill>`, or `human review`) so the validation hook can verify coverage.
 
 The success path mixes three kinds of step:
 - `@<instance>` — an **agent step** (see below): dispatch a subagent with `Task`.
