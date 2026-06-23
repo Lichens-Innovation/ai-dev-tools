@@ -1,4 +1,4 @@
-// Shared helpers for the AFK hook scripts (afk-inject-agent-context.js, afk-session-log.js).
+// Shared helpers for the Maestro hook scripts (maestro-inject-agent-context.js, maestro-session-log.js).
 // Plain Node built-ins only — plugins ship without node_modules.
 
 const fs = require("fs");
@@ -42,7 +42,7 @@ function writeSession(p, session) {
 // Tool-call logs are append-only (one JSON object per line) so concurrent
 // writers — e.g. parallel subagents firing PreToolUse — can't clobber each
 // other the way a read-modify-write of a shared JSON array would.
-const SESSION_LOG_FILE = "afk_session.log.jsonl";
+const SESSION_LOG_FILE = "maestro_session.log.jsonl";
 
 function sessionLogPath(claudeDir) {
   return path.join(claudeDir, SESSION_LOG_FILE);

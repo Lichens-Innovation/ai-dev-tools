@@ -1,11 +1,11 @@
 ---
-name: to-afk-tasks
-description: "Turn a plan or idea into a queue of ready-to-run AFK task prompts saved under .claude/afk-tasks/. Runs a /grilling session to sharpen intent, decomposes the work into tracer-bullet vertical slices, then writes one numbered, workflow-agnostic prompt file per slice for the AFK orchestrator to classify and execute. Use when the user wants to break work into AFK tasks, queue up prompts for the /agent-orchestrator skill, or asks to convert a plan/spec/idea into runnable task files."
+name: to-maestro-tasks
+description: "Turn a plan or idea into a queue of ready-to-run Maestro task prompts saved under .claude/maestro-tasks/. Runs a /grilling session to sharpen intent, decomposes the work into tracer-bullet vertical slices, then writes one numbered, workflow-agnostic prompt file per slice for the Maestro orchestrator to classify and execute. Use when the user wants to break work into Maestro tasks, queue up prompts for the /maestro skill, or asks to convert a plan/spec/idea into runnable task files."
 ---
 
-# To AFK Tasks
+# To Maestro Tasks
 
-Convert a plan, spec, or rough idea into a queue of **ready-to-run prompt files** under `<cwd>/.claude/afk-tasks/`. Each file is a self-contained, workflow-agnostic prompt that the `/agent-orchestrator` skill can classify (Step 1) and execute end-to-end.
+Convert a plan, spec, or rough idea into a queue of **ready-to-run prompt files** under `<cwd>/.claude/maestro-tasks/`. Each file is a self-contained, workflow-agnostic prompt that the `/maestro` skill can classify (Step 1) and execute end-to-end.
 
 This skill composes two upstream behaviors into one continuous session:
 
@@ -58,15 +58,15 @@ Iterate until the user approves the breakdown.
 
 ### 5. Write the task files
 
-Once approved, write one prompt file per slice into `<cwd>/.claude/afk-tasks/`. Create the directory if it doesn't exist.
+Once approved, write one prompt file per slice into `<cwd>/.claude/maestro-tasks/`. Create the directory if it doesn't exist.
 
 **Numbering — append, never overwrite:**
 
-- Read the existing `NNN-*.md` files in `.claude/afk-tasks/`. Find the highest existing number; new files continue from there. Never clear or overwrite existing files — the user may be mid-way through running an earlier queue.
+- Read the existing `NNN-*.md` files in `.claude/maestro-tasks/`. Find the highest existing number; new files continue from there. Never clear or overwrite existing files — the user may be mid-way through running an earlier queue.
 - Within this batch, order the slices **topologically** (blockers get lower numbers) so that running the files in numeric order is always a safe execution order.
 - Filenames: `NNN-kebab-slug.md`, zero-padded to 3 digits (`001-…`, `012-…`), the slug derived from the slice title.
 
-**File contents — the hybrid prompt envelope.** Each file is a workflow-agnostic prompt: an imperative opener (so the orchestrator can classify it as a request) wrapping the issue-style body. **Do not name agents or workflows** — choosing the workflow is the orchestrator's job (`afk.md` Step 1), not the prompt's.
+**File contents — the hybrid prompt envelope.** Each file is a workflow-agnostic prompt: an imperative opener (so the orchestrator can classify it as a request) wrapping the issue-style body. **Do not name agents or workflows** — choosing the workflow is the orchestrator's job (`maestro.md` Step 1), not the prompt's.
 
 <task-file-template>
 # <slice title>
@@ -95,13 +95,13 @@ than prose, inline just the decision-rich part.
 Or "None — can start immediately" if no blockers.
 </task-file-template>
 
-`Blocked by` references sibling task files by name. It is **human-facing sequencing metadata** — the AFK orchestrator runs one workflow at a time and does not auto-chain these files. Because numbering is topologically sorted, "run them in order" is always a valid path; `Blocked by` records the precise graph for anything non-linear.
+`Blocked by` references sibling task files by name. It is **human-facing sequencing metadata** — the Maestro orchestrator runs one workflow at a time and does not auto-chain these files. Because numbering is topologically sorted, "run them in order" is always a valid path; `Blocked by` records the precise graph for anything non-linear.
 
 ### 6. Report
 
-Tell the user how many task files were written, the numeric range (e.g. `003–007`), and that each is ready to paste into (or run from) a session where the `/agent-orchestrator` skill is invoked.
+Tell the user how many task files were written, the numeric range (e.g. `003–007`), and that each is ready to paste into (or run from) a session where the `/maestro` skill is invoked.
 
 ## Notes
 
-- These files are designed to be classified by the AFK orchestrator (`.claude/skills/agent-orchestrator/SKILL.md`). Keeping each prompt workflow-agnostic is what lets the orchestrator pick the right workflow per task and stay correct as `afk.json` evolves.
+- These files are designed to be classified by the Maestro orchestrator (`.claude/skills/maestro/SKILL.md`). Keeping each prompt workflow-agnostic is what lets the orchestrator pick the right workflow per task and stay correct as `maestro.json` evolves.
 - This skill never publishes to GitHub. If the user also wants tracked issues, that's a separate, explicit `/to-issues` invocation.

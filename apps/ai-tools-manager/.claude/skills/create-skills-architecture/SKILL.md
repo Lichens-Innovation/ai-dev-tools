@@ -21,7 +21,7 @@ launch-ai-tools-manager-app.sh  (thin wrapper: ensure-ai-tools-app.sh + wait-ai-
             (marketplaces, byMarketplace, cwd, repoRoot), starts the container ONLY if not already
             up, opens http://localhost:3009/create-skill, writes /tmp/ai-tools-app.state
   • wait:   truncates /tmp/ai-tools-result.json, blocks until non-empty
-  • NO EXIT-trap teardown — the container persists; SessionEnd (afk-session-cleanup.sh) tears it down
+  • NO EXIT-trap teardown — the container persists; SessionEnd (maestro-session-cleanup.sh) tears it down
         │
         ▼
 React form (apps/ai-tools-manager/src/routes/create-skill.tsx)
@@ -53,7 +53,7 @@ The two `/tmp` files are Docker volume mounts — they are how the host and cont
 |---|---|
 | Hook registration | `plugins/ai-tools-manager/hooks/hooks.json` |
 | Hook orchestration (all 4 skills) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` (wraps `ensure-ai-tools-app.sh` + `wait-ai-tools-result.sh`) |
-| Persistent lifecycle (ensure / wait / teardown) | `ensure-ai-tools-app.sh`, `wait-ai-tools-result.sh`, `afk-session-cleanup.sh` |
+| Persistent lifecycle (ensure / wait / teardown) | `ensure-ai-tools-app.sh`, `wait-ai-tools-result.sh`, `maestro-session-cleanup.sh` |
 | Unified dispatcher (listen-loop) | `plugins/ai-tools-manager/skills/ai-tools/SKILL.md` |
 | Deterministic pre-scaffold | `apps/ai-tools-manager/src/utils/scaffold.ts` |
 | Form (route) | `apps/ai-tools-manager/src/routes/create-<name>.tsx` |

@@ -1,5 +1,5 @@
 import { titleFromName } from "./text";
-import type { SessionLogEntry } from "./afk-session-log";
+import type { SessionLogEntry } from "./maestro-session-log";
 
 export interface Instance {
   id: number;
@@ -111,7 +111,7 @@ export function humanizeLog(entry: SessionLogEntry): string | null {
   const log = entry.log ?? "";
 
   // Suppress the bare "Agent" / "Task(...)" PreToolUse entries; the richer
-  // dispatch entry from afk-subagent-log.js covers the same event.
+  // dispatch entry from maestro-subagent-log.js covers the same event.
   if (log === "Agent" || log === "Task" || /^Task\(/.test(log)) {
     return null;
   }

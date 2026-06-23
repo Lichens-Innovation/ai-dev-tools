@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 // SubagentStart / SubagentStop hook — appends communication entries to the same
-// afk_session.log.jsonl as afk-session-log.js (PreToolUse).
+// maestro_session.log.jsonl as maestro-session-log.js (PreToolUse).
 //
 // SubagentStart  → dispatch entry:  who was called, with the full spawning message.
 // SubagentStop   → handoff entry:   the agent's outcome, parsed from its HANDOFF: line,
 //                                   with the full final message for debugging.
 //
-// Both are no-ops when afk.json is absent (AFK not configured for this project).
+// Both are no-ops when maestro.json is absent (Maestro not configured for this project).
 // Entries use kind:"dispatch"/"handoff" so the reader can distinguish them from
-// the plain tool-call entries written by afk-session-log.js.
+// the plain tool-call entries written by maestro-session-log.js.
 // Append-only to the same file so parallel subagents don't race.
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, appendSessionLog } = require("./lib/afk-session.cjs");
+const { readStdin, appendSessionLog } = require("./lib/maestro-session.cjs");
 
 // Parse the HANDOFF: label from the agent's final message.
 // Tolerates backticks, asterisks, and surrounding whitespace, e.g.:
@@ -44,7 +44,7 @@ function parseHandoff(msg) {
   if (!cwd) process.exit(0);
 
   const claudeDir = path.join(cwd, ".claude");
-  if (!fs.existsSync(path.join(claudeDir, "afk.json"))) process.exit(0);
+  if (!fs.existsSync(path.join(claudeDir, "maestro.json"))) process.exit(0);
 
   const event = p.hook_event_name || "";
   const agentType = p.agent_type || "";

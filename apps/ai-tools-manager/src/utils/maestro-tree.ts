@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import fs from "fs";
 import path from "path";
-import { readCwd, mountedProjectPath } from "./afk-fs";
+import { readCwd, mountedProjectPath } from "./maestro-fs";
 
 export interface TreeNode {
   path: string; // relative to cwd

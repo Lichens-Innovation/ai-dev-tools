@@ -5,18 +5,18 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CopyableText from "@repo/ui/copyable-text";
 import TopNav from "../components/top-nav";
-import { getAfkTasks, type AfkTask } from "../utils/afk-tasks";
+import { getMaestroTasks, type MaestroTask } from "../utils/maestro-tasks";
 
-export const Route = createFileRoute("/afk-tasks")({
-  loader: async () => ({ tasks: await getAfkTasks() }),
-  component: AfkTasksPage,
+export const Route = createFileRoute("/maestro-tasks")({
+  loader: async () => ({ tasks: await getMaestroTasks() }),
+  component: MaestroTasksPage,
 });
 
-function promptFor(task: AfkTask): string {
+function promptFor(task: MaestroTask): string {
   return `Do the task described in file ${task.relativePath}`;
 }
 
-function AfkTasksPage() {
+function MaestroTasksPage() {
   const { tasks } = Route.useLoaderData();
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -33,10 +33,10 @@ function AfkTasksPage() {
             <ListChecks size={20} className="text-(--ink-3)" />
           </div>
           <div>
-            <p className="text-[13px] font-medium text-(--ink) mb-1">No AFK tasks found</p>
+            <p className="text-[13px] font-medium text-(--ink) mb-1">No Maestro tasks found</p>
             <p className="text-[12px] text-(--ink-3) max-w-xs">
-              Run <span className="font-mono">/to-afk-tasks</span> to break a plan into task files
-              under <span className="font-mono">.claude/afk-tasks/</span>.
+              Run <span className="font-mono">/to-maestro-tasks</span> to break a plan into task files
+              under <span className="font-mono">.claude/maestro-tasks/</span>.
             </p>
           </div>
         </div>

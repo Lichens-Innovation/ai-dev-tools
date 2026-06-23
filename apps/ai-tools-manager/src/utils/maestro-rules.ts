@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import fs from "fs";
 import path from "path";
-import { readCwd, mountedProjectPath, parseFrontmatter } from "./afk-fs";
+import { readCwd, mountedProjectPath, parseFrontmatter } from "./maestro-fs";
 
 export interface ProjectRule {
   id: string;
@@ -14,7 +14,7 @@ const IGNORE = ["node_modules", ".git", "dist", "build", ".next", ".turbo", ".ou
 const MAX_DEPTH = 4;
 
 // Rules can live in any directory's `.claude/rules/` — they start at the project root
-// but afk-apply-rules.js moves them into assigned directories on save, so we scan the
+// but maestro-apply-rules.js moves them into assigned directories on save, so we scan the
 // whole tree (not just the root) to keep moved rules discoverable in the picker.
 export const getProjectRules = createServerFn({ method: "GET" }).handler(async (): Promise<ProjectRule[]> => {
   const cwd = mountedProjectPath(readCwd());

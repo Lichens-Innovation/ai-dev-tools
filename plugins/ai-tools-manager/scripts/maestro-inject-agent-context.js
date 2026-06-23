@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SubagentStart hook for worker subagents.
-// Reads <cwd>/.claude/afk.json (v3), looks up the invoked agent type's instance
+// Reads <cwd>/.claude/maestro.json (v3), looks up the invoked agent type's instance
 // in the active workflow, and emits as additionalContext:
 //   1a. loaded_skills     — skills to load (Skill tool) before working,
 //   1b. referenced_skills — skills available, loaded only if the task needs them,
@@ -8,12 +8,12 @@
 //   3. the per-route handoff_details payload protocol (from the
 //      templates/handoffs/<sender>/<target>.md template) so the whole
 //      communication layer lives here rather than in each agent file.
-// No-op (exit 0, no output) when afk.json is absent, not v3, or the agent type is
+// No-op (exit 0, no output) when maestro.json is absent, not v3, or the agent type is
 // not mapped to any workflow node.
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, readJson, resolveWorkflowName, readSession, writeSession } = require("./lib/afk-session.cjs");
+const { readStdin, readJson, resolveWorkflowName, readSession, writeSession } = require("./lib/maestro-session.cjs");
 
 // Read the handoff_details payload template for a sender -> receiver edge.
 // Convention: handoffs/<sender>/<receiver>.md (dir names === agent `name`). Kept
@@ -45,7 +45,7 @@ function collect(cfg, sessionPath, agentType) {
 
   // Scope to the active workflow when it resolves. When no workflow is set yet —
   // e.g. the user invoked an agent on the first prompt, before the orchestrator
-  // classified the request and ran afk-set-session-workflow.js — fall back to the
+  // classified the request and ran maestro-set-session-workflow.js — fall back to the
   // default workflow (resolveWorkflowName → first configured workflow, i.e. "default")
   // rather than unioning across every workflow, which can inject the wrong routes/skills.
   // A genuinely broken active name (set but unknown) still unions + warns loudly.
@@ -57,15 +57,15 @@ function collect(cfg, sessionPath, agentType) {
   } else if (activeWorkflowName) {
     searchList = workflows;
     warning =
-      `The active workflow "${activeWorkflowName}" (from afk_session.json) matches no workflow in afk.json. ` +
-      `The skills below are unioned across all workflows and may be wrong — re-run afk-set-session-workflow.js with a valid workflow name.`;
+      `The active workflow "${activeWorkflowName}" (from maestro_session.json) matches no workflow in maestro.json. ` +
+      `The skills below are unioned across all workflows and may be wrong — re-run maestro-set-session-workflow.js with a valid workflow name.`;
   } else {
     const fallbackName = resolveWorkflowName(cfg);
     const fallbackMatches = workflows.filter((w) => w.name === fallbackName);
     searchList = fallbackMatches.length > 0 ? fallbackMatches : workflows;
     if (workflows.length > 1) {
       warning =
-        `No active workflow is set (afk-set-session-workflow.js was not run); falling back to the "${fallbackName}" workflow. ` +
+        `No active workflow is set (maestro-set-session-workflow.js was not run); falling back to the "${fallbackName}" workflow. ` +
         `If you intended a different workflow, the orchestrator should set it before invoking subagents.`;
     }
   }
@@ -156,27 +156,27 @@ function collect(cfg, sessionPath, agentType) {
   if (!agentType) process.exit(0);
 
   const projectDir = process.env.CLAUDE_PROJECT_DIR || payload.cwd || process.cwd();
-  const cfg = readJson(path.join(projectDir, ".claude", "afk.json"));
+  const cfg = readJson(path.join(projectDir, ".claude", "maestro.json"));
   if (!cfg || cfg.version !== 3) process.exit(0);
 
-  const sessionPath = path.join(projectDir, ".claude", "afk_session.json");
+  const sessionPath = path.join(projectDir, ".claude", "maestro_session.json");
   const result = collect(cfg, sessionPath, agentType);
   if (!result) process.exit(0);
 
   const parts = [];
   if (result.warning) {
-    parts.push(`⚠️ AFK warning: ${result.warning}`);
+    parts.push(`⚠️ Maestro warning: ${result.warning}`);
   }
   if (result.loadedSkills.length > 0) {
     parts.push(
-      `Skills to load for the \`${agentType}\` agent instance (afk.json v3, loaded_skills): ${result.loadedSkills.join(", ")}.\n\n` +
+      `Skills to load for the \`${agentType}\` agent instance (maestro.json v3, loaded_skills): ${result.loadedSkills.join(", ")}.\n\n` +
         `Load each one with the Skill tool before starting your work, then follow your agent file as written.`
     );
   }
 
   if (result.referencedSkills.length > 0) {
     parts.push(
-      `Skills available to the \`${agentType}\` agent instance (afk.json v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
+      `Skills available to the \`${agentType}\` agent instance (maestro.json v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
         `Do NOT load these up front. Load one with the Skill tool only if the task at hand involves the logic that ` +
         `skill describes (check each skill's description to decide); otherwise ignore it.`
     );

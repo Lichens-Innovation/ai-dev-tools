@@ -10,16 +10,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=lib/afk-app-paths.sh
-source "$SCRIPT_DIR/lib/afk-app-paths.sh"
+# shellcheck source=lib/maestro-app-paths.sh
+source "$SCRIPT_DIR/lib/maestro-app-paths.sh"
 
 # Docker won't create a file where a dir was left; keep it a real file (but don't clear contents).
-[[ -d "$AFK_RESULT_FILE" ]] && rm -rf "$AFK_RESULT_FILE"
-[[ -e "$AFK_RESULT_FILE" ]] || : > "$AFK_RESULT_FILE"
+[[ -d "$MAESTRO_RESULT_FILE" ]] && rm -rf "$MAESTRO_RESULT_FILE"
+[[ -e "$MAESTRO_RESULT_FILE" ]] || : > "$MAESTRO_RESULT_FILE"
 
 # Wait for the result file to be populated by a form submit / cancel / shutdown.
-until [[ -s "$AFK_RESULT_FILE" ]]; do
+until [[ -s "$MAESTRO_RESULT_FILE" ]]; do
   sleep 0.2
 done
 
-cat "$AFK_RESULT_FILE"
+cat "$MAESTRO_RESULT_FILE"

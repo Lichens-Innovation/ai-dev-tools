@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Sets the active workflow name in <cwd>/.claude/afk_session.json.
-// Called by the AFK orchestrator at the start of each workflow execution:
-//   node afk-set-session-workflow.cjs "<workflow name>"
+// Sets the active workflow name in <cwd>/.claude/maestro_session.json.
+// Called by the Maestro orchestrator at the start of each workflow execution:
+//   node maestro-set-session-workflow.cjs "<workflow name>"
 //
 // If no name is given, auto-resolves to the first configured workflow, else "default".
 // Creates the session file if absent; preserves existing generated_instances.
 //
-// Self-contained on purpose: afk-install.js copies this file into the
+// Self-contained on purpose: maestro-install.js copies this file into the
 // project's .claude/scripts/ so the orchestrator agent can run it via $CLAUDE_PROJECT_DIR.
 
 const fs = require("fs");
@@ -14,17 +14,17 @@ const path = require("path");
 
 const workflowName = process.argv[2] ?? null;
 const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
-const sessionPath = path.join(projectDir, ".claude", "afk_session.json");
-const afkJsonPath = path.join(projectDir, ".claude", "afk.json");
+const sessionPath = path.join(projectDir, ".claude", "maestro_session.json");
+const maestroJsonPath = path.join(projectDir, ".claude", "maestro.json");
 
 function resolveWorkflowName(name) {
   if (name) return name;
   try {
-    const cfg = JSON.parse(fs.readFileSync(afkJsonPath, "utf8"));
+    const cfg = JSON.parse(fs.readFileSync(maestroJsonPath, "utf8"));
     const workflows = cfg.workflows ?? [];
     return (workflows[0] && workflows[0].name) || "default";
   } catch {
-    // afk.json absent or unreadable
+    // maestro.json absent or unreadable
     return "default";
   }
 }
@@ -51,9 +51,9 @@ try {
   fs.writeFileSync(tmp, JSON.stringify(updated, null, 2));
   fs.renameSync(tmp, sessionPath);
 
-  process.stdout.write(`AFK session: active workflow set to "${resolvedName}"\n`);
+  process.stdout.write(`Maestro session: active workflow set to "${resolvedName}"\n`);
   process.exit(0);
 } catch (err) {
-  process.stderr.write(`afk-set-session-workflow: ${err.message}\n`);
+  process.stderr.write(`maestro-set-session-workflow: ${err.message}\n`);
   process.exit(1);
 }

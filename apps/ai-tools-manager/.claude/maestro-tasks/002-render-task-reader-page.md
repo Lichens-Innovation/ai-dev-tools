@@ -5,11 +5,11 @@ criterion below is met.
 
 ## What to build
 
-A two-pane reader page at `/afk-tasks`. The left pane lists every queued task as
+A two-pane reader page at `/maestro-tasks`. The left pane lists every queued task as
 a selectable card showing its filename, title, and any `Blocked by` badges. The
 right pane renders the selected task's markdown and offers a one-click **Copy
 prompt** action that puts `Do the task described in file <path>` on the
-clipboard, ready to paste into an `agent: afk` session.
+clipboard, ready to paste into an `agent: maestro` session.
 
 ### Things to verify by eye
 

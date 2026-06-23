@@ -1,13 +1,13 @@
 ---
 name: rule-view
-description: "Explains how the /rules view in ai-tools-manager is built end-to-end: the left rule selectors (on-disk project rules + installable vibe-rules), the center directory tree (rule-tree.tsx), how assignments map to the AfkConfigV3 `rules` slice in .claude/afk.json, and how afk-apply-rules.js moves/installs the rule files on save. Use when the user is working inside apps/ai-tools-manager and asks how the rules view works, how rules get assigned to the project root or directory paths, how rule files get moved or installed, how vibe-rules integrate, why a rule isn't showing up, or why a rule assignment isn't reaching the config."
+description: "Explains how the /rules view in ai-tools-manager is built end-to-end: the left rule selectors (on-disk project rules + installable vibe-rules), the center directory tree (rule-tree.tsx), how assignments map to the MaestroConfigV3 `rules` slice in .claude/maestro.json, and how maestro-apply-rules.js moves/installs the rule files on save. Use when the user is working inside apps/ai-tools-manager and asks how the rules view works, how rules get assigned to the project root or directory paths, how rule files get moved or installed, how vibe-rules integrate, why a rule isn't showing up, or why a rule assignment isn't reaching the config."
 ---
 
 # Rule View
 
-The `/rules` route (`src/routes/rules.tsx`) is a visual editor for assigning a project's **rules** to scopes — the project root and/or specific directory paths. The user picks which rules to work with (left pane), assigns each to a row of the project's directory tree (center). On save it persists the **rules slice** of `.claude/afk.json` (v3), and a host-side script then physically **moves or installs** each rule file into its assigned directory.
+The `/rules` route (`src/routes/rules.tsx`) is a visual editor for assigning a project's **rules** to scopes — the project root and/or specific directory paths. The user picks which rules to work with (left pane), assigns each to a row of the project's directory tree (center). On save it persists the **rules slice** of `.claude/maestro.json` (v3), and a host-side script then physically **moves or installs** each rule file into its assigned directory.
 
-It is the rules half of the `/afk` config flow — the `/workflows` route owns the other half (workflows + instances), and the two share one `afk.json`. See the `workflow-view` skill for that side.
+It is the rules half of the `/maestro-app` config flow — the `/workflows` route owns the other half (workflows + instances), and the two share one `maestro.json`. See the `workflow-view` skill for that side.
 
 ## Layout
 
@@ -36,14 +36,14 @@ The grid is a fixed `280px 1fr` (left pane + center). The TopNav is shared with 
 
 ```
 Route loader: Promise.all([                       (src/routes/rules.tsx)
-  getAfkConfig(),       → AfkConfigV3 + cwd        (src/utils/agents-framework-kickstarter.ts)
-  getProjectTree(),     → TreeNode[]               (src/utils/afk-tree.ts)
-  getProjectRules(),    → ProjectRule[]            (src/utils/afk-rules.ts — scans whole tree)
-  getVibeRules(),       → string[]                 (src/utils/afk-vibe.ts — `vibe-rules list`)
+  getMaestroConfig(),       → MaestroConfigV3 + cwd        (src/utils/maestro.ts)
+  getProjectTree(),     → TreeNode[]               (src/utils/maestro-tree.ts)
+  getProjectRules(),    → ProjectRule[]            (src/utils/maestro-rules.ts — scans whole tree)
+  getVibeRules(),       → string[]                 (src/utils/maestro-vibe.ts — `vibe-rules list`)
 ])
         │
         ▼
-RulesPage holds `config: AfkConfigV3` (source of truth for the YAML)
+RulesPage holds `config: MaestroConfigV3` (source of truth for the YAML)
    + `selectedRuleIds: string[]` — seeded from config.rules.map(r => r.id)
    + derived `ruleSource: Record<id, "project"|"vibe-rules">`
         │   left pane edits selectedRuleIds (+ prunes config.rules); tree edits config.rules
@@ -52,14 +52,14 @@ RuleTree renders the project-root row + one row per tree dir; each row shows the
   assignment for its path and a hover "+" picker to assign a selected rule (one per rule)
         │   onAssign / onUnassign → setConfig (mutates config.rules only)
         ▼ (Save rules)
-submitAfkConfig({ sliceType: "rules", slice: { cwd, rules: config.rules } })
-  • merges the rules slice into afk.json (preserves workflows/instances)
-  • writes <cwd>/.claude/afk.json
-  • writes /tmp/result.json → "AFK v3 config data: {JSON}"  for the skill
-    (with aiToolsAction:"afk-config", sliceType:"rules" so the /ai-tools dispatcher can route it)
+submitMaestroConfig({ sliceType: "rules", slice: { cwd, rules: config.rules } })
+  • merges the rules slice into maestro.json (preserves workflows/instances)
+  • writes <cwd>/.claude/maestro.json
+  • writes /tmp/result.json → "Maestro v3 config data: {JSON}"  for the skill
+    (with aiToolsAction:"maestro-config", sliceType:"rules" so the /ai-tools dispatcher can route it)
         │
-        ▼ (host-side, run by the /afk skill — directly, or via the /ai-tools dispatcher loop)
-afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installable rules
+        ▼ (host-side, run by the /maestro-app skill — directly, or via the /ai-tools dispatcher loop)
+maestro-apply-rules.js  → moves project rule files / `vibe-rules load`s installable rules
 ```
 
 ## File-by-file map
@@ -70,33 +70,33 @@ afk-apply-rules.js  → moves project rule files / `vibe-rules load`s installabl
 | The directory tree + per-row chips + add-rule picker | `src/components/rule-tree.tsx` |
 | Rule chip multi-select (used by both left-pane sections) | `src/components/chip-multi-select.tsx` |
 | Top bar — nav links (no workflow selector here) | `src/components/top-nav.tsx` |
-| Types + `getAfkConfig` loader + `submitAfkConfig` server fn | `src/utils/agents-framework-kickstarter.ts` |
-| Directory tree loader (`getProjectTree`, walkDir) | `src/utils/afk-tree.ts` |
-| Project-rule loader (`getProjectRules`, scans every `.claude/rules/`) | `src/utils/afk-rules.ts` |
-| Installable-rule loader (`getVibeRules`, `vibe-rules list`) | `src/utils/afk-vibe.ts` |
+| Types + `getMaestroConfig` loader + `submitMaestroConfig` server fn | `src/utils/maestro.ts` |
+| Directory tree loader (`getProjectTree`, walkDir) | `src/utils/maestro-tree.ts` |
+| Project-rule loader (`getProjectRules`, scans every `.claude/rules/`) | `src/utils/maestro-rules.ts` |
+| Installable-rule loader (`getVibeRules`, `vibe-rules list`) | `src/utils/maestro-vibe.ts` |
 | Source of project rules | `<cwd>/**/.claude/rules/*.md` |
-| **Host-side apply step** (move project files / `vibe-rules load`) | `plugins/ai-tools-manager/scripts/afk-apply-rules.js` |
+| **Host-side apply step** (move project files / `vibe-rules load`) | `plugins/ai-tools-manager/scripts/maestro-apply-rules.js` |
 | vibe-rules pre-compute for Docker (writes `vibeRules` into marketplace JSON) | `plugins/ai-tools-manager/scripts/launch-ai-tools-manager-app.sh` |
-| Consuming prompt (writes afk.json, renders orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/afk/SKILL.md` (scaffolding lives in `afk-install/SKILL.md`) |
+| Consuming prompt (writes maestro.json, renders orchestrator, runs apply step) | `plugins/ai-tools-manager/skills/maestro-app/SKILL.md` (scaffolding lives in `maestro-install/SKILL.md`) |
 
 ## The data model (the `rules` slice)
 
-The view edits exactly one field of the shared `AfkConfigV3` (`src/utils/agents-framework-kickstarter.ts`):
+The view edits exactly one field of the shared `MaestroConfigV3` (`src/utils/maestro.ts`):
 
 ```ts
-AfkConfigV3 { version: 3, …workflow fields…, rules: AfkRuleV3[] }   // only `rules` here
+MaestroConfigV3 { version: 3, …workflow fields…, rules: MaestroRuleV3[] }   // only `rules` here
 
-AfkRuleV3 { id, scope?: "project", paths?: string[], source?: "project" | "vibe-rules" }
+MaestroRuleV3 { id, scope?: "project", paths?: string[], source?: "project" | "vibe-rules" }
 ```
 
-An `AfkRuleV3` is **one assignment of a rule to one location** — not a rule definition, and (post this feature) at most one per rule id:
+An `MaestroRuleV3` is **one assignment of a rule to one location** — not a rule definition, and (post this feature) at most one per rule id:
 - **Project-root assignment** → `{ id, scope: "project" }` (no `paths`).
 - **Directory assignment** → `{ id, paths: ["<dirPath>/**"] }` (no `scope`).
 - **`source`** records where the rule comes from, so the host-side apply step knows what to do:
   - `"project"` — an on-disk `.claude/rules/<file>.md`; the file is **moved** into the assigned directory.
   - `"vibe-rules"` — a rule from the vibe-rules store; **installed** via `vibe-rules load`.
 
-The rule **definitions** are separate shapes, loaded but never written into `afk.json`:
+The rule **definitions** are separate shapes, loaded but never written into `maestro.json`:
 
 ```ts
 ProjectRule { id, description, body, dir }       // from <cwd>/**/.claude/rules/<file>.md; `dir` = current location
@@ -116,11 +116,11 @@ Source bookkeeping:
 - `setGroupSelection(groupIds, next)` toggles selection within one section while leaving the other's intact, and **prunes `config.rules`** to the still-selected ids — so de-selecting a chip unassigns that rule everywhere.
 - `selectedRuleIds` is **seeded** on mount from `config.rules.map(r => r.id)`.
 
-**Save rules** → `handleSubmit` → `submitAfkConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
+**Save rules** → `handleSubmit` → `submitMaestroConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
 
 ## Center — directory tree (rule-tree.tsx)
 
-`RuleTree` renders a flat, indented list: a synthetic **`(project root)`** row (`dirPath = ""`, `⊟`), then one `TreeRow` per `TreeNode` from `getProjectTree()` (`▸`, indented by `depth * 16 + 8`px). `getProjectTree` (`afk-tree.ts`) walks from `cwd`, **maxDepth 4**, skipping `node_modules`/`.git`/`dist`/`build`/`.next`/`.turbo`/`.output`.
+`RuleTree` renders a flat, indented list: a synthetic **`(project root)`** row (`dirPath = ""`, `⊟`), then one `TreeRow` per `TreeNode` from `getProjectTree()` (`▸`, indented by `depth * 16 + 8`px). `getProjectTree` (`maestro-tree.ts`) walks from `cwd`, **maxDepth 4**, skipping `node_modules`/`.git`/`dist`/`build`/`.next`/`.turbo`/`.output`.
 
 Each `TreeRow`:
 - **Computes its own assignment** by filtering `ruleAssignments` (= `config.rules`): root matches `scope === "project" && no paths`; a dir matches `paths` containing `"<dirPath>/**"` or the bare `dirPath`.
@@ -129,13 +129,13 @@ Each `TreeRow`:
 
 **One location per rule.** `handleAssign` (in `rules.tsx`) removes **every** prior assignment of that id before appending the new one (and stamps `source` from `ruleSource`). So a rule assigned to the root and then added to a directory **moves** — the root chip disappears and the directory chip appears. `handleUnassign` filters purely by id. The glob convention `"<dirPath>/**"` is written in `rule-tree.tsx`'s `handleAdd` and read back by `pathAssignments`; the two must stay in lockstep.
 
-## Persistence (submitAfkConfig)
+## Persistence (submitMaestroConfig)
 
-Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `afk.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/afk.json`, and writes the result file with `additionalContext` = `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host, re-renders the orchestrator, then runs the apply step below (on a first run, `/afk-install` scaffolds the orchestrator first).
+Saving sends only the **rules slice** (`{ cwd, rules }`) with `sliceType: "rules"`. The server fn reads the existing `maestro.json`, overwrites **just** `rules` (so the `/workflows` slice survives), writes `.claude/maestro.json`, and writes the result file with `additionalContext` = `Maestro v3 config data: {…}`. The consuming `/maestro-app` SKILL.md writes that file on the host, re-renders the orchestrator, then runs the apply step below (on a first run, `/maestro-install` scaffolds the orchestrator first).
 
-## Runtime — applying placements (afk-apply-rules.js)
+## Runtime — applying placements (maestro-apply-rules.js)
 
-`plugins/ai-tools-manager/scripts/afk-apply-rules.js` runs **host-side** after `afk.json` is written (the container can't reach project paths and `vibe-rules` is a host CLI). It reads the `rules` slice and, per assignment:
+`plugins/ai-tools-manager/scripts/maestro-apply-rules.js` runs **host-side** after `maestro.json` is written (the container can't reach project paths and `vibe-rules` is a host CLI). It reads the `rules` slice and, per assignment:
 
 - **`source: "project"`** → finds the rule's `.claude/rules/<file>.md` by scanning the tree (matching the frontmatter `name`/basename to the id), then **moves** it into `<assignedDir>/.claude/rules/`. If it's already there (e.g. assigned to the root where it lives), it's a no-op (`unchanged`).
 - **`source: "vibe-rules"`** → runs `vibe-rules load <id> claude-code -t <assignedDir>/.claude/rules/<id>.md` (creating the parent dir first). vibe-rules **appends** a `<id>…</id>` block, so the script first checks for that tag and **skips** if already present — re-runs don't duplicate.
@@ -147,13 +147,13 @@ Under Docker the UI can't call `vibe-rules` itself, so `launch-ai-tools-manager-
 
 ## Things that bite
 
-- **Save only touches the rules slice.** Don't widen `submitAfkConfig`'s rules branch to write `workflows`/instances — that's the `/workflows` route's slice, and a stray write will clobber it.
+- **Save only touches the rules slice.** Don't widen `submitMaestroConfig`'s rules branch to write `workflows`/instances — that's the `/workflows` route's slice, and a stray write will clobber it.
 - **`rules` entries are assignments, not definitions, and now one-per-id.** `handleAssign` deletes prior assignments of the same id, so the model holds at most one location per rule. Code that assumed multiple assignments per id no longer applies.
 - **De-selecting a rule deletes its assignment.** `setGroupSelection` prunes `config.rules` to the selected ids. Unchecking a chip to "hide" a rule removes the path it was assigned to.
-- **The move is a real `fs.renameSync` at apply time, not at save time in the app.** The app only records the assignment; nothing moves until `afk-apply-rules.js` runs (via the skill). Editing the app's `submitAfkConfig` won't move files — it can't (Docker/path/CLI). Change the script instead.
+- **The move is a real `fs.renameSync` at apply time, not at save time in the app.** The app only records the assignment; nothing moves until `maestro-apply-rules.js` runs (via the skill). Editing the app's `submitMaestroConfig` won't move files — it can't (Docker/path/CLI). Change the script instead.
 - **vibe-rules `load` appends, so installs must be guarded.** The script checks for the `<id>` tag before loading; if you change the target filename or the tag format, re-runs will start duplicating blocks. Re-confirm against `vibe-rules`' actual output (`<id>…</id>` wrapper) if you touch this.
 - **The editor token is `claude-code`.** `vibe-rules load <id> claude` errors with "Unsupported rule type: claude". And `-t` is a file path whose parent dir must exist — the script `mkdir -p`s it.
-- **`getProjectRules` scans the whole tree (maxDepth 4).** A rule nested deeper than 4 levels, or under an ignored dir, won't appear in the picker even though its assignment may persist in `afk.json`. Same depth/ignore list as the tree walk — keep them consistent.
-- **A rule assigned in afk.json but missing from disk is stranded.** `selectedRuleIds` is seeded from `config.rules`, but the chips only render ids the loaders return. If the file was deleted (project) or removed from the store (vibe-rules), the chip can't render, yet the assignment persists until something prunes it — and `afk-apply-rules.js` reports it under `missing`/`errors`.
+- **`getProjectRules` scans the whole tree (maxDepth 4).** A rule nested deeper than 4 levels, or under an ignored dir, won't appear in the picker even though its assignment may persist in `maestro.json`. Same depth/ignore list as the tree walk — keep them consistent.
+- **A rule assigned in maestro.json but missing from disk is stranded.** `selectedRuleIds` is seeded from `config.rules`, but the chips only render ids the loaders return. If the file was deleted (project) or removed from the store (vibe-rules), the chip can't render, yet the assignment persists until something prunes it — and `maestro-apply-rules.js` reports it under `missing`/`errors`.
 - **Name collisions resolve to project.** If the same id exists both on disk and in `vibe-rules list`, `ruleSource` calls it `"project"` and the vibe section hides it. The on-disk file is moved; the vibe-rules version is ignored.
 - **Re-assigning a vibe-rule leaves the old install behind.** Project rules are *moved* (single file follows the assignment); vibe-rules are *installed* at the assigned path. The config holds one location per rule, but since the apply step never deletes, moving a vibe-rule to a new directory installs a fresh copy there and leaves the previous `.claude/rules/<id>.md` in place — by design (cleanup is the user's call).

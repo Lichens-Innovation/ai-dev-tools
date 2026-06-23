@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import fs from "fs";
 import path from "path";
-import { readCwd, mountedProjectPath } from "./afk-fs";
+import { readCwd, mountedProjectPath } from "./maestro-fs";
 
 export interface SessionLogEntry {
   ts: string;
   origin: string;
   log: string;
-  // Set on dispatch/handoff entries written by afk-subagent-log.js:
+  // Set on dispatch/handoff entries written by maestro-subagent-log.js:
   kind?: "dispatch" | "handoff";
   agent?: string;      // dispatch: the subagent's agent_type
   agent_id?: string;   // shared key linking a dispatch↔handoff pair
@@ -19,11 +19,11 @@ export interface SessionLogEntry {
   output?: string;     // full final message (agent → main session)
 }
 
-/** Resolve the absolute path to afk_session.log.jsonl, or null if cwd is unavailable. */
+/** Resolve the absolute path to maestro_session.log.jsonl, or null if cwd is unavailable. */
 export function resolveLogFile(): string | null {
   const cwd = mountedProjectPath(readCwd());
   if (!cwd) return null;
-  return path.join(cwd, ".claude", "afk_session.log.jsonl");
+  return path.join(cwd, ".claude", "maestro_session.log.jsonl");
 }
 
 /** Parse a JSONL string into SessionLogEntry[], skipping malformed lines. */
@@ -41,7 +41,7 @@ export function parseLogLines(raw: string): SessionLogEntry[] {
     .filter((e): e is SessionLogEntry => !!e && typeof e.origin === "string");
 }
 
-export const getAfkSessionLog = createServerFn({ method: "GET" }).handler(
+export const getMaestroSessionLog = createServerFn({ method: "GET" }).handler(
   async (): Promise<SessionLogEntry[]> => {
     const file = resolveLogFile();
     if (!file) return [];

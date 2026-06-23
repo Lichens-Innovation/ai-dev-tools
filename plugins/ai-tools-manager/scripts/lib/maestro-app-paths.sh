@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 # Per-project ai-tools-manager path constants.
 #
-# Source this AFTER setting AFK_PROJECT_DIR when the project dir comes from stdin
+# Source this AFTER setting MAESTRO_PROJECT_DIR when the project dir comes from stdin
 # JSON (SessionStart/SessionEnd hooks). For scripts invoked with the project as cwd
-# (ensure, wait, launch), omit AFK_PROJECT_DIR and it defaults to $(pwd).
+# (ensure, wait, launch), omit MAESTRO_PROJECT_DIR and it defaults to $(pwd).
 #
 # Exports:
-#   AFK_PROJECT_DIR   – absolute path to the target project
-#   AFK_KEY           – 12-char SHA-1 hash of AFK_PROJECT_DIR, stable per project
-#   AFK_PROJECT_NAME  – docker compose project name  (ai-tools-<key>)
-#   AFK_STATE_FILE    – persists AFK_PORT + AFK_COMPOSE_FILE for this project
-#   AFK_MARKETPLACE_FILE – precompute data (mounted read-only at /tmp/marketplace-data.json)
-#   AFK_RESULT_FILE   – form submit channel (mounted at /tmp/result.json)
-#   AFK_SESSIONS_DIR  – per-project marker dir for reference-counted teardown
+#   MAESTRO_PROJECT_DIR   – absolute path to the target project
+#   MAESTRO_KEY           – 12-char SHA-1 hash of MAESTRO_PROJECT_DIR, stable per project
+#   MAESTRO_PROJECT_NAME  – docker compose project name  (ai-tools-<key>)
+#   MAESTRO_STATE_FILE    – persists MAESTRO_PORT + MAESTRO_COMPOSE_FILE for this project
+#   MAESTRO_MARKETPLACE_FILE – precompute data (mounted read-only at /tmp/marketplace-data.json)
+#   MAESTRO_RESULT_FILE   – form submit channel (mounted at /tmp/result.json)
+#   MAESTRO_SESSIONS_DIR  – per-project marker dir for reference-counted teardown
 #
-# Defines afk_load_state(): sources AFK_STATE_FILE and sets AFK_PORT + AFK_COMPOSE_FILE
-# + AFK_PROJECT_NAME from it (needed by teardown to call docker compose down).
+# Defines maestro_load_state(): sources MAESTRO_STATE_FILE and sets MAESTRO_PORT + MAESTRO_COMPOSE_FILE
+# + MAESTRO_PROJECT_NAME from it (needed by teardown to call docker compose down).
 
-AFK_PROJECT_DIR="${AFK_PROJECT_DIR:-$(pwd)}"
-AFK_KEY="$(printf '%s' "$AFK_PROJECT_DIR" | shasum 2>/dev/null | cut -c1-12)"
-AFK_PROJECT_NAME="ai-tools-${AFK_KEY}"
-AFK_STATE_FILE="/tmp/ai-tools-app.${AFK_KEY}.state"
-AFK_MARKETPLACE_FILE="/tmp/ai-tools-marketplace.${AFK_KEY}.json"
-AFK_RESULT_FILE="/tmp/ai-tools-result.${AFK_KEY}.json"
-AFK_SESSIONS_DIR="/tmp/ai-tools-app.sessions/${AFK_KEY}"
+MAESTRO_PROJECT_DIR="${MAESTRO_PROJECT_DIR:-$(pwd)}"
+MAESTRO_KEY="$(printf '%s' "$MAESTRO_PROJECT_DIR" | shasum 2>/dev/null | cut -c1-12)"
+MAESTRO_PROJECT_NAME="ai-tools-${MAESTRO_KEY}"
+MAESTRO_STATE_FILE="/tmp/ai-tools-app.${MAESTRO_KEY}.state"
+MAESTRO_MARKETPLACE_FILE="/tmp/ai-tools-marketplace.${MAESTRO_KEY}.json"
+MAESTRO_RESULT_FILE="/tmp/ai-tools-result.${MAESTRO_KEY}.json"
+MAESTRO_SESSIONS_DIR="/tmp/ai-tools-app.sessions/${MAESTRO_KEY}"
 
-afk_load_state() {
+maestro_load_state() {
   # shellcheck disable=SC1090
-  [[ -f "$AFK_STATE_FILE" ]] && source "$AFK_STATE_FILE"
+  [[ -f "$MAESTRO_STATE_FILE" ]] && source "$MAESTRO_STATE_FILE"
   return 0
 }

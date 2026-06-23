@@ -16,8 +16,8 @@ import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
-import { Route as AgentsFrameworkKickstarterRouteImport } from './routes/agents-framework-kickstarter'
-import { Route as AfkTasksRouteImport } from './routes/afk-tasks'
+import { Route as MaestroRouteImport } from './routes/maestro'
+import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSessionLogStreamRouteImport } from './routes/api/session-log-stream'
 
@@ -56,15 +56,15 @@ const CreateMarketplaceRoute = CreateMarketplaceRouteImport.update({
   path: '/create-marketplace',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgentsFrameworkKickstarterRoute =
-  AgentsFrameworkKickstarterRouteImport.update({
-    id: '/agents-framework-kickstarter',
-    path: '/agents-framework-kickstarter',
+const MaestroRoute =
+  MaestroRouteImport.update({
+    id: '/maestro',
+    path: '/maestro',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AfkTasksRoute = AfkTasksRouteImport.update({
-  id: '/afk-tasks',
-  path: '/afk-tasks',
+const MaestroTasksRoute = MaestroTasksRouteImport.update({
+  id: '/maestro-tasks',
+  path: '/maestro-tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -80,8 +80,8 @@ const ApiSessionLogStreamRoute = ApiSessionLogStreamRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/afk-tasks': typeof AfkTasksRoute
-  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/maestro': typeof MaestroRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -93,8 +93,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/afk-tasks': typeof AfkTasksRoute
-  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/maestro': typeof MaestroRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -107,8 +107,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/afk-tasks': typeof AfkTasksRoute
-  '/agents-framework-kickstarter': typeof AgentsFrameworkKickstarterRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/maestro': typeof MaestroRoute
   '/create-marketplace': typeof CreateMarketplaceRoute
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
@@ -122,8 +122,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/afk-tasks'
-    | '/agents-framework-kickstarter'
+    | '/maestro-tasks'
+    | '/maestro'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -135,8 +135,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/afk-tasks'
-    | '/agents-framework-kickstarter'
+    | '/maestro-tasks'
+    | '/maestro'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -148,8 +148,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/afk-tasks'
-    | '/agents-framework-kickstarter'
+    | '/maestro-tasks'
+    | '/maestro'
     | '/create-marketplace'
     | '/create-plugin'
     | '/create-skill'
@@ -162,8 +162,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AfkTasksRoute: typeof AfkTasksRoute
-  AgentsFrameworkKickstarterRoute: typeof AgentsFrameworkKickstarterRoute
+  MaestroTasksRoute: typeof MaestroTasksRoute
+  MaestroRoute: typeof MaestroRoute
   CreateMarketplaceRoute: typeof CreateMarketplaceRoute
   CreatePluginRoute: typeof CreatePluginRoute
   CreateSkillRoute: typeof CreateSkillRoute
@@ -225,18 +225,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateMarketplaceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agents-framework-kickstarter': {
-      id: '/agents-framework-kickstarter'
-      path: '/agents-framework-kickstarter'
-      fullPath: '/agents-framework-kickstarter'
-      preLoaderRoute: typeof AgentsFrameworkKickstarterRouteImport
+    '/maestro': {
+      id: '/maestro'
+      path: '/maestro'
+      fullPath: '/maestro'
+      preLoaderRoute: typeof MaestroRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/afk-tasks': {
-      id: '/afk-tasks'
-      path: '/afk-tasks'
-      fullPath: '/afk-tasks'
-      preLoaderRoute: typeof AfkTasksRouteImport
+    '/maestro-tasks': {
+      id: '/maestro-tasks'
+      path: '/maestro-tasks'
+      fullPath: '/maestro-tasks'
+      preLoaderRoute: typeof MaestroTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -258,8 +258,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AfkTasksRoute: AfkTasksRoute,
-  AgentsFrameworkKickstarterRoute: AgentsFrameworkKickstarterRoute,
+  MaestroTasksRoute: MaestroTasksRoute,
+  MaestroRoute: MaestroRoute,
   CreateMarketplaceRoute: CreateMarketplaceRoute,
   CreatePluginRoute: CreatePluginRoute,
   CreateSkillRoute: CreateSkillRoute,

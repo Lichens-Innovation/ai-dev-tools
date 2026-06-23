@@ -7,19 +7,19 @@ import TopNav from "../components/top-nav";
 import RuleTree from "../components/rule-tree";
 import ChipMultiSelect from "../components/chip-multi-select";
 import {
-  getAfkConfig,
-  submitAfkConfig,
-  type AfkConfigV3,
-  type AfkRuleV3,
-  type AfkConfigResult,
-} from "../utils/agents-framework-kickstarter";
-import { getProjectTree, type TreeNode } from "../utils/afk-tree";
-import { getProjectRules, type ProjectRule } from "../utils/afk-rules";
-import { getVibeRules } from "../utils/afk-vibe";
+  getMaestroConfig,
+  submitMaestroConfig,
+  type MaestroConfigV3,
+  type MaestroRuleV3,
+  type MaestroConfigResult,
+} from "../utils/maestro";
+import { getProjectTree, type TreeNode } from "../utils/maestro-tree";
+import { getProjectRules, type ProjectRule } from "../utils/maestro-rules";
+import { getVibeRules } from "../utils/maestro-vibe";
 
 type RuleSource = "project" | "vibe-rules";
 
-interface RulesLoaderData extends AfkConfigResult {
+interface RulesLoaderData extends MaestroConfigResult {
   tree: TreeNode[];
   availableRules: ProjectRule[];
   vibeRules: string[];
@@ -28,7 +28,7 @@ interface RulesLoaderData extends AfkConfigResult {
 export const Route = createFileRoute("/rules")({
   loader: async (): Promise<RulesLoaderData> => {
     const [configData, tree, availableRules, vibeRules] = await Promise.all([
-      getAfkConfig(),
+      getMaestroConfig(),
       getProjectTree(),
       getProjectRules(),
       getVibeRules(),
@@ -44,7 +44,7 @@ function RulesPage() {
   const loaderData = Route.useLoaderData() as RulesLoaderData;
   const { cwd, tree, availableRules, vibeRules } = loaderData;
 
-  const [config, setConfig] = useState<AfkConfigV3>(loaderData.config);
+  const [config, setConfig] = useState<MaestroConfigV3>(loaderData.config);
   const [phase, setPhase] = useState<Phase>("idle");
 
   // IDs of rules the user has "selected" (toggled on) — the pool the tree can assign.
@@ -85,7 +85,7 @@ function RulesPage() {
   // One location per rule: assigning replaces any prior assignment of the same id
   // (root or another path), so re-assigning effectively MOVES it. Source is stamped
   // from the lookup so the host-side apply step knows move-file vs vibe-rules-load.
-  const handleAssign = (assignment: AfkRuleV3) => {
+  const handleAssign = (assignment: MaestroRuleV3) => {
     setConfig((c) => ({
       ...c,
       rules: [
@@ -101,7 +101,7 @@ function RulesPage() {
 
   const handleSubmit = async () => {
     setPhase("saving");
-    await submitAfkConfig({
+    await submitMaestroConfig({
       data: {
         cwd,
         sliceType: "rules",
@@ -111,7 +111,7 @@ function RulesPage() {
     toast(
       <>
         Rules saved to{" "}
-        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/afk.json</span> and moved
+        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/maestro.json</span> and moved
         into their assigned directories.
       </>,
     );

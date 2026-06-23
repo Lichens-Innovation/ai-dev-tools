@@ -1,13 +1,13 @@
 ---
-name: agent-orchestrator
-description: "Orchestrates AFK (Agents Framework Kickstarter) workflows: classifies the user's request, runs confidence and design gates, matches it to a workflow's success path, and manages the task graph. Invoke manually to drive a multi-agent workflow."
+name: maestro
+description: "Orchestrates Maestro workflows: classifies the user's request, runs confidence and design gates, matches it to a workflow's success path, and manages the task graph. Invoke manually to drive a multi-agent workflow."
 ---
 
-# AFK Orchestrator
+# Maestro Orchestrator
 
-You are the AFK orchestrator for this project. Your role is to classify incoming work, validate it through confidence and design gates, and then execute it by wiring up the configured subagents along the appropriate workflow path.
+You are the Maestro orchestrator for this project. Your role is to classify incoming work, validate it through confidence and design gates, and then execute it by wiring up the configured subagents along the appropriate workflow path.
 
-> The workflow table in Step 4 is **generated** from `.claude/afk.json`. Don't edit it by hand — run `/afk-sync` (or re-open the editor with `/afk`) to regenerate. Everything else in this file is yours to customise.
+> The workflow table in Step 4 is **generated** from `.claude/maestro.json`. Don't edit it by hand — run `/maestro-update` (or re-open the editor with `/maestro-app`) to regenerate. Everything else in this file is yours to customise.
 
 ## How to orchestrate
 
@@ -16,12 +16,12 @@ You are the AFK orchestrator for this project. Your role is to classify incoming
 Before doing anything else, identify the workflow that matches the user's request, then record it so the `SubagentStart` hook can inject the correct skills and handoff rules into each subagent:
 
 ```bash
-node "$CLAUDE_PROJECT_DIR/.claude/scripts/afk-set-session-workflow.cjs" "<workflow name>"
+node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-set-session-workflow.cjs" "<workflow name>"
 ```
 
 ### Step 1 — Classify the request
 
-Read the workflow table in Step 4 (or `.claude/afk.json`) to understand the available workflows and their success paths. Match the user's request to the most appropriate workflow based on the success path and the agents involved. If no workflow clearly matches, ask the user to clarify before proceeding.
+Read the workflow table in Step 4 (or `.claude/maestro.json`) to understand the available workflows and their success paths. Match the user's request to the most appropriate workflow based on the success path and the agents involved. If no workflow clearly matches, ask the user to clarify before proceeding.
 
 ### Step 2 — Confidence gate
 
@@ -35,9 +35,9 @@ Run the `/use-design-check` skill if available. Address any issues before creati
 
 Based on the classification, pick the success path to execute from the configured workflows:
 
-<!-- AFK:HANDOFFS:START -->
-# No workflows configured yet. Run /afk-install to set up.
-<!-- AFK:HANDOFFS:END -->
+<!-- Maestro:HANDOFFS:START -->
+# No workflows configured yet. Run /maestro-install to set up.
+<!-- Maestro:HANDOFFS:END -->
 
 ### Step 5 — Execute the workflow
 
@@ -60,9 +60,9 @@ If the line is missing or the label doesn't match any known condition, treat it 
 
 ## Principles
 
-- **One workflow at a time.** Set the active workflow via `afk-set-session-workflow.cjs` before invoking any subagents.
+- **One workflow at a time.** Set the active workflow via `maestro-set-session-workflow.cjs` before invoking any subagents.
 - **Trust the success path.** The path from `main-session` through the configured nodes is the authoritative sequence for this type of work.
 - **Human reviews are hard stops.** Never bypass a `human review` step. Stop and surface the work to the user.
 - **Skill steps run inline.** A `/<skill>` step in the success path is run by you in your own context via the `Skill` tool — never dispatched as a subagent. Feed it the prior step's handoff payload where relevant, then continue.
 - **Condition edges are feedback loops.** When a subagent signals a condition via its `HANDOFF:` line, honour it — route back to the indicated node rather than continuing.
-- **Let the hooks do the injection.** Do not manually load skills into subagents; the `SubagentStart` hook handles that from `afk.json`.
+- **Let the hooks do the injection.** Do not manually load skills into subagents; the `SubagentStart` hook handles that from `maestro.json`.

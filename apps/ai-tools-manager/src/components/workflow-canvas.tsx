@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import type { AfkWorkflowV3, AfkNodeV3, AfkEdgeV3, AfkInstanceV3 } from "../utils/agents-framework-kickstarter";
+import type { MaestroWorkflowV3, MaestroNodeV3, MaestroEdgeV3, MaestroInstanceV3 } from "../utils/maestro";
 import InstancePicker, {
   blankInstancePicker,
   resolveInstanceFromPicker,
@@ -36,12 +36,12 @@ import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 
 interface WorkflowCanvasProps {
-  workflow: AfkWorkflowV3 | null;
+  workflow: MaestroWorkflowV3 | null;
   availableAgents: string[];
   availableSkills: string[];
-  instances: AfkInstanceV3[];
-  onChange: (w: AfkWorkflowV3) => void;
-  onInstancesChange: (instances: AfkInstanceV3[]) => void;
+  instances: MaestroInstanceV3[];
+  onChange: (w: MaestroWorkflowV3) => void;
+  onInstancesChange: (instances: MaestroInstanceV3[]) => void;
 }
 
 // ── Dagre layout ────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ interface WorkflowCanvasProps {
 // Estimated rendered height of a node, so dagre spaces skill-heavy agent nodes apart
 // instead of overlapping them. Each skill chip wraps onto ~its own row (~30px).
 function dagreNodeHeight(n: Node): number {
-  const inst = n.data?.instanceData as AfkInstanceV3 | undefined;
+  const inst = n.data?.instanceData as MaestroInstanceV3 | undefined;
   const skills = (inst?.loaded_skills?.length ?? 0) + (inst?.referenced_skills?.length ?? 0);
   return 60 + skills * 30;
 }
@@ -67,9 +67,9 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   });
 }
 
-// ── Helpers: AfkWorkflowV3 <-> React Flow ──────────────────────────
+// ── Helpers: MaestroWorkflowV3 <-> React Flow ──────────────────────────
 
-function workflowToRfNodes(workflow: AfkWorkflowV3, instances: AfkInstanceV3[]): Node[] {
+function workflowToRfNodes(workflow: MaestroWorkflowV3, instances: MaestroInstanceV3[]): Node[] {
   const nodes: Node[] = [
     {
       id: "main-session",
@@ -86,13 +86,13 @@ function workflowToRfNodes(workflow: AfkWorkflowV3, instances: AfkInstanceV3[]):
       id: n.id,
       type: rfType,
       position: n.position ?? { x: 0, y: 0 },
-      data: { afkNode: n, instanceData },
+      data: { maestroNode: n, instanceData },
     });
   }
   return nodes;
 }
 
-function workflowToRfEdges(workflow: AfkWorkflowV3): Edge[] {
+function workflowToRfEdges(workflow: MaestroWorkflowV3): Edge[] {
   return workflow.edges.map((e, i) => ({
     id: `e-${e.from}-${e.to}-${i}`,
     source: e.from,
@@ -103,28 +103,28 @@ function workflowToRfEdges(workflow: AfkWorkflowV3): Edge[] {
     label: e.label,
     animated: e.kind === "condition",
     style: e.kind === "condition" ? { stroke: "#f97316", strokeDasharray: "5 4" } : undefined,
-    data: { afkEdge: e },
+    data: { maestroEdge: e },
   }));
 }
 
-function rfNodesToAfkNodes(nodes: Node[]): AfkNodeV3[] {
+function rfNodesToMaestroNodes(nodes: Node[]): MaestroNodeV3[] {
   return nodes
     .filter((n) => n.id !== "main-session")
     .map((n) => {
-      const afk = n.data.afkNode as AfkNodeV3;
-      return { id: afk.id, type: afk.type, instance: afk.instance, skill: afk.skill, position: n.position };
+      const maestro = n.data.maestroNode as MaestroNodeV3;
+      return { id: maestro.id, type: maestro.type, instance: maestro.instance, skill: maestro.skill, position: n.position };
     });
 }
 
-function rfEdgesToAfkEdges(edges: Edge[]): AfkEdgeV3[] {
+function rfEdgesToMaestroEdges(edges: Edge[]): MaestroEdgeV3[] {
   return edges.map((e) => {
-    const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
+    const maestro = e.data?.maestroEdge as MaestroEdgeV3 | undefined;
     return {
       from: e.source,
       to: e.target,
-      kind: (afk?.kind ?? (e.type === "conditionEdge" ? "condition" : "success")) as "success" | "condition",
-      label: typeof e.label === "string" ? e.label : afk?.label,
-      label_offset: afk?.label_offset,
+      kind: (maestro?.kind ?? (e.type === "conditionEdge" ? "condition" : "success")) as "success" | "condition",
+      label: typeof e.label === "string" ? e.label : maestro?.label,
+      label_offset: maestro?.label_offset,
       sourceHandle: e.sourceHandle ?? undefined,
       targetHandle: e.targetHandle ?? undefined,
     };
@@ -134,7 +134,7 @@ function rfEdgesToAfkEdges(edges: Edge[]): AfkEdgeV3[] {
 function isSuccessEdge(e: Edge): boolean {
   return (
     e.type === "successEdge" ||
-    ((e.data as Record<string, unknown> | undefined)?.afkEdge as AfkEdgeV3 | undefined)?.kind === "success"
+    ((e.data as Record<string, unknown> | undefined)?.maestroEdge as MaestroEdgeV3 | undefined)?.kind === "success"
   );
 }
 
@@ -214,8 +214,8 @@ function AgentNodeComponent({
   selected,
 }: NodeProps & {
   data: {
-    afkNode: AfkNodeV3;
-    instanceData?: AfkInstanceV3;
+    maestroNode: MaestroNodeV3;
+    instanceData?: MaestroInstanceV3;
     onDelete?: (id: string) => void;
     onEditInstance?: (instanceName: string) => void;
     onAddConditionEdge?: (id: string) => void;
@@ -226,7 +226,7 @@ function AgentNodeComponent({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const afk = data.afkNode;
+  const maestro = data.maestroNode;
   const inst = data.instanceData;
   const term = !!data.isTerminal;
 
@@ -269,7 +269,7 @@ function AgentNodeComponent({
           className={sideButtonClass}
           onClick={(e) => {
             e.stopPropagation();
-            data.onAddConditionEdge?.(afk.id);
+            data.onAddConditionEdge?.(maestro.id);
           }}
           title="Add condition from this node"
         >
@@ -283,7 +283,7 @@ function AgentNodeComponent({
           className={sideButtonClass}
           onClick={(e) => {
             e.stopPropagation();
-            data.onAddConditionEdge?.(afk.id);
+            data.onAddConditionEdge?.(maestro.id);
           }}
           title="Add condition from this node"
         >
@@ -295,7 +295,7 @@ function AgentNodeComponent({
             <div className="flex flex-col min-w-0 flex-1">
               {/* Instance name (primary) */}
               <span className={`font-mono text-[12px] font-semibold truncate ${nameClass}`}>
-                {afk.instance ?? afk.id}
+                {maestro.instance ?? maestro.id}
               </span>
               {/* Agent name (secondary) */}
               {inst && <span className={`text-[10px] truncate font-mono ${subClass}`}>@{inst.agent}</span>}
@@ -317,7 +317,7 @@ function AgentNodeComponent({
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
                     onClick={() => {
-                      data.onEditInstance?.(afk.instance ?? afk.id);
+                      data.onEditInstance?.(maestro.instance ?? maestro.id);
                       setMenuOpen(false);
                     }}
                   >
@@ -327,7 +327,7 @@ function AgentNodeComponent({
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
                     onClick={() => {
-                      data.onDelete?.(afk.id);
+                      data.onDelete?.(maestro.id);
                       setMenuOpen(false);
                     }}
                   >
@@ -364,7 +364,7 @@ function AgentNodeComponent({
           className={`w-5 h-5 rounded-full bg-white border-2 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:opacity-80 focus:outline-none ${term ? "border-green-400 text-green-600" : "border-orange-300 text-orange-500"}`}
           onClick={(e) => {
             e.stopPropagation();
-            data.onAddNext?.(afk.id);
+            data.onAddNext?.(maestro.id);
           }}
           title="Add next step"
         >
@@ -379,8 +379,8 @@ function AgentNodeComponent({
 function HumanStepNode({
   data,
   selected,
-}: NodeProps & { data: { afkNode: AfkNodeV3; onAddNext?: (id: string) => void } }) {
-  const afk = data.afkNode;
+}: NodeProps & { data: { maestroNode: MaestroNodeV3; onAddNext?: (id: string) => void } }) {
+  const maestro = data.maestroNode;
   return (
     <>
       <Handle type="target" position={Position.Top} id="top" />
@@ -398,7 +398,7 @@ function HumanStepNode({
           className="w-5 h-5 rounded-full bg-white border-2 border-amber-400 text-amber-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-amber-50 focus:outline-none"
           onClick={(e) => {
             e.stopPropagation();
-            data.onAddNext?.(afk.id);
+            data.onAddNext?.(maestro.id);
           }}
           title="Add next step"
         >
@@ -415,7 +415,7 @@ function SkillNodeComponent({
   selected,
 }: NodeProps & {
   data: {
-    afkNode: AfkNodeV3;
+    maestroNode: MaestroNodeV3;
     onDelete?: (id: string) => void;
     onChangeSkill?: (id: string) => void;
     onAddNext?: (id: string) => void;
@@ -423,7 +423,7 @@ function SkillNodeComponent({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const afk = data.afkNode;
+  const maestro = data.maestroNode;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -442,7 +442,7 @@ function SkillNodeComponent({
           className={`w-44 rounded-lg border-2 shadow-sm bg-violet-50 text-violet-900 ${selected ? "border-violet-500" : "border-violet-300"}`}
         >
           <div className="flex items-center justify-between px-2.5 py-2">
-            <span className="font-mono text-[12px] font-semibold truncate text-violet-800">/{afk.skill ?? afk.id}</span>
+            <span className="font-mono text-[12px] font-semibold truncate text-violet-800">/{maestro.skill ?? maestro.id}</span>
             <div className="relative ml-1 shrink-0" ref={menuRef}>
               <button
                 type="button"
@@ -460,7 +460,7 @@ function SkillNodeComponent({
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
                     onClick={() => {
-                      data.onChangeSkill?.(afk.id);
+                      data.onChangeSkill?.(maestro.id);
                       setMenuOpen(false);
                     }}
                   >
@@ -470,7 +470,7 @@ function SkillNodeComponent({
                     type="button"
                     className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
                     onClick={() => {
-                      data.onDelete?.(afk.id);
+                      data.onDelete?.(maestro.id);
                       setMenuOpen(false);
                     }}
                   >
@@ -488,7 +488,7 @@ function SkillNodeComponent({
           className="w-5 h-5 rounded-full bg-white border-2 border-violet-400 text-violet-600 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm hover:bg-violet-50 focus:outline-none"
           onClick={(e) => {
             e.stopPropagation();
-            data.onAddNext?.(afk.id);
+            data.onAddNext?.(maestro.id);
           }}
           title="Add next step"
         >
@@ -525,10 +525,10 @@ function ConditionEdge({
     targetY,
     targetPosition,
   });
-  const typedData = data as { onEditLabel?: (id: string) => void; onLabelMove?: (id: string, offset: { x: number; y: number }) => void; afkEdge?: AfkEdgeV3 } | undefined;
+  const typedData = data as { onEditLabel?: (id: string) => void; onLabelMove?: (id: string, offset: { x: number; y: number }) => void; maestroEdge?: MaestroEdgeV3 } | undefined;
   const onEditLabel = typedData?.onEditLabel;
   const onLabelMove = typedData?.onLabelMove;
-  const storedOffset = typedData?.afkEdge?.label_offset;
+  const storedOffset = typedData?.maestroEdge?.label_offset;
 
   const { getViewport } = useReactFlow();
   const localOffsetRef = useRef<{ x: number; y: number }>(storedOffset ?? { x: 0, y: 0 });
@@ -675,7 +675,7 @@ export default function WorkflowCanvas({
   rfNodesRef.current = rfNodes;
   rfEdgesRef.current = rfEdges;
   // Tracks the last workflow object we emitted so the sync effect can ignore the echo
-  const lastEmittedRef = useRef<AfkWorkflowV3 | null>(null);
+  const lastEmittedRef = useRef<MaestroWorkflowV3 | null>(null);
 
   // Condition edge state machine
   const [conditionSourceNodeId, setConditionSourceNodeId] = useState<string | null>(null);
@@ -717,7 +717,7 @@ export default function WorkflowCanvas({
   const pushChange = useCallback(
     (nodes: Node[], edges: Edge[]) => {
       if (!workflow) return;
-      const updated: AfkWorkflowV3 = { ...workflow, nodes: rfNodesToAfkNodes(nodes), edges: rfEdgesToAfkEdges(edges) };
+      const updated: MaestroWorkflowV3 = { ...workflow, nodes: rfNodesToMaestroNodes(nodes), edges: rfEdgesToMaestroEdges(edges) };
       lastEmittedRef.current = updated; // mark so the sync effect ignores the echo
       onChange(updated);
     },
@@ -760,13 +760,13 @@ export default function WorkflowCanvas({
         animated: isCondition,
         style: isCondition ? { stroke: "#f97316", strokeDasharray: "5 4" } : undefined,
         data: {
-          afkEdge: {
+          maestroEdge: {
             from: params.source,
             to: params.target,
             kind: isCondition ? "condition" : "success",
             sourceHandle: params.sourceHandle ?? undefined,
             targetHandle: params.targetHandle ?? undefined,
-          } as AfkEdgeV3,
+          } as MaestroEdgeV3,
         },
       };
       setRfEdges((eds) => {
@@ -799,12 +799,12 @@ export default function WorkflowCanvas({
     (edgeId: string, offset: { x: number; y: number }) => {
       const next = rfEdgesRef.current.map((e) => {
         if (e.id !== edgeId) return e;
-        const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
-        // Round near-zero offsets back to undefined to keep afk.json clean
+        const maestro = e.data?.maestroEdge as MaestroEdgeV3 | undefined;
+        // Round near-zero offsets back to undefined to keep maestro.json clean
         const cleanOffset = Math.abs(offset.x) < 0.5 && Math.abs(offset.y) < 0.5 ? undefined : offset;
         return {
           ...e,
-          data: { ...e.data, afkEdge: { ...(afk as AfkEdgeV3), label_offset: cleanOffset } },
+          data: { ...e.data, maestroEdge: { ...(maestro as MaestroEdgeV3), label_offset: cleanOffset } },
         };
       });
       setRfEdges(next);
@@ -856,13 +856,13 @@ export default function WorkflowCanvas({
     const trimmed = editLabelValue.trim();
     const next = rfEdgesRef.current.map((e) => {
       if (e.id !== editLabelEdgeId) return e;
-      const afk = e.data?.afkEdge as AfkEdgeV3 | undefined;
-      // Keep `e.label` and `afkEdge.label` in sync — rfEdgesToAfkEdges reads `e.label`
-      // first but falls back to afk.label, so both must be cleared when emptied.
+      const maestro = e.data?.maestroEdge as MaestroEdgeV3 | undefined;
+      // Keep `e.label` and `maestroEdge.label` in sync — rfEdgesToMaestroEdges reads `e.label`
+      // first but falls back to maestro.label, so both must be cleared when emptied.
       return {
         ...e,
         label: trimmed || undefined,
-        data: { ...e.data, afkEdge: { ...(afk as AfkEdgeV3), label: trimmed || undefined } },
+        data: { ...e.data, maestroEdge: { ...(maestro as MaestroEdgeV3), label: trimmed || undefined } },
       };
     });
     setRfEdges(next);
@@ -875,9 +875,9 @@ export default function WorkflowCanvas({
   const openChangeSkill = useCallback(
     (nodeId: string) => {
       const node = rfNodesRef.current.find((n) => n.id === nodeId);
-      const afk = node?.data.afkNode as AfkNodeV3 | undefined;
+      const maestro = node?.data.maestroNode as MaestroNodeV3 | undefined;
       setChangeSkillNodeId(nodeId);
-      setChangeSkillValue(afk?.skill ?? availableSkills[0] ?? "");
+      setChangeSkillValue(maestro?.skill ?? availableSkills[0] ?? "");
     },
     [availableSkills]
   );
@@ -886,8 +886,8 @@ export default function WorkflowCanvas({
     if (!changeSkillNodeId || !changeSkillValue) return;
     const next = rfNodesRef.current.map((n) => {
       if (n.id !== changeSkillNodeId) return n;
-      const afk = n.data.afkNode as AfkNodeV3;
-      return { ...n, data: { ...n.data, afkNode: { ...afk, skill: changeSkillValue } } };
+      const maestro = n.data.maestroNode as MaestroNodeV3;
+      return { ...n, data: { ...n.data, maestroNode: { ...maestro, skill: changeSkillValue } } };
     });
     setRfNodes(next);
     pushChange(next, rfEdgesRef.current);
@@ -899,8 +899,8 @@ export default function WorkflowCanvas({
     () =>
       new Set(
         rfNodes
-          .filter((n) => n.id !== "main-session" && (n.data.afkNode as AfkNodeV3 | undefined)?.type === "agent")
-          .map((n) => (n.data.afkNode as AfkNodeV3).instance ?? "")
+          .filter((n) => n.id !== "main-session" && (n.data.maestroNode as MaestroNodeV3 | undefined)?.type === "agent")
+          .map((n) => (n.data.maestroNode as MaestroNodeV3).instance ?? "")
           .filter(Boolean)
       ),
     [rfNodes]
@@ -983,12 +983,12 @@ export default function WorkflowCanvas({
         x: (sourceNode?.position.x ?? 0) + 240,
         y: sourceNode?.position.y ?? 0,
       };
-      const newAfkNode: AfkNodeV3 = { id: instanceName, type: "agent", instance: instanceName, position };
+      const newMaestroNode: MaestroNodeV3 = { id: instanceName, type: "agent", instance: instanceName, position };
       nextNodes.push({
         id: instanceName,
         type: "agentNode",
         position,
-        data: { afkNode: newAfkNode, instanceData: resolved.instance },
+        data: { maestroNode: newMaestroNode, instanceData: resolved.instance },
       });
     }
 
@@ -1003,14 +1003,14 @@ export default function WorkflowCanvas({
       animated: true,
       style: { stroke: "#f97316", strokeDasharray: "5 4" },
       data: {
-        afkEdge: {
+        maestroEdge: {
           from: conditionSourceNodeId,
           to: targetId,
           kind: "condition",
           label: conditionLabel || undefined,
           sourceHandle: "right",
           targetHandle: "top",
-        } as AfkEdgeV3,
+        } as MaestroEdgeV3,
       },
     };
 
@@ -1080,18 +1080,18 @@ export default function WorkflowCanvas({
       if (!resolved) return;
       nodeId = resolved.instance.name;
       if (resolved.isNew) onInstancesChange([...instances, resolved.instance]);
-      const afkNode: AfkNodeV3 = { id: nodeId, type: "agent", instance: nodeId, position };
-      newRfNode = { id: nodeId, type: "agentNode", position, data: { afkNode, instanceData: resolved.instance } };
+      const maestroNode: MaestroNodeV3 = { id: nodeId, type: "agent", instance: nodeId, position };
+      newRfNode = { id: nodeId, type: "agentNode", position, data: { maestroNode, instanceData: resolved.instance } };
     } else if (addStepType === "skill") {
       if (!addStepSkill) return;
       nodeId = nextSkillId(rfNodes);
-      const afkNode: AfkNodeV3 = { id: nodeId, type: "skill", skill: addStepSkill, position };
-      newRfNode = { id: nodeId, type: "skillNode", position, data: { afkNode } };
+      const maestroNode: MaestroNodeV3 = { id: nodeId, type: "skill", skill: addStepSkill, position };
+      newRfNode = { id: nodeId, type: "skillNode", position, data: { maestroNode } };
     } else {
       // human_review
       nodeId = nextHumanId(rfNodes);
-      const afkNode: AfkNodeV3 = { id: nodeId, type: "human_review", position };
-      newRfNode = { id: nodeId, type: "humanStep", position, data: { afkNode } };
+      const maestroNode: MaestroNodeV3 = { id: nodeId, type: "human_review", position };
+      newRfNode = { id: nodeId, type: "humanStep", position, data: { maestroNode } };
     }
 
     const newEdge: Edge = {
@@ -1102,13 +1102,13 @@ export default function WorkflowCanvas({
       targetHandle: "top",
       type: "successEdge",
       data: {
-        afkEdge: {
+        maestroEdge: {
           from: addStepSourceId,
           to: nodeId,
           kind: "success",
           sourceHandle: "bottom",
           targetHandle: "top",
-        } as AfkEdgeV3,
+        } as MaestroEdgeV3,
       },
     };
 
@@ -1156,9 +1156,9 @@ export default function WorkflowCanvas({
             data: { onAddNext: openAddStep },
           };
         }
-        const afkNode = n.data.afkNode as AfkNodeV3;
+        const maestroNode = n.data.maestroNode as MaestroNodeV3;
         // Always resolve instanceData fresh from the instances prop so edit-instance updates are reflected immediately
-        const instanceData = afkNode.type === "agent" ? instances.find((i) => i.name === afkNode.instance) : undefined;
+        const instanceData = maestroNode.type === "agent" ? instances.find((i) => i.name === maestroNode.instance) : undefined;
         return {
           ...n,
           data: {
@@ -1304,8 +1304,8 @@ export default function WorkflowCanvas({
               {rfNodes
                 .filter((n) => n.id !== conditionSourceNodeId && n.id !== "main-session")
                 .map((n) => {
-                  const afk = n.data.afkNode as AfkNodeV3 | undefined;
-                  const label = afk?.type === "skill" ? `/${afk.skill ?? afk.id}` : (afk?.instance ?? afk?.id ?? n.id);
+                  const maestro = n.data.maestroNode as MaestroNodeV3 | undefined;
+                  const label = maestro?.type === "skill" ? `/${maestro.skill ?? maestro.id}` : (maestro?.instance ?? maestro?.id ?? n.id);
                   return (
                     <option key={n.id} value={n.id}>
                       {label}

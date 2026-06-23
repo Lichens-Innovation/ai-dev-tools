@@ -1,13 +1,13 @@
 ---
 name: ai-tools
-description: "Opens the ai-tools-manager app as a persistent session and listens for every submit the user makes on any page — workflow/rules saves, skill/subagent/plugin/marketplace creation — applying each one as it arrives until the user stops. Use when the user wants an interactive AFK/ai-tools editing session, to 'open the app', manage workflows/rules/skills/agents/plugins/marketplaces visually, or work in the canvas while you apply their changes live."
+description: "Opens the ai-tools-manager app as a persistent session and listens for every submit the user makes on any page — workflow/rules saves, skill/subagent/plugin/marketplace creation — applying each one as it arrives until the user stops. Use when the user wants an interactive Maestro/ai-tools editing session, to 'open the app', manage workflows/rules/skills/agents/plugins/marketplaces visually, or work in the canvas while you apply their changes live."
 ---
 
 # AI Tools (dispatcher)
 
 This is the single entry point for the ai-tools-manager web app. Unlike the per-form skills, it
 brings the app up **once** and then **listens in a loop**: each time the user submits something on
-any page, the app does the deterministic part (scaffolding files, writing `afk.json`) and hands you
+any page, the app does the deterministic part (scaffolding files, writing `maestro.json`) and hands you
 a result; you finish the intelligent part and loop back to listen. The container stays up for the
 whole session — it is torn down at `SessionEnd` (or when the user stops it from Docker Desktop).
 
@@ -24,7 +24,7 @@ $ARGUMENTS
 ### 1. Bring the app up (once)
 
 Run the idempotent launcher. If `$ARGUMENTS` names a starting page (e.g. `workflows`, `rules`,
-`afk-tasks`, `session-log`, `create-skill`), pass it; otherwise open the home page:
+`maestro-tasks`, `session-log`, `create-skill`), pass it; otherwise open the home page:
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/../../scripts/ensure-ai-tools-app.sh" "<route or '/'>"
@@ -64,7 +64,7 @@ Repeat until you break out:
    | `create-subagent` | Invoke the **create-subagent** skill with the payload. |
    | `create-plugin` | Invoke the **create-plugin** skill with the payload. Usually the scaffold already wrote the manifest + registration; just verify and report. |
    | `create-marketplace` | Invoke the **create-marketplace** skill with the payload. |
-   | `afk-config` | Run the **afk** skill's processing path (write `afk.json` from the payload, re-render the orchestrator, apply rules). Tell it the payload is already supplied so it **skips launching the form** (its Step 1). `sliceType` tells you whether the save was workflows or rules. |
+   | `maestro-config` | Run the **maestro-app** skill's processing path (write `maestro.json` from the payload, re-render the orchestrator, apply rules). Tell it the payload is already supplied so it **skips launching the form** (its Step 1). `sliceType` tells you whether the save was workflows or rules. |
 
 4. **Clear the result file**, then loop back to step 2.1 to wait for the next event:
 
@@ -97,7 +97,7 @@ do not re-scaffold."*
   `wait` repeats.
 - **Cancels don't stop the loop.** Only `shutdown`, Esc, or session end break it.
 - **The app owns the deterministic part.** Don't duplicate file scaffolding it already did; finish
-  the intelligent part and route. Read-only pages (`session-log`, `afk-tasks`) emit no events —
+  the intelligent part and route. Read-only pages (`session-log`, `maestro-tasks`) emit no events —
   they just work while the app is up.
 - **Teardown is automatic.** The `SessionEnd` hook stops the container; you don't run
   `docker compose down` yourself.
@@ -106,5 +106,5 @@ do not re-scaffold."*
 
 - This skill supersedes launching the per-form skills individually, but those still work on their
   own (their `UserPromptExpansion` hooks now reuse the same persistent container).
-- For a one-off single edit you can still use `/afk`, `/create-skill`, etc. directly; use
+- For a one-off single edit you can still use `/maestro-app`, `/create-skill`, etc. directly; use
   `/ai-tools` when you want a sustained editing session.

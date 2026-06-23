@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import type { SessionLogEntry } from "./afk-session-log";
+import type { SessionLogEntry } from "./maestro-session-log";
 
 interface SessionLogContextValue {
   entries: SessionLogEntry[];

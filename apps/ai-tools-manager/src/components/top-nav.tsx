@@ -109,11 +109,11 @@ export default function TopNav({
         </span>
       </Link>
       <Link
-        to="/afk-tasks"
+        to="/maestro-tasks"
         activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
       >
-        <ListChecks size={13} /> AFK Tasks
+        <ListChecks size={13} /> Maestro Tasks
       </Link>
 
       {/* Centered workflow selector */}
@@ -210,7 +210,7 @@ export default function TopNav({
         type="button"
         onClick={handleStop}
         disabled={stopped}
-        title={stopped ? "Session stopped — you can close this tab" : "Stop the AFK app session (the dispatcher stops listening)"}
+        title={stopped ? "Session stopped — you can close this tab" : "Stop the Maestro app session (the dispatcher stops listening)"}
         className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] border cursor-pointer focus:outline-none ${
           stopped
             ? "bg-(--bg-elev) border-(--line) text-(--ink-3) cursor-default"

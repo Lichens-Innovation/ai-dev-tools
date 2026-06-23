@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook — register this session as a live user of the per-project
 # ai-tools-manager container, via a marker file under a project-keyed sessions dir.
-# The SessionEnd cleanup (afk-session-cleanup.sh) drops this session's marker and
+# The SessionEnd cleanup (maestro-session-cleanup.sh) drops this session's marker and
 # only tears the container down when NO markers remain for that project — so the app
 # survives until the LAST session for that project ends, not the first.
 #
@@ -23,11 +23,11 @@ project_cwd=$(echo "$STDIN_DATA" | python3 -c "import sys,json; print(json.load(
 [[ -z "$project_cwd" ]] && exit 0
 
 # Derive per-project paths from the session cwd.
-AFK_PROJECT_DIR="$project_cwd"
-# shellcheck source=lib/afk-app-paths.sh
-source "$SCRIPT_DIR/lib/afk-app-paths.sh"
+MAESTRO_PROJECT_DIR="$project_cwd"
+# shellcheck source=lib/maestro-app-paths.sh
+source "$SCRIPT_DIR/lib/maestro-app-paths.sh"
 
-mkdir -p "$AFK_SESSIONS_DIR"
-: > "$AFK_SESSIONS_DIR/$sid"
+mkdir -p "$MAESTRO_SESSIONS_DIR"
+: > "$MAESTRO_SESSIONS_DIR/$sid"
 
 exit 0

@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// Uninstalls / disables the AFK orchestrator in a project. The inverse of
-// afk-install.js. Idempotent — safe to re-run.
+// Uninstalls / disables the Maestro orchestrator in a project. The inverse of
+// maestro-install.js. Idempotent — safe to re-run.
 //
-//   node afk-uninstall.js [projectDir] [--purge]
+//   node maestro-uninstall.js [projectDir] [--purge]
 //
 // Default: removes the bash-validation PreToolUse hook from
-//   <project>/.claude/settings.json (only the keys AFK added; all other keys
+//   <project>/.claude/settings.json (only the keys Maestro added; all other keys
 //   are preserved), deletes the ephemeral session files, and cleans up any
-//   legacy `agent: "afk"` key left by older installs.
+//   legacy `agent: "maestro"` key left by older installs.
 // --purge: additionally removes the installed orchestrator skill, the
-//   project-copied runtime scripts, and the user-authored config (afk.json) —
+//   project-copied runtime scripts, and the user-authored config (maestro.json) —
 //   i.e. everything the install pipeline produced.
 //
-// Default (no --purge): never touches afk.json — that is the user-authored
-// config and is kept so a later /afk-install or /afk-sync can restore things.
+// Default (no --purge): never touches maestro.json — that is the user-authored
+// config and is kept so a later /maestro-install or /maestro-update can restore things.
 // Prints a JSON summary to stdout.
 
 const fs = require("fs");
@@ -45,7 +45,7 @@ function removeBashValidationHook(settings) {
   return changed;
 }
 
-// Removes the bash-validation hook (and any legacy `agent: "afk"` from older
+// Removes the bash-validation hook (and any legacy `agent: "maestro"` from older
 // installs) from settings.json in one read/write. Returns which keys were touched.
 function cleanSettings(settingsPath) {
   if (!fs.existsSync(settingsPath)) return { removedAgentSetting: false, removedBashHook: false };
@@ -56,7 +56,7 @@ function cleanSettings(settingsPath) {
     return { removedAgentSetting: false, removedBashHook: false };
   }
   let removedAgentSetting = false;
-  if (settings.agent === "afk") {
+  if (settings.agent === "maestro") {
     delete settings.agent;
     removedAgentSetting = true;
   }
@@ -78,19 +78,19 @@ try {
 
   const { removedAgentSetting, removedBashHook } = cleanSettings(path.join(claudeDir, "settings.json"));
   const removedSession = [
-    removeIfPresent(path.join(claudeDir, "afk_session.json")),
-    removeIfPresent(path.join(claudeDir, "afk_session.log.jsonl")),
+    removeIfPresent(path.join(claudeDir, "maestro_session.json")),
+    removeIfPresent(path.join(claudeDir, "maestro_session.log.jsonl")),
   ].some(Boolean);
 
   const purged = [];
   if (purge) {
     const targets = [
-      path.join(claudeDir, "skills", "agent-orchestrator", "SKILL.md"),
-      path.join(claudeDir, "scripts", "afk-set-session-workflow.cjs"),
-      path.join(claudeDir, "scripts", "afk-render-orchestrator.cjs"),
+      path.join(claudeDir, "skills", "maestro", "SKILL.md"),
+      path.join(claudeDir, "scripts", "maestro-set-session-workflow.cjs"),
+      path.join(claudeDir, "scripts", "maestro-render-orchestrator.cjs"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
-      path.join(claudeDir, "scripts", "lib", "afk-session.cjs"),
-      path.join(claudeDir, "afk.json"),
+      path.join(claudeDir, "scripts", "lib", "maestro-session.cjs"),
+      path.join(claudeDir, "maestro.json"),
     ];
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));
   }
@@ -106,6 +106,6 @@ try {
     }) + "\n"
   );
 } catch (err) {
-  process.stderr.write(`afk-uninstall: ${err.message}\n`);
+  process.stderr.write(`maestro-uninstall: ${err.message}\n`);
   process.exit(1);
 }
