@@ -7,12 +7,12 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-inject-agent-context.js"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-inject-agent-context.js"]
           },
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-subagent-log.js"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-subagent-log.js"]
           }
         ]
       }
@@ -24,7 +24,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-subagent-log.js"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-subagent-log.js"]
           }
         ]
       }
@@ -36,7 +36,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-session-log.js"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-session-log.js"]
           }
         ]
       }
@@ -48,7 +48,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-app-session-register.sh"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-app-session-register.sh"]
           }
         ]
       }
@@ -60,7 +60,7 @@
           {
             "type": "command",
             "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/afk-session-cleanup.sh"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-session-cleanup.sh"]
           }
         ]
       }

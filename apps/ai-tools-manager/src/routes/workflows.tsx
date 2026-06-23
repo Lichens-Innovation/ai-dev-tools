@@ -6,26 +6,26 @@ import { toast } from "@repo/ui/toast";
 import TopNav from "../components/top-nav";
 import WorkflowCanvas from "../components/workflow-canvas";
 import {
-  getAfkConfig,
-  submitAfkConfig,
-  type AfkConfigV3,
-  type AfkWorkflowV3,
-  type AfkInstanceV3,
-  type AfkConfigResult,
-} from "../utils/agents-framework-kickstarter";
+  getMaestroConfig,
+  submitMaestroConfig,
+  type MaestroConfigV3,
+  type MaestroWorkflowV3,
+  type MaestroInstanceV3,
+  type MaestroConfigResult,
+} from "../utils/maestro";
 
 export const Route = createFileRoute("/workflows")({
-  loader: () => getAfkConfig(),
+  loader: () => getMaestroConfig(),
   component: WorkflowsPage,
 });
 
 type Phase = "idle" | "saving";
 
 function WorkflowsPage() {
-  const loaderData = Route.useLoaderData() as AfkConfigResult;
+  const loaderData = Route.useLoaderData() as MaestroConfigResult;
   const { cwd, bundledAgents, projectSkills } = loaderData;
 
-  const [config, setConfig] = useState<AfkConfigV3>(loaderData.config);
+  const [config, setConfig] = useState<MaestroConfigV3>(loaderData.config);
   const [activeWorkflowIdx, setActiveWorkflowIdx] = useState<number>(0);
   const [phase, setPhase] = useState<Phase>("idle");
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
@@ -44,7 +44,7 @@ function WorkflowsPage() {
     setConfig((c) => ({ ...c, skills_available: ids }));
   };
 
-  const setInstances = (instances: AfkInstanceV3[]) => {
+  const setInstances = (instances: MaestroInstanceV3[]) => {
     setConfig((c) => ({ ...c, workflow_instances: instances }));
   };
 
@@ -61,7 +61,7 @@ function WorkflowsPage() {
     const name =
       newWorkflowName.trim() ||
       (source ? `Copy of ${source.name}` : `Workflow ${config.workflows.length + 1}`);
-    const newWf: AfkWorkflowV3 = source
+    const newWf: MaestroWorkflowV3 = source
       ? { name, nodes: structuredClone(source.nodes), edges: structuredClone(source.edges) }
       : { name, nodes: [], edges: [] };
     const next = [...config.workflows, newWf];
@@ -83,7 +83,7 @@ function WorkflowsPage() {
     });
   };
 
-  const updateWorkflow = (idx: number, wf: AfkWorkflowV3) => {
+  const updateWorkflow = (idx: number, wf: MaestroWorkflowV3) => {
     setConfig((c) => {
       const next = [...c.workflows];
       next[idx] = wf;
@@ -101,7 +101,7 @@ function WorkflowsPage() {
 
   const handleSubmit = async () => {
     setPhase("saving");
-    await submitAfkConfig({
+    await submitMaestroConfig({
       data: {
         cwd,
         sliceType: "workflows",
@@ -117,7 +117,7 @@ function WorkflowsPage() {
     toast(
       <>
         Workflows saved to{" "}
-        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/afk.json</span>.
+        <span className="font-mono text-(--ink)">{(cwd || "<cwd>").replace(/\/+$/, "")}/.claude/maestro.json</span>.
       </>,
     );
     setPhase("idle");

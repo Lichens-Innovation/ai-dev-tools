@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Applies the `rules` slice of <project>/.claude/afk.json to the filesystem.
+// Applies the `rules` slice of <project>/.claude/maestro.json to the filesystem.
 //
 //   source:"project"    → MOVE the rule's .claude/rules/<file>.md into the assigned
 //                          directory's .claude/rules/ (no-op if it's already there).
@@ -8,9 +8,9 @@
 //                          if that block is already present, so re-runs don't duplicate).
 //   unassigned/removed  → left untouched. We NEVER delete rule files; that's the user's call.
 //
-//   node afk-apply-rules.js [projectDir]
+//   node maestro-apply-rules.js [projectDir]
 //
-// Run by the afk skill after afk.json is written (host-side —
+// Run by the maestro skill after maestro.json is written (host-side —
 // the container can't reach project paths and vibe-rules is a host CLI). Idempotent.
 // Prints a JSON summary to stdout.
 
@@ -22,9 +22,9 @@ const projectDir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.
 const IGNORE = ["node_modules", ".git", "dist", "build", ".next", ".turbo", ".output", ".claude"];
 const MAX_DEPTH = 4;
 
-function readAfk() {
+function readMaestro() {
   try {
-    return JSON.parse(fs.readFileSync(path.join(projectDir, ".claude", "afk.json"), "utf8"));
+    return JSON.parse(fs.readFileSync(path.join(projectDir, ".claude", "maestro.json"), "utf8"));
   } catch {
     return null;
   }
@@ -108,14 +108,14 @@ function alreadyInstalled(file, id) {
 }
 
 function main() {
-  const afk = readAfk();
+  const maestro = readMaestro();
   const summary = { moved: [], installed: [], unchanged: [], skipped: [], missing: [], errors: [] };
-  if (!afk || afk.version !== 3 || !Array.isArray(afk.rules)) {
+  if (!maestro || maestro.version !== 3 || !Array.isArray(maestro.rules)) {
     process.stdout.write(JSON.stringify(summary));
     return;
   }
 
-  for (const rule of afk.rules) {
+  for (const rule of maestro.rules) {
     const relDir = targetDirFor(rule);
     const targetRulesDir = path.join(projectDir, relDir, ".claude", "rules");
     const source = rule.source || "project";

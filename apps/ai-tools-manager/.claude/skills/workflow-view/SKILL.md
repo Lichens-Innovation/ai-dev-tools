@@ -1,13 +1,13 @@
 ---
 name: workflow-view
-description: "Explains how the /workflows view in ai-tools-manager is built end-to-end: the React Flow canvas (workflow-canvas.tsx), the left agents/skills pane and top workflow selector, and how the diagram maps to the AfkConfigV3 model written to .claude/afk.json. Use when the user is working inside apps/ai-tools-manager and asks how the workflow view/canvas works, how nodes and edges map to afk.json, how the success vs condition paths are built, how workflow instances and per-instance skills work, or why a workflow change isn't reaching the config."
+description: "Explains how the /workflows view in ai-tools-manager is built end-to-end: the React Flow canvas (workflow-canvas.tsx), the left agents/skills pane and top workflow selector, and how the diagram maps to the MaestroConfigV3 model written to .claude/maestro.json. Use when the user is working inside apps/ai-tools-manager and asks how the workflow view/canvas works, how nodes and edges map to maestro.json, how the success vs condition paths are built, how workflow instances and per-instance skills work, or why a workflow change isn't reaching the config."
 ---
 
 # Workflow View
 
-The `/workflows` route (`src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), then wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas). On save it persists the workflow slice of `.claude/afk.json` (v3).
+The `/workflows` route (`src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), then wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas). On save it persists the workflow slice of `.claude/maestro.json` (v3).
 
-It is the workflow half of the `/afk` config flow — the `/rules` route owns the other half (rules), and the two share one `afk.json`.
+It is the workflow half of the `/maestro-app` config flow — the `/rules` route owns the other half (rules), and the two share one `maestro.json`.
 
 ## Layout
 
@@ -36,30 +36,30 @@ The grid is a fixed `280px 1fr` (left pane + center; `workflows.tsx`, `gridTempl
 ## Data flow
 
 ```
-Route loader: getAfkConfig()                    (src/utils/agents-framework-kickstarter.ts)
-  • reads <cwd>/.claude/afk.json → AfkConfigV3
-      under Docker: path is resolved via mountedProjectPath(cwd) → /project/.claude/afk.json
+Route loader: getMaestroConfig()                    (src/utils/maestro.ts)
+  • reads <cwd>/.claude/maestro.json → MaestroConfigV3
+      under Docker: path is resolved via mountedProjectPath(cwd) → /project/.claude/maestro.json
       (the ensure script mounts the target project at /project; works for any repo on disk)
       first install (no file): seeded defaultV3Config(implAgents); corrupt/old: blankV3Config()
   • also returns cwd, bundledAgents, projectSkills
         │
         ▼
-WorkflowsPage holds `config: AfkConfigV3` in useState (the single source of truth)
+WorkflowsPage holds `config: MaestroConfigV3` in useState (the single source of truth)
         │   passes slices down as props (incl. workflow_instances)
         ▼
 WorkflowCanvas mirrors the active workflow into React Flow state (rfNodes/rfEdges)
   • workflowToRfNodes / workflowToRfEdges  on the way in
-  • rfNodesToAfkNodes / rfEdgesToAfkEdges  on the way out → onChange(workflow)
+  • rfNodesToMaestroNodes / rfEdgesToMaestroEdges  on the way out → onChange(workflow)
         │   every edit calls onChange → updateWorkflow → setConfig
         │   instance edits go via onInstancesChange
         ▼ (Save workflows)
-submitAfkConfig({ sliceType: "workflows", slice })
-  • merges the workflow slice into existing afk.json (preserves `rules`)
-  • writes <cwd>/.claude/afk.json
-  • writes /tmp/result.json  → "AFK v3 config data: {JSON}"  for the skill
+submitMaestroConfig({ sliceType: "workflows", slice })
+  • merges the workflow slice into existing maestro.json (preserves `rules`)
+  • writes <cwd>/.claude/maestro.json
+  • writes /tmp/result.json  → "Maestro v3 config data: {JSON}"  for the skill
 ```
 
-**First-install seed.** When no `afk.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `/afk-install` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
+**First-install seed.** When no `maestro.json` exists yet, the canvas does **not** open empty — `readConfig`'s missing-file branch returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` and two ready-made workflows (`default` + `tdd`) with positioned nodes. `implAgents` is the repo-detected implementation chain — `["backend"]` (default), `["frontend"]`, or `["backend","frontend"]` (fullstack); the `/maestro-install` skill detects it and passes it in through the marketplace precompute file (`readImplAgents()`). It sets the happy-path implementation step (and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent). Only a corrupt or wrong-version file falls back to the empty `blankV3Config()`.
 
 ## File-by-file map
 
@@ -69,44 +69,44 @@ submitAfkConfig({ sliceType: "workflows", slice })
 | The canvas (React Flow nodes/edges, all interactions)                    | `src/components/workflow-canvas.tsx`                                       |
 | Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/instance-skill-picker.tsx` (loaded/referenced toggle) |
 | Top bar — nav links, workflow selector                                   | `src/components/top-nav.tsx`                                               |
-| Types + loader + submit server fns                                       | `src/utils/agents-framework-kickstarter.ts`                                |
-| Shared `readCwd` + `parseFrontmatter`                                    | `src/utils/afk-fs.ts`                                                      |
+| Types + loader + submit server fns                                       | `src/utils/maestro.ts`                                |
+| Shared `readCwd` + `parseFrontmatter`                                    | `src/utils/maestro-fs.ts`                                                      |
 | Bundled subagents (source of the Agents list)                            | `plugins/ai-tools-manager/agents/*.md`                                     |
 | Project skills (source of the Skills list)                               | `<cwd>/.claude/skills/*/SKILL.md`                                          |
-| Consuming prompt (writes afk.json, renders orchestrator)                 | `plugins/ai-tools-manager/skills/afk/SKILL.md`                             |
+| Consuming prompt (writes maestro.json, renders orchestrator)                 | `plugins/ai-tools-manager/skills/maestro-app/SKILL.md`                         |
 
-## The data model (AfkConfigV3)
+## The data model (MaestroConfigV3)
 
-The whole view edits one object (`src/utils/agents-framework-kickstarter.ts`):
+The whole view edits one object (`src/utils/maestro.ts`):
 
 ```ts
-AfkConfigV3 {
+MaestroConfigV3 {
   version: 3
   agents_available: string[]                  // left pane "Agents" checkboxes
   skills_available: string[]                  // left pane "Skills" checkboxes (plain ids)
-  workflow_instances: AfkInstanceV3[]         // project-scoped reusable nodes (agent + skills)
-  workflows: AfkWorkflowV3[]                   // one per entry in the top selector
-  rules: AfkRuleV3[]                           // NOT edited here — owned by /rules
+  workflow_instances: MaestroInstanceV3[]         // project-scoped reusable nodes (agent + skills)
+  workflows: MaestroWorkflowV3[]                   // one per entry in the top selector
+  rules: MaestroRuleV3[]                           // NOT edited here — owned by /rules
 }
 
-AfkInstanceV3 { name, agent, loaded_skills: string[], referenced_skills: string[] }   // referenced by name from agent nodes; loaded = auto-load at start, referenced = load only if relevant
-AfkWorkflowV3 { name, nodes: AfkNodeV3[], edges: AfkEdgeV3[] }   // success_path is DERIVED, never stored
-AfkNodeV3     { id, type: "agent"|"human_review"|"skill", instance?, skill?, position? }
-AfkEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, targetHandle? }
+MaestroInstanceV3 { name, agent, loaded_skills: string[], referenced_skills: string[] }   // referenced by name from agent nodes; loaded = auto-load at start, referenced = load only if relevant
+MaestroWorkflowV3 { name, nodes: MaestroNodeV3[], edges: MaestroEdgeV3[] }   // success_path is DERIVED, never stored
+MaestroNodeV3     { id, type: "agent"|"human_review"|"skill", instance?, skill?, position? }
+MaestroEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, targetHandle? }
 ```
 
 Key points:
 
 - **Instances carry the agent + skills, nodes just reference them.** An agent node's `instance` field (and its `id`, which equals the instance name) points at a `workflow_instances` entry. Skills are stored once per instance, not per node — so the same instance reused across workflows shares one skill list. Editing an instance updates every placement. Each instance keeps two skill lists: `loaded_skills` (auto-loaded by the `SubagentStart` hook before the agent works) and `referenced_skills` (surfaced as available; the agent loads one only if the task needs it). The canvas chips render loaded skills solid and referenced skills dashed/muted.
-- **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToAfkNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToAfkEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete.
-- **`success_path` is derived, never stored.** It is computed by the plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) from the success edges and rendered into the orchestrator's `AFK:HANDOFFS` table, but it is absent from `afk.json`.
+- **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToMaestroNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToMaestroEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete.
+- **`success_path` is derived, never stored.** It is computed by the plugin renderer (`successPath` in `maestro-render-orchestrator.cjs`) from the success edges and rendered into the orchestrator's `Maestro:HANDOFFS` table, but it is absent from `maestro.json`.
 
 ## Left pane (workflows.tsx)
 
 - **Agents** checkboxes come from `bundledAgents` — read from `plugins/ai-tools-manager/agents/*.md` frontmatter by `readBundledAgents()`. Toggling edits `config.agents_available`. `＋ Agent` `window.prompt`s for a manual id (for agents not bundled).
 - **Skills** checkboxes come from `projectSkills` — read from `<cwd>/.claude/skills/*/SKILL.md` by `readProjectSkills()`. Toggling edits `config.skills_available` (a plain `string[]` of skill ids). `＋ Skill` prompts for a manual id.
 - `skills_available` is the menu of skills the canvas can attach to instances — only a skill checked here can be attached.
-- **Save workflows** → `handleSubmit` → `submitAfkConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
+- **Save workflows** → `handleSubmit` → `submitMaestroConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
 
 ## Center canvas (workflow-canvas.tsx)
 
@@ -117,14 +117,14 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
 - `mainSession` — green rounded card (`w-48 rounded-2xl border-2 border-green-400`), `deletable: false`. A bottom-center `+` button (`onAddNext`) opens the "Add step" modal. Handles (`left`, `right`, `bottom`) are fragment siblings of the card div — **not inside it** — so they anchor to the node bounding box, not to the card's flex flow.
 - `agentNode` — card showing the instance name (primary) and `@agent` (secondary), skill chips from the referenced instance, side `+` buttons (left/right) for conditions, a bottom-center `+` button (`onAddNext`) for adding the next step, and a `⋮` kebab menu (Edit instance / Delete). Orange normally; **green when it is the success-path terminal** (see `findSuccessTerminalId`).
 - `humanStep` — amber diamond rendering "Review" (`human_review`). Wrapped in a `relative` div so the bottom-center `+` button (`onAddNext`) can be absolutely positioned below the diamond.
-- `skillNode` — violet card rendering `/<skill>` for a standalone **skill step** (`type: "skill"`, carries a `skill` id, no instance). A `⋮` kebab offers **Change skill** / **Delete**, plus the bottom-center `+` (`onAddNext`). Like `human_review` it is a non-agent node: it carries no instance, is excluded from `placedInstanceNames`, renders in the success path as `/<skill>`, and at runtime the orchestrator runs it inline via the `Skill` tool (no subagent dispatch — see the `afk-architecture` skill).
+- `skillNode` — violet card rendering `/<skill>` for a standalone **skill step** (`type: "skill"`, carries a `skill` id, no instance). A `⋮` kebab offers **Change skill** / **Delete**, plus the bottom-center `+` (`onAddNext`). Like `human_review` it is a non-agent node: it carries no instance, is excluded from `placedInstanceNames`, renders in the success path as `/<skill>`, and at runtime the orchestrator runs it inline via the `Skill` tool (no subagent dispatch — see the `maestro-architecture` skill).
 
 **Edges**
 
 - `successEdge` — the solid straight path, `bottom → top`. Following it on success is the happy path; reaching the terminal node = task complete.
 - `conditionEdge` — orange dashed + animated, drawn from a `left`/`right` handle → `top`, with a label. Used to branch back to an earlier step or off to a secondary path. The label box is always rendered with an inline `✎` edit button — it shows the label text, or a dashed `no label` placeholder when empty — so a missing label can still be filled in (see **Edit condition label**).
 
-**Layout** — `applyDagreLayout` (dagre, `rankdir: "TB"`) runs whenever the workflow's nodes have no saved `position` (including brand-new empty workflows with only the synthetic main-session node). Once positions exist in `afk.json` they're honored, and any drag persists back into each node's `position`.
+**Layout** — `applyDagreLayout` (dagre, `rankdir: "TB"`) runs whenever the workflow's nodes have no saved `position` (including brand-new empty workflows with only the synthetic main-session node). Once positions exist in `maestro.json` they're honored, and any drag persists back into each node's `position`.
 
 **`FitViewEffect`** — a small module-level component rendered inside `ReactFlowProvider` that calls `useReactFlow().fitView()` imperatively (50 ms debounce) whenever `workflow.name` changes. This handles viewport re-centering when switching between workflows, since `fitView` as a ReactFlow prop only fires on mount.
 
@@ -132,7 +132,7 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
 
 - **Skip `dimensions` and `select`** — React Flow internal events; pushing them triggers "setState during render" on the parent.
 - **Push `position` only on drag-end** (`c.dragging === false`) — pushing on every mousemove would cause `setConfig` → new `workflow` prop → sync effect rebuilds RF state mid-drag → blink. `handleEdgesChange` still pushes on every change (no drag).
-- **Echo guard** — `pushChange` stores the emitted `AfkWorkflowV3` object in `lastEmittedRef`. The sync `useEffect` skips re-building RF state when `workflow === lastEmittedRef.current`, preventing the parent's echoed update from resetting the canvas.
+- **Echo guard** — `pushChange` stores the emitted `MaestroWorkflowV3` object in `lastEmittedRef`. The sync `useEffect` skips re-building RF state when `workflow === lastEmittedRef.current`, preventing the parent's echoed update from resetting the canvas.
 
 ### Interactions
 
@@ -142,7 +142,7 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
   1. Bottom-bar "Add condition" enters `__picking__` mode (crosshair cursor, source `+` buttons pulse); click a node to pick the source.
   2. A node's own left/right `+` button opens the modal for that node directly.
      The modal takes a label and a target — an existing node, or (via the same `InstancePicker`) a reused/new instance to seed a node. Confirm creates a `condition` edge from the source's `right` handle → target `top`.
-- **Edit condition label** — every condition edge renders an inline `✎` button beside its label (threaded in via `enrichedEdges`, which injects `onEditLabel` into each `conditionEdge`'s `data`). Clicking opens the edit-label modal (`openEditLabel` → `confirmEditLabel`, state `editLabelEdgeId`/`editLabelValue`); Enter saves, Esc cancels. Saving keeps `e.label` and `data.afkEdge.label` in sync — `rfEdgesToAfkEdges` reads `e.label` first but falls back to `afk.label`, so both must be set, and an emptied label clears both (reverting to the `no label` placeholder).
+- **Edit condition label** — every condition edge renders an inline `✎` button beside its label (threaded in via `enrichedEdges`, which injects `onEditLabel` into each `conditionEdge`'s `data`). Clicking opens the edit-label modal (`openEditLabel` → `confirmEditLabel`, state `editLabelEdgeId`/`editLabelValue`); Enter saves, Esc cancels. Saving keeps `e.label` and `data.maestroEdge.label` in sync — `rfEdgesToMaestroEdges` reads `e.label` first but falls back to `maestro.label`, so both must be set, and an emptied label clears both (reverting to the `no label` placeholder).
 - **Attach skills per instance** — agent node `⋮` → Edit instance opens a modal with a subagent `<select>` and an `InstanceSkillPicker` (drawn from `availableSkills`): check a skill to attach it (referenced by default), then flip its per-row Loaded/Ref toggle. Saving rewrites that `workflow_instances` entry's `loaded_skills` / `referenced_skills` via `onInstancesChange`, so all placements update.
 - **Edit instance** — agent node `⋮` → Edit instance (see above) is how you change an instance's agent or skills; the node id stays the instance name.
 - **Single success edge per node** — `replaceSuccessEdgeFrom` strips any existing outgoing success edge before adding a new one (in `onConnect` and `confirmAddStep`), enforcing one success successor per node.
@@ -163,18 +163,18 @@ The centered control drives `config.workflows` through a custom dropdown (hand-r
 
 `WorkflowSelectorProps` is unchanged — `onRemove(i)` deletes the clicked row (not necessarily the active one). One workflow is edited at a time.
 
-## Persistence (submitAfkConfig)
+## Persistence (submitMaestroConfig)
 
-Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` (resolved via `mountedProjectPath` → `/project/.claude/afk.json` under Docker, so any project repo is reachable regardless of where it lives on disk), and writes the result file with `additionalContext` of exactly `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host and re-renders the orchestrator (`afk-render-orchestrator.cjs`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
+Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `maestro.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/maestro.json` (resolved via `mountedProjectPath` → `/project/.claude/maestro.json` under Docker, so any project repo is reachable regardless of where it lives on disk), and writes the result file with `additionalContext` of exactly `Maestro v3 config data: {…}`. The consuming `/maestro-app` SKILL.md writes that file on the host and re-renders the orchestrator (`maestro-render-orchestrator.cjs`); on a first run `/maestro-install` has already scaffolded it via `maestro-install.js`. The `SubagentStart` hook (`maestro-inject-agent-context.js`) reads `.claude/maestro.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
 
-The save result also carries `aiToolsAction: "afk-config"` + `sliceType` so the persistent **`/ai-tools`** dispatcher can route it without re-launching the app — in that mode `/afk` runs its processing path (write → render → apply) on the supplied payload and skips opening the form. See `afk-architecture` (runtime) and `apps/ai-tools-manager/CLAUDE.md` (Lifecycle / Dispatcher).
+The save result also carries `aiToolsAction: "maestro-config"` + `sliceType` so the persistent **`/ai-tools`** dispatcher can route it without re-launching the app — in that mode `/maestro-app` runs its processing path (write → render → apply) on the supplied payload and skips opening the form. See `maestro-architecture` (runtime) and `apps/ai-tools-manager/CLAUDE.md` (Lifecycle / Dispatcher).
 
 ## Things that bite
 
 - **`main-session` lives in edges but not nodes.** Code that consumes `workflows[].edges` must treat `"main-session"` as a valid `from` that has no matching entry in `nodes[]`. Filtering edges by "node exists" will silently drop the entry edge.
 - **Skills live on the instance, not the node.** A node only stores `instance` (+ id + position); the agent and skills come from the `workflow_instances` entry. Editing an instance updates every node that references it across all workflows.
-- **`success_path` is derived — never write it to `afk.json`.** The plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) computes it from the edges and emits it into the orchestrator's `AFK:HANDOFFS` table. Persisting it would duplicate state that can drift from the edges.
-- **Save only touches the workflow slice.** Don't widen `submitAfkConfig`'s workflow branch to write `rules` — that's the `/rules` route's slice, and a stray write will clobber it.
+- **`success_path` is derived — never write it to `maestro.json`.** The plugin renderer (`successPath` in `maestro-render-orchestrator.cjs`) computes it from the edges and emits it into the orchestrator's `Maestro:HANDOFFS` table. Persisting it would duplicate state that can drift from the edges.
+- **Save only touches the workflow slice.** Don't widen `submitMaestroConfig`'s workflow branch to write `rules` — that's the `/rules` route's slice, and a stray write will clobber it.
 - **An instance can only hold skills that are checked in the left pane.** The `InstanceSkillPicker` lists `availableSkills` (= `skills_available` ids). Unchecking a skill in the left pane after attaching it leaves a dangling id on the instance.
 - **`NODE_TYPES`/`EDGE_TYPES` must stay module-level.** Moving them inside the component recreates the maps each render and React Flow remounts every node (loses selection, flickers).
 - **Layout auto-runs for any workflow without saved positions** — including empty ones (only main-session). The old guard `nodes.length > 1` was removed; dagre handles single-node graphs correctly.

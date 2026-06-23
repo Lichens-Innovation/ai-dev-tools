@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-// Re-exported from the shared package so existing `./afk-fs` imports keep working.
+// Re-exported from the shared package so existing `./maestro-fs` imports keep working.
 export { parseFrontmatter } from "@repo/claude-fs";
 
 // Resolve the Claude working directory. In Docker the host cwd is passed via the

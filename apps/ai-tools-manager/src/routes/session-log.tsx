@@ -38,7 +38,7 @@ function SessionLogPage() {
           <div>
             <p className="text-[13px] font-medium text-(--ink) mb-1">No session log found</p>
             <p className="text-[12px] text-(--ink-3) max-w-xs">
-              The log appears while an AFK session is running and is cleared when it ends.
+              The log appears while an Maestro session is running and is cleared when it ends.
             </p>
           </div>
           {/* Live connection indicator in empty state */}

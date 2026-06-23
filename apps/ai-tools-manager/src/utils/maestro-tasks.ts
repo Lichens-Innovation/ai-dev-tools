@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import fs from "fs";
 import path from "path";
-import { readCwd, mountedProjectPath } from "./afk-fs";
+import { readCwd, mountedProjectPath } from "./maestro-fs";
 
-export interface AfkTask {
+export interface MaestroTask {
   // The bare filename, e.g. "001-add-login-form.md"
   filename: string;
-  // Path relative to the project root, e.g. ".claude/afk-tasks/001-add-login-form.md"
+  // Path relative to the project root, e.g. ".claude/maestro-tasks/001-add-login-form.md"
   // — this is what the copy-prompt tells Claude Code to implement.
   relativePath: string;
   // First "# " heading in the file, or the filename if there is none.
@@ -17,7 +17,7 @@ export interface AfkTask {
   content: string;
 }
 
-const TASKS_SUBDIR = path.join(".claude", "afk-tasks");
+const TASKS_SUBDIR = path.join(".claude", "maestro-tasks");
 
 function parseTitle(content: string, filename: string): string {
   const m = content.match(/^#\s+(.+?)\s*$/m);
@@ -37,8 +37,8 @@ function parseBlockedBy(content: string): string[] {
   return Array.from(new Set(refs.map((r) => r.replace(/`/g, ""))));
 }
 
-export const getAfkTasks = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AfkTask[]> => {
+export const getMaestroTasks = createServerFn({ method: "GET" }).handler(
+  async (): Promise<MaestroTask[]> => {
     const cwd = readCwd();
     if (!cwd) return [];
     const dir = path.join(mountedProjectPath(cwd), TASKS_SUBDIR);
@@ -62,7 +62,7 @@ export const getAfkTasks = createServerFn({ method: "GET" }).handler(
       }
       return {
         filename,
-        relativePath: path.posix.join(".claude", "afk-tasks", filename),
+        relativePath: path.posix.join(".claude", "maestro-tasks", filename),
         title: parseTitle(content, filename),
         blockedBy: parseBlockedBy(content),
         content,

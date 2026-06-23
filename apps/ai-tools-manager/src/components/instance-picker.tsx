@@ -1,4 +1,4 @@
-import type { AfkInstanceV3 } from "../utils/agents-framework-kickstarter";
+import type { MaestroInstanceV3 } from "../utils/maestro";
 import InstanceSkillPicker, { emptySelection, type SkillSelection } from "./instance-skill-picker";
 
 export interface InstancePickerValue {
@@ -17,8 +17,8 @@ export function blankInstancePicker(defaultAgent = ""): InstancePickerValue {
 // is invalid (no reuse target, blank/duplicate new name, already-placed instance).
 export function resolveInstanceFromPicker(
   v: InstancePickerValue,
-  opts: { instances: AfkInstanceV3[]; placedNames: Set<string>; availableAgents: string[] },
-): { instance: AfkInstanceV3; isNew: boolean } | null {
+  opts: { instances: MaestroInstanceV3[]; placedNames: Set<string>; availableAgents: string[] },
+): { instance: MaestroInstanceV3; isNew: boolean } | null {
   if (v.mode === "reuse") {
     if (!v.reuseInstanceName || opts.placedNames.has(v.reuseInstanceName)) return null;
     const inst = opts.instances.find((i) => i.name === v.reuseInstanceName);
@@ -55,7 +55,7 @@ export default function InstancePicker({
   onChange: (next: InstancePickerValue) => void;
   availableAgents: string[];
   availableSkills: string[];
-  reusableInstances: AfkInstanceV3[];
+  reusableInstances: MaestroInstanceV3[];
   // All instance names already in the config — used to flag duplicate new names.
   existingInstanceNames?: string[];
   onEnter?: () => void;

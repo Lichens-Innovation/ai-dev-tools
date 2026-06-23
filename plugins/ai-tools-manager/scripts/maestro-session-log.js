@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // PreToolUse hook — appends one line per tool call to
-// <cwd>/.claude/afk_session.log.jsonl. Runs on every tool call from any agent.
-// No-op when afk.json is absent (AFK not configured for this project).
+// <cwd>/.claude/maestro_session.log.jsonl. Runs on every tool call from any agent.
+// No-op when maestro.json is absent (Maestro not configured for this project).
 //
 // The log is append-only (one JSON object per line) rather than a JSON array in
-// afk_session.json: every PreToolUse fires this hook, and parallel subagents
+// maestro_session.json: every PreToolUse fires this hook, and parallel subagents
 // would otherwise race on a read-modify-write and lose entries.
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, appendSessionLog } = require("./lib/afk-session.cjs");
+const { readStdin, appendSessionLog } = require("./lib/maestro-session.cjs");
 
 // Short, human-readable summary of a tool call for the session log.
 function summarize(toolName, ti) {
@@ -48,7 +48,7 @@ function summarize(toolName, ti) {
   if (!cwd) process.exit(0);
 
   const claudeDir = path.join(cwd, ".claude");
-  if (!fs.existsSync(path.join(claudeDir, "afk.json"))) process.exit(0); // only log AFK-configured projects
+  if (!fs.existsSync(path.join(claudeDir, "maestro.json"))) process.exit(0); // only log Maestro-configured projects
 
   try {
     appendSessionLog(claudeDir, {

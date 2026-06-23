@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// Re-renders the generated region of the project's AFK orchestrator skill
-// (.claude/skills/agent-orchestrator/SKILL.md) from .claude/afk.json:
-//   - the <!-- AFK:HANDOFFS --> table   ← workflows + derived success paths
+// Re-renders the generated region of the project's Maestro orchestrator skill
+// (.claude/skills/maestro/SKILL.md) from .claude/maestro.json:
+//   - the <!-- Maestro:HANDOFFS --> table   ← workflows + derived success paths
 //
-//   node afk-render-orchestrator.cjs [projectDir]
+//   node maestro-render-orchestrator.cjs [projectDir]
 //
-// Invoked by the /afk skill (on form save) and by the /afk-sync skill.
+// Invoked by the /maestro-app skill (on form save) and by the /maestro-update skill.
 
 const fs = require("fs");
 const path = require("path");
-const { readJson } = require("./lib/afk-session.cjs");
+const { readJson } = require("./lib/maestro-session.cjs");
 
-// Derived success path (never stored in afk.json) for a single workflow.
+// Derived success path (never stored in maestro.json) for a single workflow.
 // This is the SOLE implementation — the success path is computed here at render
-// time and written into the orchestrator's AFK:HANDOFFS table. Labels: "@<instance>"
+// time and written into the orchestrator's Maestro:HANDOFFS table. Labels: "@<instance>"
 // for agent nodes, "/<skill>" for skill nodes, "human review" for review nodes,
 // joined by " → ".
 function successPath(wf, instances) {
@@ -46,7 +46,7 @@ function handoffTable(cfg) {
   const instances = cfg.workflow_instances || [];
   const workflows = cfg.workflows || [];
   if (workflows.length === 0) {
-    return "# No workflows configured yet. Run /afk-install to set up.";
+    return "# No workflows configured yet. Run /maestro-install to set up.";
   }
   const rows = workflows.map((wf) => {
     const sp = successPath(wf, instances) || "(no steps configured)";
@@ -66,13 +66,13 @@ function replaceRegion(text, start, end, replacement) {
 }
 
 function render(projectDir) {
-  const cfg = readJson(path.join(projectDir, ".claude", "afk.json"));
-  if (!cfg) return { ok: false, reason: "afk.json not found" };
-  const skillPath = path.join(projectDir, ".claude", "skills", "agent-orchestrator", "SKILL.md");
-  if (!fs.existsSync(skillPath)) return { ok: false, reason: "agent-orchestrator/SKILL.md not found" };
+  const cfg = readJson(path.join(projectDir, ".claude", "maestro.json"));
+  if (!cfg) return { ok: false, reason: "maestro.json not found" };
+  const skillPath = path.join(projectDir, ".claude", "skills", "maestro", "SKILL.md");
+  if (!fs.existsSync(skillPath)) return { ok: false, reason: "maestro/SKILL.md not found" };
 
   let text = fs.readFileSync(skillPath, "utf8");
-  text = replaceRegion(text, "<!-- AFK:HANDOFFS:START -->", "<!-- AFK:HANDOFFS:END -->", handoffTable(cfg));
+  text = replaceRegion(text, "<!-- Maestro:HANDOFFS:START -->", "<!-- Maestro:HANDOFFS:END -->", handoffTable(cfg));
   fs.writeFileSync(skillPath, text);
   return { ok: true };
 }
@@ -81,10 +81,10 @@ if (require.main === module) {
   const dir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const r = render(dir);
   if (!r.ok) {
-    process.stderr.write(`afk-render-orchestrator: ${r.reason}\n`);
+    process.stderr.write(`maestro-render-orchestrator: ${r.reason}\n`);
     process.exit(1);
   }
-  process.stdout.write("AFK orchestrator skill re-rendered from .claude/afk.json\n");
+  process.stdout.write("Maestro orchestrator skill re-rendered from .claude/maestro.json\n");
 }
 
 module.exports = { render, successPath, handoffTable };

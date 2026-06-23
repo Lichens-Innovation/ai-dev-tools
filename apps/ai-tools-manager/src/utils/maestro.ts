@@ -9,10 +9,10 @@ import {
   getInstalledPluginAgents,
   getInstalledPluginSkills,
 } from "@repo/claude-fs";
-import { readCwd, mountedProjectPath } from "./afk-fs";
+import { readCwd, mountedProjectPath } from "./maestro-fs";
 
 // `source` records where the agent/skill was discovered: "project" (the project's
-// own .claude/), "user" (the global ~/.claude/), the bundled AFK plugin, or an
+// own .claude/), "user" (the global ~/.claude/), the bundled Maestro plugin, or an
 // installed plugin's name. Surfaced in the UI so mixed-origin lists stay legible.
 export interface BundledAgent {
   id: string;
@@ -60,9 +60,9 @@ function dedupeById<T extends { id: string }>(items: T[]): T[] {
 }
 
 // All agents the user can choose from: project-scoped, global (~/.claude), the bundled
-// AFK subagents, and every installed plugin's agents — each tagged with its `source`.
+// Maestro subagents, and every installed plugin's agents — each tagged with its `source`.
 // Directory reading, the global/plugin sweeps, and host→container path rebasing live in
-// @repo/claude-fs; this only layers the AFK-specific sources, tags, and priority.
+// @repo/claude-fs; this only layers the Maestro-specific sources, tags, and priority.
 async function discoverAgents(cwd: string): Promise<BundledAgent[]> {
   const projectRoot = mountedProjectPath(cwd);
   const bundledDir = getAgentsDir();
@@ -98,9 +98,9 @@ async function discoverSkills(cwd: string): Promise<ProjectSkill[]> {
   return dedupeById(items).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-// ── AFK v3 types ───────────────────────────────────────────────────
+// ── Maestro v3 types ───────────────────────────────────────────────────
 
-export interface AfkInstanceV3 {
+export interface MaestroInstanceV3 {
   name: string;
   agent: string;
   // Skills the SubagentStart hook auto-loads (Skill tool) before the agent starts working.
@@ -110,15 +110,15 @@ export interface AfkInstanceV3 {
   referenced_skills: string[];
 }
 
-export interface AfkNodeV3 {
+export interface MaestroNodeV3 {
   id: string;
   type: "agent" | "human_review" | "skill";
-  instance?: string; // agent nodes only; references AfkInstanceV3.name
+  instance?: string; // agent nodes only; references MaestroInstanceV3.name
   skill?: string; // skill nodes only; the skill id run inline by the orchestrator
   position?: { x: number; y: number };
 }
 
-export interface AfkEdgeV3 {
+export interface MaestroEdgeV3 {
   from: string;
   to: string;
   kind: "success" | "condition";
@@ -128,53 +128,53 @@ export interface AfkEdgeV3 {
   targetHandle?: string;
 }
 
-export interface AfkWorkflowV3 {
+export interface MaestroWorkflowV3 {
   name: string;
-  nodes: AfkNodeV3[];
-  edges: AfkEdgeV3[];
-  // success_path is DERIVED — never stored in afk.json
+  nodes: MaestroNodeV3[];
+  edges: MaestroEdgeV3[];
+  // success_path is DERIVED — never stored in maestro.json
 }
 
-export interface AfkRuleV3 {
+export interface MaestroRuleV3 {
   id: string;
   scope?: "project";
   paths?: string[];
-  // Origin of the rule, so the host-side apply step (afk-apply-rules.js) knows what to do:
+  // Origin of the rule, so the host-side apply step (maestro-apply-rules.js) knows what to do:
   // "project" → MOVE the on-disk .claude/rules/<id>.md to the assigned directory;
   // "vibe-rules" → install via `vibe-rules load <id> claude-code -t <dir>/.claude/rules/<id>.md`.
   source?: "project" | "vibe-rules";
 }
 
-export interface AfkConfigV3 {
+export interface MaestroConfigV3 {
   version: 3;
   agents_available: string[];
   skills_available: string[];
-  workflow_instances: AfkInstanceV3[]; // project-scoped reusable components
-  workflows: AfkWorkflowV3[];
-  rules: AfkRuleV3[];
+  workflow_instances: MaestroInstanceV3[]; // project-scoped reusable components
+  workflows: MaestroWorkflowV3[];
+  rules: MaestroRuleV3[];
 }
 
-export interface AfkWorkflowsSlice {
+export interface MaestroWorkflowsSlice {
   cwd: string;
   agents_available: string[];
   skills_available: string[];
-  workflow_instances: AfkInstanceV3[];
-  workflows: AfkWorkflowV3[];
+  workflow_instances: MaestroInstanceV3[];
+  workflows: MaestroWorkflowV3[];
 }
 
-export interface AfkRulesSlice {
+export interface MaestroRulesSlice {
   cwd: string;
-  rules: AfkRuleV3[];
+  rules: MaestroRuleV3[];
 }
 
-export interface AfkConfigResult {
-  config: AfkConfigV3;
+export interface MaestroConfigResult {
+  config: MaestroConfigV3;
   cwd: string;
   bundledAgents: BundledAgent[];
   projectSkills: ProjectSkill[];
 }
 
-function blankV3Config(): AfkConfigV3 {
+function blankV3Config(): MaestroConfigV3 {
   return {
     version: 3,
     agents_available: [],
@@ -186,14 +186,14 @@ function blankV3Config(): AfkConfigV3 {
 }
 
 // The non-implementation agents every seeded workflow shares.
-const CORE_INSTANCES: AfkInstanceV3[] = [
+const CORE_INSTANCES: MaestroInstanceV3[] = [
   { name: "test", agent: "test", loaded_skills: [], referenced_skills: [] },
   { name: "reviewer", agent: "reviewer", loaded_skills: [], referenced_skills: [] },
   { name: "refactor", agent: "refactor", loaded_skills: [], referenced_skills: [] },
   { name: "scribe", agent: "scribe", loaded_skills: [], referenced_skills: [] },
 ];
 
-const succ = (from: string, to: string): AfkEdgeV3 => ({
+const succ = (from: string, to: string): MaestroEdgeV3 => ({
   from,
   to,
   kind: "success",
@@ -201,7 +201,7 @@ const succ = (from: string, to: string): AfkEdgeV3 => ({
   targetHandle: "top",
 });
 
-const cond = (from: string, to: string, label: string): AfkEdgeV3 => ({
+const cond = (from: string, to: string, label: string): MaestroEdgeV3 => ({
   from,
   to,
   kind: "condition",
@@ -222,11 +222,11 @@ type SkillCount = (instanceName: string) => number;
 // Lay out a vertical column of nodes at x:0, each node's y offset by the cumulative height
 // of the nodes above it (taller when an instance carries skills). `human_review-1` becomes a
 // human_review node; every other id becomes an agent node whose instance == its id.
-function columnNodes(ids: string[], skillCount: SkillCount = () => 0): AfkNodeV3[] {
+function columnNodes(ids: string[], skillCount: SkillCount = () => 0): MaestroNodeV3[] {
   let y = BASE_STEP;
-  return ids.map((id): AfkNodeV3 => {
+  return ids.map((id): MaestroNodeV3 => {
     const position = { x: 0, y };
-    const node: AfkNodeV3 =
+    const node: MaestroNodeV3 =
       id === "human_review-1"
         ? { id, type: "human_review", position }
         : { id, type: "agent", instance: id, position };
@@ -247,26 +247,26 @@ function buildWorkflow(
   kind: "default" | "tdd",
   impl: string[],
   skillCount: SkillCount = () => 0
-): AfkWorkflowV3 {
+): MaestroWorkflowV3 {
   const column =
     kind === "tdd"
       ? ["test", "human_review-1", ...impl, "reviewer", "scribe"]
       : [...impl, "human_review-1", "test", "reviewer", "scribe"];
   const colNodes = columnNodes(column, skillCount);
   const reviewerY = colNodes.find((n) => n.id === "reviewer")?.position?.y ?? BASE_STEP;
-  const nodes: AfkNodeV3[] = [
+  const nodes: MaestroNodeV3[] = [
     ...colNodes,
     { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: reviewerY } },
   ];
 
   // Success chain: main-session through the whole happy-path column.
   const seq = ["main-session", ...column];
-  const edges: AfkEdgeV3[] = [];
+  const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
 
   // Code-issue routes vary by workflow kind and impl-agent count.
-  const reviewerCode: AfkEdgeV3[] = [];
-  const refactorCode: AfkEdgeV3[] = [];
+  const reviewerCode: MaestroEdgeV3[] = [];
+  const refactorCode: MaestroEdgeV3[] = [];
   if (kind === "tdd") {
     reviewerCode.push(cond("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
     refactorCode.push(cond("refactor", "test", "finding requires code changes"));
@@ -304,11 +304,11 @@ function buildWorkflow(
 // Build a simple linear happy-path workflow: main-session → each step in order, success edges only.
 // Step ids: "human_review-1" → human_review node; "skill:<id>" → skill node (run inline by the
 // orchestrator); anything else → an agent node whose instance == the id.
-function linearWorkflow(name: string, steps: string[], skillCount: SkillCount = () => 0): AfkWorkflowV3 {
+function linearWorkflow(name: string, steps: string[], skillCount: SkillCount = () => 0): MaestroWorkflowV3 {
   let y = BASE_STEP;
-  const nodes: AfkNodeV3[] = steps.map((step): AfkNodeV3 => {
+  const nodes: MaestroNodeV3[] = steps.map((step): MaestroNodeV3 => {
     const position = { x: 0, y };
-    let node: AfkNodeV3;
+    let node: MaestroNodeV3;
     let skills = 0;
     if (step === "human_review-1") {
       node = { id: step, type: "human_review", position };
@@ -323,7 +323,7 @@ function linearWorkflow(name: string, steps: string[], skillCount: SkillCount = 
     return node;
   });
   const seq = ["main-session", ...nodes.map((n) => n.id)];
-  const edges: AfkEdgeV3[] = [];
+  const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
   return { name, nodes, edges };
 }
@@ -333,13 +333,13 @@ function linearWorkflow(name: string, steps: string[], skillCount: SkillCount = 
 //   • simple fix: @reviewer → @<impl> directly;
 //   • bigger finding: @reviewer → @refactor → @<impl> (delegate the refactor before re-testing).
 // Splits per-agent when impl.length > 1 (fullstack).
-function buildTestsWorkflow(name: string, impl: string[], skillCount: SkillCount = () => 0): AfkWorkflowV3 {
+function buildTestsWorkflow(name: string, impl: string[], skillCount: SkillCount = () => 0): MaestroWorkflowV3 {
   const column = ["test", "reviewer", "scribe"];
   const colNodes = columnNodes(column, skillCount);
   const reviewerY = colNodes.find((n) => n.id === "reviewer")?.position?.y ?? BASE_STEP;
   // Side column: refactor on the reviewer's row, then the impl agent(s) stacked below it,
   // each offset by its own skill height so a tall impl node doesn't overlap the next.
-  const sideNodes: AfkNodeV3[] = [
+  const sideNodes: MaestroNodeV3[] = [
     { id: "refactor", type: "agent", instance: "refactor", position: { x: 360, y: reviewerY } },
   ];
   let implY = reviewerY;
@@ -347,10 +347,10 @@ function buildTestsWorkflow(name: string, impl: string[], skillCount: SkillCount
     sideNodes.push({ id: a, type: "agent", instance: a, position: { x: 720, y: implY } });
     implY += BASE_STEP + skillCount(a) * PER_SKILL_STEP;
   }
-  const nodes: AfkNodeV3[] = [...colNodes, ...sideNodes];
+  const nodes: MaestroNodeV3[] = [...colNodes, ...sideNodes];
 
   const seq = ["main-session", ...column];
-  const edges: AfkEdgeV3[] = [];
+  const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
 
   // Bigger finding: reviewer delegates to refactor before the impl agent(s) re-do the code.
@@ -370,21 +370,21 @@ function buildTestsWorkflow(name: string, impl: string[], skillCount: SkillCount
 }
 
 // Best-fit project-skill → seeded-agent assignments discovered at install time by the
-// afk-install skill (one entry per agent the user checked skills for). Passed through the
+// maestro-install skill (one entry per agent the user checked skills for). Passed through the
 // precompute file; see readSkillAssignments. Empty when no skills were found/selected.
 export type SkillMap = Record<string, string[]>;
 
-// Returned on first install (no afk.json yet). Seeds the bundled agents as reusable
+// Returned on first install (no maestro.json yet). Seeds the bundled agents as reusable
 // instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
 // canvas isn't empty. `implAgents` is the repo-detected implementation agent chain in the
 // happy path (the kickstarter skill passes it via launch-ai-tools-manager-app.sh); falls back to ["backend"].
 // `skillMap` attaches the install-time discovered project skills to their best-fit instance.
-function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConfigV3 {
+function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): MaestroConfigV3 {
   const impl = implAgents.length > 0 ? implAgents : ["backend"];
   // Defensive: only attach skills to instances that actually exist in this seed.
   const skillsFor = (agent: string): string[] => Array.from(new Set(skillMap[agent] ?? [])).filter(Boolean);
   // Install-time discovered skills seed as referenced (the default mode); promote in the canvas.
-  const instances: AfkInstanceV3[] = [
+  const instances: MaestroInstanceV3[] = [
     ...impl.map((a) => ({ name: a, agent: a, loaded_skills: [], referenced_skills: skillsFor(a) })),
     ...CORE_INSTANCES.map((i) => ({ ...i, referenced_skills: skillsFor(i.name) })),
   ];
@@ -414,7 +414,7 @@ function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConf
 
 // Implementation agent(s) for the seeded workflows' happy path. Under Docker the kickstarter
 // skill analyzes the repo and passes them through the marketplace precompute file (see
-// launch-ai-tools-manager-app.sh's AFK_IMPL_AGENTS handling). Falls back to ["backend"].
+// launch-ai-tools-manager-app.sh's MAESTRO_IMPL_AGENTS handling). Falls back to ["backend"].
 function readImplAgents(): string[] {
   if (process.env.RUNNING_IN_DOCKER === "true") {
     try {
@@ -428,7 +428,7 @@ function readImplAgents(): string[] {
 }
 
 // Install-time project-skill → seeded-agent assignments, mirroring readImplAgents: the
-// afk-install skill discovers/maps them and passes a JSON object via AFK_SKILL_MAP, which
+// maestro-install skill discovers/maps them and passes a JSON object via MAESTRO_SKILL_MAP, which
 // launch-ai-tools-manager-app.sh writes into the precompute file as `skillMap`. Empty by default.
 function readSkillAssignments(): SkillMap {
   if (process.env.RUNNING_IN_DOCKER === "true") {
@@ -442,20 +442,20 @@ function readSkillAssignments(): SkillMap {
   return {};
 }
 
-function readConfig(jsonPath: string, implAgents: string[] = ["backend"], skillMap: SkillMap = {}): AfkConfigV3 {
+function readConfig(jsonPath: string, implAgents: string[] = ["backend"], skillMap: SkillMap = {}): MaestroConfigV3 {
   if (!fs.existsSync(jsonPath)) return defaultV3Config(implAgents, skillMap);
   try {
-    const parsed = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as AfkConfigV3;
+    const parsed = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as MaestroConfigV3;
     return parsed.version === 3 ? parsed : blankV3Config();
   } catch {
     return blankV3Config();
   }
 }
 
-export const getAfkConfig = createServerFn({ method: "GET" }).handler(async (): Promise<AfkConfigResult> => {
+export const getMaestroConfig = createServerFn({ method: "GET" }).handler(async (): Promise<MaestroConfigResult> => {
   const cwd = readCwd();
   const config = readConfig(
-    path.join(mountedProjectPath(cwd), ".claude", "afk.json"),
+    path.join(mountedProjectPath(cwd), ".claude", "maestro.json"),
     readImplAgents(),
     readSkillAssignments()
   );
@@ -463,29 +463,29 @@ export const getAfkConfig = createServerFn({ method: "GET" }).handler(async (): 
   return { config, cwd, bundledAgents, projectSkills };
 });
 
-export const submitAfkConfig = createServerFn({ method: "POST" })
+export const submitMaestroConfig = createServerFn({ method: "POST" })
   .inputValidator(
     (data: unknown) =>
-      data as { cwd: string; slice: AfkWorkflowsSlice | AfkRulesSlice; sliceType: "workflows" | "rules" }
+      data as { cwd: string; slice: MaestroWorkflowsSlice | MaestroRulesSlice; sliceType: "workflows" | "rules" }
   )
   .handler(async ({ data }) => {
     const claudeDir = path.join(data.cwd, ".claude");
-    const jsonPath = path.join(claudeDir, "afk.json");
+    const jsonPath = path.join(claudeDir, "maestro.json");
     const current = readConfig(jsonPath);
     current.version = 3;
 
     if (data.sliceType === "workflows") {
-      const s = data.slice as AfkWorkflowsSlice;
+      const s = data.slice as MaestroWorkflowsSlice;
       current.agents_available = s.agents_available;
       current.skills_available = s.skills_available;
       current.workflow_instances = s.workflow_instances;
       current.workflows = s.workflows;
     } else {
-      const s = data.slice as AfkRulesSlice;
+      const s = data.slice as MaestroRulesSlice;
       current.rules = s.rules;
     }
 
-    // afk.json is the single source of truth (read by the SubagentStart hook and the
+    // maestro.json is the single source of truth (read by the SubagentStart hook and the
     // orchestrator renderer). Written here for local dev; the skill re-writes it
     // verbatim from additionalContext so Docker runs work too.
     if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
@@ -497,12 +497,12 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
       JSON.stringify({
         // Top-level discriminator read by the /ai-tools dispatcher to route this submit.
         // Left alongside hookSpecificOutput so the legacy hook contract is untouched.
-        aiToolsAction: "afk-config",
+        aiToolsAction: "maestro-config",
         sliceType: data.sliceType,
         hookSpecificOutput: {
           hookEventName: "UserPromptExpansion",
           additionalContext:
-            `AFK v3 config data: ${JSON.stringify({ projectPath: data.cwd, config: current })}`,
+            `Maestro v3 config data: ${JSON.stringify({ projectPath: data.cwd, config: current })}`,
         },
       })
     );

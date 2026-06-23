@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// /afk-post-mortem helper — condenses <project>/.claude/afk_session.log.jsonl
+// /maestro-post-mortem helper — condenses <project>/.claude/maestro_session.log.jsonl
 // into a compact digest the skill reasons over (instead of dumping the raw,
 // message-heavy log into the model's context).
 //
-// Read-only: parses the append-only session log + afk_session.json, prints a
+// Read-only: parses the append-only session log + maestro_session.json, prints a
 // markdown digest (default) or a structured object (--json) to stdout, and
 // never edits or deletes anything.
 //
-//   node afk-post-mortem.js <projectRoot> [--json]
+//   node maestro-post-mortem.js <projectRoot> [--json]
 //
 // The digest is deterministic and cheap: a session summary, the dispatch↔handoff
 // timeline correlated by agent_id, and heuristic FLAGS (repeated reads, edit
@@ -17,7 +17,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readJson, sessionLogPath } = require("./lib/afk-session.cjs");
+const { readJson, sessionLogPath } = require("./lib/maestro-session.cjs");
 
 // --- tuning knobs (candidate thresholds, intentionally loose) -----------------
 const REPEAT_READ_MIN = 3; // same file Read this many times → flag
@@ -172,7 +172,7 @@ function analyze(entries, session) {
 
 function renderMarkdown(a) {
   const L = [];
-  L.push("# AFK Post-Mortem digest");
+  L.push("# Maestro Post-Mortem digest");
   L.push("");
   L.push(`- **Workflow**: ${a.workflow || "(unknown / not set)"}`);
   L.push(`- **Tool calls**: ${a.counts.toolCalls}`);
@@ -243,9 +243,9 @@ function main() {
   const entries = parseLog(logFile);
   if (entries === null || entries.length === 0) {
     const msg =
-      "No AFK session log found at " +
+      "No Maestro session log found at " +
       logFile +
-      ".\nThe post-mortem reads the live session log, which is ephemeral and deleted at SessionEnd.\nRun /afk-post-mortem during an active AFK session that has done some work.";
+      ".\nThe post-mortem reads the live session log, which is ephemeral and deleted at SessionEnd.\nRun /maestro-post-mortem during an active Maestro session that has done some work.";
     if (asJson) {
       process.stdout.write(JSON.stringify({ error: "no-log", logFile, message: msg }, null, 2) + "\n");
     } else {
@@ -254,7 +254,7 @@ function main() {
     process.exit(0);
   }
 
-  const session = readJson(path.join(claudeDir, "afk_session.json"));
+  const session = readJson(path.join(claudeDir, "maestro_session.json"));
   const a = analyze(entries, session);
   if (asJson) {
     process.stdout.write(JSON.stringify(a, null, 2) + "\n");

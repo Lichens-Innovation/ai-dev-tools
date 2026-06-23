@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Blocks Bash commands that read .env secret files. Only .env.example is allowed.
-# Installed into a project's .claude/scripts/ by afk-install.js and
+# Installed into a project's .claude/scripts/ by maestro-install.js and
 # wired as a PreToolUse hook (matcher "Bash") in the project's .claude/settings.json.
 
 INPUT=$(cat)

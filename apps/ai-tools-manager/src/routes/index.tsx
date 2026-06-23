@@ -12,7 +12,7 @@ const PAGES = [
   { path: '/workflows', label: 'Workflows' },
   { path: '/rules', label: 'Rules' },
   { path: '/session-log', label: 'Session Log' },
-  { path: '/afk-tasks', label: 'AFK Tasks' },
+  { path: '/maestro-tasks', label: 'Maestro Tasks' },
 ]
 
 function Home() {

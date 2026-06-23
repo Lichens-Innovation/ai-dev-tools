@@ -1,12 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { mountedProjectPath } from "./afk-fs";
+import { mountedProjectPath } from "./maestro-fs";
 import { buildDesc, clip, titleFromName } from "./text";
 
 // Deterministic "pre-scaffold" the app performs the moment a create-* form is submitted, so the
 // user sees the artifact appear immediately and the /ai-tools dispatcher only has to finish the
 // intelligent part (authoring a skill/agent body, enriching a README). It is the create-flow
-// counterpart to submitAfkConfig writing afk.json directly.
+// counterpart to submitMaestroConfig writing maestro.json directly.
 //
 // Path reach: writes go through mountedProjectPath, which maps host paths under the repo root to
 // the container's /app mount. Targets outside the repo (common for a brand-new marketplace dir)

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { TreeNode } from "../utils/afk-tree";
-import type { ProjectRule } from "../utils/afk-rules";
-import type { AfkRuleV3 } from "../utils/agents-framework-kickstarter";
+import type { TreeNode } from "../utils/maestro-tree";
+import type { ProjectRule } from "../utils/maestro-rules";
+import type { MaestroRuleV3 } from "../utils/maestro";
 
 type RuleSource = "project" | "vibe-rules";
 
@@ -9,9 +9,9 @@ interface RuleTreeProps {
   tree: TreeNode[];
   rules: ProjectRule[];
   selectedRuleIds: string[];
-  ruleAssignments: AfkRuleV3[];
+  ruleAssignments: MaestroRuleV3[];
   ruleSource: Record<string, RuleSource>;
-  onAssign: (assignment: AfkRuleV3) => void;
+  onAssign: (assignment: MaestroRuleV3) => void;
   onUnassign: (ruleId: string) => void;
 }
 
@@ -21,9 +21,9 @@ interface TreeRowProps {
   depth: number;
   rules: ProjectRule[];
   selectedRuleIds: string[];
-  ruleAssignments: AfkRuleV3[];
+  ruleAssignments: MaestroRuleV3[];
   ruleSource: Record<string, RuleSource>;
-  onAssign: (assignment: AfkRuleV3) => void;
+  onAssign: (assignment: MaestroRuleV3) => void;
   onUnassign: (ruleId: string) => void;
 }
 
