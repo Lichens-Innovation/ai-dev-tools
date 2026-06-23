@@ -1,4 +1,4 @@
-@import '@repo/tailwind-config/shared-styles.css';
+@import '@repo/styles/shared-styles.css';
 
 @keyframes csSpin {
   to { transform: rotate(360deg); }
