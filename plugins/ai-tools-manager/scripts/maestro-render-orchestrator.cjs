@@ -9,37 +9,14 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readJson } = require("./lib/maestro-session.cjs");
+const { readJson, successPathSteps } = require("./lib/maestro-session.cjs");
 
 // Derived success path (never stored in maestro.json) for a single workflow.
-// This is the SOLE implementation — the success path is computed here at render
-// time and written into the orchestrator's Maestro:HANDOFFS table. Labels: "@<instance>"
-// for agent nodes, "/<skill>" for skill nodes, "human review" for review nodes,
-// joined by " → ".
+// The walk itself lives in lib/maestro-session.cjs (shared with the validation
+// hook). This wrapper joins the array into the " → " display form used by the
+// Maestro:HANDOFFS table.
 function successPath(wf, instances) {
-  const labelFor = (id) => {
-    if (id === "main-session") return "";
-    const n = (wf.nodes || []).find((x) => x.id === id);
-    if (!n) return id;
-    if (n.type === "agent") {
-      const inst = instances.find((i) => i.name === n.instance);
-      return "@" + ((inst && inst.name) || n.instance || n.id);
-    }
-    if (n.type === "skill") return "/" + (n.skill || n.id);
-    return "human review";
-  };
-  const out = [];
-  let cur = "main-session";
-  const seen = new Set();
-  while (!seen.has(cur)) {
-    seen.add(cur);
-    const next = (wf.edges || []).find((e) => e.from === cur && e.kind === "success");
-    if (!next) break;
-    const label = labelFor(next.to);
-    if (label) out.push(label);
-    cur = next.to;
-  }
-  return out.join(" → ");
+  return successPathSteps(wf, instances).join(" → ");
 }
 
 function handoffTable(cfg) {
