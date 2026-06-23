@@ -74,6 +74,7 @@ function ensureRepoRootGitignore(repoRoot) {
   return appendGitignoreEntries(path.join(repoRoot, ".gitignore"), [
     "**/.claude/maestro_session.json",
     "**/.claude/maestro_session.log.jsonl",
+    "**/.claude/maestro_session_tasks.json",
   ]);
 }
 

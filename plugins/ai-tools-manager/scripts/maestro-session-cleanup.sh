@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SessionEnd hook — two responsibilities:
-#  1. Remove the ephemeral Maestro session files (maestro_session.json, maestro_session.log.jsonl)
+#  1. Remove the ephemeral Maestro session files (maestro_session.json, maestro_session.log.jsonl, maestro_session_tasks.json)
 #     from the project's .claude/ directory. The source of truth (.claude/maestro.json) and
 #     the orchestrator agent (.claude/agents/maestro.md) are intentionally preserved.
 #  2. Tear down the per-project ai-tools-manager container — but only when the LAST
@@ -20,7 +20,7 @@ sid=$(echo "$STDIN_DATA" | python3 -c "import sys,json; print(json.load(sys.stdi
 
 # 1. Ephemeral Maestro session files (only when we know the cwd).
 if [[ -n "$cwd" ]]; then
-  rm -f "$cwd/.claude/maestro_session.json" "$cwd/.claude/maestro_session.log.jsonl"
+  rm -f "$cwd/.claude/maestro_session.json" "$cwd/.claude/maestro_session.log.jsonl" "$cwd/.claude/maestro_session_tasks.json"
 fi
 
 # 2. Per-project reference-counted teardown.
