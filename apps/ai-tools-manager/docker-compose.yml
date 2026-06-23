@@ -6,14 +6,15 @@ services:
       dockerfile: apps/ai-tools-manager/Dockerfile.dev
     restart: unless-stopped
     ports:
-      - '3009:3009'
+      - '${AFK_PORT:-3009}:3009'
     volumes:
       - ../..:/app
+      - ${AFK_PROJECT_DIR:-../..}:/project
       - ~/.claude:/root/.claude:ro
       - /app/node_modules
       - /app/apps/ai-tools-manager/.output
-      - /tmp/ai-tools-result.json:/tmp/result.json
-      - /tmp/ai-tools-marketplace.json:/tmp/marketplace-data.json:ro
+      - ${AFK_RESULT_FILE:-/tmp/ai-tools-result.json}:/tmp/result.json
+      - ${AFK_MARKETPLACE_FILE:-/tmp/ai-tools-marketplace.json}:/tmp/marketplace-data.json:ro
     environment:
       - NODE_ENV=development
       - RUNNING_IN_DOCKER=true

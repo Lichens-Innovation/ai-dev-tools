@@ -38,18 +38,20 @@ The grid is a fixed `280px 1fr` (left pane + center; `workflows.tsx`, `gridTempl
 ```
 Route loader: getAfkConfig()                    (src/utils/agents-framework-kickstarter.ts)
   • reads <cwd>/.claude/afk.json → AfkConfigV3
+      under Docker: path is resolved via mountedProjectPath(cwd) → /project/.claude/afk.json
+      (the ensure script mounts the target project at /project; works for any repo on disk)
       first install (no file): seeded defaultV3Config(implAgents); corrupt/old: blankV3Config()
   • also returns cwd, bundledAgents, projectSkills
         │
         ▼
 WorkflowsPage holds `config: AfkConfigV3` in useState (the single source of truth)
-        │   passes slices down as props (incl. workflow_instances + main_session_loaded_skills)
+        │   passes slices down as props (incl. workflow_instances)
         ▼
 WorkflowCanvas mirrors the active workflow into React Flow state (rfNodes/rfEdges)
   • workflowToRfNodes / workflowToRfEdges  on the way in
   • rfNodesToAfkNodes / rfEdgesToAfkEdges  on the way out → onChange(workflow)
         │   every edit calls onChange → updateWorkflow → setConfig
-        │   instance + main-session edits go via onInstancesChange / onMainSessionSkillsChange
+        │   instance edits go via onInstancesChange
         ▼ (Save workflows)
 submitAfkConfig({ sliceType: "workflows", slice })
   • merges the workflow slice into existing afk.json (preserves `rules`)
@@ -65,7 +67,7 @@ submitAfkConfig({ sliceType: "workflows", slice })
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | Route, left pane, save, workflow CRUD                                    | `src/routes/workflows.tsx`                                                 |
 | The canvas (React Flow nodes/edges, all interactions)                    | `src/components/workflow-canvas.tsx`                                       |
-| Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/instance-skill-picker.tsx` (loaded/referenced toggle), `src/components/skill-checklist.tsx` (plain list, main-session only) |
+| Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/components/instance-picker.tsx`, `src/components/instance-skill-picker.tsx` (loaded/referenced toggle) |
 | Top bar — nav links, workflow selector                                   | `src/components/top-nav.tsx`                                               |
 | Types + loader + submit server fns                                       | `src/utils/agents-framework-kickstarter.ts`                                |
 | Shared `readCwd` + `parseFrontmatter`                                    | `src/utils/afk-fs.ts`                                                      |
@@ -82,7 +84,6 @@ AfkConfigV3 {
   version: 3
   agents_available: string[]                  // left pane "Agents" checkboxes
   skills_available: string[]                  // left pane "Skills" checkboxes (plain ids)
-  main_session_loaded_skills: string[]        // green node's attached skills (replaces main_session)
   workflow_instances: AfkInstanceV3[]         // project-scoped reusable nodes (agent + skills)
   workflows: AfkWorkflowV3[]                   // one per entry in the top selector
   rules: AfkRuleV3[]                           // NOT edited here — owned by /rules
@@ -97,14 +98,14 @@ AfkEdgeV3     { from, to, kind: "success"|"condition", label?, sourceHandle?, ta
 Key points:
 
 - **Instances carry the agent + skills, nodes just reference them.** An agent node's `instance` field (and its `id`, which equals the instance name) points at a `workflow_instances` entry. Skills are stored once per instance, not per node — so the same instance reused across workflows shares one skill list. Editing an instance updates every placement. Each instance keeps two skill lists: `loaded_skills` (auto-loaded by the `SubagentStart` hook before the agent works) and `referenced_skills` (surfaced as available; the agent loads one only if the task needs it). The canvas chips render loaded skills solid and referenced skills dashed/muted.
-- **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToAfkNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToAfkEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete. Main-session's skills live in `config.main_session_loaded_skills`, not on a node.
+- **`main-session` is synthetic.** `workflowToRfNodes` always prepends a non-deletable `main-session` node, and `rfNodesToAfkNodes` filters it back out — so it never appears in `nodes[]`. But `rfEdgesToAfkEdges` does **not** filter edges, so edges _from_ it persist with `from: "main-session"`. It is the implicit entry point every workflow starts from; the success path that reaches the terminal node marks the task complete.
 - **`success_path` is derived, never stored.** It is computed by the plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) from the success edges and rendered into the orchestrator's `AFK:HANDOFFS` table, but it is absent from `afk.json`.
 
 ## Left pane (workflows.tsx)
 
 - **Agents** checkboxes come from `bundledAgents` — read from `plugins/ai-tools-manager/agents/*.md` frontmatter by `readBundledAgents()`. Toggling edits `config.agents_available`. `＋ Agent` `window.prompt`s for a manual id (for agents not bundled).
 - **Skills** checkboxes come from `projectSkills` — read from `<cwd>/.claude/skills/*/SKILL.md` by `readProjectSkills()`. Toggling edits `config.skills_available` (a plain `string[]` of skill ids). `＋ Skill` prompts for a manual id.
-- `skills_available` is the menu of skills the canvas can attach to instances and the main session — only a skill checked here can be attached.
+- `skills_available` is the menu of skills the canvas can attach to instances — only a skill checked here can be attached.
 - **Save workflows** → `handleSubmit` → `submitAfkConfig`. On success the page fires a `toast` (`@repo/ui/toast`) and **stays on the canvas** (the app is a persistent session reused across many saves), rather than swapping to a terminal success view.
 
 ## Center canvas (workflow-canvas.tsx)
@@ -113,7 +114,7 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
 
 **Nodes**
 
-- `mainSession` — green rounded card (`w-48 rounded-2xl border-2 border-green-400`), `deletable: false`. Has a `⋮` kebab (Add Skill) in the header and skill chips inside the card body. A bottom-center `+` button (`onAddNext`) opens the "Add step" modal. Handles (`left`, `right`, `bottom`) are fragment siblings of the card div — **not inside it** — so they anchor to the node bounding box, not to the card's flex flow.
+- `mainSession` — green rounded card (`w-48 rounded-2xl border-2 border-green-400`), `deletable: false`. A bottom-center `+` button (`onAddNext`) opens the "Add step" modal. Handles (`left`, `right`, `bottom`) are fragment siblings of the card div — **not inside it** — so they anchor to the node bounding box, not to the card's flex flow.
 - `agentNode` — card showing the instance name (primary) and `@agent` (secondary), skill chips from the referenced instance, side `+` buttons (left/right) for conditions, a bottom-center `+` button (`onAddNext`) for adding the next step, and a `⋮` kebab menu (Edit instance / Delete). Orange normally; **green when it is the success-path terminal** (see `findSuccessTerminalId`).
 - `humanStep` — amber diamond rendering "Review" (`human_review`). Wrapped in a `relative` div so the bottom-center `+` button (`onAddNext`) can be absolutely positioned below the diamond.
 - `skillNode` — violet card rendering `/<skill>` for a standalone **skill step** (`type: "skill"`, carries a `skill` id, no instance). A `⋮` kebab offers **Change skill** / **Delete**, plus the bottom-center `+` (`onAddNext`). Like `human_review` it is a non-agent node: it carries no instance, is excluded from `placedInstanceNames`, renders in the success path as `/<skill>`, and at runtime the orchestrator runs it inline via the `Skill` tool (no subagent dispatch — see the `afk-architecture` skill).
@@ -142,7 +143,7 @@ Built on `@xyflow/react` (React Flow), gated behind a `mounted` flag to dodge SS
   2. A node's own left/right `+` button opens the modal for that node directly.
      The modal takes a label and a target — an existing node, or (via the same `InstancePicker`) a reused/new instance to seed a node. Confirm creates a `condition` edge from the source's `right` handle → target `top`.
 - **Edit condition label** — every condition edge renders an inline `✎` button beside its label (threaded in via `enrichedEdges`, which injects `onEditLabel` into each `conditionEdge`'s `data`). Clicking opens the edit-label modal (`openEditLabel` → `confirmEditLabel`, state `editLabelEdgeId`/`editLabelValue`); Enter saves, Esc cancels. Saving keeps `e.label` and `data.afkEdge.label` in sync — `rfEdgesToAfkEdges` reads `e.label` first but falls back to `afk.label`, so both must be set, and an emptied label clears both (reverting to the `no label` placeholder).
-- **Attach skills per instance** — agent node `⋮` → Edit instance opens a modal with a subagent `<select>` and an `InstanceSkillPicker` (drawn from `availableSkills`): check a skill to attach it (referenced by default), then flip its per-row Loaded/Ref toggle. Saving rewrites that `workflow_instances` entry's `loaded_skills` / `referenced_skills` via `onInstancesChange`, so all placements update. The main-session node's `⋮` → Add Skill edits `main_session_loaded_skills` via a plain `SkillChecklist` (those are always loaded — no toggle).
+- **Attach skills per instance** — agent node `⋮` → Edit instance opens a modal with a subagent `<select>` and an `InstanceSkillPicker` (drawn from `availableSkills`): check a skill to attach it (referenced by default), then flip its per-row Loaded/Ref toggle. Saving rewrites that `workflow_instances` entry's `loaded_skills` / `referenced_skills` via `onInstancesChange`, so all placements update.
 - **Edit instance** — agent node `⋮` → Edit instance (see above) is how you change an instance's agent or skills; the node id stays the instance name.
 - **Single success edge per node** — `replaceSuccessEdgeFrom` strips any existing outgoing success edge before adding a new one (in `onConnect` and `confirmAddStep`), enforcing one success successor per node.
 - **Instance placed once per workflow** — `placedInstanceNames` (memoised from the canvas) gates the reuse list and `resolveInstanceFromPicker`, so an instance can't appear twice in the same diagram.
@@ -164,7 +165,7 @@ The centered control drives `config.workflows` through a custom dropdown (hand-r
 
 ## Persistence (submitAfkConfig)
 
-Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `main_session_loaded_skills`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json`, and writes the result file with `additionalContext` of exactly `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host and re-renders the orchestrator (`afk-render-orchestrator.cjs`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
+Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`. The server fn reads the existing `afk.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `.claude/afk.json` (resolved via `mountedProjectPath` → `/project/.claude/afk.json` under Docker, so any project repo is reachable regardless of where it lives on disk), and writes the result file with `additionalContext` of exactly `AFK v3 config data: {…}`. The consuming `/afk` SKILL.md writes that file on the host and re-renders the orchestrator (`afk-render-orchestrator.cjs`); on a first run `/afk-install` has already scaffolded it via `afk-install.js`. The `SubagentStart` hook (`afk-inject-agent-context.js`) reads `.claude/afk.json` (v3) at each subagent start to inject that instance's skills + condition-edge handoff rules.
 
 The save result also carries `aiToolsAction: "afk-config"` + `sliceType` so the persistent **`/ai-tools`** dispatcher can route it without re-launching the app — in that mode `/afk` runs its processing path (write → render → apply) on the supplied payload and skips opening the form. See `afk-architecture` (runtime) and `apps/ai-tools-manager/CLAUDE.md` (Lifecycle / Dispatcher).
 
@@ -174,7 +175,7 @@ The save result also carries `aiToolsAction: "afk-config"` + `sliceType` so the 
 - **Skills live on the instance, not the node.** A node only stores `instance` (+ id + position); the agent and skills come from the `workflow_instances` entry. Editing an instance updates every node that references it across all workflows.
 - **`success_path` is derived — never write it to `afk.json`.** The plugin renderer (`successPath` in `afk-render-orchestrator.cjs`) computes it from the edges and emits it into the orchestrator's `AFK:HANDOFFS` table. Persisting it would duplicate state that can drift from the edges.
 - **Save only touches the workflow slice.** Don't widen `submitAfkConfig`'s workflow branch to write `rules` — that's the `/rules` route's slice, and a stray write will clobber it.
-- **An instance can only hold skills that are checked in the left pane.** The skill checklist lists `availableSkills` (= `skills_available` ids). Unchecking a skill in the left pane after attaching it leaves a dangling id on the instance.
+- **An instance can only hold skills that are checked in the left pane.** The `InstanceSkillPicker` lists `availableSkills` (= `skills_available` ids). Unchecking a skill in the left pane after attaching it leaves a dangling id on the instance.
 - **`NODE_TYPES`/`EDGE_TYPES` must stay module-level.** Moving them inside the component recreates the maps each render and React Flow remounts every node (loses selection, flickers).
 - **Layout auto-runs for any workflow without saved positions** — including empty ones (only main-session). The old guard `nodes.length > 1` was removed; dagre handles single-node graphs correctly.
 - **Don't call `pushChange` inside a state updater.** React Flow emits `dimensions` changes during its commit phase (node measurement). If `pushChange` runs inside `setRfNodes(nds => { pushChange(...); return nds })`, it triggers `setConfig` on the parent during render and React warns. Always call `pushChange` outside the setter and skip it for `dimensions`/`select` change types.

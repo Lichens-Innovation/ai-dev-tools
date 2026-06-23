@@ -19,18 +19,18 @@ export function readCwd(): string {
   return process.cwd();
 }
 
-// Map a host project path to one reachable inside the container. The hook mounts the
-// repo root (the dir containing turbo.json) at /app and records it as `repoRoot` in
-// marketplace-data.json, so a project under that root lives at /app/<subpath>. Used
-// for READING project-scoped files (agents/skills/afk.json) under Docker — the host
-// cwd is still what we display and write back through. Outside Docker, a no-op.
+// Map a host project path to one reachable inside the container. The ensure script
+// mounts the target project at /project and records its host path as `cwd` in
+// marketplace-data.json, so any path under that root lives at /project/<subpath>.
+// Used for ALL project-scoped file I/O (read and write) under Docker. Outside Docker,
+// a no-op.
 export function mountedProjectPath(cwd: string): string {
   if (process.env.RUNNING_IN_DOCKER !== "true" || !cwd) return cwd;
   try {
-    const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as { repoRoot?: string };
-    const root = data.repoRoot;
-    if (root && (cwd === root || cwd.startsWith(root + path.sep))) {
-      return path.join("/app", cwd.slice(root.length));
+    const data = JSON.parse(fs.readFileSync("/tmp/marketplace-data.json", "utf8")) as { cwd?: string };
+    const base = data.cwd;
+    if (base && (cwd === base || cwd.startsWith(base + path.sep))) {
+      return path.join("/project", cwd.slice(base.length));
     }
   } catch {
     // fall through to the raw cwd

@@ -5,7 +5,6 @@ import InstancePicker, {
   resolveInstanceFromPicker,
   type InstancePickerValue,
 } from "./instance-picker";
-import SkillChecklist from "./skill-checklist";
 import InstanceSkillPicker, { emptySelection, type SkillSelection } from "./instance-skill-picker";
 
 // Static import — rendering is gated by `mounted` to avoid SSR issues.
@@ -40,10 +39,8 @@ interface WorkflowCanvasProps {
   workflow: AfkWorkflowV3 | null;
   availableAgents: string[];
   availableSkills: string[];
-  mainSessionSkills: string[];
   instances: AfkInstanceV3[];
   onChange: (w: AfkWorkflowV3) => void;
-  onMainSessionSkillsChange: (skills: string[]) => void;
   onInstancesChange: (instances: AfkInstanceV3[]) => void;
 }
 
@@ -179,20 +176,8 @@ function nextSkillId(nodes: Node[]): string {
 function MainSessionNode({
   data,
 }: NodeProps & {
-  data: { skills?: string[]; onEditSkills?: (id: string) => void; onAddNext?: (id: string) => void };
+  data: { onAddNext?: (id: string) => void };
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
-
   return (
     <>
       <Handle type="target" position={Position.Top} id="top" />
@@ -201,48 +186,9 @@ function MainSessionNode({
       <div className="relative select-none">
         <div className="w-48 rounded-2xl border-2 border-green-400 bg-green-100 shadow-sm">
           {/* Header row */}
-          <div className="flex items-center justify-between px-2.5 pt-2 pb-1">
+          <div className="flex items-center px-2.5 py-2">
             <span className="text-green-800 text-[12px] font-semibold">Claude Main Session</span>
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen((v) => !v);
-                }}
-                className="w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none text-green-600 hover:bg-green-200"
-              >
-                ⋮
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-6 z-50 w-36 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => {
-                      data.onEditSkills?.("main-session");
-                      setMenuOpen(false);
-                    }}
-                  >
-                    + Add Skill
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
-          {/* Skill chips */}
-          {data.skills && data.skills.length > 0 && (
-            <div className="px-2.5 pb-2 flex flex-wrap gap-1">
-              {data.skills.map((s) => (
-                <span
-                  key={s}
-                  className="px-1.5 py-0.5 rounded-full bg-green-200 border border-green-300 text-green-700 text-[10px] font-mono"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
         {/* Bottom "+" — add next step */}
         <button
@@ -717,10 +663,8 @@ export default function WorkflowCanvas({
   workflow,
   availableAgents,
   availableSkills,
-  mainSessionSkills,
   instances,
   onChange,
-  onMainSessionSkillsChange,
   onInstancesChange,
 }: WorkflowCanvasProps) {
   const [mounted, setMounted] = useState(false);
@@ -732,8 +676,6 @@ export default function WorkflowCanvas({
   rfEdgesRef.current = rfEdges;
   // Tracks the last workflow object we emitted so the sync effect can ignore the echo
   const lastEmittedRef = useRef<AfkWorkflowV3 | null>(null);
-  // Skill panel — only used for main-session
-  const [skillPanelNodeId, setSkillPanelNodeId] = useState<string | null>(null);
 
   // Condition edge state machine
   const [conditionSourceNodeId, setConditionSourceNodeId] = useState<string | null>(null);
@@ -849,14 +791,6 @@ export default function WorkflowCanvas({
       });
     },
     [pushChange]
-  );
-
-  // Only used for main-session skill editing
-  const updateMainSessionSkills = useCallback(
-    (skills: string[]) => {
-      onMainSessionSkillsChange(skills);
-    },
-    [onMainSessionSkillsChange]
   );
 
   // ── Move condition-edge label ────────────────────────────────────
@@ -997,7 +931,6 @@ export default function WorkflowCanvas({
 
   const openConditionModal = useCallback(
     (nodeId: string) => {
-      setSkillPanelNodeId(null);
       setConditionSourceNodeId(nodeId);
       setConditionModalOpen(true);
       setConditionLabel("");
@@ -1220,7 +1153,7 @@ export default function WorkflowCanvas({
         if (n.id === "main-session") {
           return {
             ...n,
-            data: { skills: mainSessionSkills, onEditSkills: setSkillPanelNodeId, onAddNext: openAddStep },
+            data: { onAddNext: openAddStep },
           };
         }
         const afkNode = n.data.afkNode as AfkNodeV3;
@@ -1243,7 +1176,6 @@ export default function WorkflowCanvas({
       }),
     [
       rfNodes,
-      mainSessionSkills,
       instances,
       deleteNode,
       openEditInstance,
@@ -1644,34 +1576,6 @@ export default function WorkflowCanvas({
         </div>
       )}
 
-      {/* Skill attach modal — main-session only */}
-      {skillPanelNodeId === "main-session" && (
-        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
-          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-72 flex flex-col gap-3">
-            <div className="text-[13px] font-semibold text-(--ink)">
-              Skills for <span className="font-mono">Claude Main Session</span>
-            </div>
-            {availableSkills.length === 0 ? (
-              <p className="text-[12px] text-subtle">No skills selected in the left panel.</p>
-            ) : (
-              <SkillChecklist
-                skills={availableSkills}
-                value={mainSessionSkills}
-                onChange={updateMainSessionSkills}
-                maxHeight="max-h-60"
-                size="md"
-              />
-            )}
-            <button
-              type="button"
-              onClick={() => setSkillPanelNodeId(null)}
-              className="w-full py-1.5 text-[12px] bg-(--bg-elev) border border-(--line) rounded-lg cursor-pointer text-(--ink-2) hover:border-(--ink-4)"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

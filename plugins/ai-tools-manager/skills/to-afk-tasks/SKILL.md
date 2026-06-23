@@ -1,11 +1,11 @@
 ---
 name: to-afk-tasks
-description: "Turn a plan or idea into a queue of ready-to-run AFK task prompts saved under .claude/afk-tasks/. Runs a /grilling session to sharpen intent, decomposes the work into tracer-bullet vertical slices, then writes one numbered, workflow-agnostic prompt file per slice for the AFK orchestrator to classify and execute. Use when the user wants to break work into AFK tasks, queue up prompts for agent: afk sessions, or asks to convert a plan/spec/idea into runnable task files."
+description: "Turn a plan or idea into a queue of ready-to-run AFK task prompts saved under .claude/afk-tasks/. Runs a /grilling session to sharpen intent, decomposes the work into tracer-bullet vertical slices, then writes one numbered, workflow-agnostic prompt file per slice for the AFK orchestrator to classify and execute. Use when the user wants to break work into AFK tasks, queue up prompts for the /agent-orchestrator skill, or asks to convert a plan/spec/idea into runnable task files."
 ---
 
 # To AFK Tasks
 
-Convert a plan, spec, or rough idea into a queue of **ready-to-run prompt files** under `<cwd>/.claude/afk-tasks/`. Each file is a self-contained, workflow-agnostic prompt that a later `agent: afk` session can classify (Step 1 of `afk.md`) and execute end-to-end.
+Convert a plan, spec, or rough idea into a queue of **ready-to-run prompt files** under `<cwd>/.claude/afk-tasks/`. Each file is a self-contained, workflow-agnostic prompt that the `/agent-orchestrator` skill can classify (Step 1) and execute end-to-end.
 
 This skill composes two upstream behaviors into one continuous session:
 
@@ -99,9 +99,9 @@ Or "None — can start immediately" if no blockers.
 
 ### 6. Report
 
-Tell the user how many task files were written, the numeric range (e.g. `003–007`), and that each is ready to paste into (or run from) an `agent: afk` session.
+Tell the user how many task files were written, the numeric range (e.g. `003–007`), and that each is ready to paste into (or run from) a session where the `/agent-orchestrator` skill is invoked.
 
 ## Notes
 
-- These files are designed to be classified by the AFK orchestrator (`.claude/agents/afk.md`). Keeping each prompt workflow-agnostic is what lets the orchestrator pick the right workflow per task and stay correct as `afk.json` evolves.
+- These files are designed to be classified by the AFK orchestrator (`.claude/skills/agent-orchestrator/SKILL.md`). Keeping each prompt workflow-agnostic is what lets the orchestrator pick the right workflow per task and stay correct as `afk.json` evolves.
 - This skill never publishes to GitHub. If the user also wants tracked issues, that's a separate, explicit `/to-issues` invocation.

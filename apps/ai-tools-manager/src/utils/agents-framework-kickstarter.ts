@@ -149,7 +149,6 @@ export interface AfkConfigV3 {
   version: 3;
   agents_available: string[];
   skills_available: string[];
-  main_session_loaded_skills: string[];
   workflow_instances: AfkInstanceV3[]; // project-scoped reusable components
   workflows: AfkWorkflowV3[];
   rules: AfkRuleV3[];
@@ -159,7 +158,6 @@ export interface AfkWorkflowsSlice {
   cwd: string;
   agents_available: string[];
   skills_available: string[];
-  main_session_loaded_skills: string[];
   workflow_instances: AfkInstanceV3[];
   workflows: AfkWorkflowV3[];
 }
@@ -181,7 +179,6 @@ function blankV3Config(): AfkConfigV3 {
     version: 3,
     agents_available: [],
     skills_available: [],
-    main_session_loaded_skills: [],
     workflow_instances: [],
     workflows: [],
     rules: [],
@@ -402,7 +399,6 @@ function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): AfkConf
     version: 3,
     agents_available: agentsAvailable,
     skills_available: skillsAvailable,
-    main_session_loaded_skills: [],
     workflow_instances: instances,
     workflows: [
       buildWorkflow("default", "default", impl, skillCount),
@@ -482,7 +478,6 @@ export const submitAfkConfig = createServerFn({ method: "POST" })
       const s = data.slice as AfkWorkflowsSlice;
       current.agents_available = s.agents_available;
       current.skills_available = s.skills_available;
-      current.main_session_loaded_skills = s.main_session_loaded_skills;
       current.workflow_instances = s.workflow_instances;
       current.workflows = s.workflows;
     } else {

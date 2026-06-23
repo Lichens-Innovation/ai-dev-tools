@@ -1,6 +1,6 @@
 ---
 name: afk-install
-description: "Installs the AFK orchestrator into this project, then opens the visual editor to author the config. Detects the implementation agent(s) from the repo, scaffolds the afk orchestrator agent + runtime scripts + settings (agent: afk, bash-validation hook) + gitignore, then hands off to the /afk skill to fill the canvas, write afk.json, render the orchestrator, and place rules. Use when the user runs /afk-install, or asks to set up / scaffold / install the AFK subagents workflow for this project. To re-edit an already-installed project, use /afk instead."
+description: "Installs the AFK orchestrator into this project, then opens the visual editor to author the config. Detects the implementation agent(s) from the repo, scaffolds the agent-orchestrator skill + runtime scripts + settings (bash-validation hook) + gitignore, then hands off to the /afk skill to fill the canvas, write afk.json, render the orchestrator, and place rules. Use when the user runs /afk-install, or asks to set up / scaffold / install the AFK subagents workflow for this project. To re-edit an already-installed project, use /afk instead."
 ---
 
 # AFK Install
@@ -55,15 +55,15 @@ $ARGUMENTS
    ```
 
    This is idempotent and:
-   - copies the `afk` orchestrator agent to `<projectPath>/.claude/agents/afk.md` (only if absent — your edits are preserved on re-runs),
+   - copies the `agent-orchestrator` skill to `<projectPath>/.claude/skills/agent-orchestrator/SKILL.md` (only if absent — your edits are preserved on re-runs),
    - copies the runtime scripts (`afk-set-session-workflow.cjs`, `afk-render-orchestrator.cjs`, `bash-validation.sh`, `lib/afk-session.cjs`) into `<projectPath>/.claude/scripts/`,
-   - merges `"agent": "afk"` and the `bash-validation.sh` PreToolUse Bash hook into `<projectPath>/.claude/settings.json` (preserving other keys), so new sessions adopt the orchestrator and `.env` reads are blocked,
+   - merges the `bash-validation.sh` PreToolUse Bash hook into `<projectPath>/.claude/settings.json` (preserving other keys), so `.env` reads are blocked,
    - ensures `<projectPath>/.claude/.gitignore` ignores the ephemeral session files (`afk_session.json`, `afk_session.log.jsonl`),
    - adds an `# AFK` section to the repo-root `.gitignore` (`git rev-parse --show-toplevel`) ignoring every nested session file across the repo / monorepo via `**/.claude/afk_session.json` and `**/.claude/afk_session.log.jsonl`.
 
-   It prints a JSON summary (`installedAgent`, `setAgentSetting`, `setBashHook`, `wroteGitignore`, `wroteRepoGitignore`). It does **not** render `afk.md`'s managed regions — that needs `afk.json`, which the next step produces.
+   It prints a JSON summary (`installedOrchestratorSkill`, `setBashHook`, `wroteGitignore`, `wroteRepoGitignore`). It does **not** render the skill's managed region — that needs `afk.json`, which the next step produces.
 
-   Note the `installedAgent` flag: `true` means a fresh `afk.md` was written; `false` means one was already present and was left untouched.
+   Note the `installedOrchestratorSkill` flag: `true` means a fresh `SKILL.md` was written; `false` means one was already present and was left untouched.
 
 4. **Author the config — run the `/afk` skill.** Now that `afk.md` exists, invoke the **`afk`** skill, passing the detected implementation agents (and, if you assembled one in step 2, the skill map) as its arguments so the canvas opens already seeded for this project:
 
@@ -72,9 +72,9 @@ $ARGUMENTS
    `/afk` turns these into `AFK_IMPL_AGENTS` / `AFK_SKILL_MAP` on the launcher (see its SKILL.md). It opens the visual editor, writes `afk.json`, re-renders the orchestrator from the new config, and applies rule placements — and reports those details. If the user cancels the form, `/afk` stops and reports the reason; nothing further to do here.
 
 5. **Confirm the install.** After `/afk` returns, add a short scaffold-level summary on top of what it already reported:
-   - whether the orchestrator was newly installed (`installedAgent`) and whether `agent: afk` / the bash-validation hook were added to `settings.json`,
-   - that the orchestrator only takes effect in **new sessions** (the `agent: afk` setting is read at session start),
-   - that they can re-open the editor any time with `/afk`, re-render after a hand-edit with `/afk-sync`, and turn AFK off with `/afk-uninstall`.
+   - whether the orchestrator skill was newly installed (`installedOrchestratorSkill`) and whether the bash-validation hook was added to `settings.json`,
+   - that they invoke the orchestrator manually by running `/agent-orchestrator`,
+   - that they can re-open the editor any time with `/afk`, re-render after a hand-edit with `/afk-sync`, and uninstall AFK with `/afk-uninstall`.
 
 ## Hook contract (SubagentStart)
 
