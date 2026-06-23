@@ -9,7 +9,12 @@ import {
   setChatError,
   setChatMessages,
 } from '../store/chat-store'
-import { sendChatMessage, getChatHistory, clearChatHistory, checkSuperHelpAvailable } from '../utils/chat'
+import {
+  sendChatMessage,
+  getChatHistory,
+  clearChatHistory,
+  checkSuperHelpAvailable,
+} from '../utils/chat'
 import type { ChatHistoryEntry } from '../utils/chat'
 
 export default function ChatSidebar() {
@@ -89,7 +94,11 @@ export default function ChatSidebar() {
       if (result.error) {
         setChatError(result.error)
       } else {
-        addChatMessage({ role: 'assistant', content: result.response, timestamp: Date.now() })
+        addChatMessage({
+          role: 'assistant',
+          content: result.response,
+          timestamp: Date.now(),
+        })
       }
 
       if (!result.skillAvailable) {
@@ -114,7 +123,8 @@ export default function ChatSidebar() {
     setChatError(null)
   }, [])
 
-  const installCommand = 'claude plugin install ai-tools-manager@lichens-ai-dev-tools'
+  const installCommand =
+    'claude plugin install ai-tools-manager@lichens-ai-dev-tools'
 
   return (
     <SlidePanel
@@ -127,7 +137,14 @@ export default function ChatSidebar() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-(--line) bg-(--bg-2) px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-primary">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            className="text-primary"
+          >
             <path
               d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
               fill="currentColor"
@@ -138,10 +155,17 @@ export default function ChatSidebar() {
               stroke="currentColor"
               strokeWidth="1.5"
             />
-            <path d="M8 15h8M8 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path
+              d="M8 15h8M8 11h5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
           </svg>
           <div>
-            <h2 className="text-[13px] font-semibold text-(--ink)">Help Chat</h2>
+            <h2 className="text-[13px] font-semibold text-(--ink)">
+              Help Chat
+            </h2>
             <p className="text-[10px] text-subtle">Powered by /super-help</p>
           </div>
         </div>
@@ -152,7 +176,13 @@ export default function ChatSidebar() {
               title="Clear history"
               className="flex h-7 w-7 items-center justify-center rounded-md text-subtle hover:bg-(--bg-3) hover:text-(--ink)"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
                 <path
                   d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
                   stroke="currentColor"
@@ -168,8 +198,18 @@ export default function ChatSidebar() {
             aria-label="Close chat"
             className="flex h-7 w-7 items-center justify-center rounded-md text-subtle hover:bg-(--bg-3) hover:text-(--ink)"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.4" />
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M1 1l12 12M13 1L1 13"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
             </svg>
           </button>
         </div>
@@ -180,13 +220,24 @@ export default function ChatSidebar() {
         {messages.length === 0 && !error && skillAvailable !== false && (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--primary-dim)">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-primary">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                className="text-primary"
+              >
                 <path
                   d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"
                   stroke="currentColor"
                   strokeWidth="1.5"
                 />
-                <path d="M8 15h8M8 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M8 15h8M8 11h5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </div>
             <p className="m-0 text-[13px] text-subtle">
@@ -198,10 +249,15 @@ export default function ChatSidebar() {
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            key={i}
+            className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
             <div
               className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                msg.role === 'user' ? 'border border-ring bg-(--primary-dim) text-primary' : 'bg-(--bg-3) text-(--ink)'
+                msg.role === 'user'
+                  ? 'border border-ring bg-(--primary-dim) text-primary'
+                  : 'bg-(--bg-3) text-(--ink)'
               }`}
             >
               {msg.content.split('\n').map((line, li) => (
@@ -229,23 +285,53 @@ export default function ChatSidebar() {
         {localOnly && (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-(--bg-3)">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-subtle" aria-hidden="true">
-                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                className="text-subtle"
+                aria-hidden="true"
+              >
+                <rect
+                  x="2"
+                  y="3"
+                  width="20"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M8 21h8M12 17v4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </div>
             <div>
-              <p className="m-0 mb-1 text-[13px] font-medium text-(--ink)">Local only</p>
+              <p className="m-0 mb-1 text-[13px] font-medium text-(--ink)">
+                Local only
+              </p>
               <p className="m-0 text-[12px] text-subtle">
-                The chat requires a local <code className="rounded bg-(--bg-3) px-1 py-0.5 text-[11px]">yarn dev</code>{' '}
+                The chat requires a local{' '}
+                <code className="rounded bg-(--bg-3) px-1 py-0.5 text-[11px]">
+                  pnpm dev
+                </code>{' '}
                 session.
               </p>
             </div>
             <div className="w-full rounded-xl border border-(--line) bg-(--bg-2) px-3.5 py-3 text-left">
-              <p className="m-0 mb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">Alternative</p>
+              <p className="m-0 mb-1 text-[11px] font-medium uppercase tracking-wider text-subtle">
+                Alternative
+              </p>
               <p className="m-0 text-[12px] text-(--ink-2)">
-                Use the <code className="rounded bg-(--bg-3) px-1 py-0.5 text-[11px]">/super-help</code> skill directly
-                in Claude Code to get the same answers.
+                Use the{' '}
+                <code className="rounded bg-(--bg-3) px-1 py-0.5 text-[11px]">
+                  /super-help
+                </code>{' '}
+                skill directly in Claude Code to get the same answers.
               </p>
             </div>
           </div>
@@ -254,9 +340,26 @@ export default function ChatSidebar() {
         {error && !localOnly && (
           <div className="mb-3 rounded-xl border border-(--line) bg-(--red-dim) px-3.5 py-3 text-[13px]">
             <div className="mb-1.5 flex items-center gap-2 text-[--red]">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M12 8v4M12 16h.01"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
               <span className="font-medium">Not available</span>
             </div>
@@ -267,10 +370,14 @@ export default function ChatSidebar() {
                   Install command
                 </p>
                 <div className="flex items-center justify-between gap-2">
-                  <code className="bg-transparent border-0 p-0 text-[12px] text-(--ink)">{installCommand}</code>
+                  <code className="bg-transparent border-0 p-0 text-[12px] text-(--ink)">
+                    {installCommand}
+                  </code>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(installCommand).catch(() => {})
+                      navigator.clipboard
+                        .writeText(installCommand)
+                        .catch(() => {})
                     }}
                     className="shrink-0 rounded-md border border-(--line) bg-(--bg-3) px-2 py-1 text-[11px] text-subtle hover:text-(--ink)"
                   >
@@ -305,10 +412,21 @@ export default function ChatSidebar() {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading || skillAvailable === false || localOnly}
+            disabled={
+              !input.trim() ||
+              isLoading ||
+              skillAvailable === false ||
+              localOnly
+            }
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-(--primary-3) text-[#1c1917] transition hover:bg-(--primary-2) disabled:opacity-40 disabled:hover:bg-(--primary-3)"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
               <path
                 d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"
                 stroke="currentColor"
@@ -319,7 +437,9 @@ export default function ChatSidebar() {
             </svg>
           </button>
         </div>
-        <p className="mt-1.5 text-[10px] text-subtle">Press Enter to send, Shift+Enter for new line</p>
+        <p className="mt-1.5 text-[10px] text-subtle">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
     </SlidePanel>
   )

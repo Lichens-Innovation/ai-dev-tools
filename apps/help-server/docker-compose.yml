@@ -19,4 +19,4 @@ services:
     environment:
       - NODE_ENV=development
       - RUNNING_IN_DOCKER=true
-    command: yarn workspace helper-server dev
+    command: pnpm --filter helper-server dev
