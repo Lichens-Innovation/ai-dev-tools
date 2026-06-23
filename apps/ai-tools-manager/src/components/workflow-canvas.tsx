@@ -37,6 +37,8 @@ import dagre from "dagre";
 
 interface WorkflowCanvasProps {
   workflow: MaestroWorkflowV3 | null;
+  /** Pass activeWorkflowIdx so the canvas can detect a workflow switch and bypass the echo guard. */
+  workflowKey: number;
   availableAgents: string[];
   availableSkills: string[];
   instances: MaestroInstanceV3[];
@@ -661,6 +663,7 @@ const EDGE_TYPES = { successEdge: SuccessEdge, conditionEdge: ConditionEdge };
 
 export default function WorkflowCanvas({
   workflow,
+  workflowKey,
   availableAgents,
   availableSkills,
   instances,
@@ -701,18 +704,25 @@ export default function WorkflowCanvas({
     setMounted(true);
   }, []);
 
+  // Track the previous workflowKey to detect switches between workflows
+  const prevKeyRef = useRef(workflowKey);
+
   // Sync incoming workflow → RF state (always produces at least the main-session node)
   useEffect(() => {
     if (!workflow) return;
-    // Skip if this is the echo of our own pushChange — the canvas already has the right state
-    if (workflow === lastEmittedRef.current) return;
+    const switched = prevKeyRef.current !== workflowKey;
+    prevKeyRef.current = workflowKey;
+    // Skip if this is the echo of our own pushChange — but always rebuild on a workflow switch
+    if (!switched && workflow === lastEmittedRef.current) return;
+    // Clear the last-emitted ref on switch so subsequent edits don't stale-match the old workflow
+    if (switched) lastEmittedRef.current = null;
     let nodes = workflowToRfNodes(workflow, instances);
     const edges = workflowToRfEdges(workflow);
     const hasPositions = workflow.nodes.length > 0 && workflow.nodes.every((n) => n.position != null);
     if (!hasPositions) nodes = applyDagreLayout(nodes, edges);
     setRfNodes(nodes);
     setRfEdges(edges);
-  }, [workflow, instances]);
+  }, [workflow, instances, workflowKey]);
 
   const pushChange = useCallback(
     (nodes: Node[], edges: Edge[]) => {
