@@ -20,9 +20,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.0))
-      '@repo/tailwind-config':
+      '@repo/styles':
         specifier: workspace:*
-        version: link:../../packages/tailwind-config
+        version: link:../../packages/styles
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -105,9 +105,9 @@ importers:
       '@base-ui/react':
         specifier: 1.0.0
         version: 1.0.0(@types/react@19.2.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      '@repo/tailwind-config':
+      '@repo/styles':
         specifier: workspace:*
-        version: link:../../packages/tailwind-config
+        version: link:../../packages/styles
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -244,7 +244,7 @@ importers:
         specifier: latest
         version: 0.4.0(@typescript-eslint/utils@8.61.1(eslint@9.20.0(jiti@2.7.0))(typescript@6.0.2))(eslint@9.20.0(jiti@2.7.0))(typescript@6.0.2)
 
-  packages/tailwind-config:
+  packages/styles:
     dependencies:
       '@tailwindcss/typography':
         specifier: 0.5.16

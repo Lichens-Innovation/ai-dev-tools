@@ -1,4 +1,4 @@
-import { Drawer } from '@base-ui/react/drawer'
+import { Dialog } from '@base-ui/react/dialog'
 import { useEffect, useRef } from 'react'
 
 interface SlidePanelProps {
@@ -43,7 +43,7 @@ export default function SlidePanel({
       : 'data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full'
 
   return (
-    <Drawer.Root
+    <Dialog.Root
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose()
@@ -51,16 +51,16 @@ export default function SlidePanel({
       modal={false}
       disablePointerDismissal
     >
-      <Drawer.Portal>
-        <Drawer.Viewport className="pointer-events-none fixed inset-0 z-50">
-          <Drawer.Popup
+      <Dialog.Portal>
+        <Dialog.Viewport className="pointer-events-none fixed inset-0 z-50">
+          <Dialog.Popup
             ref={popupRef}
             className={`pointer-events-auto fixed top-0 flex h-full flex-col border-(--line) bg-(--bg) shadow-(--shadow-2) pt-14 translate-x-0 transition-transform duration-200 ease-in-out ${widthClass} ${borderClass} ${animClass} ${className}`}
           >
             {children}
-          </Drawer.Popup>
-        </Drawer.Viewport>
-      </Drawer.Portal>
-    </Drawer.Root>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
