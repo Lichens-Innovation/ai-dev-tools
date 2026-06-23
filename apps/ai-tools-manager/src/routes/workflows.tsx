@@ -44,10 +44,6 @@ function WorkflowsPage() {
     setConfig((c) => ({ ...c, skills_available: ids }));
   };
 
-  const setMainSessionSkills = (skills: string[]) => {
-    setConfig((c) => ({ ...c, main_session_loaded_skills: skills }));
-  };
-
   const setInstances = (instances: AfkInstanceV3[]) => {
     setConfig((c) => ({ ...c, workflow_instances: instances }));
   };
@@ -113,7 +109,6 @@ function WorkflowsPage() {
           cwd,
           agents_available: config.agents_available,
           skills_available: config.skills_available,
-          main_session_loaded_skills: config.main_session_loaded_skills,
           workflow_instances: config.workflow_instances,
           workflows: config.workflows,
         },
@@ -274,10 +269,8 @@ function WorkflowsPage() {
               workflow={activeWorkflow}
               availableAgents={config.agents_available}
               availableSkills={availableSkillIds}
-              mainSessionSkills={config.main_session_loaded_skills}
               instances={config.workflow_instances}
               onChange={(wf) => updateWorkflow(activeWorkflowIdx, wf)}
-              onMainSessionSkillsChange={setMainSessionSkills}
               onInstancesChange={setInstances}
             />
           ) : (

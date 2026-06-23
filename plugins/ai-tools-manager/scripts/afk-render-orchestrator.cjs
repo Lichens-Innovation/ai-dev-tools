@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Re-renders the generated regions of the project's AFK orchestrator agent
-// (.claude/agents/afk.md) from .claude/afk.json:
-//   - the frontmatter `skills:` array  ← main_session_loaded_skills
+// Re-renders the generated region of the project's AFK orchestrator skill
+// (.claude/skills/agent-orchestrator/SKILL.md) from .claude/afk.json:
 //   - the <!-- AFK:HANDOFFS --> table   ← workflows + derived success paths
 //
 //   node afk-render-orchestrator.cjs [projectDir]
@@ -66,29 +65,15 @@ function replaceRegion(text, start, end, replacement) {
   return text.replace(re, `${start}\n${replacement}\n${end}`);
 }
 
-function setFrontmatterSkills(text, skills) {
-  const fm = text.match(/^(---\s*\n)([\s\S]*?)(\n---)/);
-  if (!fm) return text;
-  const list = `[${skills.join(", ")}]`;
-  let body = fm[2];
-  if (/^skills:.*$/m.test(body)) {
-    body = body.replace(/^skills:.*$/m, `skills: ${list}`);
-  } else {
-    body = `${body}\nskills: ${list}`;
-  }
-  return fm[1] + body + fm[3] + text.slice(fm[0].length);
-}
-
 function render(projectDir) {
   const cfg = readJson(path.join(projectDir, ".claude", "afk.json"));
   if (!cfg) return { ok: false, reason: "afk.json not found" };
-  const agentPath = path.join(projectDir, ".claude", "agents", "afk.md");
-  if (!fs.existsSync(agentPath)) return { ok: false, reason: "afk.md not found" };
+  const skillPath = path.join(projectDir, ".claude", "skills", "agent-orchestrator", "SKILL.md");
+  if (!fs.existsSync(skillPath)) return { ok: false, reason: "agent-orchestrator/SKILL.md not found" };
 
-  let text = fs.readFileSync(agentPath, "utf8");
-  text = setFrontmatterSkills(text, cfg.main_session_loaded_skills || []);
+  let text = fs.readFileSync(skillPath, "utf8");
   text = replaceRegion(text, "<!-- AFK:HANDOFFS:START -->", "<!-- AFK:HANDOFFS:END -->", handoffTable(cfg));
-  fs.writeFileSync(agentPath, text);
+  fs.writeFileSync(skillPath, text);
   return { ok: true };
 }
 
@@ -99,7 +84,7 @@ if (require.main === module) {
     process.stderr.write(`afk-render-orchestrator: ${r.reason}\n`);
     process.exit(1);
   }
-  process.stdout.write("AFK orchestrator re-rendered from .claude/afk.json\n");
+  process.stdout.write("AFK orchestrator skill re-rendered from .claude/afk.json\n");
 }
 
 module.exports = { render, successPath, handoffTable };

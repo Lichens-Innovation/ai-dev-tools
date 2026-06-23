@@ -32,7 +32,7 @@ This is read-and-reason first; it never changes anything until the user opts in.
 4. **Offer to explore fixes.** Ask the user which snags they want to address — don't fix unprompted. For each one they pick, propose a concrete remediation mapped to the right AFK lever, then **apply it once they confirm**:
    - tighten a subagent's prompt, or its handoff payload template at `templates/handoffs/<sender>/<receiver>.md`
    - add or adjust a skill/rule mapping — re-run `/afk` for the visual editor, or hand-edit `.claude/afk.json` and run `/afk-sync`
-   - adjust the orchestrator's prose in `.claude/agents/afk.md`
+   - adjust the orchestrator's prose in `.claude/skills/agent-orchestrator/SKILL.md`
    - fix a workflow edge or a condition label that misrouted a handoff
    - or a plain process fix (e.g. "read the file once and reuse it", "run the typecheck only after the edit batch")
 

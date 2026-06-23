@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 // Scaffolds the AFK orchestrator into a project. Idempotent — safe to re-run.
-//   1. copies templates/afk.md      → <project>/.claude/agents/afk.md   (only if absent)
+//   1. copies templates/agent-orchestrator/SKILL.md → <project>/.claude/skills/agent-orchestrator/SKILL.md  (only if absent)
 //   2. copies runtime scripts        → <project>/.claude/scripts/        (always refreshed)
-//   3. merges { "agent": "afk" } + the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
-//   4. ignores the ephemeral session files via <project>/.claude/.gitignore
-//   5. adds an `# AFK` section to the repo-root .gitignore ignoring every nested
-//      .claude/afk_session*.{json,jsonl} across the repo / monorepo
+//   3. merges the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
+//   4. adds an `# AFK` section to the repo-root .gitignore ignoring every nested
+//      .claude/afk_session*.{json,jsonl} across the repo / monorepo (the `**/` glob covers
+//      root-level .claude/ too, so no per-package .gitignore is needed)
 //
-// Scaffolding only — it does NOT render afk.md's managed regions. Rendering needs
-// afk.json (written by the form) and is done afterwards by afk-render-orchestrator.cjs
+// Scaffolding only — it does NOT render the orchestrator skill's managed region. Rendering
+// needs afk.json (written by the form) and is done afterwards by afk-render-orchestrator.cjs
 // (the /afk skill runs it; /afk-sync wraps it standalone). The /afk-install skill
-// runs this first to lay down afk.md, then hands off to /afk to author + render.
+// runs this first to lay down the skill, then hands off to /afk to author + render.
 //
 //   node afk-install.js [projectDir]
 //
@@ -52,13 +52,6 @@ function appendGitignoreEntries(gitignorePath, entries) {
 }
 
 // Keep the ephemeral session state out of version control. The files are
-// recreated each session and removed at SessionEnd, but a crash (no SessionEnd)
-// can leave them behind as untracked noise in a consumer project. The bare
-// filenames here are anchored to this one .claude/ dir.
-function ensureGitignore(claudeDir) {
-  return appendGitignoreEntries(path.join(claudeDir, ".gitignore"), ["afk_session.json", "afk_session.log.jsonl"]);
-}
-
 // Resolve the git toplevel from the project dir, or null if not a git repo.
 function findRepoRoot(startDir) {
   try {
@@ -104,8 +97,7 @@ function ensureBashValidationHook(settings) {
   return true;
 }
 
-// Merge `agent: afk` and the bash-validation hook into settings.json in one
-// read/write, preserving all other keys.
+// Merge the bash-validation hook into settings.json, preserving all other keys.
 function mergeSettings(settingsPath) {
   let settings = {};
   if (fs.existsSync(settingsPath)) {
@@ -115,28 +107,26 @@ function mergeSettings(settingsPath) {
       settings = {};
     }
   }
-  let setAgentSetting = false;
-  if (settings.agent !== "afk") {
-    settings.agent = "afk";
-    setAgentSetting = true;
-  }
   const setBashHook = ensureBashValidationHook(settings);
-  if (setAgentSetting || setBashHook) {
+  if (setBashHook) {
     ensureDir(path.dirname(settingsPath));
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   }
-  return { setAgentSetting, setBashHook };
+  return { setBashHook };
 }
 
 try {
   const claudeDir = path.join(projectDir, ".claude");
-  const agentsDir = path.join(claudeDir, "agents");
+  const orchestratorSkillDir = path.join(claudeDir, "skills", "agent-orchestrator");
   const scriptsDir = path.join(claudeDir, "scripts");
-  ensureDir(agentsDir);
+  ensureDir(orchestratorSkillDir);
   ensureDir(scriptsDir);
   ensureDir(path.join(scriptsDir, "lib"));
 
-  const installedAgent = copyIfMissing(path.join(pluginRoot, "templates", "afk.md"), path.join(agentsDir, "afk.md"));
+  const installedOrchestratorSkill = copyIfMissing(
+    path.join(pluginRoot, "templates", "agent-orchestrator", "SKILL.md"),
+    path.join(orchestratorSkillDir, "SKILL.md")
+  );
 
   // Runtime scripts the orchestrator / repo invoke via $CLAUDE_PROJECT_DIR.
   // They run in-place inside the project, whose package.json may declare
@@ -161,17 +151,14 @@ try {
   fs.copyFileSync(path.join(pluginRoot, "scripts", "bash-validation.sh"), bashValidationDest);
   fs.chmodSync(bashValidationDest, 0o755);
 
-  const { setAgentSetting, setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
-  const wroteGitignore = ensureGitignore(claudeDir);
+  const { setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
   const wroteRepoGitignore = ensureRepoRootGitignore(findRepoRoot(projectDir));
 
   process.stdout.write(
     JSON.stringify({
       ok: true,
-      installedAgent,
-      setAgentSetting,
+      installedOrchestratorSkill,
       setBashHook,
-      wroteGitignore,
       wroteRepoGitignore,
     }) + "\n"
   );

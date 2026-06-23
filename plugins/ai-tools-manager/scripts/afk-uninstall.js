@@ -4,11 +4,11 @@
 //
 //   node afk-uninstall.js [projectDir] [--purge]
 //
-// Default: removes the `agent: "afk"` key and the bash-validation PreToolUse hook
-//   from <project>/.claude/settings.json (only the keys AFK added; all other keys
-//   are preserved), and deletes the ephemeral session files. New sessions stop
-//   adopting the orchestrator.
-// --purge: additionally removes the installed orchestrator agent, the
+// Default: removes the bash-validation PreToolUse hook from
+//   <project>/.claude/settings.json (only the keys AFK added; all other keys
+//   are preserved), deletes the ephemeral session files, and cleans up any
+//   legacy `agent: "afk"` key left by older installs.
+// --purge: additionally removes the installed orchestrator skill, the
 //   project-copied runtime scripts, and the user-authored config (afk.json) —
 //   i.e. everything the install pipeline produced.
 //
@@ -45,8 +45,8 @@ function removeBashValidationHook(settings) {
   return changed;
 }
 
-// Removes `agent: "afk"` and the bash-validation hook from settings.json in one
-// read/write. Returns which keys were touched.
+// Removes the bash-validation hook (and any legacy `agent: "afk"` from older
+// installs) from settings.json in one read/write. Returns which keys were touched.
 function cleanSettings(settingsPath) {
   if (!fs.existsSync(settingsPath)) return { removedAgentSetting: false, removedBashHook: false };
   let settings;
@@ -85,7 +85,7 @@ try {
   const purged = [];
   if (purge) {
     const targets = [
-      path.join(claudeDir, "agents", "afk.md"),
+      path.join(claudeDir, "skills", "agent-orchestrator", "SKILL.md"),
       path.join(claudeDir, "scripts", "afk-set-session-workflow.cjs"),
       path.join(claudeDir, "scripts", "afk-render-orchestrator.cjs"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
