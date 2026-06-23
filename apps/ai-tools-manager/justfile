@@ -1,14 +1,14 @@
 dev:
-    yarn dev
+    pnpm dev
 
 build:
-    yarn build
+    pnpm build
 
 start:
-    yarn start
+    pnpm start
 
 lint:
-    yarn lint
+    pnpm lint
 
 check:
-    yarn check
+    pnpm check

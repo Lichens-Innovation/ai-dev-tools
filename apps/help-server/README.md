@@ -7,14 +7,14 @@ A management dashboard for AI development tools, plugins, and marketplace resour
 To run this application:
 
 ```bash
-yarn install
-yarn run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Building For Production
 
 ```bash
-yarn run build
+pnpm run build
 ```
 
 ## Testing
@@ -22,15 +22,15 @@ yarn run build
 This project uses [Vitest](https://vitest.dev/) for testing:
 
 ```bash
-yarn run test
+pnpm run test
 ```
 
 ## Linting & Formatting
 
 ```bash
-yarn run lint
-yarn run format
-yarn run check
+pnpm run lint
+pnpm run format
+pnpm run check
 ```
 
 ## Features
