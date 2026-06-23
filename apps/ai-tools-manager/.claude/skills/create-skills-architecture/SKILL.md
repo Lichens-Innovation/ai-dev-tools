@@ -17,11 +17,16 @@ plugins/ai-tools-manager/hooks/hooks.json matches "create-skill"
         │  invokes scripts/launch-ai-tools-manager-app.sh create-skill
         ▼
 launch-ai-tools-manager-app.sh  (thin wrapper: ensure-ai-tools-app.sh + wait-ai-tools-result.sh)
-  • ensure: reads ~/.claude/plugins/known_marketplaces.json, writes /tmp/ai-tools-marketplace.json
+  • ensure: reads ~/.claude/plugins/known_marketplaces.json, writes /tmp/ai-tools-marketplace.<key>.json
             (marketplaces, byMarketplace, cwd, repoRoot), starts the container ONLY if not already
-            up, opens http://localhost:3009/create-skill, writes /tmp/ai-tools-app.state
-  • wait:   truncates /tmp/ai-tools-result.json, blocks until non-empty
+            up, opens http://localhost:<port>/create-skill, writes /tmp/ai-tools-app.<key>.state
+  • wait:   truncates /tmp/ai-tools-result.<key>.json, blocks until non-empty
   • NO EXIT-trap teardown — the container persists; SessionEnd (maestro-session-cleanup.sh) tears it down
+
+The container is **per-project**: `lib/maestro-app-paths.sh` derives `<key>` (a 12-char SHA-1 of
+the project cwd) → compose project `ai-tools-<key>`, a port allocated once in the 3010–3099 range
+(persisted in the state file), and per-project `/tmp` channel files. Two sessions in different repos
+run side by side without colliding. (Bare `docker compose up` for local dev still uses port 3009.)
         │
         ▼
 React form (apps/ai-tools-manager/src/routes/create-skill.tsx)
