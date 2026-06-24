@@ -13,7 +13,7 @@ export const Route = createFileRoute("/maestro-tasks")({
 });
 
 function promptFor(task: MaestroTask): string {
-  return `Do the task described in file ${task.relativePath}`;
+  return `Use /maestro to complete the task described in file ${task.relativePath}`;
 }
 
 function MaestroTasksPage() {
