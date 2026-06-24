@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json pnpm.lock.yaml pnpm-workspace.yaml ./
 COPY packages/claude-fs/package.json ./packages/claude-fs/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
-COPY packages/tailwind-config/package.json ./packages/tailwind-config/
+COPY packages/styles/package.json ./packages/styles/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/ui/package.json ./packages/ui/
 COPY apps/help-server/package.json ./apps/help-server/
