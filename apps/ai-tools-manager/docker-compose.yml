@@ -19,4 +19,7 @@ services:
       - NODE_ENV=development
       - RUNNING_IN_DOCKER=true
       - RESULT_FILE=/tmp/result.json
+      # pnpm's deps-status check tries to purge node_modules on startup; without a
+      # TTY it aborts. CI=true makes pnpm skip the interactive purge confirmation.
+      - CI=true
 
