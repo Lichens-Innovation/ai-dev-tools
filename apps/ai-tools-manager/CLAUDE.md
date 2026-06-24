@@ -37,7 +37,7 @@ The `/ai-tools` skill brings the app up once and **listens in a loop** (`wait` �
 - `/create-marketplace` — Marketplace creation form
 - `/workflows` — Visual agent-workflow editor (React Flow canvas). Writes the workflow slice of `.claude/maestro.json` (v3). See the `workflow-view` skill in `.claude/skills/`.
 - `/rules` — Assign rules (on-disk project rules + installable vibe-rules) to the project root and/or directory paths. Writes the `rules` slice of the same `maestro.json`; on save the skill runs `maestro-apply-rules.js` to move project rule files / `vibe-rules load` installable ones into their assigned `.claude/rules/`. See the `rule-view` skill.
-- `/session-log` — Read-only view of `<cwd>/.claude/maestro_session.log.jsonl`. Left pane: vertical card diagram (one card per instance occurrence, with SUCCESS/FAILURE badge). Right pane: humanized log text. Clicking a card scrolls the log to that instance's section. Hover a subagent card to see the full input/output messages for debugging. Refreshes on demand (the file is ephemeral — cleared at SessionEnd).
+- `/session-log` — Read-only view of `<cwd>/.claude/maestro_session.log.jsonl`. Three-pane layout: thin left step list (step names with status icons — green checkmark/red cross/yellow warning), center framed log (humanized tool calls per step in rounded bordered sections, click to select), right detail panel (Input/Process/Output for the selected step). Clicking a step in any pane selects it across all three. Live-streams via SSE (the file is ephemeral — cleared at SessionEnd).
 - `/maestro-tasks` — Read-only list of the task prompt files `/to-maestro-tasks` writes under `<cwd>/.claude/maestro-tasks/*.md`. Left pane: one selectable card per task (filename, title, `Blocked by` badges). Right pane: the task markdown rendered via `react-markdown` + `remark-gfm` inside `prose prose-neutral` (the typography plugin + token-themed `.prose` from the shared `@repo/styles`, same as help-server's doc reader), with a `CopyableText` "Copy prompt" button (`@repo/ui/copyable-text`) that copies `Do the task described in file <relativePath>` to paste into a Maestro session.
 
 ## Form architecture
@@ -152,9 +152,10 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 
 ### Session Log (`/session-log`)
 
-- `src/routes/session-log.tsx` — route: consumes `useSessionLog()`, state for activeId + sectionRefs, empty state with live indicator
-- `src/components/session-log-cards.tsx` — left card diagram: one card per instance segment with SUCCESS/FAILURE badge + hover popup showing full input/output
-- `src/components/session-log-view.tsx` — right log pane: humanized log lines grouped by instance, scroll anchor per section, `● live` indicator replacing Refresh button
+- `src/routes/session-log.tsx` — route: consumes `useSessionLog()`, 3-pane grid (180px / 1fr / 320px), state for activeId + sectionRefs, empty state with live indicator
+- `src/components/session-log-cards.tsx` — thin left step list: status icons (CircleCheck/CircleX/AlertTriangle) + step names, selected step underlined with status color
+- `src/components/session-log-view.tsx` — center framed log pane: rounded bordered sections per instance, click-to-select with colored border, `● live` indicator
+- `src/components/session-log-detail.tsx` — right detail panel: Input/Process/Output sections for the selected step
 - `src/routes/api/session-log-stream.ts` — SSE server route (`server.handlers.GET`): tails `maestro_session.log.jsonl` every 1 s and emits `init`/`entry`/`reset` events to connected browsers
 - `src/utils/session-log-context.tsx` — `SessionLogProvider` (mounted in `__root.tsx`): one app-wide `EventSource`, exposes `{ entries, connected }` via `useSessionLog()`
 - `src/utils/maestro-session-log.ts` — `getMaestroSessionLog` server fn + `resolveLogFile` + `parseLogLines` helpers (shared by server fn and SSE route)
