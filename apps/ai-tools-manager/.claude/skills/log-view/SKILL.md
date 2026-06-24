@@ -1,46 +1,48 @@
 ---
 name: log-view
-description: "Explains how the /session-log view in ai-tools-manager is built end-to-end: the left instance card-diagram, the right humanized log pane, the hover input/output popup, how log entries map to Instance segments, and how the maestro-session-log.js / maestro-subagent-log.js hooks write the maestro_session.log.jsonl it reads. Use when the user is working inside apps/ai-tools-manager and asks how the session-log view works, how cards/instances are derived, where SUCCESS/FAILURE comes from, why the log is empty, why a card has no status badge, or how dispatch/handoff entries are produced by the hooks."
+description: "Explains how the /session-log view in ai-tools-manager is built end-to-end: the thin left step list, the center framed log pane, the right Input/Process/Output detail panel, how log entries map to Instance segments, and how the maestro-session-log.js / maestro-subagent-log.js hooks write the maestro_session.log.jsonl it reads. Use when the user is working inside apps/ai-tools-manager and asks how the session-log view works, how cards/instances are derived, where SUCCESS/FAILURE comes from, why the log is empty, why a step has no status icon, or how dispatch/handoff entries are produced by the hooks."
 ---
 
 # Log View
 
-The `/session-log` route (`src/routes/session-log.tsx`) is a **read-only debugger** for Maestro workflow sessions. It reads `<cwd>/.claude/maestro_session.log.jsonl` and presents it in two panes: a **left vertical card diagram** (one card per instance occurrence — main session + each subagent run, with a SUCCESS/FAILURE badge) and a **right humanized log** (tool calls as readable English, grouped by instance). Clicking a card scrolls the log to where that instance started. Hovering a subagent card opens a popup showing the full input message (what the main session told the agent) and output message (the agent's full final message including its `HANDOFF:` line) — the primary debugging view.
+The `/session-log` route (`src/routes/session-log.tsx`) is a **read-only debugger** for Maestro workflow sessions. It reads `<cwd>/.claude/maestro_session.log.jsonl` and presents it in three panes: a **thin left step list** (step names with status icons), a **center framed log** (humanized tool calls per step in rounded bordered sections), and a **right detail panel** (Input/Process/Output for the selected step). Clicking a step in any pane selects it across all three.
 
 This is the **read side** of the Maestro runtime: it displays what the hook scripts write. See the `maestro-architecture` skill for the **write side** (how the log is produced and the full HANDOFF routing contract). See the `workflow-view` skill for the sibling `/workflows` authoring view.
 
 ## Layout
 
 ```
-┌────────────────────────────── TopNav (top-nav.tsx) ──────────────────────────────┐
-│ Workflows | Rules | Session Log                                              ☀    │
-├──────────────────────────────┬───────────────────────────────────────────────────┤
-│ Left — SessionLogCards        │ Right — SessionLogView                            │
-│ (session-log-cards.tsx)       │ (session-log-view.tsx)                            │
-│                               │                                                   │
-│  Agents Flow                  │  Logs                              ● live          │
-│                               │                                                   │
-│  ┌──────────────────┐         │  MAIN SESSION                                     │
-│  │  Main Session    │         │  - calling `backend` agent                        │
-│  └────────┬─────────┘         │                                                   │
-│           ↓                   │  BACKEND                                          │
-│  ┌──────────────────┐         │  - [Backend]: read file `/src/…`                  │
-│  │  Backend         │         │  - [Backend]: edited file `/src/…`                │
-│  │  success ← green │  hover→ │  - [Backend]: handed off — success                │
-│  └────────┬─────────┘  popup  │                                                   │
-│           ↓            shows  │  MAIN SESSION                                     │
-│  ┌──────────────────┐  Input  │  - calling `test` agent                           │
-│  │  Test            │ /Output │                                                   │
-│  │  failure · …←red │         │  TEST                                             │
-│  └────────┬─────────┘         │  - [Test]: ran `npm test`                         │
-│           ↓                   │  - [Test]: handed off — tests_failed (condition)  │
-│          ...                  │  …                                                │
-│                               │                                                   │
-└──────────────────────────────┴───────────────────────────────────────────────────┘
-   360px                                    1fr
+┌──────────────────────────────── TopNav (top-nav.tsx) ────────────────────────────────┐
+│ Workflows | Rules | Session Log                                                  ☀    │
+├────────────┬─────────────────────────────────────┬──────────────────────────────────┤
+│ Left       │ Center — SessionLogView              │ Right — SessionLogDetail          │
+│ Cards      │ (session-log-view.tsx)               │ (session-log-detail.tsx)          │
+│ (cards.tsx)│                                      │                                   │
+│            │  Agents Flow                 ● live  │  Logs: Backend (1)                │
+│ Workflow   │                                      │                                   │
+│            │  ┌────────────────────────────────┐  │  Input                            │
+│ ✓ Main Ses │  │ Main Session                   │  │  Create a button component…       │
+│ ✓ Backend  │  │ - calling `backend` agent      │  │                                   │
+│ ✓ Human R  │  │ - …                            │  │  Process                          │
+│ ✗ Test     │  └────────────────────────────────┘  │  - [Backend]: read file `…`       │
+│ ✓ Backend  │                                      │  - [Backend]: wrote file `…`      │
+│ ✓ Test     │  ┌════════════════════════════════┐  │  - …                              │
+│ ⚠ Reviewer │  ║ Backend (1)          «green»   ║  │                                   │
+│ ✓ Scribe   │  ║ - calling backend agent        ║  │  Output                           │
+│            │  ║ - [Backend]: read file `…`     ║  │  Created a button component …     │
+│            │  ║ - [Backend]: wrote file `…`    ║  │                                   │
+│            │  └════════════════════════════════┘  │                                   │
+│            │                                      │                                   │
+│            │  ┌────────────────────────────────┐  │                                   │
+│            │  │ Human Review                   │  │                                   │
+│            │  │ - …                            │  │                                   │
+│            │  └────────────────────────────────┘  │                                   │
+│            │                                      │                                   │
+└────────────┴─────────────────────────────────────┴──────────────────────────────────┘
+   180px                     1fr                                320px
 ```
 
-**No workflow selector and no YAML preview toggle** — TopNav is rendered bare (no `workflowSelector` or `onPreviewToggle` props). When the log file is absent the whole two-pane layout is replaced by an **empty state**: a centred `ScrollText` icon + "No session log found" message + a `● live / ○ connecting…` indicator (the log is ephemeral, so this is the normal between-sessions condition).
+**No workflow selector and no YAML preview toggle** — TopNav is rendered bare (no `workflowSelector` or `onPreviewToggle` props). When the log file is absent the whole three-pane layout is replaced by an **empty state**: a centred `ScrollText` icon + "No session log found" message + a `● live / ○ connecting…` indicator (the log is ephemeral, so this is the normal between-sessions condition).
 
 ## Data flow
 
@@ -58,17 +60,25 @@ App-wide (src/routes/__root.tsx)
 SessionLogPage (src/routes/session-log.tsx)
   const { entries, connected } = useSessionLog()
   instances = useMemo(() => buildInstances(entries))  → Instance[]
-  activeId state (which card is selected)
-  sectionRefs: Record<id, HTMLDivElement|null>  (one per instance section in the right pane)
+  activeId state (which step is selected)
+  activeInstance = instances.find(id === activeId)
+  sectionRefs: Record<id, HTMLDivElement|null>  (one per instance section in the center pane)
        │
        ├──▶ SessionLogCards (left)
-       │      renders Instance[] as a vertical card list with ArrowDown connectors
+       │      renders Instance[] as a compact step list with status icons
        │      onSelect(id): setActiveId(id) + sectionRefs[id].scrollIntoView()
        │
-       └──▶ SessionLogView (right)
-              renders per-instance sections; each section anchors its sectionRef
-              calls humanizeLog(entry) per entry, filters nulls, prefixes subagent lines
-              header shows "● live" / "○ reconnecting…" from connected
+       ├──▶ SessionLogView (center)
+       │      renders per-instance sections in rounded bordered frames
+       │      onClick on a frame: onSelect(id) → selects step across all panes
+       │      selected frame gets border-2 colored by status (green/red/yellow)
+       │      header shows "● live" / "○ reconnecting…" from connected
+       │
+       └──▶ SessionLogDetail (right)
+              shows Input / Process / Output for the activeInstance
+              Input = instance.input (spawning message from dispatch entry)
+              Process = humanized log lines (same as center pane)
+              Output = instance.output (final message from handoff entry)
 
 TopNav (every Maestro page): "● Session Log" dot driven by useSessionLog().connected
 ```
@@ -89,9 +99,10 @@ All three hooks append to the same file. All are no-ops when `maestro.json` is a
 
 | Concern | File |
 |---|---|
-| Route, state, scroll-sync, empty state | `src/routes/session-log.tsx` |
-| Left card diagram, status badge, hover input/output popup | `src/components/session-log-cards.tsx` |
-| Right humanized log pane, live indicator, per-section anchors | `src/components/session-log-view.tsx` |
+| Route, state, 3-pane grid, scroll-sync, empty state | `src/routes/session-log.tsx` |
+| Left step list with status icons (CircleCheck/CircleX/AlertTriangle) | `src/components/session-log-cards.tsx` |
+| Center framed log pane, click-to-select, live indicator, per-section anchors | `src/components/session-log-view.tsx` |
+| Right detail panel: Input/Process/Output sections | `src/components/session-log-detail.tsx` |
 | SSE server route — tails the JSONL and pushes init/entry/reset | `src/routes/api/session-log-stream.ts` |
 | App-wide SSE context: `SessionLogProvider`, `useSessionLog()` | `src/utils/session-log-context.tsx` |
 | Log reader server fn + `resolveLogFile` + `parseLogLines` + `SessionLogEntry` | `src/utils/maestro-session-log.ts` |
@@ -99,6 +110,7 @@ All three hooks append to the same file. All are no-ops when `maestro.json` is a
 | Top bar — nav links incl. `ScrollText` + global `●` live dot | `src/components/top-nav.tsx` |
 | Docker-aware cwd helpers (`readCwd`, `mountedProjectPath`) | `src/utils/maestro-fs.ts` |
 | `titleFromName` — origin string → display name | `src/utils/text.ts` |
+| Yellow color tokens (`--yellow`, `--yellow-dim`) | `packages/styles/scss/abstracts/_tokens.scss` |
 | **Writer — tool-call entries** (PreToolUse, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-session-log.js` |
 | **Writer — dispatch + handoff entries** (SubagentStart/Stop, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-subagent-log.js` |
 | Shared append helper (`appendSessionLog`, `readStdin`) | `plugins/ai-tools-manager/scripts/lib/maestro-session.cjs` |
@@ -140,7 +152,7 @@ A missing `kind` = a plain tool-call entry from `maestro-session-log.js`. The sc
 
 ```ts
 interface Instance {
-  id: number;           // position in the ordered list (stable card key + sectionRef key)
+  id: number;           // position in the ordered list (stable key for all three panes)
   origin: string;       // raw origin string
   displayName: string;  // "Main Session" | titleFromName(origin)
   startIndex: number;   // index of first entry in the flat entries[] array
@@ -153,45 +165,43 @@ interface Instance {
 }
 ```
 
-## Left pane — card diagram (`session-log-cards.tsx`)
+## Left pane — step list (`session-log-cards.tsx`)
 
-One card per `Instance`, stacked vertically with `<ArrowDown size={16} />` connectors (last card omits the arrow). Each card:
+A thin (180px) vertical list of step names with status icons. Each row:
 
-- **Click** → `onSelect(id)` → `setActiveId(id)` + `scrollIntoView` on the matching right-pane section.
-- **Active card** → `border-primary bg-(--primary-dim)` highlight; default → `border-(--line) bg-(--bg-elev)`.
-- **Status badge** (subagent cards only, `status !== null`):
-  - `"success"` → `text-(--green)` "success"
-  - `"condition"` → `text-(--red)` "failure · `<label>`"
-  - `"unknown"` → `text-(--ink-3)` "—"
-  - Main Session → no badge
-- **Hover popup** — only rendered for subagent cards where `inst.input || inst.output` is non-null (needs dispatch/handoff entries from `maestro-subagent-log.js`). Implemented via `hoveredId` state + `onMouseEnter`/`onMouseLeave` on both the card wrapper and the popup (so moving from card to popup doesn't dismiss it). Popup has two scrollable `<pre>` sections — **Input** and **Output** — styled `max-h-[80vh] overflow-y-auto w-[30rem] bg-(--bg) border border-(--line) rounded-lg shadow-xl`. Shows "no message captured" when a side is null.
+- **Status icon** (from `lucide-react`):
+  - `"success"` → `CircleCheck` in `text-(--green)`
+  - `"condition"` → `CircleX` in `text-(--red)`
+  - `"unknown"` → `AlertTriangle` in `text-(--yellow)`
+  - Main Session (`status: null`) → `CircleCheck` in `text-(--green)` (default)
+- **Click** → `onSelect(id)` → `setActiveId(id)` + `scrollIntoView` on the matching center-pane section.
+- **Active step** → `font-medium` + a `border-b-2` underline colored by status (green/red/yellow).
 
-## Right pane — humanized log (`session-log-view.tsx`)
+## Center pane — framed log (`session-log-view.tsx`)
 
-A fixed header row (title + `● live` / `○ reconnecting…` indicator driven by the `connected` prop) above a `flex-1 overflow-y-auto` scroll body. Per-instance sections:
+A header row ("Agents Flow" + `● live` indicator) above a scrollable body of per-instance sections. Each section is wrapped in a **rounded bordered frame** (`border rounded-lg p-4`):
 
-```tsx
-<div ref={(el) => { sectionRefs.current[inst.id] = el; }}
-     className={`scroll-mt-4 mb-4 ${isActive ? "bg-(--primary-dim) rounded-md px-2 -mx-2" : ""}`}>
-  <div className="text-(--ink-3) text-[10px] font-semibold uppercase tracking-wider py-1 mb-0.5">
-    {inst.displayName}
-  </div>
-  {lines.map(line => (
-    <div className="whitespace-pre-wrap break-words text-(--ink-2)">
-      - {isMainSession ? line : `[${inst.displayName}]: ${line}`}
-    </div>
-  ))}
-</div>
-```
+- **Click** anywhere in the frame → `onSelect(id)` → selects the step across all panes.
+- **Selected frame** → `border-2` colored by status: `border-[var(--green)]` / `border-[var(--red)]` / `border-[var(--yellow)]`.
+- **Default frame** → `border border-(--line)`.
+- Content: humanized log lines via `humanizeLog(entry)`, same as before.
 
-The active-card section gets a `--primary-dim` tinted background. When a card is clicked, `scrollIntoView({ behavior:"smooth", block:"start" })` brings its section into view; `scroll-mt-4` adds top clearance so the section label isn't obscured.
+## Right pane — detail panel (`session-log-detail.tsx`)
+
+Shows the selected instance's data in three sections:
+
+- **Header:** "Logs: {displayName}"
+- **Input:** the instance's `input` field — the full spawning message sent by the main session. Shows "No input captured" for main_session instances or when no dispatch entry exists.
+- **Process:** the humanized log lines (same content as the center pane section for this step).
+- **Output:** the instance's `output` field — the agent's full final message including the HANDOFF line. Shows "No output captured" for main_session or when no handoff entry exists.
+- When no step is selected, shows "Select a step to view details".
 
 ## Deriving instances (`buildInstances`)
 
 `buildInstances` in `src/utils/session-log.ts` (pure, no Node imports) walks entries in order and starts a **new segment whenever `origin` changes**. This means:
 
-- The same agent appearing after a main-session interlude becomes a **separate card** (correct — it's a second invocation).
-- The main session itself segments into multiple "Main Session" cards when subagents interleave (normal for sequential Maestro dispatch).
+- The same agent appearing after a main-session interlude becomes a **separate step** (correct — it's a second invocation).
+- The main session itself segments into multiple "Main Session" steps when subagents interleave (normal for sequential Maestro dispatch).
 - Parallel subagents would fragment, but Maestro runs agents sequentially, so interleaving is rare.
 
 **Status/label/output** are populated from the first `kind:"handoff"` entry found within the segment (matching `origin`). **Input** is correlated by `agent_id`: find the handoff's `agent_id`, then find the dispatch entry with the same `agent_id` anywhere in the full `entries[]`. Fallback: if no handoff entry exists (agent didn't produce one), search for a dispatch entry matching by `agent` type.
@@ -217,7 +227,7 @@ This is the relationship between the page and the custom hooks/scripts.
     "agent": "<agent_type>", "agent_id": "<agent_id>",
     "input": "<last_assistant_message>", "log": "→ <agent_type>" }
   ```
-  `last_assistant_message` on SubagentStart = the main session's message that triggered the subagent spawn. This is the **Input** shown in the hover popup.
+  `last_assistant_message` on SubagentStart = the main session's message that triggered the subagent spawn. This is the **Input** shown in the right detail panel.
 - **On SubagentStop** → parses `last_assistant_message` for a `HANDOFF:` line (last occurrence, tolerant of surrounding backticks/asterisks), writes a `kind:"handoff"` entry:
   ```json
   { "ts": "…", "origin": "<agent_type>", "kind": "handoff",
@@ -225,7 +235,7 @@ This is the relationship between the page and the custom hooks/scripts.
     "label": "<label|null>", "output": "<last_assistant_message>",
     "log": "HANDOFF: <label>" }
   ```
-  `last_assistant_message` on SubagentStop = the agent's entire final message, including `HANDOFF:` + any `handoff_details` payload. This is the **Output** shown in the hover popup. `agent_id` is shared across both entries for correlation.
+  `last_assistant_message` on SubagentStop = the agent's entire final message, including `HANDOFF:` + any `handoff_details` payload. This is the **Output** shown in the right detail panel. `agent_id` is shared across both entries for correlation.
 - **`parseHandoff`:** takes the last `HANDOFF:` match; `"success"` (case-insensitive) → `status:"success"`, any other label → `status:"condition"`, no match → `status:"unknown"`.
 - Same gate and append-only pattern as `maestro-session-log.js`.
 
@@ -252,21 +262,21 @@ This is the relationship between the page and the custom hooks/scripts.
 
 ### Why SUCCESS/FAILURE requires `maestro-subagent-log.js`
 
-The plain tool-call log from `maestro-session-log.js` has **no outcome data** — it records only that a tool was called. The subagent's `HANDOFF:` line lives in its transcript (the `last_assistant_message` at SubagentStop time), which is only accessible to a SubagentStop hook. Without `maestro-subagent-log.js`, all instance `status` fields would be `null` and no badges would render. See `maestro-architecture` for the full HANDOFF routing contract and how the orchestrator uses the same label to route the workflow.
+The plain tool-call log from `maestro-session-log.js` has **no outcome data** — it records only that a tool was called. The subagent's `HANDOFF:` line lives in its transcript (the `last_assistant_message` at SubagentStop time), which is only accessible to a SubagentStop hook. Without `maestro-subagent-log.js`, all instance `status` fields would be `null` and no icons would render status colors. See `maestro-architecture` for the full HANDOFF routing contract and how the orchestrator uses the same label to route the workflow.
 
 ## Things that bite
 
 - **The log is ephemeral.** Deleted at SessionEnd by `maestro-session-cleanup.sh` (the same hook now also tears down the persistent ai-tools-manager container — so this view, like the app, is up only for the session). An empty page is the normal between-sessions state, not an error. The file only exists during and immediately after an active Maestro session.
-- **Status comes exclusively from the SubagentStop handoff entry.** If `maestro-subagent-log.js` is not registered, all cards will have `status: null` and no badge. If a subagent exits without a parseable `HANDOFF:` line (crash, force-stop, no Maestro contract), the status will be `"unknown"` (shown as "—").
+- **Status comes exclusively from the SubagentStop handoff entry.** If `maestro-subagent-log.js` is not registered, all steps will have `status: null` and default to green checkmarks. If a subagent exits without a parseable `HANDOFF:` line (crash, force-stop, no Maestro contract), the status will be `"unknown"` (shown as yellow warning icon).
 - **Reads use `mountedProjectPath(readCwd())`**, not `process.cwd()`. Inside Docker, `readCwd()` returns the host path from `/tmp/marketplace-data.json`; `mountedProjectPath` maps it to the container-visible `/app/…` path. Pattern is shared with `maestro-tree.ts` and `maestro-rules.ts`.
 - **The SSE route polls server-side, not with `fs.watch`.** `inotify`/FSEvents is unreliable across Docker Desktop bind mounts on macOS. The route uses `setInterval` + `fs.readFileSync` + line-count diff instead. Each open browser connection runs its own poll loop; close the tab to kill the loop (the `request.signal` abort cleans up).
 - **`reset` event on SessionEnd.** When the JSONL file disappears (deleted by `maestro-session-cleanup.sh`), the server emits `reset: {}` and `lineCount` drops to 0. The provider clears `entries`, the page shows the empty state. A new session's `init` event re-fills it. This is the normal SessionEnd → new session cycle without a page reload.
 - **EventSource auto-reconnects.** On network hiccup or dev-server restart, the browser `EventSource` reconnects automatically. The server handler then sends a fresh `init` (the whole current log) — `setEntries(replacement)` handles it idempotently.
 - **Live stream is app-wide.** `SessionLogProvider` mounts in `__root.tsx`'s `RootLayout`, so the SSE connection is maintained on every page. Entries accumulate in context even while the user is on `/workflows` or `/rules`; `/session-log` sees the full current state when you navigate to it.
 - **`getMaestroSessionLog` server fn is kept for SSR.** On a hard reload the provider starts with `entries: []` until the first `init` event arrives. The route no longer uses a `loader`, so there is a brief empty state flash on page load — acceptable for a debugging tool.
-- **Instances segment by origin change.** The same agent appearing twice in the log produces two cards — that's intentional (second run = second card). Parallel subagents would interleave their tool-call lines, fragmenting into many cards. Maestro runs subagents sequentially, so this is normally not an issue in practice. `agent_id` correlation keeps input↔output paired correctly even in edge-case interleaving.
+- **Instances segment by origin change.** The same agent appearing twice in the log produces two steps — that's intentional (second run = second step). Parallel subagents would interleave their tool-call lines, fragmenting into many steps. Maestro runs subagents sequentially, so this is normally not an issue in practice. `agent_id` correlation keeps input↔output paired correctly even in edge-case interleaving.
 - **`humanizeLog` returns `null` for bare `Agent`/`Task(...)` lines.** These PreToolUse entries capture the tool dispatch from the main session, but the richer `kind:"dispatch"` entry from `maestro-subagent-log.js` covers the same event more informatively. The nulls are intentionally filtered in `session-log-view.tsx`. Do not "fix" them.
 - **`session-log.ts` must remain node-free.** It is imported client-side by the route. All `fs`/`path` usage belongs in `maestro-session-log.ts` (the server fn). Adding a Node import to `session-log.ts` will cause a client-bundle error.
 - **`maestro-subagent-log.js` runs from the plugin dir, not the project copy.** Unlike `maestro-set-session-workflow.cjs` and `maestro-render-orchestrator.cjs` (which are copied into `.claude/scripts/` at install time), the SubagentStart/Stop scripts run directly from `${CLAUDE_PLUGIN_ROOT}/scripts/`. Editing `maestro-subagent-log.js` takes effect immediately for all projects. Adding or removing the hook registration in `hooks.json` requires a new Claude session to pick up.
-- **The hover popup uses `onMouseEnter`/`onMouseLeave` state, not CSS `group-hover`.** Pure CSS `group-hover` loses the popup when the pointer briefly leaves the card on its way to the popup. The React state approach (`hoveredId`) keeps it open through that gap.
-- **Large messages in `input`/`output`.** A spawning message that includes injected skills + handoff templates can be several kilobytes. The hover popup has `max-h-[80vh] overflow-y-auto` — scroll within the popup to read it all. The JSONL file stores the full messages; that's intentional for debugging fidelity.
+- **Large messages in `input`/`output`.** A spawning message that includes injected skills + handoff templates can be several kilobytes. The right detail panel sections are scrollable. The JSONL file stores the full messages; that's intentional for debugging fidelity.
+- **`--yellow` color token.** Added in `packages/styles/scss/abstracts/_tokens.scss` alongside `--green`/`--red`. Used for "unknown" status (subagent with no parseable HANDOFF line). Both light and dark mode variants exist.

@@ -4,13 +4,22 @@ import type { Instance } from "../utils/session-log";
 interface SessionLogViewProps {
   instances: Instance[];
   activeId: number | null;
+  onSelect: (id: number) => void;
   sectionRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>;
   connected: boolean;
+}
+
+function borderColor(status: Instance["status"]): string {
+  if (status === "condition") return "border-[var(--red)]";
+  if (status === "unknown") return "border-[var(--yellow)]";
+  if (status === "success") return "border-[var(--green)]";
+  return "border-[var(--green)]";
 }
 
 export default function SessionLogView({
   instances,
   activeId,
+  onSelect,
   sectionRefs,
   connected,
 }: SessionLogViewProps) {
@@ -18,8 +27,7 @@ export default function SessionLogView({
     <div className="flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-(--line) shrink-0">
-        <span className="text-[13px] font-medium text-(--ink)">Logs</span>
-        {/* Live connection indicator */}
+        <span className="text-[13px] font-medium text-(--ink)">Agents Flow</span>
         <div
           className={`flex items-center gap-1.5 text-[11px] ${
             connected ? "text-(--green)" : "text-(--ink-3)"
@@ -44,7 +52,12 @@ export default function SessionLogView({
               ref={(el) => {
                 sectionRefs.current[inst.id] = el;
               }}
-              className={`scroll-mt-4 mb-4 ${isActive ? "bg-(--primary-dim) rounded-md px-2 -mx-2" : ""}`}
+              onClick={() => onSelect(inst.id)}
+              className={`scroll-mt-4 mb-4 rounded-lg p-4 cursor-pointer transition-colors ${
+                isActive
+                  ? `border-2 ${borderColor(inst.status)}`
+                  : "border border-(--line) hover:border-(--line-2)"
+              }`}
             >
               {/* Section label */}
               <div className="text-(--ink-3) text-[10px] font-semibold uppercase tracking-wider py-1 mb-0.5">

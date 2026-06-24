@@ -4,6 +4,7 @@ import { ScrollText } from "lucide-react";
 import TopNav from "../components/top-nav";
 import SessionLogCards from "../components/session-log-cards";
 import SessionLogView from "../components/session-log-view";
+import SessionLogDetail from "../components/session-log-detail";
 import { useSessionLog } from "../utils/session-log-context";
 import { buildInstances } from "../utils/session-log";
 
@@ -18,10 +19,12 @@ function SessionLogPage() {
 
   const instances = useMemo(() => buildInstances(entries), [entries]);
 
-  const handleCardClick = (id: number) => {
+  const handleSelect = (id: number) => {
     setActiveId(id);
     sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  const activeInstance = instances.find((inst) => inst.id === activeId) ?? null;
 
   const isEmpty = entries.length === 0;
 
@@ -48,22 +51,24 @@ function SessionLogPage() {
           </div>
         </div>
       ) : (
-        /* Two-pane layout */
+        /* Three-pane layout */
         <div
           className="flex-1 grid overflow-hidden"
-          style={{ gridTemplateColumns: "360px 1fr" }}
+          style={{ gridTemplateColumns: "180px 1fr 320px" }}
         >
           <SessionLogCards
             instances={instances}
             activeId={activeId}
-            onSelect={handleCardClick}
+            onSelect={handleSelect}
           />
           <SessionLogView
             instances={instances}
             activeId={activeId}
+            onSelect={handleSelect}
             sectionRefs={sectionRefs}
             connected={connected}
           />
+          <SessionLogDetail instance={activeInstance} />
         </div>
       )}
     </div>
