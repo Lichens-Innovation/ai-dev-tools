@@ -13,7 +13,34 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, appendSessionLog } = require("./lib/maestro-session.cjs");
+const {
+  readStdin,
+  appendSessionLog,
+  readJson,
+  readSession,
+  resolveSearchList,
+  collectAgentSkills,
+} = require("./lib/maestro-session.cjs");
+
+// Resolve the loaded/referenced skills the SubagentStart hook would offer this
+// agent, so the dispatch entry records what was on the table. /session-log diffs
+// this against the agent's reported skillsTriage to surface silent omissions.
+// Uses the same resolveSearchList + collectAgentSkills as maestro-inject-agent-context.js,
+// so the logged set can't drift from the injected one. Returns null on any miss.
+function offeredSkills(claudeDir, agentType) {
+  if (!agentType) return null;
+  const cfg = readJson(path.join(claudeDir, "maestro.json"));
+  if (!cfg || cfg.version !== 3) return null;
+  const session = readSession(path.join(claudeDir, "maestro_session.json"));
+  const { searchList } = resolveSearchList(cfg, session);
+  const { loaded, referenced, matchedInstances } = collectAgentSkills(
+    searchList,
+    cfg.workflow_instances || [],
+    agentType
+  );
+  if (matchedInstances.length === 0) return null;
+  return { loaded, referenced };
+}
 
 // Parse the HANDOFF: label from the agent's final message.
 // Tolerates backticks, asterisks, and surrounding whitespace, e.g.:
@@ -53,6 +80,7 @@ function parseHandoff(msg) {
 
   try {
     if (event === "SubagentStart") {
+      const offered = offeredSkills(claudeDir, agentType);
       appendSessionLog(claudeDir, {
         ts: new Date().toISOString(),
         origin: "main_session",
@@ -60,6 +88,7 @@ function parseHandoff(msg) {
         agent: agentType,
         agent_id: agentId,
         input: lastMsg,
+        ...(offered ? { offered_skills: offered } : {}),
         log: `→ ${agentType}`,
       });
     } else if (event === "SubagentStop") {

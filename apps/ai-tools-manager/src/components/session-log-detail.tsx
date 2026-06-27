@@ -1,4 +1,4 @@
-import { humanizeLog } from "../utils/session-log";
+import { humanizeLog, unaccountedSkills } from "../utils/session-log";
 import type { Instance } from "../utils/session-log";
 
 interface SessionLogDetailProps {
@@ -26,6 +26,8 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
   const processLines = instance.entries
     .map((e) => humanizeLog(e))
     .filter((line): line is string => line !== null);
+
+  const unaccounted = unaccountedSkills(instance);
 
   return (
     <div className="border-l border-(--line) flex flex-col min-h-0 overflow-hidden">
@@ -61,6 +63,66 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
             <span className="text-(--ink-3) italic">No tool calls recorded</span>
           )}
         </Section>
+
+        {instance.skillsTriage && (
+          <Section title="Skills Triage">
+            {instance.skillsTriage.loaded.length > 0 && (
+              <div className="mb-2">
+                <div className="text-[11px] text-(--ink-3) mb-1">Loaded</div>
+                <div className="flex flex-wrap gap-1">
+                  {instance.skillsTriage.loaded.map((id) => (
+                    <span
+                      key={id}
+                      className="inline-flex items-center rounded-full border border-[var(--green)] text-(--green) px-2 py-0.5 text-[11px] font-mono"
+                    >
+                      {id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {unaccounted.length > 0 && (
+              <div className="mb-2">
+                <div className="text-[11px] text-(--red) mb-1">
+                  Unaccounted — offered but not reported
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {unaccounted.map((id) => (
+                    <span
+                      key={id}
+                      className="inline-flex items-center rounded-full border border-[var(--red)] text-(--red) px-2 py-0.5 text-[11px] font-mono"
+                    >
+                      {id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {instance.skillsTriage.skipped.length > 0 && (
+              <div>
+                <div className="text-[11px] text-(--ink-3) mb-1">Skipped</div>
+                <ul className="m-0 list-none p-0 flex flex-col gap-1">
+                  {instance.skillsTriage.skipped.map((s) => {
+                    // A hollow reason (empty or barely there) reads as a lazy skip —
+                    // flag it yellow so it stands out from a justified skip.
+                    const hollow = s.reason.trim().length < 8;
+                    return (
+                      <li key={s.id} className="font-mono text-[11px]">
+                        <span className={hollow ? "text-(--yellow)" : "text-(--ink-2)"}>
+                          {s.id}
+                        </span>
+                        <span className="text-(--ink-3)">
+                          {" "}
+                          — {s.reason.trim() || "no reason given"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </Section>
+        )}
 
         <Section title="Output">
           {instance.output ? (

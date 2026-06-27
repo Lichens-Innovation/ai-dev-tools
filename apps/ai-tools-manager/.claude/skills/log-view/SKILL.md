@@ -106,7 +106,7 @@ All three hooks append to the same file. All are no-ops when `maestro.json` is a
 | SSE server route — tails the JSONL and pushes init/entry/reset | `src/routes/api/session-log-stream.ts` |
 | App-wide SSE context: `SessionLogProvider`, `useSessionLog()` | `src/utils/session-log-context.tsx` |
 | Log reader server fn + `resolveLogFile` + `parseLogLines` + `SessionLogEntry` | `src/utils/maestro-session-log.ts` |
-| Pure transforms `buildInstances` + `humanizeLog` + `Instance` type | `src/utils/session-log.ts` |
+| Pure transforms `buildInstances` + `humanizeLog` + `parseSkillsTriage` + `unaccountedSkills` + `Instance`/`SkillsTriage` types | `src/utils/session-log.ts` |
 | Top bar — nav links incl. `ScrollText` + global `●` live dot | `src/components/top-nav.tsx` |
 | Docker-aware cwd helpers (`readCwd`, `mountedProjectPath`) | `src/utils/maestro-fs.ts` |
 | `titleFromName` — origin string → display name | `src/utils/text.ts` |
@@ -134,6 +134,7 @@ interface SessionLogEntry {
   agent?: string;      // the subagent's agent_type
   agent_id?: string;   // unique identifier — links this dispatch to its matching handoff
   input?: string;      // full spawning message (what the main session said to spawn this agent)
+  offered_skills?: { loaded: string[]; referenced: string[] };  // skills the SubagentStart hook surfaced to this agent
 
   // Present only on handoff entries (SubagentStop):
   kind?: "handoff";
@@ -162,8 +163,14 @@ interface Instance {
   label: string | null;   // condition label, e.g. "tests_failed" (null for success)
   input: string | null;   // spawning message from the matching dispatch entry
   output: string | null;  // final message from this segment's handoff entry
+  skillsTriage: SkillsTriage | null;  // parsed { loaded[], skipped[{id,reason}] } from the agent's report
+  offeredSkills: { loaded: string[]; referenced: string[] } | null;  // from the dispatch entry's offered_skills
 }
 ```
+
+`skillsTriage` is parsed from `output` by `parseSkillsTriage` (pure, in `session-log.ts`): it grabs the last fenced ```` ```json ```` block, `JSON.parse`s it, and reads the `skillsTriage` field every skill-receiving agent emits in its final report (see `plugins/ai-tools-manager/agents/*.md`). Any parse/shape failure yields `null`, so the section is simply omitted — fully backward compatible with older logs and agents that don't emit it. The triage data is already in `output`; that parse is a pure read-side interpretation.
+
+`offeredSkills` is the *other* side of the diff: the skills the `SubagentStart` hook actually surfaced, written onto the **dispatch** entry by `maestro-subagent-log.js` (correlated to the instance by `agent_id`, same as `input`). `unaccountedSkills(inst)` is the diff — skills that were offered but appear in neither `triage.loaded` nor `triage.skipped`, i.e. the agent **silently dropped** them. It returns `[]` unless both sides are present (a diff is only meaningful when we know what was offered *and* what was reported). This is what makes the triage auditable rather than self-reported: a hollow *reason* flags a lazy skip, but an unaccounted skill catches a skill the agent omitted from its report entirely.
 
 ## Left pane — step list (`session-log-cards.tsx`)
 
@@ -176,6 +183,7 @@ A thin (180px) vertical list of step names with status icons. Each row:
   - Main Session (`status: null`) → `CircleCheck` in `text-(--green)` (default)
 - **Click** → `onSelect(id)` → `setActiveId(id)` + `scrollIntoView` on the matching center-pane section.
 - **Active step** → `font-medium` + a `border-b-2` underline colored by status (green/red/yellow).
+- **Skills badge** (right-aligned, only when `inst.skillsTriage` is set) → compact `<loaded>` in `--green`, `/<skipped>` in `--yellow`, and `/<unaccounted>` in `--red`. Lets you scan which steps skipped or silently dropped skills without opening each detail panel.
 
 ## Center pane — framed log (`session-log-view.tsx`)
 
@@ -185,6 +193,7 @@ A header row ("Agents Flow" + `● live` indicator) above a scrollable body of p
 - **Selected frame** → `border-2` colored by status: `border-[var(--green)]` / `border-[var(--red)]` / `border-[var(--yellow)]`.
 - **Default frame** → `border border-(--line)`.
 - Content: humanized log lines via `humanizeLog(entry)`, same as before.
+- **Section header** shows the `displayName` and, when `inst.skillsTriage` is set, a `<N> loaded · <N> skipped · <N> unaccounted` badge (green / yellow / red — each segment shown only when non-zero).
 
 ## Right pane — detail panel (`session-log-detail.tsx`)
 
@@ -193,6 +202,7 @@ Shows the selected instance's data in three sections:
 - **Header:** "Logs: {displayName}"
 - **Input:** the instance's `input` field — the full spawning message sent by the main session. Shows "No input captured" for main_session instances or when no dispatch entry exists.
 - **Process:** the humanized log lines (same content as the center pane section for this step).
+- **Skills Triage:** (only when `instance.skillsTriage` is set) the agent's own account of which injected skills it loaded vs deliberately skipped, audited against what was offered. **Loaded** render as green chips; **Unaccounted** (`unaccountedSkills(instance)` — offered but reported in neither loaded nor skipped) render as red chips; **Skipped** render as `id — reason`, with a hollow reason (`< 8` chars) flagged in `--yellow`. Hollow reasons surface lazy *explicit* skips; the red unaccounted group surfaces skills the agent dropped *silently* — caught by diffing the dispatch entry's `offered_skills` against the report.
 - **Output:** the instance's `output` field — the agent's full final message including the HANDOFF line. Shows "No output captured" for main_session or when no handoff entry exists.
 - When no step is selected, shows "Select a step to view details".
 

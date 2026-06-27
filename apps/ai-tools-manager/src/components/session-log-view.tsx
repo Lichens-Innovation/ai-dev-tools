@@ -1,4 +1,4 @@
-import { humanizeLog } from "../utils/session-log";
+import { humanizeLog, unaccountedSkills } from "../utils/session-log";
 import type { Instance } from "../utils/session-log";
 
 interface SessionLogViewProps {
@@ -60,8 +60,29 @@ export default function SessionLogView({
               }`}
             >
               {/* Section label */}
-              <div className="text-(--ink-3) text-[10px] font-semibold uppercase tracking-wider py-1 mb-0.5">
-                {inst.displayName}
+              <div className="flex items-center justify-between py-1 mb-0.5">
+                <span className="text-(--ink-3) text-[10px] font-semibold uppercase tracking-wider">
+                  {inst.displayName}
+                </span>
+                {inst.skillsTriage && (
+                  <span className="text-[10px] font-mono">
+                    <span className="text-(--green)">
+                      {inst.skillsTriage.loaded.length} loaded
+                    </span>
+                    {inst.skillsTriage.skipped.length > 0 && (
+                      <span className="text-(--yellow)">
+                        {" · "}
+                        {inst.skillsTriage.skipped.length} skipped
+                      </span>
+                    )}
+                    {unaccountedSkills(inst).length > 0 && (
+                      <span className="text-(--red)">
+                        {" · "}
+                        {unaccountedSkills(inst).length} unaccounted
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
 
               {lines.length > 0 ? (
