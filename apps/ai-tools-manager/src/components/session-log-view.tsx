@@ -12,6 +12,7 @@ interface SessionLogViewProps {
 function borderColor(status: Instance["status"]): string {
   if (status === "condition") return "border-[var(--red)]";
   if (status === "unknown") return "border-[var(--yellow)]";
+  if (status === "transition") return "border-[var(--line-2)]";
   if (status === "success") return "border-[var(--green)]";
   return "border-[var(--green)]";
 }
@@ -89,7 +90,7 @@ export default function SessionLogView({
                 lines.map((line, i) => (
                   <div key={i} className="whitespace-pre-wrap break-words text-(--ink-2)">
                     -{" "}
-                    {inst.origin === "main_session"
+                    {inst.origin === "main_session" || inst.origin === "transition"
                       ? line
                       : `[${inst.displayName}]: ${line}`}
                   </div>

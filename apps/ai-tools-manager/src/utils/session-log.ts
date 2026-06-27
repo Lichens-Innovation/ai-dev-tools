@@ -18,8 +18,12 @@ export interface Instance {
   /** Index of the first entry in the flat entries array that belongs to this segment. */
   startIndex: number;
   entries: SessionLogEntry[];
-  /** null for the main_session — status only applies to subagent instances. */
-  status: "success" | "condition" | "unknown" | null;
+  /**
+   * null for the main_session — status only applies to subagent instances.
+   * "transition" marks a non-workflow SubagentStop (e.g. the /ai-tools listen
+   * loop pausing for the user), shown as a neutral boundary rather than an error.
+   */
+  status: "success" | "condition" | "unknown" | "transition" | null;
   /** The HANDOFF label (e.g. "tests_failed"), null when status is success or no handoff. */
   label: string | null;
   /** Full spawning message sent by the main session (from the matching dispatch entry). */
@@ -72,6 +76,11 @@ export function buildInstances(entries: SessionLogEntry[]): Instance[] {
     if (entry.kind === "handoff" && current.origin === entry.origin) {
       current.status = entry.status ?? "unknown";
       current.label = entry.label ?? null;
+      current.output = entry.output ?? null;
+    } else if (entry.kind === "transition") {
+      // A non-workflow boundary — keep its message for the detail panel but
+      // mark it neutral so it doesn't render as a failed/unknown handoff.
+      current.status = "transition";
       current.output = entry.output ?? null;
     }
   }
@@ -199,6 +208,11 @@ export function humanizeLog(entry: SessionLogEntry): string | null {
     const label = entry.label ?? "none";
     const status = entry.status ?? "unknown";
     return `handed off — ${label} (${status})`;
+  }
+  if (entry.kind === "transition") {
+    const msg = (entry.output ?? "").trim();
+    if (!msg) return "transition";
+    return `transition — ${msg.length > 80 ? `${msg.slice(0, 80)}…` : msg}`;
   }
 
   const log = entry.log ?? "";
