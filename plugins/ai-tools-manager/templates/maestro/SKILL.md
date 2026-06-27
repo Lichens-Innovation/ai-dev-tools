@@ -58,6 +58,16 @@ If the line is missing or the label doesn't match any known condition, treat it 
 
 **Forward the handoff payload.** The subagent's final JSON includes a `handoff_details` object describing what the next agent needs (issues, failing tests, scribe notes, etc.). When you invoke the routed-to subagent, pass that `handoff_details` payload verbatim in its `Task` prompt — it is the structured input the receiving agent expects.
 
+### Step 6 — Mark the task done (only if this run came from a task file)
+
+If — and only if — this run was invoked to complete a specific task-queue file (the request named a `.claude/maestro-tasks/NNN-*.md` file), mark it done **once the workflow has fully reached its successful end**, including approval at any `human review` step. Do not mark it done after a partial run, a condition-edge loop that hasn't resolved, or while a review is still pending.
+
+```bash
+node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done <filename>
+```
+
+`<filename>` is the bare task filename (e.g. `002-add-login.md`). The script flips that file to `done` and recomputes the queue's `status.json` so any dependents whose blockers are now all done become `ready` — you don't compute the cascade yourself. If the run was not invoked from a task file, skip this step.
+
 ## Principles
 
 - **One workflow at a time.** Set the active workflow via `maestro-set-session-workflow.cjs` before invoking any subagents.

@@ -95,9 +95,21 @@ than prose, inline just the decision-rich part.
 Or "None — can start immediately" if no blockers.
 </task-file-template>
 
-`Blocked by` references sibling task files by name. It is **human-facing sequencing metadata** — the Maestro orchestrator runs one workflow at a time and does not auto-chain these files. Because numbering is topologically sorted, "run them in order" is always a valid path; `Blocked by` records the precise graph for anything non-linear.
+`Blocked by` references sibling task files by name. It is the **sole authored source of the dependency graph** — the next step parses it into the status tracker, and the `/maestro-tasks` view derives each task's blocked/ready state from it. Because numbering is topologically sorted, "run them in order" is always a valid path; `Blocked by` records the precise graph for anything non-linear. (The Maestro orchestrator still runs one workflow at a time and does not auto-chain these files.)
 
-### 6. Report
+Never write task **state** (done/ready/blocked) into the markdown — state lives only in `status.json`, maintained by the tracker in the next step.
+
+### 6. Sync the status tracker
+
+After writing the files, refresh `<cwd>/.claude/maestro-tasks/status.json` so the new tasks (and their `Blocked by` edges) are picked up:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/maestro-task-status.cjs" sync
+```
+
+`sync` parses each file's `## Blocked by` section, adds entries for the new files, preserves any tasks already marked `done`, and recomputes every `ready`/`blocked`. It's idempotent and safe to re-run. (Uses the plugin-root script so it works even before `/maestro-install` has copied the runtime scripts into the project.)
+
+### 7. Report
 
 Tell the user how many task files were written, the numeric range (e.g. `003–007`), and that each is ready to paste into (or run from) a session where the `/maestro` skill is invoked.
 

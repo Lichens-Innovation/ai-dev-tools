@@ -6,7 +6,8 @@
 //
 // Default: removes the bash-validation PreToolUse hook from
 //   <project>/.claude/settings.json (only the keys Maestro added; all other keys
-//   are preserved), deletes the ephemeral session files, and cleans up any
+//   are preserved), deletes the ephemeral session files (maestro_session.json,
+//   maestro_session.log.jsonl, maestro_session_tasks.json), and cleans up any
 //   legacy `agent: "maestro"` key left by older installs.
 // --purge: additionally removes the installed orchestrator skill, the
 //   project-copied runtime scripts, and the user-authored config (maestro.json) —
@@ -80,6 +81,7 @@ try {
   const removedSession = [
     removeIfPresent(path.join(claudeDir, "maestro_session.json")),
     removeIfPresent(path.join(claudeDir, "maestro_session.log.jsonl")),
+    removeIfPresent(path.join(claudeDir, "maestro_session_tasks.json")),
   ].some(Boolean);
 
   const purged = [];
