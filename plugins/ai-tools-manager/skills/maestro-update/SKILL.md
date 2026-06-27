@@ -15,7 +15,7 @@ Refresh the project's Maestro runtime scripts from the plugin and regenerate the
    node "${CLAUDE_PLUGIN_ROOT}/scripts/maestro-install.js" "${CLAUDE_PROJECT_DIR:-.}"
    ```
 
-   This overwrites `.claude/scripts/{maestro-set-session-workflow.cjs,maestro-render-orchestrator.cjs,bash-validation.sh,lib/maestro-session.cjs}` with the current plugin versions, so any fixes or new validation steps in a newer plugin release are picked up immediately.
+   This overwrites `.claude/scripts/{maestro-set-session-workflow.cjs,maestro-render-orchestrator.cjs,maestro-task-status.cjs,bash-validation.sh,lib/maestro-session.cjs,lib/maestro-tasks.cjs}` with the current plugin versions, so any fixes or new validation steps in a newer plugin release are picked up immediately.
 
 2. **Run the renderer** from the project root:
 
@@ -32,5 +32,5 @@ Refresh the project's Maestro runtime scripts from the plugin and regenerate the
 ## Notes
 
 - Hook scripts (`maestro-inject-agent-context.js`, `maestro-subagent-log.js`, `maestro-session-log.js`) run from `${CLAUDE_PLUGIN_ROOT}/scripts/` and are always current — no sync needed for them.
-- Project-copied scripts (`maestro-set-session-workflow.cjs`, `maestro-render-orchestrator.cjs`, `bash-validation.sh`, `lib/maestro-session.cjs`) are what step 1 refreshes.
+- Project-copied scripts (`maestro-set-session-workflow.cjs`, `maestro-render-orchestrator.cjs`, `maestro-task-status.cjs`, `bash-validation.sh`, `lib/maestro-session.cjs`, `lib/maestro-tasks.cjs`) are what step 1 refreshes.
 - `maestro.json` is the source of truth. The `SubagentStart` hook reads it directly at runtime, so subagent skill injection is always current even between `/maestro-update` runs — only the orchestrator's handoff table needs the renderer re-run.

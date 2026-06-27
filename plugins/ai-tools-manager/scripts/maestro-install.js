@@ -145,6 +145,14 @@ try {
     path.join(pluginRoot, "scripts", "lib", "maestro-session.cjs"),
     path.join(scriptsDir, "lib", "maestro-session.cjs")
   );
+  fs.copyFileSync(
+    path.join(pluginRoot, "scripts", "maestro-task-status.cjs"),
+    path.join(scriptsDir, "maestro-task-status.cjs")
+  );
+  fs.copyFileSync(
+    path.join(pluginRoot, "scripts", "lib", "maestro-tasks.cjs"),
+    path.join(scriptsDir, "lib", "maestro-tasks.cjs")
+  );
 
   // PreToolUse Bash guard that blocks reading .env secret files. Copied with its
   // executable bit so the hook can run it directly.
