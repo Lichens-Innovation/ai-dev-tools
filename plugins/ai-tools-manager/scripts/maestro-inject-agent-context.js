@@ -13,7 +13,15 @@
 
 const fs = require("fs");
 const path = require("path");
-const { readStdin, readJson, resolveWorkflowName, readSession, writeSession } = require("./lib/maestro-session.cjs");
+const {
+  readStdin,
+  readJson,
+  resolveWorkflowName,
+  readSession,
+  writeSession,
+  resolveSearchList,
+  collectAgentSkills,
+} = require("./lib/maestro-session.cjs");
 
 // Read the handoff_details payload template for a sender -> receiver edge.
 // Convention: handoffs/<sender>/<receiver>.md (dir names === agent `name`). Kept
@@ -41,41 +49,23 @@ function collect(cfg, sessionPath, agentType) {
   const workflows = cfg.workflows || [];
 
   const session = readSession(sessionPath);
-  const activeWorkflowName = session.workflow || null;
 
-  // Scope to the active workflow when it resolves. When no workflow is set yet —
-  // e.g. the user invoked an agent on the first prompt, before the orchestrator
-  // classified the request and ran maestro-set-session-workflow.js — fall back to the
-  // default workflow (resolveWorkflowName → first configured workflow, i.e. "default")
-  // rather than unioning across every workflow, which can inject the wrong routes/skills.
-  // A genuinely broken active name (set but unknown) still unions + warns loudly.
-  const activeMatches = activeWorkflowName ? workflows.filter((w) => w.name === activeWorkflowName) : [];
-  let warning = null;
-  let searchList;
-  if (activeWorkflowName && activeMatches.length > 0) {
-    searchList = activeMatches;
-  } else if (activeWorkflowName) {
-    searchList = workflows;
-    warning =
-      `The active workflow "${activeWorkflowName}" (from maestro_session.json) matches no workflow in maestro.json. ` +
-      `The skills below are unioned across all workflows and may be wrong — re-run maestro-set-session-workflow.js with a valid workflow name.`;
-  } else {
-    const fallbackName = resolveWorkflowName(cfg);
-    const fallbackMatches = workflows.filter((w) => w.name === fallbackName);
-    searchList = fallbackMatches.length > 0 ? fallbackMatches : workflows;
-    if (workflows.length > 1) {
-      warning =
-        `No active workflow is set (maestro-set-session-workflow.js was not run); falling back to the "${fallbackName}" workflow. ` +
-        `If you intended a different workflow, the orchestrator should set it before invoking subagents.`;
-    }
-  }
+  // Scope to the active workflow when it resolves; fall back to the default
+  // workflow when none is set yet, or union-and-warn on a broken active name.
+  // resolveSearchList owns this logic (shared with maestro-subagent-log.js so
+  // the offered-skills it logs match exactly what we inject here).
+  const { searchList, warning, activeWorkflowName } = resolveSearchList(cfg, session);
+
+  // loaded = auto-load before working; referenced = available, load only if the
+  // task needs it. collectAgentSkills owns the node-walk + dedup (loaded wins).
+  const { loaded: loadedList, referenced: referencedList, matchedInstances } = collectAgentSkills(
+    searchList,
+    instances,
+    agentType
+  );
 
   const instByName = (name) => instances.find((i) => i.name === name);
 
-  // loaded = auto-load before working; referenced = available, load only if the task needs it.
-  const loadedSet = new Set();
-  const referencedSet = new Set();
-  const matchedInstances = [];
   // routeKey ("success" | condition label) -> target agent name (may be null)
   const routes = new Map();
 
@@ -100,9 +90,6 @@ function collect(cfg, sessionPath, agentType) {
       if (node.type !== "agent") continue;
       const inst = instByName(node.instance);
       if (!inst || inst.agent !== agentType) continue;
-      matchedInstances.push(node.instance);
-      for (const s of inst.loaded_skills || []) loadedSet.add(s);
-      for (const s of inst.referenced_skills || []) referencedSet.add(s);
       for (const edge of wf.edges || []) {
         if (edge.from !== node.id) continue;
         if (edge.kind === "success") {
@@ -131,13 +118,9 @@ function collect(cfg, sessionPath, agentType) {
     // Don't fail the hook on session write errors.
   }
 
-  // A skill auto-loaded by one instance shouldn't also be listed as merely "available"
-  // (loaded wins) when the same agent has multiple instances in the workflow.
-  for (const s of loadedSet) referencedSet.delete(s);
-
   return {
-    loadedSkills: Array.from(loadedSet),
-    referencedSkills: Array.from(referencedSet),
+    loadedSkills: loadedList,
+    referencedSkills: referencedList,
     routes: Array.from(routes, ([label, target]) => ({ label, target })),
     warning,
   };

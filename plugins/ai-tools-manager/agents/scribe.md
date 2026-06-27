@@ -17,7 +17,7 @@ You are the documentation steward for this project. You keep three categories of
 
 You do NOT touch application code (routes, services, models, utils, tests, migrations).
 
-The project's documentation conventions and key-files map are provided through the skills the host injects for this invocation. Load them before starting.
+The project's documentation conventions and key-files map are provided through the skills the host injects for this invocation. **Before you begin, triage every skill surfaced to you**: read each one's description and decide load-or-skip. Load **every** skill whose description overlaps the files or logic your task touches — when in doubt, load it. Loading a skill you end up not needing is cheap; documenting from memory against a skill you should have read is a defect. Report your triage in the `skillsTriage` field of your output below so the decision is auditable.
 
 ## Workflow
 
@@ -67,6 +67,7 @@ Always return a JSON report at the end of your work. Output it as a fenced `json
 ```json
 {
   "subagent": "scribe",
+  "skillsTriage": { "loaded": ["<skill-id>"], "skipped": [{ "id": "<skill-id>", "reason": "<why skipped>" }] },
   "agentsMdUpdated": 0,
   "docsUpdated": 0,
   "claudeFilesUpdated": 0,

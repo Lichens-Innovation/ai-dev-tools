@@ -1,4 +1,5 @@
 import { CircleCheck, CircleX, AlertTriangle } from "lucide-react";
+import { unaccountedSkills } from "../utils/session-log";
 import type { Instance } from "../utils/session-log";
 
 interface SessionLogCardsProps {
@@ -47,6 +48,20 @@ export default function SessionLogCards({ instances, activeId, onSelect }: Sessi
             <span className="text-[13px] text-(--ink) truncate">
               {inst.displayName}
             </span>
+            {inst.skillsTriage && (
+              <span
+                className="ml-auto shrink-0 text-[10px] font-mono"
+                title="skills loaded / skipped / unaccounted"
+              >
+                <span className="text-(--green)">{inst.skillsTriage.loaded.length}</span>
+                {inst.skillsTriage.skipped.length > 0 && (
+                  <span className="text-(--yellow)">/{inst.skillsTriage.skipped.length}</span>
+                )}
+                {unaccountedSkills(inst).length > 0 && (
+                  <span className="text-(--red)">/{unaccountedSkills(inst).length}</span>
+                )}
+              </span>
+            )}
           </button>
         );
       })}

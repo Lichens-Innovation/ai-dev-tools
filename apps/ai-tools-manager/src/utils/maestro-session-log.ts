@@ -13,6 +13,7 @@ export interface SessionLogEntry {
   agent_id?: string;   // shared key linking a dispatch↔handoff pair
   // dispatch only:
   input?: string;      // full spawning message (main session → agent)
+  offered_skills?: { loaded: string[]; referenced: string[] };  // skills the SubagentStart hook surfaced
   // handoff only:
   status?: "success" | "condition" | "unknown";
   label?: string | null;
