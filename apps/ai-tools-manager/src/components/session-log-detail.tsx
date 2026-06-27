@@ -54,7 +54,7 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
           {processLines.length > 0 ? (
             processLines.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap break-words font-mono text-[11px]">
-                - {instance.origin === "main_session"
+                - {instance.origin === "main_session" || instance.origin === "transition"
                   ? line
                   : `[${instance.displayName}]: ${line}`}
               </div>

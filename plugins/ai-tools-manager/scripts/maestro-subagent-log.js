@@ -92,17 +92,30 @@ function parseHandoff(msg) {
         log: `→ ${agentType}`,
       });
     } else if (event === "SubagentStop") {
-      const { status, label } = parseHandoff(lastMsg);
-      appendSessionLog(claudeDir, {
-        ts: new Date().toISOString(),
-        origin: agentType || "unknown",
-        kind: "handoff",
-        agent_id: agentId,
-        status,
-        label,
-        output: lastMsg,
-        log: label ? `HANDOFF: ${label}` : "HANDOFF: (none)",
-      });
+      if (!agentType) {
+        // No agent_type → this SubagentStop isn't a real workflow agent handing
+        // off (e.g. the /ai-tools listen-loop pausing for the user). Log it as a
+        // transition boundary rather than letting it fall back to "unknown".
+        appendSessionLog(claudeDir, {
+          ts: new Date().toISOString(),
+          origin: "transition",
+          kind: "transition",
+          output: lastMsg,
+          log: "transition",
+        });
+      } else {
+        const { status, label } = parseHandoff(lastMsg);
+        appendSessionLog(claudeDir, {
+          ts: new Date().toISOString(),
+          origin: agentType,
+          kind: "handoff",
+          agent_id: agentId,
+          status,
+          label,
+          output: lastMsg,
+          log: label ? `HANDOFF: ${label}` : "HANDOFF: (none)",
+        });
+      }
     }
   } catch {
     // Best-effort — never fail the agent on a logging error.

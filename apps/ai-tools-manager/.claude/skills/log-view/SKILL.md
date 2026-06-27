@@ -136,16 +136,22 @@ interface SessionLogEntry {
   input?: string;      // full spawning message (what the main session said to spawn this agent)
   offered_skills?: { loaded: string[]; referenced: string[] };  // skills the SubagentStart hook surfaced to this agent
 
-  // Present only on handoff entries (SubagentStop):
+  // Present only on handoff entries (SubagentStop with an agent_type):
   kind?: "handoff";
   agent_id?: string;   // matches the dispatch entry for this run
   status?: "success" | "condition" | "unknown";
   label?: string | null;  // raw HANDOFF label; null for "success" outcome
   output?: string;     // full final message (agent's last message, incl. HANDOFF: line + payload)
+
+  // Present only on transition entries (SubagentStop with NO agent_type):
+  kind?: "transition";
+  output?: string;     // the final message of the non-workflow turn (e.g. "waiting on the user")
 }
 ```
 
-A missing `kind` = a plain tool-call entry from `maestro-session-log.js`. The schema is **backward compatible**: old logs (tool-call-only) parse and display correctly; `dispatch`/`handoff` fields simply don't appear.
+A missing `kind` = a plain tool-call entry from `maestro-session-log.js`. The schema is **backward compatible**: old logs (tool-call-only) parse and display correctly; `dispatch`/`handoff`/`transition` fields simply don't appear.
+
+**Transition vs handoff.** A `SubagentStop` only carries an `agent_type` when a real workflow agent is handing off. When `agent_type` is empty — e.g. the `/ai-tools` listen-loop pausing for the user to submit a form — there is no HANDOFF contract to parse, so `maestro-subagent-log.js` writes a `kind:"transition"` entry with `origin:"transition"` instead of letting it fall back to `origin:"unknown"` + `status:"unknown"`. This is what keeps non-workflow boundaries from masquerading as failed/unknown agent runs.
 
 ### `Instance` — the derived client model
 
@@ -159,7 +165,7 @@ interface Instance {
   startIndex: number;   // index of first entry in the flat entries[] array
   entries: SessionLogEntry[];
 
-  status: "success" | "condition" | "unknown" | null;  // null = main_session
+  status: "success" | "condition" | "unknown" | "transition" | null;  // null = main_session; "transition" = non-workflow boundary
   label: string | null;   // condition label, e.g. "tests_failed" (null for success)
   input: string | null;   // spawning message from the matching dispatch entry
   output: string | null;  // final message from this segment's handoff entry
@@ -180,6 +186,7 @@ A thin (180px) vertical list of step names with status icons. Each row:
   - `"success"` → `CircleCheck` in `text-(--green)`
   - `"condition"` → `CircleX` in `text-(--red)`
   - `"unknown"` → `AlertTriangle` in `text-(--yellow)`
+  - `"transition"` → hollow `Circle` in `text-(--ink-3)` (neutral — a non-workflow boundary, not an error)
   - Main Session (`status: null`) → `CircleCheck` in `text-(--green)` (default)
 - **Click** → `onSelect(id)` → `setActiveId(id)` + `scrollIntoView` on the matching center-pane section.
 - **Active step** → `font-medium` + a `border-b-2` underline colored by status (green/red/yellow).
@@ -190,7 +197,7 @@ A thin (180px) vertical list of step names with status icons. Each row:
 A header row ("Agents Flow" + `● live` indicator) above a scrollable body of per-instance sections. Each section is wrapped in a **rounded bordered frame** (`border rounded-lg p-4`):
 
 - **Click** anywhere in the frame → `onSelect(id)` → selects the step across all panes.
-- **Selected frame** → `border-2` colored by status: `border-[var(--green)]` / `border-[var(--red)]` / `border-[var(--yellow)]`.
+- **Selected frame** → `border-2` colored by status: `border-[var(--green)]` / `border-[var(--red)]` / `border-[var(--yellow)]` / `border-[var(--line-2)]` (transition, neutral).
 - **Default frame** → `border border-(--line)`.
 - Content: humanized log lines via `humanizeLog(entry)`, same as before.
 - **Section header** shows the `displayName` and, when `inst.skillsTriage` is set, a `<N> loaded · <N> skipped · <N> unaccounted` badge (green / yellow / red — each segment shown only when non-zero).
@@ -214,7 +221,7 @@ Shows the selected instance's data in three sections:
 - The main session itself segments into multiple "Main Session" steps when subagents interleave (normal for sequential Maestro dispatch).
 - Parallel subagents would fragment, but Maestro runs agents sequentially, so interleaving is rare.
 
-**Status/label/output** are populated from the first `kind:"handoff"` entry found within the segment (matching `origin`). **Input** is correlated by `agent_id`: find the handoff's `agent_id`, then find the dispatch entry with the same `agent_id` anywhere in the full `entries[]`. Fallback: if no handoff entry exists (agent didn't produce one), search for a dispatch entry matching by `agent` type.
+**Status/label/output** are populated from the first `kind:"handoff"` entry found within the segment (matching `origin`); a `kind:"transition"` entry instead sets `status:"transition"` and keeps its message as `output`. **Input** is correlated by `agent_id`: find the handoff's `agent_id`, then find the dispatch entry with the same `agent_id` anywhere in the full `entries[]`. Fallback: if no handoff entry exists (agent didn't produce one), search for a dispatch entry matching by `agent` type.
 
 ## Runtime — how the log gets written
 
@@ -238,7 +245,7 @@ This is the relationship between the page and the custom hooks/scripts.
     "input": "<last_assistant_message>", "log": "→ <agent_type>" }
   ```
   `last_assistant_message` on SubagentStart = the main session's message that triggered the subagent spawn. This is the **Input** shown in the right detail panel.
-- **On SubagentStop** → parses `last_assistant_message` for a `HANDOFF:` line (last occurrence, tolerant of surrounding backticks/asterisks), writes a `kind:"handoff"` entry:
+- **On SubagentStop with an `agent_type`** → parses `last_assistant_message` for a `HANDOFF:` line (last occurrence, tolerant of surrounding backticks/asterisks), writes a `kind:"handoff"` entry:
   ```json
   { "ts": "…", "origin": "<agent_type>", "kind": "handoff",
     "agent_id": "<agent_id>", "status": "success|condition|unknown",
@@ -246,6 +253,12 @@ This is the relationship between the page and the custom hooks/scripts.
     "log": "HANDOFF: <label>" }
   ```
   `last_assistant_message` on SubagentStop = the agent's entire final message, including `HANDOFF:` + any `handoff_details` payload. This is the **Output** shown in the right detail panel. `agent_id` is shared across both entries for correlation.
+- **On SubagentStop with NO `agent_type`** → not a real workflow handoff (e.g. the `/ai-tools` listen-loop pausing for the user). Writes a `kind:"transition"` entry instead, so it can't masquerade as a failed/unknown agent run:
+  ```json
+  { "ts": "…", "origin": "transition", "kind": "transition",
+    "output": "<last_assistant_message>", "log": "transition" }
+  ```
+  `buildInstances` segments this as its own neutral card (`status:"transition"`, displayName "Transition" via `titleFromName`); the message is kept as `output` for the detail panel.
 - **`parseHandoff`:** takes the last `HANDOFF:` match; `"success"` (case-insensitive) → `status:"success"`, any other label → `status:"condition"`, no match → `status:"unknown"`.
 - Same gate and append-only pattern as `maestro-session-log.js`.
 
@@ -277,7 +290,7 @@ The plain tool-call log from `maestro-session-log.js` has **no outcome data** �
 ## Things that bite
 
 - **The log is ephemeral.** Deleted at SessionEnd by `maestro-session-cleanup.sh` (the same hook now also tears down the persistent ai-tools-manager container — so this view, like the app, is up only for the session). An empty page is the normal between-sessions state, not an error. The file only exists during and immediately after an active Maestro session.
-- **Status comes exclusively from the SubagentStop handoff entry.** If `maestro-subagent-log.js` is not registered, all steps will have `status: null` and default to green checkmarks. If a subagent exits without a parseable `HANDOFF:` line (crash, force-stop, no Maestro contract), the status will be `"unknown"` (shown as yellow warning icon).
+- **Status comes exclusively from the SubagentStop handoff entry.** If `maestro-subagent-log.js` is not registered, all steps will have `status: null` and default to green checkmarks. If a real workflow agent (has an `agent_type`) exits without a parseable `HANDOFF:` line (crash, force-stop, broken Maestro contract), the status will be `"unknown"` (shown as yellow warning icon). A `SubagentStop` with **no `agent_type`** is instead logged as `kind:"transition"` (a neutral grey card) — that's the `/ai-tools` listen-loop pausing for the user, not a failed agent, so it deliberately does **not** show a yellow warning.
 - **Reads use `mountedProjectPath(readCwd())`**, not `process.cwd()`. Inside Docker, `readCwd()` returns the host path from `/tmp/marketplace-data.json`; `mountedProjectPath` maps it to the container-visible `/app/…` path. Pattern is shared with `maestro-tree.ts` and `maestro-rules.ts`.
 - **The SSE route polls server-side, not with `fs.watch`.** `inotify`/FSEvents is unreliable across Docker Desktop bind mounts on macOS. The route uses `setInterval` + `fs.readFileSync` + line-count diff instead. Each open browser connection runs its own poll loop; close the tab to kill the loop (the `request.signal` abort cleans up).
 - **`reset` event on SessionEnd.** When the JSONL file disappears (deleted by `maestro-session-cleanup.sh`), the server emits `reset: {}` and `lineCount` drops to 0. The provider clears `entries`, the page shows the empty state. A new session's `init` event re-fills it. This is the normal SessionEnd → new session cycle without a page reload.

@@ -8,7 +8,7 @@ export interface SessionLogEntry {
   origin: string;
   log: string;
   // Set on dispatch/handoff entries written by maestro-subagent-log.js:
-  kind?: "dispatch" | "handoff";
+  kind?: "dispatch" | "handoff" | "transition";
   agent?: string;      // dispatch: the subagent's agent_type
   agent_id?: string;   // shared key linking a dispatch↔handoff pair
   // dispatch only:

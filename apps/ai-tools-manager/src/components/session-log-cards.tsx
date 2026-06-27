@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, AlertTriangle } from "lucide-react";
+import { CircleCheck, CircleX, AlertTriangle, Circle } from "lucide-react";
 import { unaccountedSkills } from "../utils/session-log";
 import type { Instance } from "../utils/session-log";
 
@@ -15,12 +15,15 @@ function StatusIcon({ status }: { status: Instance["status"] }) {
     return <CircleX size={16} className="text-(--red) shrink-0" />;
   if (status === "unknown")
     return <AlertTriangle size={16} className="text-(--yellow) shrink-0" />;
+  if (status === "transition")
+    return <Circle size={16} className="text-(--ink-3) shrink-0" />;
   return <CircleCheck size={16} className="text-(--green) shrink-0" />;
 }
 
 function underlineColor(status: Instance["status"]): string {
   if (status === "condition") return "border-b-[var(--red)]";
   if (status === "unknown") return "border-b-[var(--yellow)]";
+  if (status === "transition") return "border-b-[var(--line-2)]";
   return "border-b-[var(--green)]";
 }
 
