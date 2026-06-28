@@ -78,11 +78,20 @@ function resolveSearchList(cfg, session) {
   return { searchList, warning, activeWorkflowName };
 }
 
+// Normalize an agent identifier to its bare frontmatter name. At dispatch time
+// Claude Code addresses plugin-provided agents with a namespace prefix
+// (e.g. "ai-tools-manager:frontend"), but maestro.json stores the bare name
+// ("frontend"). Strip any "<plugin>:" prefix so the two compare equal.
+function bareAgentName(s) {
+  return (s || "").split(":").pop();
+}
+
 // Collect the loaded/referenced skill sets offered to `agentType` across the
 // given workflows. `loaded` (auto-load) wins over `referenced` (load-if-relevant)
 // when the same skill appears in both. Also returns the matched instance names.
 function collectAgentSkills(searchList, instances, agentType) {
   const instByName = (name) => (instances || []).find((i) => i.name === name);
+  const wantAgent = bareAgentName(agentType);
   const loadedSet = new Set();
   const referencedSet = new Set();
   const matchedInstances = [];
@@ -90,7 +99,7 @@ function collectAgentSkills(searchList, instances, agentType) {
     for (const node of wf.nodes || []) {
       if (node.type !== "agent") continue;
       const inst = instByName(node.instance);
-      if (!inst || inst.agent !== agentType) continue;
+      if (!inst || bareAgentName(inst.agent) !== wantAgent) continue;
       matchedInstances.push(node.instance);
       for (const s of inst.loaded_skills || []) loadedSet.add(s);
       for (const s of inst.referenced_skills || []) referencedSet.add(s);
@@ -170,6 +179,7 @@ module.exports = {
   writeSession,
   resolveSearchList,
   collectAgentSkills,
+  bareAgentName,
   appendSessionLog,
   sessionLogPath,
   SESSION_LOG_FILE,

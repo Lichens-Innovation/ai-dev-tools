@@ -21,6 +21,7 @@ const {
   writeSession,
   resolveSearchList,
   collectAgentSkills,
+  bareAgentName,
 } = require("./lib/maestro-session.cjs");
 
 // Read the handoff_details payload template for a sender -> receiver edge.
@@ -65,6 +66,7 @@ function collect(cfg, sessionPath, agentType) {
   );
 
   const instByName = (name) => instances.find((i) => i.name === name);
+  const wantAgent = bareAgentName(agentType);
 
   // routeKey ("success" | condition label) -> target agent name (may be null)
   const routes = new Map();
@@ -89,7 +91,7 @@ function collect(cfg, sessionPath, agentType) {
     for (const node of wf.nodes || []) {
       if (node.type !== "agent") continue;
       const inst = instByName(node.instance);
-      if (!inst || inst.agent !== agentType) continue;
+      if (!inst || bareAgentName(inst.agent) !== wantAgent) continue;
       for (const edge of wf.edges || []) {
         if (edge.from !== node.id) continue;
         if (edge.kind === "success") {
@@ -185,7 +187,7 @@ function collect(cfg, sessionPath, agentType) {
     const protocols = [];
     for (const r of result.routes) {
       if (!r.target) continue;
-      const proto = readHandoffProtocol(projectDir, agentType, r.target);
+      const proto = readHandoffProtocol(projectDir, bareAgentName(agentType), r.target);
       if (!proto) continue;
       protocols.push(`Route \`HANDOFF: ${r.label}\` → \`${r.target}\`:\n\n${proto}`);
     }
