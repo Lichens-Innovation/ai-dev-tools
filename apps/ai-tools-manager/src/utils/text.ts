@@ -3,6 +3,12 @@ export function firstSentence(s: string): string {
   return m ? m[0].trim() : s.trim();
 }
 
+/** Drop a plugin/marketplace namespace prefix: "ai-tools-manager:frontend" -> "frontend". */
+export function stripNamespace(name: string): string {
+  const i = name.lastIndexOf(":");
+  return i === -1 ? name : name.slice(i + 1);
+}
+
 export function titleFromName(name: string, fallback = "my-thing"): string {
   return (name || fallback)
     .split("-")

@@ -126,6 +126,8 @@ The subagent has no static knowledge of its handoffs — the `SubagentStart` hoo
 
 The orchestrator (`templates/maestro/SKILL.md`, Step 5) reads the `HANDOFF:` line: `success` continues the workflow's success path; a label matching a condition edge routes back to that edge's target node. A missing/unknown line is treated as `success` but flagged. It then **forwards the emitted `handoff_details` payload** verbatim into the routed-to subagent's `Task` prompt.
 
+**Condition edges from a `human review` node are the exception — orchestrator-driven, not HANDOFF-driven.** A human-review node has no subagent, so nothing emits a `HANDOFF:` line for it. Instead the orchestrator itself, at the human-review hard stop, reads the user's feedback: on approval it continues the success path; on a correction request it dispatches the change as a `Task` to the agent a `condition` edge points at (e.g. `human requested code corrections` → `@backend`), rather than editing code in its own context. The seeded `default`/`tdd` workflows wire these edges automatically (`buildWorkflow` in `maestro.ts`: default → impl agent(s), split per-agent for fullstack; tdd → `@test`, since the human reviews the test plan before impl runs).
+
 Note: protocol templates live **only** in the agent template files, never in `maestro.json` — keeping the app/skill byte-identical `maestro.json` invariant intact. The hook reads them as a side input, exactly as it reads session state.
 
 ## Common questions — where to look

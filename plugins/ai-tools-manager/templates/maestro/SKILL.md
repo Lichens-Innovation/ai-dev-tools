@@ -56,7 +56,7 @@ Create tasks for each step in the success path using `TaskCreate`. Wire dependen
 The success path mixes three kinds of step:
 - `@<instance>` — an **agent step** (see below): dispatch a subagent with `Task`.
 - `/<skill>` — a **skill step**: run that skill **yourself, inline, in your own context** via the `Skill` tool (just as you ran the gate skills in Steps 2–3). Do **not** dispatch a subagent for it. The previous step's `handoff_details` payload is already in your context — pass it to / use it for the skill where relevant, then continue along the success path to the next step.
-- `human review` — a hard stop: surface the work to the user (see Principles).
+- `human review` — a hard stop: surface the work to the user (see Principles). If the user **approves**, continue along the success path. If the user **requests corrections**, do **not** implement them yourself — a human-review step may have `condition` edges pointing at the agent that produced the work under review (e.g. `human requested code corrections` → `@backend`). Dispatch the requested changes as a `Task` to that agent (matching the condition label to the user's intent — for fullstack, pick `@frontend` vs `@backend` by the nature of the change), then resume the success path from this step once the agent reports back. Only fall back to fixing it inline if no such condition edge exists.
 
 For each agent step, use `Task` to invoke the corresponding subagent. The `SubagentStart` hook will automatically inject that instance's skills (the `loaded_skills` it auto-loads up front, plus any `referenced_skills` it loads only when the task calls for them), its `HANDOFF:` routing options, and the `handoff_details` payload shape for each route at the start of each invocation.
 
@@ -84,7 +84,7 @@ node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done
 
 - **One workflow at a time.** Set the active workflow via `maestro-set-session-workflow.cjs` before invoking any subagents.
 - **Trust the success path.** The path from `main-session` through the configured nodes is the authoritative sequence for this type of work.
-- **Human reviews are hard stops.** Never bypass a `human review` step. Stop and surface the work to the user.
+- **Human reviews are hard stops.** Never bypass a `human review` step. Stop and surface the work to the user. When the user asks for changes, route them to the responsible agent via the human-review node's condition edges (see Step 5) instead of editing code in your own context.
 - **Skill steps run inline.** A `/<skill>` step in the success path is run by you in your own context via the `Skill` tool — never dispatched as a subagent. Feed it the prior step's handoff payload where relevant, then continue.
 - **Condition edges are feedback loops.** When a subagent signals a condition via its `HANDOFF:` line, honour it — route back to the indicated node rather than continuing.
 - **Let the hooks do the injection.** Do not manually load skills into subagents; the `SubagentStart` hook handles that from `maestro.json`.

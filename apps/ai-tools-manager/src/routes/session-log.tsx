@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { ScrollText } from "lucide-react";
+import { usePanelResize, PanelResizeHandle } from "@repo/ui/resizable-panel";
 import TopNav from "../components/top-nav";
 import SessionLogCards from "../components/session-log-cards";
 import SessionLogView from "../components/session-log-view";
@@ -16,6 +17,24 @@ function SessionLogPage() {
   const { entries, connected } = useSessionLog();
   const [activeId, setActiveId] = useState<number | null>(null);
   const sectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const left = usePanelResize({
+    initial: 180,
+    min: 140,
+    max: 400,
+    side: "right",
+    cssVar: "--log-left-w",
+    containerRef: gridRef,
+  });
+  const right = usePanelResize({
+    initial: 320,
+    min: 240,
+    max: 560,
+    side: "left",
+    cssVar: "--log-right-w",
+    containerRef: gridRef,
+  });
 
   const instances = useMemo(() => buildInstances(entries), [entries]);
 
@@ -51,10 +70,15 @@ function SessionLogPage() {
           </div>
         </div>
       ) : (
-        /* Three-pane layout */
+        /* Three-pane layout — left & right panes are drag-resizable */
         <div
-          className="flex-1 grid overflow-hidden"
-          style={{ gridTemplateColumns: "180px 1fr 320px" }}
+          ref={gridRef}
+          className="relative flex-1 grid overflow-hidden"
+          style={{
+            gridTemplateColumns: "var(--log-left-w) 1fr var(--log-right-w)",
+            ...left.style,
+            ...right.style,
+          }}
         >
           <SessionLogCards
             instances={instances}
@@ -69,6 +93,18 @@ function SessionLogPage() {
             connected={connected}
           />
           <SessionLogDetail instance={activeInstance} />
+
+          {/* resize handles overlaid on the pane borders */}
+          <PanelResizeHandle
+            onResizeStart={left.onResizeStart}
+            className="absolute top-0 bottom-0 z-10"
+            style={{ left: "var(--log-left-w)", marginLeft: "-3px" }}
+          />
+          <PanelResizeHandle
+            onResizeStart={right.onResizeStart}
+            className="absolute top-0 bottom-0 z-10"
+            style={{ right: "var(--log-right-w)", marginRight: "-3px" }}
+          />
         </div>
       )}
     </div>

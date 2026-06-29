@@ -1,4 +1,4 @@
-import { titleFromName } from "./text";
+import { titleFromName, stripNamespace } from "./text";
 import type { SessionLogEntry } from "./maestro-session-log";
 
 /**
@@ -57,7 +57,7 @@ export function buildInstances(entries: SessionLogEntry[]): Instance[] {
         displayName:
           entry.origin === "main_session"
             ? "Main Session"
-            : titleFromName(entry.origin),
+            : titleFromName(stripNamespace(entry.origin)),
         startIndex: i,
         entries: [],
         status: null,

@@ -1,6 +1,6 @@
 {
   "name": "ai-tools-manager",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Skills for managing the ai-dev-tools marketplace: create new skills and plugins",
   "author": {
     "name": "Samuel Daigle",
