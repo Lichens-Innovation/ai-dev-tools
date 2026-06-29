@@ -102,11 +102,33 @@ Generate a concise pull request description by analyzing git changes and using t
      3. Shorten or remove Level-2 sub-bullets starting from the least critical theme.
      4. Condense remaining lines.
 
-9. **Write file, copy to clipboard, remove file**
+9. **Write file, present options, execute**
    - At **PR project root**, create or overwrite `pr-description.md` with the full PR output.
-   - Call: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"`
-   - **On success:** remove the file and tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."**
-   - **On error:** leave `pr-description.md` in place and tell the user they can open it or copy manually.
+   - Ask the user to choose:
+
+     > **Option A — Post via GitHub CLI (`gh`)**: creates or updates the PR on GitHub directly.
+     > **Option B — Copy to clipboard**: copies the description so you can paste it manually.
+
+   - **Option A flow:**
+     1. Verify `gh` is available: `gh --version`. If missing, tell the user to install the GitHub CLI and fall back to Option B.
+     2. Check if a PR already exists for the current branch: `gh pr view --json number,url 2>/dev/null`
+        - PR exists → `gh pr edit --title "<semantic-title>" --body-file pr-description.md`
+        - No PR → `gh pr create --title "<semantic-title>" --body-file pr-description.md`
+     3. Capture the PR URL from the command output.
+     4. Remove `pr-description.md`.
+     5. Open the PR URL in the browser:
+        - macOS: `open <url>`
+        - Linux: `xdg-open <url>`
+        - Windows: `start <url>`
+     6. Tell the user the PR was created/updated and the browser is opening.
+     7. **On error:** leave `pr-description.md` in place, report the error, suggest Option B.
+
+   - **Option B flow:**
+     1. Call: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"`
+     2. **On success:** remove the file.
+     3. Fetch the PR URL for the current branch: `gh pr view --json url --jq '.url' 2>/dev/null`. If a URL is returned, open it in the browser (macOS: `open <url>`, Linux: `xdg-open <url>`, Windows: `start <url>`).
+     4. Tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."** If the browser was opened, mention it.
+     5. **On clipboard error:** leave `pr-description.md` in place and tell the user they can open it or copy manually.
 
 ## Output Format
 
