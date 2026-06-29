@@ -6,6 +6,7 @@
   "exports": {
     "./theme-toggle": "./src/theme-toggle.tsx",
     "./copyable-text": "./src/copyable-text.tsx",
+    "./resizable-panel": "./src/resizable-panel.tsx",
     "./slide-panel": "./src/slide-panel.tsx",
     "./button": "./src/button.tsx",
     "./field": "./src/field.tsx",

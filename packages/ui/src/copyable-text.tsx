@@ -3,7 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 
 interface CopyableTextProps {
   text: string
-  children: React.ReactNode
+  /** Static content, or a render function receiving the current `copied` state so the trigger can show a copied cue. */
+  children: React.ReactNode | ((copied: boolean) => React.ReactNode)
   className?: string
   copiedText?: string
   previewText?: string
@@ -37,8 +38,12 @@ export default function CopyableText({
       <Tooltip.Root>
         <Tooltip.Trigger
           render={(props) => (
-            <span {...props} className={`cursor-pointer select-none ${className}`}>
-              {children}
+            <span
+              {...props}
+              data-copied={copied ? '' : undefined}
+              className={`cursor-pointer select-none ${className}`}
+            >
+              {typeof children === 'function' ? children(copied) : children}
             </span>
           )}
           tabIndex={0}

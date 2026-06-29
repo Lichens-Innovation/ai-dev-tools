@@ -381,12 +381,56 @@ function AgentNodeComponent({
 function HumanStepNode({
   data,
   selected,
-}: NodeProps & { data: { maestroNode: MaestroNodeV3; onAddNext?: (id: string) => void } }) {
+}: NodeProps & {
+  data: {
+    maestroNode: MaestroNodeV3;
+    onAddNext?: (id: string) => void;
+    onAddConditionEdge?: (id: string) => void;
+    isPickingConditionSource?: boolean;
+  };
+}) {
   const maestro = data.maestroNode;
+  // Side condition "+" buttons let a human-review step route corrections back to the
+  // agent that produced the work under review (e.g. "human requested code corrections" → @backend).
+  const sideButtonClass = `w-5 h-5 rounded-full bg-white border-2 text-orange-500 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm focus:outline-none transition-all ${
+    data.isPickingConditionSource
+      ? "border-orange-500 animate-pulse scale-125"
+      : "border-orange-300 hover:bg-orange-50 hover:border-orange-500"
+  }`;
   return (
     <>
       <Handle type="target" position={Position.Top} id="top" />
+      <Handle type="source" position={Position.Left} id="left" style={{ top: "50%" }} />
+      <Handle type="source" position={Position.Right} id="right" style={{ top: "50%" }} />
       <div className="relative" style={{ width: 120, height: 60 }}>
+        {/* Left condition + button */}
+        <button
+          type="button"
+          style={{ position: "absolute", left: -10, top: "50%", transform: "translateY(-50%)" }}
+          className={sideButtonClass}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddConditionEdge?.(maestro.id);
+          }}
+          title="Add condition from this node"
+        >
+          +
+        </button>
+
+        {/* Right condition + button */}
+        <button
+          type="button"
+          style={{ position: "absolute", right: -10, top: "50%", transform: "translateY(-50%)" }}
+          className={sideButtonClass}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onAddConditionEdge?.(maestro.id);
+          }}
+          title="Add condition from this node"
+        >
+          +
+        </button>
+
         <div
           className={`flex items-center justify-center border-2 bg-amber-50 text-amber-800 ${selected ? "border-amber-500" : "border-amber-300"}`}
           style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", width: 120, height: 60 }}

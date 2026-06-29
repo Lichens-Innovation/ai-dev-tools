@@ -298,6 +298,19 @@ function buildWorkflow(
     )
   );
 
+  // Human-review corrections route back to whoever produced the work under review,
+  // so the responsible agent fixes it — not the main session. In the default flow the
+  // implementation agent(s) precede human review, so corrections go to them (split
+  // per-agent for fullstack). In tdd the human reviews the test plan before any impl
+  // runs, so corrections route to @test.
+  if (kind === "tdd") {
+    edges.push(cond("human_review-1", "test", "human requested test corrections"));
+  } else if (impl.length === 1) {
+    edges.push(cond("human_review-1", impl[0], "human requested code corrections"));
+  } else {
+    for (const a of impl) edges.push(cond("human_review-1", a, `human requested ${a} corrections`));
+  }
+
   return { name, nodes, edges };
 }
 

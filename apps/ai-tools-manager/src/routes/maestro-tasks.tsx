@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ListChecks, Copy, CircleCheck, CircleDot, CircleDashed } from "lucide-react";
+import { ListChecks, Copy, Check, CircleCheck, CircleDot, CircleDashed } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CopyableText from "@repo/ui/copyable-text";
@@ -149,9 +149,19 @@ function MaestroTasksPage() {
                     text={promptFor(active)}
                     copiedText="Prompt copied!"
                     previewText="Copy prompt for Claude Code"
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-primary bg-(--primary-dim) px-3 py-1.5 text-[12px] font-medium text-(--ink) hover:brightness-110"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-primary bg-(--primary-dim) px-3 py-1.5 text-[12px] font-medium text-(--ink) transition-colors hover:brightness-110 data-[copied]:border-(--green) data-[copied]:bg-(--green-dim) data-[copied]:text-(--green)"
                   >
-                    <Copy size={13} /> Copy prompt
+                    {(copied) =>
+                      copied ? (
+                        <>
+                          <Check size={13} /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} /> Copy prompt
+                        </>
+                      )
+                    }
                   </CopyableText>
                 </div>
 

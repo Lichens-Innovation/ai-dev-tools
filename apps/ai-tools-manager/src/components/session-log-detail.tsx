@@ -1,4 +1,5 @@
 import { humanizeLog, unaccountedSkills } from "../utils/session-log";
+import { stripNamespace } from "../utils/text";
 import type { Instance } from "../utils/session-log";
 
 interface SessionLogDetailProps {
@@ -75,7 +76,7 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
                       key={id}
                       className="inline-flex items-center rounded-full border border-[var(--green)] text-(--green) px-2 py-0.5 text-[11px] font-mono"
                     >
-                      {id}
+                      {stripNamespace(id)}
                     </span>
                   ))}
                 </div>
@@ -92,7 +93,7 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
                       key={id}
                       className="inline-flex items-center rounded-full border border-[var(--red)] text-(--red) px-2 py-0.5 text-[11px] font-mono"
                     >
-                      {id}
+                      {stripNamespace(id)}
                     </span>
                   ))}
                 </div>
@@ -109,7 +110,7 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
                     return (
                       <li key={s.id} className="font-mono text-[11px]">
                         <span className={hollow ? "text-(--yellow)" : "text-(--ink-2)"}>
-                          {s.id}
+                          {stripNamespace(s.id)}
                         </span>
                         <span className="text-(--ink-3)">
                           {" "}
