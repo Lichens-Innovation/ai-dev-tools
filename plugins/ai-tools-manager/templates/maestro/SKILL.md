@@ -19,6 +19,14 @@ Before doing anything else, identify the workflow that matches the user's reques
 node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-set-session-workflow.cjs" "<workflow name>"
 ```
 
+**If this run was invoked to complete a specific task-queue file** (the request named a `.claude/maestro-tasks/NNN-*.md` file), pass that filename too so it's recorded now — while you still have it in front of you — rather than re-derived at the end:
+
+```bash
+node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-set-session-workflow.cjs" "<workflow name>" --task "<NNN-filename.md>"
+```
+
+This writes `active_task` into the session state; Steps 5–6 use it to mark exactly that task done when the workflow finishes.
+
 ### Step 1 — Classify the request
 
 Read the workflow table in Step 4 (or `.claude/maestro.json`) to understand the available workflows and their success paths. Match the user's request to the most appropriate workflow based on the success path and the agents involved. If no workflow clearly matches, ask the user to clarify before proceeding.
@@ -43,6 +51,8 @@ Based on the classification, pick the success path to execute from the configure
 
 Create tasks for each step in the success path using `TaskCreate`. Wire dependencies with `TaskUpdate addBlockedBy`. Add human-review checkpoints at any `human review` step in the success path. Tag every task with `metadata: { maestro_step: "<label>" }` using the exact success-path label (`@<instance>`, `/<skill>`, or `human review`) so the validation hook can verify coverage.
 
+**If `active_task` is set** (Step 0 recorded a task-queue file), also create a final **mark-task-done** task as the last node — `subject: "Mark <active_task> done"`, `metadata: { maestro_step: "mark-task-done" }`, blocked by the last real success-path step via `TaskUpdate addBlockedBy`. Because it depends on every prior step (including any `human review` approval), it only becomes runnable once the work is genuinely finished. When that task comes up, execute Step 6 and complete it. Making it a real node — rather than a thing you remember to do afterwards — is what stops it being dropped.
+
 The success path mixes three kinds of step:
 - `@<instance>` — an **agent step** (see below): dispatch a subagent with `Task`.
 - `/<skill>` — a **skill step**: run that skill **yourself, inline, in your own context** via the `Skill` tool (just as you ran the gate skills in Steps 2–3). Do **not** dispatch a subagent for it. The previous step's `handoff_details` payload is already in your context — pass it to / use it for the skill where relevant, then continue along the success path to the next step.
@@ -58,15 +68,17 @@ If the line is missing or the label doesn't match any known condition, treat it 
 
 **Forward the handoff payload.** The subagent's final JSON includes a `handoff_details` object describing what the next agent needs (issues, failing tests, scribe notes, etc.). When you invoke the routed-to subagent, pass that `handoff_details` payload verbatim in its `Task` prompt — it is the structured input the receiving agent expects.
 
-### Step 6 — Mark the task done (only if this run came from a task file)
+### Step 6 — Mark the task done (the mark-task-done node)
 
-If — and only if — this run was invoked to complete a specific task-queue file (the request named a `.claude/maestro-tasks/NNN-*.md` file), mark it done **once the workflow has fully reached its successful end**, including approval at any `human review` step. Do not mark it done after a partial run, a condition-edge loop that hasn't resolved, or while a review is still pending.
+This step runs when you reach the **mark-task-done** task created in Step 5 — i.e. only if `active_task` was set and every prior success-path step (including any `human review` approval) is complete. Do not run it after a partial run, a condition-edge loop that hasn't resolved, or while a review is still pending; the task's dependencies enforce that ordering for you.
+
+Run the script with no filename — it reads `active_task` from the session state recorded in Step 0, so you don't re-derive it from the original prompt:
 
 ```bash
-node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done <filename>
+node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done
 ```
 
-`<filename>` is the bare task filename (e.g. `002-add-login.md`). The script flips that file to `done` and recomputes the queue's `status.json` so any dependents whose blockers are now all done become `ready` — you don't compute the cascade yourself. If the run was not invoked from a task file, skip this step.
+(You can still pass an explicit filename — `done 002-add-login.md` — to override.) The script flips that file to `done` and recomputes the queue's `status.json` so any dependents whose blockers are now all done become `ready` — you don't compute the cascade yourself. Then mark the mark-task-done task complete. If `active_task` is empty (the run wasn't invoked from a task file), there is no mark-task-done task and you skip this step.
 
 ## Principles
 

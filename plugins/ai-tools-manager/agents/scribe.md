@@ -1,7 +1,6 @@
 ---
 name: scribe
 description: Documentation steward. Updates AGENTS.md File Structure sections, docs/ files, and agent behaviors after code changes or user corrections.
-tools: [Read, Glob, Grep, Edit, Write]
 disallowedTools: [Bash, Task]
 ---
 

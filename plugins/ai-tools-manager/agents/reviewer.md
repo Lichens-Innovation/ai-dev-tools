@@ -1,7 +1,6 @@
 ---
 name: reviewer
 description: Senior Critic. Conducts final code review for style, correctness, redundancy, and requirement coverage before marking a feature complete.
-tools: [Read, Glob, Grep, Bash, Task]
 disallowedTools: [Edit, Write, NotebookEdit]
 ---
 
