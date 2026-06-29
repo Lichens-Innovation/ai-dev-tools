@@ -25,7 +25,7 @@ $ARGUMENTS
 
    If it prints `missing`, **stop without launching the form**. The orchestrator hasn't been installed, so editing config now would leave an unwired `maestro.json`. Tell the user to run **`/maestro-install`** first (it scaffolds the orchestrator and then opens this same editor), then stop.
 
-> **Dispatcher path.** When invoked by the `/ai-tools` dispatcher, the form payload (the `Maestro v3 config data:` block) is already supplied to you and the app already wrote `.claude/maestro.json`. In that case **skip Step 1** (do not launch the form) and go straight to Step 2 with the supplied payload; Steps 2–5 are unchanged. Step 0's precondition still applies.
+> **Dispatcher path.** When invoked by the `/ai-tools` dispatcher, the form payload (the `Maestro v3 config data:` block) is already supplied to you. In that case **skip Step 1** (do not launch the form) and go straight to Step 2 with the supplied payload; Steps 2–5 are unchanged. Step 0's precondition still applies.
 
 1. **Launch the form and read the payload.** Run the form launcher in the **background** — the user fills the form interactively, which can take a while:
 
@@ -87,10 +87,10 @@ $ARGUMENTS
    - `success_path` is **derived** (the orchestrator renderer computes it for the `Maestro:HANDOFFS` table); it is never stored in `maestro.json`.
    - each `rules` entry is **one assignment of a rule to one location** (`scope: "project"` for the root, or `paths: ["<dir>/**"]` for a directory) with a `source` of `"project"` (on-disk rule file, moved into place) or `"vibe-rules"` (installed via `vibe-rules load`). A rule id appears at most once. Step 4 applies these to the filesystem.
 
-2. **Write the config file** under `projectPath`:
-   - `<projectPath>/.claude/maestro.json` — the `config` object serialized with `JSON.stringify(config, null, 2)`: 2-space indent and **no trailing newline**. This must be byte-identical to what the app writes, so a double-write in local dev produces no git diff. This is the source of truth the hooks read. Create `.claude/` if needed.
+2. **Write the config file** under `projectPath`. **Always do this — do not skip it even if the file already exists.**
+   - `<projectPath>/.claude/maestro.json` — the `config` object from the form payload, serialized with `JSON.stringify(config, null, 2)`: 2-space indent and **no trailing newline**. Create `.claude/` if needed.
 
-   (In local dev the app already wrote it; writing it here makes the skill correct under Docker too, where the container can't reach the host project path.)
+   The app runs inside Docker and cannot write back to the host filesystem, so **you are always the one responsible for persisting the file**. Writing it unconditionally is safe — if the content is identical to what's on disk, git will show no diff.
 
 3. **Re-render the orchestrator** from the new `maestro.json`:
 

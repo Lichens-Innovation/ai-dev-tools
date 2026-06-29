@@ -4,6 +4,7 @@ import type { Instance } from "../utils/session-log";
 
 interface SessionLogDetailProps {
   instance: Instance | null;
+  cwd: string;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -15,7 +16,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
+export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProps) {
   if (!instance) {
     return (
       <div className="border-l border-(--line) flex items-center justify-center h-full">
@@ -25,7 +26,7 @@ export default function SessionLogDetail({ instance }: SessionLogDetailProps) {
   }
 
   const processLines = instance.entries
-    .map((e) => humanizeLog(e))
+    .map((e) => humanizeLog(e, cwd))
     .filter((line): line is string => line !== null);
 
   const unaccounted = unaccountedSkills(instance);

@@ -8,12 +8,15 @@ import SessionLogView from "../components/session-log-view";
 import SessionLogDetail from "../components/session-log-detail";
 import { useSessionLog } from "../utils/session-log-context";
 import { buildInstances } from "../utils/session-log";
+import { getProjectCwd } from "../utils/maestro-session-log";
 
 export const Route = createFileRoute("/session-log")({
+  loader: async () => ({ cwd: await getProjectCwd() }),
   component: SessionLogPage,
 });
 
 function SessionLogPage() {
+  const { cwd } = Route.useLoaderData();
   const { entries, connected } = useSessionLog();
   const [activeId, setActiveId] = useState<number | null>(null);
   const sectionRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -30,7 +33,7 @@ function SessionLogPage() {
   const right = usePanelResize({
     initial: 320,
     min: 240,
-    max: 560,
+    max: 1120,
     side: "left",
     cssVar: "--log-right-w",
     containerRef: gridRef,
@@ -91,8 +94,9 @@ function SessionLogPage() {
             onSelect={handleSelect}
             sectionRefs={sectionRefs}
             connected={connected}
+            cwd={cwd}
           />
-          <SessionLogDetail instance={activeInstance} />
+          <SessionLogDetail instance={activeInstance} cwd={cwd} />
 
           {/* resize handles overlaid on the pane borders */}
           <PanelResizeHandle

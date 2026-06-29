@@ -7,6 +7,7 @@ interface SessionLogViewProps {
   onSelect: (id: number) => void;
   sectionRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>;
   connected: boolean;
+  cwd: string;
 }
 
 function borderColor(status: Instance["status"]): string {
@@ -23,6 +24,7 @@ export default function SessionLogView({
   onSelect,
   sectionRefs,
   connected,
+  cwd,
 }: SessionLogViewProps) {
   return (
     <div className="flex flex-col min-h-0 overflow-hidden">
@@ -44,7 +46,7 @@ export default function SessionLogView({
         {instances.map((inst) => {
           const isActive = inst.id === activeId;
           const lines = inst.entries
-            .map((e) => humanizeLog(e))
+            .map((e) => humanizeLog(e, cwd))
             .filter((line): line is string => line !== null);
 
           return (
