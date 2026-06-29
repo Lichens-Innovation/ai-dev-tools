@@ -42,6 +42,11 @@ export function parseLogLines(raw: string): SessionLogEntry[] {
     .filter((e): e is SessionLogEntry => !!e && typeof e.origin === "string");
 }
 
+/** The host working directory — used client-side to display log file paths relative to it. */
+export const getProjectCwd = createServerFn({ method: "GET" }).handler(
+  async (): Promise<string> => readCwd()
+);
+
 export const getMaestroSessionLog = createServerFn({ method: "GET" }).handler(
   async (): Promise<SessionLogEntry[]> => {
     const file = resolveLogFile();

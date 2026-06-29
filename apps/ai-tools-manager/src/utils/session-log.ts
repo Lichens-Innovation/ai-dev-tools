@@ -200,7 +200,15 @@ function extractTriage(raw: string): SkillsTriage | null {
  * Returns null for entries that are covered by a richer dispatch/handoff line
  * (the bare PreToolUse "Agent" tool-call lines), which the view should filter out.
  */
-export function humanizeLog(entry: SessionLogEntry): string | null {
+/** Strip the cwd prefix from an absolute path so files under the project show relative. */
+function relPath(p: string, cwd: string): string {
+  if (!cwd) return p;
+  if (p === cwd) return ".";
+  const prefix = cwd.endsWith("/") ? cwd : cwd + "/";
+  return p.startsWith(prefix) ? p.slice(prefix.length) : p;
+}
+
+export function humanizeLog(entry: SessionLogEntry, cwd = ""): string | null {
   if (entry.kind === "dispatch") {
     return `calling \`${entry.agent}\` agent`;
   }
@@ -230,14 +238,14 @@ export function humanizeLog(entry: SessionLogEntry): string | null {
     const a = (arg ?? "").trim();
     switch (tool) {
       case "Read":
-        return `read file \`${a}\``;
+        return `read file \`${relPath(a, cwd)}\``;
       case "Write":
-        return `wrote file \`${a}\``;
+        return `wrote file \`${relPath(a, cwd)}\``;
       case "Edit":
       case "NotebookEdit":
-        return `edited file \`${a}\``;
+        return `edited file \`${relPath(a, cwd)}\``;
       case "Glob":
-        return `searched files \`${a}\``;
+        return `searched files \`${relPath(a, cwd)}\``;
       case "Grep":
         return `searched for \`${a}\``;
       case "Bash":
