@@ -9,6 +9,8 @@ user-invocable: false
 
 Before starting any implementation, run this check to decide whether `/design` must run first.
 
+> **Skills before source.** Before opening sibling or source files to judge the criteria below, check the available skills list: if a project skill documents the relevant resource or pattern, consult it first — it often answers "new resource?" and "is there a direct template?" without reading the files.
+
 ## Evaluation Criteria
 
 Answer each question YES or NO:

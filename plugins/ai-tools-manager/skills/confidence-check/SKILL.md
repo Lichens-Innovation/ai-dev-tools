@@ -18,6 +18,8 @@ Assess your readiness based on these four pillars (+0.25 each):
 3.  **Root Cause / Intent:** For bugs, is the root cause identified? For features, is the user's intent 100% unambiguous?
 4.  **Verification Plan:** Do you have a specific test or command ready to prove success?
 
+> **Skills before source.** When assessing Context Discovery and Architecture Alignment, check the available skills list first: if a project skill documents the file or logic you are about to open, read that skill before diving into source. It usually confirms what already exists, how it is structured, and the established pattern without a file-by-file dive — don't rediscover from code what a skill already explains.
+
 ## Execution Gates
 
 - **Score >= 0.9:** Proceed. Output a brief "Reasoning Chain" and the score, then start.

@@ -1,7 +1,6 @@
 ---
 name: refactor
 description: Code Quality Auditor. Identifies DRY violations, pattern drift, and project-specific quality issues. Produces a Refactoring Report and delegates fixes to the responsible agent.
-tools: [Read, Glob, Grep, Bash, Task]
 disallowedTools: [Edit, Write, NotebookEdit]
 ---
 

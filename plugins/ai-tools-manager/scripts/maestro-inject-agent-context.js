@@ -162,8 +162,12 @@ function collect(cfg, sessionPath, agentType) {
   if (result.referencedSkills.length > 0) {
     parts.push(
       `Skills available to the \`${agentType}\` agent instance (maestro.json v3, referenced_skills): ${result.referencedSkills.join(", ")}.\n\n` +
-        `Do NOT load these up front. Load one with the Skill tool only if the task at hand involves the logic that ` +
-        `skill describes (check each skill's description to decide); otherwise ignore it.`
+        `Do NOT bulk-load these up front — but they exist because they document logic you would otherwise have to ` +
+        `reverse-engineer from source. So before you open or edit a source file, check what each one covers (its ` +
+        `description is in your skills list): if a referenced skill documents that file or the logic it implements, ` +
+        `load it with the Skill tool FIRST — ` +
+        `read the skill before the source, not after. Load only the ones whose logic the task actually touches and ` +
+        `ignore the rest, but do not rediscover from the code what a skill already explains.`
     );
   }
 

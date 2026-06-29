@@ -110,6 +110,12 @@ function writeTasks(claudeDir, data) {
       heuristicMatch(ti.subject, ti.description, [...allLabels]) ||
       null;
 
+    // "mark-task-done" is a synthetic terminal step the orchestrator appends when
+    // the run came from a task-queue file (it runs maestro-task-status.cjs done at
+    // the very end). It's not a node in the workflow graph, so accept it as valid
+    // and skip coverage checks — otherwise it would trip the mismatch warning below.
+    if (resolvedLabel === "mark-task-done") process.exit(0);
+
     // --- Track created steps ---
     const tracker = readTasks(claudeDir);
     if (resolvedLabel) {

@@ -1,7 +1,6 @@
 ---
 name: backend
 description: Feature builder. Implements routes, services, models, and utility functions for the project's chosen stack.
-tools: [Read, Glob, Grep, Bash, Task, Edit, Write]
 ---
 
 # Backend Agent

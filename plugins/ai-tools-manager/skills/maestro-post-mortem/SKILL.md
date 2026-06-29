@@ -32,6 +32,8 @@ This is read-and-reason first; it never changes anything until the user opts in.
 4. **Offer to explore fixes.** Ask the user which snags they want to address — don't fix unprompted. For each one they pick, propose a concrete remediation mapped to the right Maestro lever, then **apply it once they confirm**:
    - tighten a subagent's prompt, or its handoff payload template at `templates/handoffs/<sender>/<receiver>.md`
    - add or adjust a skill/rule mapping — re-run `/maestro-app` for the visual editor, or hand-edit `.claude/maestro.json` and run `/maestro-update`
+   - make a skill agents *should* be using actually usable: give it proper frontmatter (`name` + a `description` that names the files/logic it covers) so it registers and the description matches the task — a skill with no/weak description never gets loaded, so the agent reverse-engineers from source instead
+   - retune where a skill lives: move it between an instance's `loaded_skills` (auto-load up front) and `referenced_skills` (load on demand) in `.claude/maestro.json` (then `/maestro-update`) when it was loaded too eagerly (context tax on unrelated tasks) or not eagerly enough (agent dove into source first)
    - adjust the orchestrator's prose in `.claude/skills/maestro/SKILL.md`
    - fix a workflow edge or a condition label that misrouted a handoff
    - or a plain process fix (e.g. "read the file once and reuse it", "run the typecheck only after the edit batch")

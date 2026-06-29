@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 // Sets the active workflow name in <cwd>/.claude/maestro_session.json.
 // Called by the Maestro orchestrator at the start of each workflow execution:
-//   node maestro-set-session-workflow.cjs "<workflow name>"
+//   node maestro-set-session-workflow.cjs "<workflow name>" [--task <NNN-file.md>]
 //
 // If no name is given, auto-resolves to the first configured workflow, else "default".
-// Creates the session file if absent; preserves existing generated_instances.
+// When `--task <filename>` is passed (the run was invoked to complete a specific
+// task-queue file), the bare filename is recorded as `active_task` so the
+// orchestrator can mark exactly that task done at the end of the success path
+// without re-deriving the filename from the original prompt — the fragile step
+// that otherwise gets dropped once the real work is finished.
+//
+// Creates the session file if absent; preserves every other existing key
+// (generated_instances, etc.).
 //
 // Self-contained on purpose: maestro-install.js copies this file into the
 // project's .claude/scripts/ so the orchestrator agent can run it via $CLAUDE_PROJECT_DIR.
@@ -12,7 +19,26 @@
 const fs = require("fs");
 const path = require("path");
 
-const workflowName = process.argv[2] ?? null;
+// Parse args: the first non-flag positional is the workflow name; `--task <f>`
+// (or `--task=<f>`) carries the optional task filename.
+function parseArgs(argv) {
+  let workflowName = null;
+  let task = null;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--task") {
+      task = argv[++i] ?? null;
+    } else if (a.startsWith("--task=")) {
+      task = a.slice("--task=".length);
+    } else if (!a.startsWith("--") && workflowName === null) {
+      workflowName = a;
+    }
+  }
+  return { workflowName, task };
+}
+
+const { workflowName, task } = parseArgs(process.argv.slice(2));
+const activeTask = task ? path.basename(task) : null; // tolerate a path; key on the bare filename
 const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 const sessionPath = path.join(projectDir, ".claude", "maestro_session.json");
 const maestroJsonPath = path.join(projectDir, ".claude", "maestro.json");
@@ -39,10 +65,16 @@ try {
     // Start fresh
   }
 
+  // Preserve every existing key (generated_instances, active_task from a prior
+  // call, etc.) and only override what this invocation sets.
   const updated = {
+    ...session,
     workflow: resolvedName,
     generated_instances: session.generated_instances ?? [],
   };
+  // Only touch active_task when a task was passed, so re-running this mid-session
+  // to switch workflows doesn't silently forget the task being completed.
+  if (activeTask) updated.active_task = activeTask;
 
   const claudeDir = path.join(projectDir, ".claude");
   if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
@@ -51,7 +83,8 @@ try {
   fs.writeFileSync(tmp, JSON.stringify(updated, null, 2));
   fs.renameSync(tmp, sessionPath);
 
-  process.stdout.write(`Maestro session: active workflow set to "${resolvedName}"\n`);
+  const taskNote = activeTask ? `, active task "${activeTask}"` : "";
+  process.stdout.write(`Maestro session: active workflow set to "${resolvedName}"${taskNote}\n`);
   process.exit(0);
 } catch (err) {
   process.stderr.write(`maestro-set-session-workflow: ${err.message}\n`);

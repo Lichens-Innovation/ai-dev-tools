@@ -1,7 +1,6 @@
 ---
 name: frontend
 description: Feature builder. Implements UI components, pages, client-side state, and styling for the project's chosen frontend stack.
-tools: [Read, Glob, Grep, Bash, Task, Edit, Write]
 ---
 
 # Frontend Agent
