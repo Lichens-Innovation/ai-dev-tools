@@ -98,6 +98,10 @@
     - [❌ Avoid `require()` in ESM or TypeScript Files](#-avoid-require-in-esm-or-typescript-files)
     - [✅ Prefer `import` for Static and `import()` for Dynamic Dependencies](#-prefer-import-for-static-and-import-for-dynamic-dependencies)
     - [ℹ️ Explanation](#ℹ️-explanation-23)
+  - [*HIGH* Prefer Getters for Derived State in TypeScript Classes](#high-prefer-getters-for-derived-state-in-typescript-classes)
+    - [❌ Avoid Repeating Derived Computations Inline in Class Methods](#-avoid-repeating-derived-computations-inline-in-class-methods)
+    - [✅ Prefer Simple Getters as Named Building Blocks](#-prefer-simple-getters-as-named-building-blocks)
+    - [ℹ️ Explanation](#ℹ️-explanation-getters)
   - [*MEDIUM* Prefer `const` Over `let` for Variable Declarations](#medium-prefer-const-over-let-for-variable-declarations)
     - [❌ Avoid Using `let` When `const` Can Be Used](#-avoid-using-let-when-const-can-be-used)
     - [✅ Prefer Using `const` To Promote Values That Do Not Change](#-prefer-using-const-to-promote-values-that-do-not-change)
@@ -1225,6 +1229,77 @@ const config = await import(`./config.${process.env.NODE_ENV}`);
 - **Module System Mismatch:** `require()` is the CommonJS module system. Using it in an ESM file (`.mjs`, or `.ts`/`.js` with `"type": "module"`) either throws at runtime or requires a workaround (`createRequire`).
 - **Tree-Shaking:** ESM `import` statements are statically analysable, enabling bundlers to eliminate dead code. `require()` is dynamic and opaque — bundlers cannot safely tree-shake it.
 - **Dynamic Imports:** When you need to load a module conditionally or lazily, use the ESM `import()` function (which returns a promise) instead of dynamic `require()`.
+
+## *HIGH* Prefer Getters for Derived State in TypeScript Classes
+
+When a class method recomputes the same derived value inline — or multiple methods duplicate the same expression — extract it as a getter. Getters act as named, reusable building blocks that keep individual methods simple and the class DRY.
+
+### ❌ Avoid Repeating Derived Computations Inline in Class Methods
+
+```ts
+class OrderSummary {
+  constructor(
+    private readonly items: OrderItem[],
+    private readonly firstName: string,
+    private readonly lastName: string,
+  ) {}
+
+  getLabel(): string {
+    // fullName and activeCount computed inline — duplicated if used elsewhere
+    const fullName = `${this.firstName} ${this.lastName}`;
+    const activeCount = this.items.filter((i) => i.active).length;
+    return `${fullName} (${activeCount} active)`;
+  }
+
+  getShortLabel(): string {
+    // same computation repeated
+    const activeCount = this.items.filter((i) => i.active).length;
+    return `Order: ${activeCount}`;
+  }
+}
+```
+
+### ✅ Prefer Simple Getters as Named Building Blocks
+
+```ts
+class OrderSummary {
+  constructor(
+    private readonly items: OrderItem[],
+    private readonly firstName: string,
+    private readonly lastName: string,
+  ) {}
+
+  // Derived state extracted to getters — each has one responsibility
+  get fullName(): string {
+    return `${this.firstName} ${this.lastName}`;
+  }
+
+  get activeItems(): OrderItem[] {
+    return this.items.filter((i) => i.active);
+  }
+
+  get activeCount(): number {
+    return this.activeItems.length;
+  }
+
+  // Methods compose getters — simple and DRY
+  getLabel(): string {
+    return `${this.fullName} (${this.activeCount} active)`;
+  }
+
+  getShortLabel(): string {
+    return `Order: ${this.activeCount}`;
+  }
+}
+```
+
+### ℹ️ Explanation {#ℹ️-explanation-getters}
+
+- **DRY internally:** Other class methods call the getter instead of repeating the expression. If the derivation logic changes, update one place.
+- **DRY externally:** Public getters let callers read derived state without reimplementing the logic outside the class.
+- **Composable building blocks:** Simple getters compose naturally — `activeCount` builds on `activeItems`, `getLabel` builds on `fullName` and `activeCount`. Each step is readable and testable in isolation.
+- **Keep getters pure:** Getters must read `this` properties and return a value with no side effects. A getter that modifies state or triggers I/O is a method, not a getter.
+- **Naming:** Name the getter after what it represents, not how it is computed (e.g. `activeCount`, not `getFilteredItemsLength`).
 
 ## *MEDIUM* Prefer `const` Over `let` for Variable Declarations
 
