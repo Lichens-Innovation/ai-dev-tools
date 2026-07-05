@@ -17,6 +17,7 @@ jobs:
         run: |
           rm -rf skills/
           mkdir -p skills/
+          shopt -s nullglob
           for skill_dir in plugins/*/skills/*/; do
             skill_name=$(basename "$skill_dir")
             cp -r "$skill_dir" "skills/$skill_name"
@@ -26,6 +27,7 @@ jobs:
         run: |
           rm -rf agents/
           mkdir -p agents/
+          shopt -s nullglob
           for agent_dir in plugins/*/agents/*/; do
             agent_name=$(basename "$agent_dir")
             cp -r "$agent_dir" "agents/$agent_name"
