@@ -6,6 +6,7 @@ on:
     paths:
       - 'plugins/*/skills/**'
       - 'plugins/*/agents/**'
+  workflow_dispatch:
 
 jobs:
   sync:
