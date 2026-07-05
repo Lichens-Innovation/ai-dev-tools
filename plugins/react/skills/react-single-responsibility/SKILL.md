@@ -126,6 +126,29 @@ Only apply in **`*.ts`** (plain functions) → threshold **40 lines**.
 - **Signal:** Copy-paste with minor variations.
 - **Fix:** Extract a **parameterized arrow function** (e.g. single `getMarketsForUser({ userId, status }: GetMarketsForUserArgs)` instead of `getActiveMarketsForUser` and `getClosedMarketsForUser`).
 
+### TypeScript classes — getters for derived state
+
+When the method lives inside a **TypeScript class**, consider extracting computed or derived values into **simple getters** before applying other simplifications.
+
+- **Signal:** A method (or multiple methods) recomputes the same derived value inline (e.g. `this.items.filter(...).length`, `this.firstName + ' ' + this.lastName`).
+- **Fix:** Extract a getter. Keep getters **simple and pure** — they should read `this` properties and return a value, with no side effects.
+
+```ts
+// Before — repeated inline computation
+get label() {
+  return `${this.firstName} ${this.lastName} (${this.items.filter(i => i.active).length})`;
+}
+
+// After — derived values extracted to getters
+get fullName() { return `${this.firstName} ${this.lastName}`; }
+get activeCount() { return this.items.filter(i => i.active).length; }
+get label() { return `${this.fullName} (${this.activeCount})`; }
+```
+
+- **DRY internally** — other class methods call the getter instead of repeating the expression.
+- **DRY externally** — public getters let callers read derived state without re-implementing the logic.
+- **Naming** — getter name describes *what it represents*, not *how it's computed* (e.g. `activeCount`, not `getFilteredItemsLength`).
+
 ---
 
 ## Shared (components and methods)
@@ -152,3 +175,4 @@ Only apply in **`*.ts`** (plain functions) → threshold **40 lines**.
 - [ ] Copy-pasted code? → extract and parameterize.
 - [ ] Control flow deeply nested? → use early returns and intermediate variables.
 - [ ] Comments explaining _what_? → rename for self-documenting code; keep comments for _why_ only.
+- [ ] Inside a class and re-computing derived state? → extract a getter (`get xyz() { return ... }`) to promote DRY and simplify method bodies.

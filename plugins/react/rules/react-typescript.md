@@ -34,6 +34,7 @@ paths:
 | Using `req.body` / external payloads directly | Validate at the boundary with `schema.parse(...)` / `safeParse` (zod) |
 | `process.env.X` read raw across the codebase | `env = schema.parse(process.env)` validated once at startup |
 | `const x = require("pkg")` in TS / ESM files | `import { x } from "pkg"` static, `await import(...)` for dynamic |
+| Inline derived computations repeated across class methods (`this.items.filter(...).length` in every method) | `get` accessor for each derived value; methods compose getters |
 
 ## MEDIUM
 
