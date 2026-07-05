@@ -5,17 +5,32 @@ description: "Scaffolds a new Claude Code plugin marketplace: creates the direct
 
 # Create Marketplace
 
-Scaffold a new plugin marketplace with valid manifest, then guide the user through local testing and (optionally) private-repo + auto-update setup before publishing.
+Scaffold a new plugin marketplace with a valid manifest, then guide the user through local testing and (optionally) private-repo + auto-update setup before publishing.
+
+## User's intention
+
+$ARGUMENTS
+
+## References
+
+Consult the relevant doc(s) before making structural decisions:
+
+- [`docs/marketplace.md`](${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
+- [`docs/plugins.md`](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md) — plugin structure, manifest, hooks and relative paths
+- [`docs/skills.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills.md) — skill format, popular repositories, skills CLI
+- [`docs/subagents.md`](${CLAUDE_SKILL_DIR}/../../../../docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
+- [`docs/hooks.md`](${CLAUDE_SKILL_DIR}/../../../../docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
+- [`docs/rules.md`](${CLAUDE_SKILL_DIR}/../../../../docs/rules.md) — rules format and scope
+- [`docs/mcp.md`](${CLAUDE_SKILL_DIR}/../../../../docs/mcp.md) — MCP server configuration
+- [`docs/memory.md`](${CLAUDE_SKILL_DIR}/../../../../docs/memory.md) — memory system, persistent memory for subagents
+- [`docs/skills-cli.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills-cli.md) — skills CLI commands
+- [`docs/claude-code.md`](${CLAUDE_SKILL_DIR}/../../../../docs/claude-code.md) — Claude Code settings, commands, IDE integrations
 
 ## Workflow
 
-1. **Gather info via script**
-   Run: `node <skill-dir>/scripts/gather-marketplace-info.cjs`
-   Returns one JSON line: `{ name, description, owner, homepage, targetDir, privateRepo }`.
+The form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. Parse the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` and proceed:
 
-   The script enforces unique kebab-case names and rejects names reserved by Anthropic (`anthropic-marketplace`, `claude-code-plugins`, `agent-skills`).
-
-2. **Create marketplace directory structure**
+1. **Create marketplace directory structure**
    ```
    <targetDir>/
    ├── .claude-plugin/
@@ -25,13 +40,13 @@ Scaffold a new plugin marketplace with valid manifest, then guide the user throu
    └── README.md
    ```
 
-3. **Write `.claude-plugin/marketplace.json`**
+2. **Write `.claude-plugin/marketplace.json`**
    ```json
    {
      "name": "<name>",
      "owner": {
-       "name": "<owner.name>",
-       "email": "<owner.email>"
+       "name": "<ownerName>",
+       "email": "<ownerEmail>"
      },
      "metadata": {
        "description": "<description>",
@@ -41,9 +56,9 @@ Scaffold a new plugin marketplace with valid manifest, then guide the user throu
      "plugins": []
    }
    ```
-   Required fields: `name` (kebab-case), `owner.name`, `plugins[]`. Omit `homepage` if user left it blank.
+   Omit `homepage` if the user left it blank.
 
-4. **Write `README.md`**
+3. **Write `README.md`**
    Minimal: title, one-line description, install instructions:
    ```markdown
    # <name>
@@ -52,42 +67,27 @@ Scaffold a new plugin marketplace with valid manifest, then guide the user throu
 
    ## Install
 
-   ```bash
+   \`\`\`bash
    claude plugin marketplace add <repo-or-path>
    claude plugin install <plugin-name>@<name>
+   \`\`\`
    ```
-   ```
 
-5. **Write `CLAUDE.md`**
-   Short context file for Claude Code sessions opened inside this marketplace repo. Explain that this is a marketplace catalog, point at `.claude-plugin/marketplace.json`, and describe the convention used for plugin source layout.
+4. **Write `CLAUDE.md`**
+   Short context file for Claude Code sessions opened inside this marketplace repo. Explain that this is a marketplace catalog, point at `.claude-plugin/marketplace.json`, and describe the plugin source layout convention.
 
-6. **Validate locally**
-   Run: `claude plugin validate <targetDir>`
-   The validator checks `marketplace.json`, every plugin's `plugin.json`, skill/agent/command frontmatter, and `hooks/hooks.json` for syntax and schema errors.
-
-7. **Test locally before sharing**
-   Tell the user to add at least one plugin (use `create-plugin` skill) then run:
-   ```bash
-   claude plugin marketplace add <targetDir>
-   claude plugin install <plugin-name>@<name>
-   ```
-   Inside Claude Code: `/plugin marketplace add <targetDir>` then `/plugin install <plugin-name>@<name>`.
-
-   This proves the marketplace resolves, the plugin manifest is valid, and the catalog can be navigated before anyone else sees it.
-
-8. **Configure auto-updates (optional)**
-   By default, third-party and local marketplaces have auto-update **disabled**. To enable for this marketplace once it is registered on the user's machine:
+5. **Configure auto-updates**
+   Third-party and local marketplaces have auto-update **disabled** by default. To enable once the marketplace is registered:
    - Run `/plugin` → **Marketplaces** tab → select marketplace → **Enable auto-update**.
 
-   Global env-var overrides (mention only if relevant to user's setup):
+   Global env-var overrides:
    ```bash
    export DISABLE_AUTOUPDATER=1          # disable everything
-   export FORCE_AUTOUPDATE_PLUGINS=1     # keep plugin auto-update only
+   export FORCE_AUTOUPDATE_PLUGINS=1     # keep plugin auto-update, disable Claude Code updates
    ```
-   See `docs/marketplace.md#auto-updates` for the full table.
 
-9. **Configure private repository access (only if `privateRepo` is true)**
-   For manual install/update, Claude Code uses existing git credentials (`gh auth login`, SSH key in `ssh-agent`, etc.). For background auto-update at startup, credential helpers are skipped — set the matching env var:
+6. **Configure private repository access** _(only if `privateRepo` is true)_
+   For background auto-update at startup, credential helpers are skipped — set the matching env var:
 
    | Provider  | Env vars                     |
    | --------- | ---------------------------- |
@@ -95,18 +95,13 @@ Scaffold a new plugin marketplace with valid manifest, then guide the user throu
    | GitLab    | `GITLAB_TOKEN` or `GL_TOKEN` |
    | Bitbucket | `BITBUCKET_TOKEN`            |
 
-   Example:
-   ```bash
-   export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-   ```
-   Add to `.bashrc` / `.zshrc` so it persists. For CI, set as a secret. See `docs/marketplace.md#private-repositories`.
+   Add to `.bashrc` / `.zshrc` so it persists. For CI, set as a secret. See `${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md#private-repositories`.
 
-10. **Report to user**
-    - `<targetDir>/.claude-plugin/marketplace.json` created
-    - `<targetDir>/README.md`, `CLAUDE.md`, and `plugins/` created
-    - Validation passed
-    - Next steps:
-      - Add plugins with `create-plugin` skill
-      - Test locally with `claude plugin marketplace add <targetDir>`
-      - When ready: push to a Git host, then share `claude plugin marketplace add owner/repo`
-      - Auto-update + private repo setup as above (if applicable)
+7. **Report to user**
+   - `<targetDir>/.claude-plugin/marketplace.json` created
+   - `<targetDir>/plugins/`, `README.md`, and `CLAUDE.md` created
+   - Next steps:
+     - Use `/create-plugin` to add plugins to the marketplace
+     - Then use `/create-skill` or `/create-subagent` to populate each plugin with tools
+     - Test locally: `claude plugin marketplace add <targetDir>`
+     - When ready to publish: push to a Git host, then share with `claude plugin marketplace add owner/repo`
