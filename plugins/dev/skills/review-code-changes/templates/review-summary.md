@@ -1,35 +1,14 @@
-## Review Summary
+## Review
 
-**Overall assessment**: [✅ Pass / ⚠️ Needs attention / ❌ Issues found]
+**Verdict**: ✅ Pass / ⚠️ Needs attention / ❌ Issues found
 
-### Contextual Sense
-- [ ] Changes align with stated purpose
-- [ ] Scope is appropriate
-- [ ] No unrelated changes
+**Contextual sense**: [ok | finding]
+**Regressions**: [none | finding]
+**Maintainability**: [ok | finding]
+**Readability**: [ok | finding]
 
-**Findings**: [Specific observations]
+## Issues
 
-### Regression Prevention
-- [ ] No breaking behavior changes
-- [ ] No unintended side effects
-- [ ] Edge cases preserved
-
-**Findings**: [Specific concerns or confirmations]
-
-### Maintainability & Evolvability
-- [ ] Code structure improved
-- [ ] Complexity reduced
-- [ ] Better testability
-
-**Findings**: [Specific improvements or concerns]
-
-### Readability
-- [ ] Code is clearer
-- [ ] Naming is descriptive
-- [ ] Formatting is consistent
-
-**Findings**: [Specific observations]
-
-## Recommendations
-
-[Actionable suggestions, prioritized by severity]
+- ❌ `path:line` — [problem]. [fix].
+- ⚠️ `path:line` — [problem]. [fix].
+- 💡 `path:line` — [problem]. [fix].
