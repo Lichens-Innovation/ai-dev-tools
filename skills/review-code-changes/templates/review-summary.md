@@ -4,32 +4,36 @@
 
 ### Contextual Sense
 - [ ] Changes align with stated purpose
-- [ ] Scope is appropriate
-- [ ] No unrelated changes
+- [ ] Scope appropriate — not too broad, not too narrow
+- [ ] No unrelated changes included
 
 **Findings**: [Specific observations]
 
 ### Regression Prevention
-- [ ] No breaking behavior changes
-- [ ] No unintended side effects
-- [ ] Edge cases preserved
+- [ ] No unintended behavior changes (intent-approved changes excluded)
+- [ ] No API/signature changes without coordination
+- [ ] Edge cases still handled correctly
 
 **Findings**: [Specific concerns or confirmations]
 
 ### Maintainability & Evolvability
-- [ ] Code structure improved
+- [ ] Structure improved (extracted functions, clearer modules)
 - [ ] Complexity reduced
-- [ ] Better testability
+- [ ] Established patterns followed consistently
 
 **Findings**: [Specific improvements or concerns]
 
 ### Readability
-- [ ] Code is clearer
-- [ ] Naming is descriptive
-- [ ] Formatting is consistent
+- [ ] Naming is clear and descriptive
+- [ ] Code flow easy to follow
+- [ ] Comments explain "why", not "what"
 
 **Findings**: [Specific observations]
 
-## Recommendations
+## Issues
 
-[Actionable suggestions, prioritized by severity]
+- ❌ `path:line` — [problem]. [fix].
+- ⚠️ `path:line` — [problem]. [fix].
+- 💡 `path:line` — [problem]. [fix].
+
+Severity: ❌ Critical · ⚠️ Warning · 💡 Suggestion
