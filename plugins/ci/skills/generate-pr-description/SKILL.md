@@ -12,9 +12,8 @@ Generate a concise pull request description by analyzing git changes and using t
 ## Workflow
 
 1. **Identify parent branch**
-   - Check current branch: `git rev-parse --abbrev-ref HEAD`
-   - Determine parent (usually `main` or `master`): `git show-branch | grep '*' | grep -v "$(git rev-parse --abbrev-ref HEAD)" | head -1 | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/[\^~].*//'`
-   - Or use: `git merge-base HEAD main` to find common ancestor
+   - Current branch: `git branch --show-current`
+   - Parent branch: default `main`; if absent, `master` (`git show-ref --verify --quiet refs/heads/main || echo master`)
 
 2. **Analyze changes**
    - Get diff stats: `git diff --stat <parent-branch>..HEAD`
@@ -102,43 +101,38 @@ Generate a concise pull request description by analyzing git changes and using t
      3. Shorten or remove Level-2 sub-bullets starting from the least critical theme.
      4. Condense remaining lines.
 
-9. **Write file, present options, execute**
-   - At **PR project root**, create or overwrite `pr-description.md` with the full PR output.
-   - Ask the user to choose:
-
-     > **Option A — Post via GitHub CLI (`gh`)**: creates or updates the PR on GitHub directly.
-     > **Option B — Copy to clipboard**: copies the description so you can paste it manually.
-
-   - **Option A flow:**
-     1. Verify `gh` is available: `gh --version`. If missing, tell the user to install the GitHub CLI and fall back to Option B.
-     2. Check if a PR already exists for the current branch: `gh pr view --json number,url 2>/dev/null`
-        - PR exists → `gh pr edit --title "<semantic-title>" --body-file pr-description.md`
-        - No PR → `gh pr create --title "<semantic-title>" --body-file pr-description.md`
-     3. Capture the PR URL from the command output.
-     4. Remove `pr-description.md`.
-     5. Open the PR URL in the browser:
-        - macOS: `open <url>`
-        - Linux: `xdg-open <url>`
-        - Windows: `start <url>`
-     6. Tell the user the PR was created/updated and the browser is opening.
-     7. **On error:** leave `pr-description.md` in place, report the error, suggest Option B.
-
-   - **Option B flow:**
-     1. Call: `node <skill-dir>/scripts/copy-to-clipboard.mjs "<full-path-to-pr-description.md>"`
-     2. **On success:** remove the file.
-     3. Fetch the PR URL for the current branch: `gh pr view --json url --jq '.url' 2>/dev/null`. If a URL is returned, open it in the browser (macOS: `open <url>`, Linux: `xdg-open <url>`, Windows: `start <url>`).
-     4. Tell the user: **"The full PR description is in the clipboard; you can paste it into your PR."** If the browser was opened, mention it.
-     5. **On clipboard error:** leave `pr-description.md` in place and tell the user they can open it or copy manually.
-
-## Output Format
-
-```markdown
-## PR Description
-
-<semantic-commit-style-title>
-
-<filled-template-markdown>
-```
+9. **Write file, confirm, execute**
+   1. At **PR project root**, write `pr-description.md`: **line 1** = semantic title, **line 2** = blank, **line 3+** = the filled template body. This exact shape is required — the commands below split the file on it (`head -1` for title, `tail -n +3` for body).
+   2. Verify `gh` and `jq` are available: `gh --version` / `jq --version`. If either is missing, tell the user to install it and stop — both are required, there is no fallback.
+   3. Ask the user to confirm: "Post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
+   4. On confirm, check if a PR already exists for the current branch: `gh pr view --json number --jq .number 2>/dev/null`
+      - **PR exists (PATCH — update):**
+        ```bash
+        jq -n \
+          --rawfile body <(tail -n +3 pr-description.md) \
+          --arg title "$(head -1 pr-description.md)" \
+          '{title: $title, body: $body}' \
+        | gh api repos/{owner}/{repo}/pulls/<number> -X PATCH --input -
+        ```
+      - **No PR (POST — create):**
+        ```bash
+        jq -n \
+          --rawfile body <(tail -n +3 pr-description.md) \
+          --arg title "$(head -1 pr-description.md)" \
+          --arg head "$(git branch --show-current)" \
+          --arg base "<parent-branch>" \
+          '{title: $title, body: $body, head: $head, base: $base}' \
+        | gh api repos/{owner}/{repo}/pulls -X POST --input -
+        ```
+      - `{owner}/{repo}` are literal — `gh api` resolves them from the repo detected in the current directory. PATCH cannot create a PR; POST cannot update an existing one — never substitute one for the other.
+   5. Capture the PR URL from the response JSON's `.html_url`.
+   6. Remove `pr-description.md`.
+   7. Open the PR URL in the browser:
+      - macOS: `open <url>`
+      - Linux: `xdg-open <url>`
+      - Windows: `start <url>`
+   8. Tell the user the PR was created/updated and the browser is opening.
+   9. **On error:** leave `pr-description.md` in place, report the error.
 
 ## Extended Example
 
