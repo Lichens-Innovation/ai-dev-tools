@@ -11,28 +11,28 @@
     "check": "prettier --check ."
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^5.4.0",
     "@repo/tailwind-config": "*",
     "@repo/ui": "*",
-    "@tanstack/react-router": "1.168.7",
-    "@tanstack/react-start": "1.167.13",
+    "@tanstack/react-router": "1.170.17",
+    "@tanstack/react-start": "1.168.27",
     "lucide-react": "^1.16.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "react-hook-form": "^7.76.0",
-    "tailwindcss": "4.1.18",
-    "zod": "4.3.6"
+    "tailwindcss": "4.3.2",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@repo/claude-fs": "*",
     "@repo/typescript-config": "*",
-    "@tailwindcss/vite": "4.1.18",
-    "@tanstack/router-plugin": "1.167.9",
+    "@tailwindcss/vite": "4.3.2",
+    "@tanstack/router-plugin": "1.168.19",
     "@types/node": "22.10.2",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
-    "@vitejs/plugin-react": "6.0.1",
-    "typescript": "6.0.2",
-    "vite": "8.0.0"
+    "@vitejs/plugin-react": "6.0.3",
+    "typescript": "6.0.3",
+    "vite": "8.1.3"
   }
 }
