@@ -105,8 +105,13 @@ Generate a concise pull request description by analyzing git changes and using t
 9. **Write file, confirm, execute**
    1. At **PR project root**, write `pr-description.md`: **line 1** = semantic title, **line 2** = blank, **line 3+** = the filled template body. This exact shape is required — the commands below split the file on it (`head -1` for title, `tail -n +3` for body).
    2. Verify `gh` and `jq` are available: `gh --version` / `jq --version`. If either is missing, tell the user to install it and stop — both are required, there is no fallback.
-   3. Ask the user to confirm: "Post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
-   4. On confirm, check if a PR already exists for the current branch: `gh pr view --json number --jq .number 2>/dev/null`
+   3. Verify `gh` auth has sufficient scope: run `gh auth status`.
+      - A `GITHUB_TOKEN` (or `GH_TOKEN`) environment variable silently overrides `gh`'s stored credentials, even when a properly-scoped account is already logged in. Check whether one is set (`env | grep -i _TOKEN=`); if so, also run `env -u GITHUB_TOKEN -u GH_TOKEN gh auth status` and compare.
+      - The required scope is `repo` (shown as `Token scopes: ...` per account in the output). If the active account is missing it but another logged-in account has it, prefix every `gh` command for the rest of this step (existing-PR check, PATCH, POST) with `env -u GITHUB_TOKEN -u GH_TOKEN`.
+      - If no account has `repo` scope, tell the user to run `gh auth refresh -h github.com -s repo` (or log in with a token that has it) and stop.
+      - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh api` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
+   4. Ask the user to confirm: "Post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
+   5. On confirm, check if a PR already exists for the current branch (prefix with the `env -u ...` from step 3 if one was needed): `gh pr view --json number --jq .number 2>/dev/null`
       - **PR exists (PATCH — update):**
         ```bash
         jq -n \
@@ -126,14 +131,14 @@ Generate a concise pull request description by analyzing git changes and using t
         | gh api repos/{owner}/{repo}/pulls -X POST --input -
         ```
       - `{owner}/{repo}` are literal — `gh api` resolves them from the repo detected in the current directory. PATCH cannot create a PR; POST cannot update an existing one — never substitute one for the other.
-   5. Capture the PR URL from the response JSON's `.html_url`.
-   6. Remove `pr-description.md`.
-   7. Open the PR URL in the browser:
+   6. Capture the PR URL from the response JSON's `.html_url`.
+   7. Remove `pr-description.md`.
+   8. Open the PR URL in the browser:
       - macOS: `open <url>`
       - Linux: `xdg-open <url>`
       - Windows: `start <url>`
-   8. Tell the user the PR was created/updated and the browser is opening.
-   9. **On error:** leave `pr-description.md` in place, report the error.
+   9. Tell the user the PR was created/updated and the browser is opening.
+   10. **On error:** leave `pr-description.md` in place, report the error.
 
 ## Extended Example
 
