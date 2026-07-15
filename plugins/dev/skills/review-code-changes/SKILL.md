@@ -1,6 +1,7 @@
 ---
 name: review-code-changes
 description: Reviews code changes for quality, maintainability, readability, and potential regressions. Supports reviewing explicitly mentioned files, git staged files, or changes between branches. Use when reviewing code changes, examining git diffs, reviewing staged changes, comparing branches, or when the user asks to review modifications.
+disable-model-invocation: true
 ---
 
 # Review Code Changes
