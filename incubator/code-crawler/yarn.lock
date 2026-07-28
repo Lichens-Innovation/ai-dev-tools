@@ -1026,20 +1026,20 @@
   resolved "https://registry.yarnpkg.com/@modelcontextprotocol/ext-apps/-/ext-apps-1.5.0.tgz#43de81703e01cd35441bf0c4b6901eb205cb520c"
   integrity sha512-q4fut89TOoP2LEPHSGfZErIf1K1xOTTzV+41h/bB2BqKw2gKb0uLKbHusOy1UtbY0puS16zBho/vFp3f5XMVbQ==
 
-"@modelcontextprotocol/inspector-cli@^0.21.2":
-  version "0.21.2"
-  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-cli/-/inspector-cli-0.21.2.tgz#7ad2a774358cd301bc71295fb9179c6f886cce3a"
-  integrity sha512-Om2ApfIbkbfR7+PqJX0bO2Qwg0z55MgxquC+G0YL6x80ElpZMfxITsWQ1238kh3bv1zlwPSePc2kvDnCcU5tXw==
+"@modelcontextprotocol/inspector-cli@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-cli/-/inspector-cli-1.0.1.tgz#b9b143f1843d1f69eee34d164e3c6a6404ef5cfd"
+  integrity sha512-BvuDpAVmo92X1dbz6Zm8fgY/+OFKCTTos7MILvNFB295aL9YFfET6aKYh9/uov7N9Soh6Pnm+qYxH0PfC0u4jw==
   dependencies:
     "@modelcontextprotocol/sdk" "^1.25.2"
     commander "^13.1.0"
     express "^5.2.1"
     spawn-rx "^5.1.2"
 
-"@modelcontextprotocol/inspector-client@^0.21.2":
-  version "0.21.2"
-  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-client/-/inspector-client-0.21.2.tgz#6ad612ff19bc331d07903c00752184e21eb28e57"
-  integrity sha512-8us3hVXDgMHGb5jF1bBE/a6rRRlEaS+SKjbDFB56oE6+mNcAP9JgL8h6T0fYd3XQ3vL/CYxjVeQE+5yRdvhsVg==
+"@modelcontextprotocol/inspector-client@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-client/-/inspector-client-1.0.1.tgz#626b78681ee01c32db1fd36744297abb77593bbd"
+  integrity sha512-V7TrzNc2jBf3B7yd5XIbDJpTBJLyVEPHIpujlGRP+0TIsBObMtBa+jHOw1oJAgGJSq3mXZ/BA7CedG/kUFH0vA==
   dependencies:
     "@mcp-ui/client" "^6.0.0"
     "@modelcontextprotocol/ext-apps" "^1.0.0"
@@ -1069,34 +1069,34 @@
     tailwind-merge "^2.5.3"
     zod "^3.25.76"
 
-"@modelcontextprotocol/inspector-server@^0.21.2":
-  version "0.21.2"
-  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-server/-/inspector-server-0.21.2.tgz#c92f52cff8d5afef627ac607fd830d72c6ec068a"
-  integrity sha512-ASFNPFMnT0Vn5u6aYRwwMrwA/0qpxb1lg3sE5GjWii5bUfPNXuIaLOXuXKSOFIMG4o82RxpuipdqX1ZdsmTPUw==
+"@modelcontextprotocol/inspector-server@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector-server/-/inspector-server-1.0.1.tgz#e3e950bde2ee2ac288197f724bb1be1e73c08a3b"
+  integrity sha512-99TMp1jx6OTZ31yLpNvlxr/bVo8yuJxCJr0+t/TFrGFChwGyhn3jSGdlN06g/4/TtGEvHoVFydmttrxcxuD3FA==
   dependencies:
     "@modelcontextprotocol/sdk" "^1.25.2"
     cors "^2.8.5"
     express "^5.1.0"
     express-rate-limit "^8.2.1"
-    shell-quote "^1.8.3"
+    shell-quote "^1.8.4"
     shx "^0.3.4"
     spawn-rx "^5.1.2"
     ws "^8.18.0"
     zod "^3.25.76"
 
-"@modelcontextprotocol/inspector@^0.21.2":
-  version "0.21.2"
-  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector/-/inspector-0.21.2.tgz#4e70f7722d4a631e1bc55897ece47ddd55802191"
-  integrity sha512-f/zIzl6ccYjIxSTgmol9EKvd8AXsXkIaZX16kLGhrYwxrApvU3IL6IzgOqATKP/2kgyKdFUOVLlHMxX9e6BZZA==
+"@modelcontextprotocol/inspector@^1.0.0":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@modelcontextprotocol/inspector/-/inspector-1.0.1.tgz#17ae86eba307e460a3f642d55dac0eca8dc0002b"
+  integrity sha512-ZMefwjYUFeeiv4eGqi0/GArUmbdGjoo2scvfnI7fbnafigVVdaPPlU5gmES4h2Pr7Bjtefyep4TbqDYdRtySNA==
   dependencies:
-    "@modelcontextprotocol/inspector-cli" "^0.21.2"
-    "@modelcontextprotocol/inspector-client" "^0.21.2"
-    "@modelcontextprotocol/inspector-server" "^0.21.2"
+    "@modelcontextprotocol/inspector-cli" "^1.0.1"
+    "@modelcontextprotocol/inspector-client" "^1.0.1"
+    "@modelcontextprotocol/inspector-server" "^1.0.1"
     "@modelcontextprotocol/sdk" "^1.25.2"
     concurrently "^9.2.0"
     node-fetch "^3.3.2"
     open "^10.2.0"
-    shell-quote "^1.8.3"
+    shell-quote "^1.8.4"
     spawn-rx "^5.1.2"
     ts-node "^10.9.2"
     zod "^3.25.76"
@@ -4674,10 +4674,15 @@ shebang-regex@^3.0.0:
   resolved "https://registry.yarnpkg.com/shebang-regex/-/shebang-regex-3.0.0.tgz#ae16f1644d873ecad843b0307b143362d4c42172"
   integrity sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==
 
-shell-quote@1.8.3, shell-quote@^1.8.3:
+shell-quote@1.8.3:
   version "1.8.3"
   resolved "https://registry.yarnpkg.com/shell-quote/-/shell-quote-1.8.3.tgz#55e40ef33cf5c689902353a3d8cd1a6725f08b4b"
   integrity sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==
+
+shell-quote@^1.8.4:
+  version "1.10.0"
+  resolved "https://registry.yarnpkg.com/shell-quote/-/shell-quote-1.10.0.tgz#482033e192e4f5c07151521ffa03400ec71b1b0f"
+  integrity sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==
 
 shelljs@^0.8.5:
   version "0.8.5"
