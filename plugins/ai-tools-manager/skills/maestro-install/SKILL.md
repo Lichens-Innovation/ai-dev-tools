@@ -55,15 +55,18 @@ $ARGUMENTS
    ```
 
    This is idempotent and:
-   - copies the `maestro` skill to `<projectPath>/.claude/skills/maestro/SKILL.md` (only if absent — your edits are preserved on re-runs),
-   - copies the runtime scripts (`maestro-set-session-workflow.cjs`, `maestro-render-orchestrator.cjs`, `bash-validation.sh`, `lib/maestro-session.cjs`) into `<projectPath>/.claude/scripts/`,
+   - installs the `maestro` skill at `<projectPath>/.claude/skills/maestro/SKILL.md` — copied whole if absent, otherwise its plugin-owned managed regions (`Maestro:STEPS`, `Maestro:PRINCIPLES`) are re-synced from the template while everything outside them, plus the rendered `Maestro:HANDOFFS` table, is preserved,
+   - copies the runtime scripts (`maestro-set-session-workflow.cjs`, `maestro-render-orchestrator.cjs`, `bash-validation.sh`, `lib/maestro-session.cjs`, `lib/maestro-skill-regions.cjs`) into `<projectPath>/.claude/scripts/`,
    - merges the `bash-validation.sh` PreToolUse Bash hook into `<projectPath>/.claude/settings.json` (preserving other keys), so `.env` reads are blocked,
-   - ensures `<projectPath>/.claude/.gitignore` ignores the ephemeral session files (`maestro_session.json`, `maestro_session.log.jsonl`),
-   - adds an `# Maestro` section to the repo-root `.gitignore` (`git rev-parse --show-toplevel`) ignoring every nested session file across the repo / monorepo via `**/.claude/maestro_session.json` and `**/.claude/maestro_session.log.jsonl`.
+   - adds an `# Maestro` section to the repo-root `.gitignore` (`git rev-parse --show-toplevel`) ignoring every nested session file across the repo / monorepo via `**/.claude/maestro_session.json`, `**/.claude/maestro_session.log.jsonl`, and `**/.claude/maestro_session_tasks.json`. The `**/` globs match `.claude/` at any depth including the root, so there is no per-project `.claude/.gitignore` to write.
 
-   It prints a JSON summary (`installedOrchestratorSkill`, `setBashHook`, `wroteGitignore`, `wroteRepoGitignore`). It does **not** render the skill's managed region — that needs `maestro.json`, which the next step produces.
+   It prints a JSON summary (`orchestratorSkill`, `installedOrchestratorSkill`, `setBashHook`, `wroteRepoGitignore`). It does **not** render the skill's managed region — that needs `maestro.json`, which the next step produces.
 
-   Note the `installedOrchestratorSkill` flag: `true` means a fresh `SKILL.md` was written; `false` means one was already present and was left untouched.
+   `orchestratorSkill.action` says what happened to `SKILL.md`:
+   - `installed` — no skill was present; the template was copied whole.
+   - `synced` — managed regions refreshed from the template (`.regions` lists which).
+   - `unchanged` — already in sync.
+   - `migrated` — the installed skill predates the managed-region markers, so it could not be synced in place: it was copied to `.claude/skills/maestro/SKILL.md.bak` (path in `.backup`) and replaced with the current template. **Tell the user**, and offer to re-apply any custom prose from the `.bak` file *outside* the managed regions before deleting it.
 
 4. **Author the config — run the `/maestro-app` skill.** Now that `maestro.md` exists, invoke the **`maestro-app`** skill, passing the detected implementation agents (and, if you assembled one in step 2, the skill map) as its arguments so the canvas opens already seeded for this project:
 
@@ -72,7 +75,7 @@ $ARGUMENTS
    `/maestro-app` turns these into `MAESTRO_IMPL_AGENTS` / `MAESTRO_SKILL_MAP` on the launcher (see its SKILL.md). It opens the visual editor, writes `maestro.json`, re-renders the orchestrator from the new config, and applies rule placements — and reports those details. If the user cancels the form, `/maestro-app` stops and reports the reason; nothing further to do here.
 
 5. **Confirm the install.** After `/maestro-app` returns, add a short scaffold-level summary on top of what it already reported:
-   - whether the orchestrator skill was newly installed (`installedOrchestratorSkill`) and whether the bash-validation hook was added to `settings.json`,
+   - what happened to the orchestrator skill (`orchestratorSkill.action` — including a `migrated` backup if there is one) and whether the bash-validation hook was added to `settings.json`,
    - that they invoke the orchestrator manually by running `/maestro`,
    - that they can re-open the editor any time with `/maestro-app`, re-render after a hand-edit with `/maestro-update`, and uninstall Maestro with `/maestro-uninstall`.
 

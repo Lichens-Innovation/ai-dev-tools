@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 // Scaffolds the Maestro orchestrator into a project. Idempotent — safe to re-run.
-//   1. copies templates/maestro/SKILL.md → <project>/.claude/skills/maestro/SKILL.md  (only if absent)
+//   1. installs templates/maestro/SKILL.md → <project>/.claude/skills/maestro/SKILL.md
+//      - absent            → copied whole
+//      - has the managed-region markers → the plugin-owned regions (Maestro:STEPS,
+//        Maestro:PRINCIPLES) are re-synced from the template, so template improvements
+//        reach existing installs. Content outside those regions, and the rendered
+//        Maestro:HANDOFFS table nested inside them, is preserved.
+//      - predates the markers → backed up to SKILL.md.bak and replaced with the
+//        template (there is no safe way to locate the managed regions in it);
+//        reported as `migratedOrchestratorSkill` so the skill can tell the user.
 //   2. copies runtime scripts        → <project>/.claude/scripts/        (always refreshed)
 //   3. merges the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
 //   4. adds an `# Maestro` section to the repo-root .gitignore ignoring every nested
@@ -19,6 +27,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { syncManagedRegions } = require("./lib/maestro-skill-regions.cjs");
 
 const projectDir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const pluginRoot = path.resolve(__dirname, "..");
@@ -29,10 +38,33 @@ function ensureDir(d) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
-function copyIfMissing(src, dest) {
-  if (fs.existsSync(dest)) return false;
-  fs.copyFileSync(src, dest);
-  return true;
+// Install / refresh the orchestrator skill. Returns one of:
+//   { action: "installed" }                     — first install, template copied whole
+//   { action: "synced", regions: [...] }        — plugin-owned regions refreshed in place
+//   { action: "unchanged" }                     — already identical to the template
+//   { action: "migrated", backup: "<path>" }    — pre-markers install, backed up + replaced
+function installOrchestratorSkill(templatePath, destPath) {
+  const template = fs.readFileSync(templatePath, "utf8");
+  if (!fs.existsSync(destPath)) {
+    fs.writeFileSync(destPath, template);
+    return { action: "installed" };
+  }
+
+  const installed = fs.readFileSync(destPath, "utf8");
+  const { text, synced, missing } = syncManagedRegions(installed, template);
+
+  if (missing.length > 0) {
+    // No markers to sync into: an install from before managed regions existed.
+    // Keep the old body next to the new one so custom prose isn't just lost.
+    const backup = `${destPath}.bak`;
+    fs.writeFileSync(backup, installed);
+    fs.writeFileSync(destPath, template);
+    return { action: "migrated", backup };
+  }
+
+  if (text === installed) return { action: "unchanged" };
+  fs.writeFileSync(destPath, text);
+  return { action: "synced", regions: synced };
 }
 
 // Append any missing `entries` to the .gitignore at `gitignorePath`, under the
@@ -124,7 +156,7 @@ try {
   ensureDir(scriptsDir);
   ensureDir(path.join(scriptsDir, "lib"));
 
-  const installedOrchestratorSkill = copyIfMissing(
+  const orchestratorSkill = installOrchestratorSkill(
     path.join(pluginRoot, "templates", "maestro", "SKILL.md"),
     path.join(orchestratorSkillDir, "SKILL.md")
   );
@@ -153,6 +185,10 @@ try {
     path.join(pluginRoot, "scripts", "lib", "maestro-tasks.cjs"),
     path.join(scriptsDir, "lib", "maestro-tasks.cjs")
   );
+  fs.copyFileSync(
+    path.join(pluginRoot, "scripts", "lib", "maestro-skill-regions.cjs"),
+    path.join(scriptsDir, "lib", "maestro-skill-regions.cjs")
+  );
 
   // PreToolUse Bash guard that blocks reading .env secret files. Copied with its
   // executable bit so the hook can run it directly.
@@ -166,7 +202,8 @@ try {
   process.stdout.write(
     JSON.stringify({
       ok: true,
-      installedOrchestratorSkill,
+      installedOrchestratorSkill: orchestratorSkill.action === "installed",
+      orchestratorSkill,
       setBashHook,
       wroteRepoGitignore,
     }) + "\n"

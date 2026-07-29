@@ -5,7 +5,7 @@ RUN corepack enable
 WORKDIR /app
 
 # Copy workspace manifests so pnpm can install all workspace dependencies
-COPY package.json pnpm.lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/claude-fs/package.json ./packages/claude-fs/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/styles/package.json ./packages/styles/
