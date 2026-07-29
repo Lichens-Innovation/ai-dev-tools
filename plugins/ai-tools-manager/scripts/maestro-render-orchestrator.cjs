@@ -10,6 +10,7 @@
 const fs = require("fs");
 const path = require("path");
 const { readJson, successPathSteps } = require("./lib/maestro-session.cjs");
+const { replaceRegion } = require("./lib/maestro-skill-regions.cjs");
 
 // Derived success path (never stored in maestro.json) for a single workflow.
 // The walk itself lives in lib/maestro-session.cjs (shared with the validation
@@ -32,16 +33,6 @@ function handoffTable(cfg) {
   return ["| Workflow | Success path |", "| --- | --- |", ...rows].join("\n");
 }
 
-function escapeRe(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function replaceRegion(text, start, end, replacement) {
-  const re = new RegExp(`${escapeRe(start)}[\\s\\S]*?${escapeRe(end)}`);
-  if (!re.test(text)) return text;
-  return text.replace(re, `${start}\n${replacement}\n${end}`);
-}
-
 function render(projectDir) {
   const cfg = readJson(path.join(projectDir, ".claude", "maestro.json"));
   if (!cfg) return { ok: false, reason: "maestro.json not found" };
@@ -49,7 +40,7 @@ function render(projectDir) {
   if (!fs.existsSync(skillPath)) return { ok: false, reason: "maestro/SKILL.md not found" };
 
   let text = fs.readFileSync(skillPath, "utf8");
-  text = replaceRegion(text, "<!-- Maestro:HANDOFFS:START -->", "<!-- Maestro:HANDOFFS:END -->", handoffTable(cfg));
+  text = replaceRegion(text, "HANDOFFS", handoffTable(cfg));
   fs.writeFileSync(skillPath, text);
   return { ok: true };
 }

@@ -7,8 +7,9 @@ description: "Orchestrates Maestro workflows: classifies the user's request, run
 
 You are the Maestro orchestrator for this project. Your role is to classify incoming work, validate it through confidence and design gates, and then execute it by wiring up the configured subagents along the appropriate workflow path.
 
-> The workflow table in Step 4 is **generated** from `.claude/maestro.json`. Don't edit it by hand — run `/maestro-update` (or re-open the editor with `/maestro-app`) to regenerate. Everything else in this file is yours to customise.
+> The regions between the `<!-- Maestro:... -->` markers below are **generated** — the workflow table from `.claude/maestro.json`, the steps and principles from the plugin's template. Don't edit them by hand; `/maestro-update` (or re-opening the editor with `/maestro-app`) overwrites them. Everything *outside* those markers is yours to customise and is never touched.
 
+<!-- Maestro:STEPS:START -->
 ## How to orchestrate
 
 ### Step 0 — Set active workflow
@@ -79,7 +80,9 @@ node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done
 ```
 
 (You can still pass an explicit filename — `done 002-add-login.md` — to override.) The script flips that file to `done` and recomputes the queue's `status.json` so any dependents whose blockers are now all done become `ready` — you don't compute the cascade yourself. Then mark the mark-task-done task complete. If `active_task` is empty (the run wasn't invoked from a task file), there is no mark-task-done task and you skip this step.
+<!-- Maestro:STEPS:END -->
 
+<!-- Maestro:PRINCIPLES:START -->
 ## Principles
 
 - **One workflow at a time.** Set the active workflow via `maestro-set-session-workflow.cjs` before invoking any subagents.
@@ -88,3 +91,4 @@ node "$CLAUDE_PROJECT_DIR/.claude/scripts/maestro-task-status.cjs" done
 - **Skill steps run inline.** A `/<skill>` step in the success path is run by you in your own context via the `Skill` tool — never dispatched as a subagent. Feed it the prior step's handoff payload where relevant, then continue.
 - **Condition edges are feedback loops.** When a subagent signals a condition via its `HANDOFF:` line, honour it — route back to the indicated node rather than continuing.
 - **Let the hooks do the injection.** Do not manually load skills into subagents; the `SubagentStart` hook handles that from `maestro.json`.
+<!-- Maestro:PRINCIPLES:END -->

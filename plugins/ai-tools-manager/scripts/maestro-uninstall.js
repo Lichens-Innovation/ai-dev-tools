@@ -9,9 +9,11 @@
 //   are preserved), deletes the ephemeral session files (maestro_session.json,
 //   maestro_session.log.jsonl, maestro_session_tasks.json), and cleans up any
 //   legacy `agent: "maestro"` key left by older installs.
-// --purge: additionally removes the installed orchestrator skill, the
+// --purge: additionally removes the installed orchestrator skill (and any
+//   SKILL.md.bak the installer's managed-region migration left behind), the
 //   project-copied runtime scripts, and the user-authored config (maestro.json) —
-//   i.e. everything the install pipeline produced.
+//   i.e. everything the install pipeline produced. Keep this list in sync with the
+//   files maestro-install.js copies into .claude/scripts/.
 //
 // Default (no --purge): never touches maestro.json — that is the user-authored
 // config and is kept so a later /maestro-install or /maestro-update can restore things.
@@ -88,10 +90,15 @@ try {
   if (purge) {
     const targets = [
       path.join(claudeDir, "skills", "maestro", "SKILL.md"),
+      // Backup left by the installer when it migrates a pre-managed-regions skill.
+      path.join(claudeDir, "skills", "maestro", "SKILL.md.bak"),
       path.join(claudeDir, "scripts", "maestro-set-session-workflow.cjs"),
       path.join(claudeDir, "scripts", "maestro-render-orchestrator.cjs"),
+      path.join(claudeDir, "scripts", "maestro-task-status.cjs"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
       path.join(claudeDir, "scripts", "lib", "maestro-session.cjs"),
+      path.join(claudeDir, "scripts", "lib", "maestro-tasks.cjs"),
+      path.join(claudeDir, "scripts", "lib", "maestro-skill-regions.cjs"),
       path.join(claudeDir, "maestro.json"),
     ];
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));

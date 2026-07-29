@@ -19,4 +19,5 @@ services:
     environment:
       - NODE_ENV=development
       - RUNNING_IN_DOCKER=true
+      - CI=true
     command: pnpm --filter helper-server dev
