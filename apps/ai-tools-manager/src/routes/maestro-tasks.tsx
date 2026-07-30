@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ListChecks, Copy, Check, CircleCheck, CircleDot, CircleDashed } from "lucide-react";
+import { ListChecks, Copy, Check, CircleCheck, CircleDot, CircleDashed, CheckCheck } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CopyableText from "@repo/ui/copyable-text";
+import { toast } from "@repo/ui/toast";
 import TopNav from "../components/top-nav";
-import { getMaestroTasks, type MaestroTask, type TaskStatus } from "../utils/maestro-tasks";
+import { getMaestroTasks, closeMaestroTask, type MaestroTask, type TaskStatus } from "../utils/maestro-tasks";
 
 export const Route = createFileRoute("/maestro-tasks")({
   loader: async () => ({ tasks: await getMaestroTasks() }),
@@ -35,9 +36,11 @@ function StatusBadge({ status }: { status: TaskStatus }) {
 }
 
 function MaestroTasksPage() {
-  const { tasks } = Route.useLoaderData();
+  const loaderData = Route.useLoaderData();
+  const [tasks, setTasks] = useState<MaestroTask[]>(loaderData.tasks);
   const [filter, setFilter] = useState<Filter>("open");
   const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   const openCount = useMemo(() => tasks.filter(isOpen).length, [tasks]);
   const closedCount = tasks.length - openCount;
@@ -49,6 +52,18 @@ function MaestroTasksPage() {
 
   // Keep a valid selection within the current filter; default to the first row.
   const active = visible.find((t) => t.filename === activeFile) ?? visible[0];
+
+  const handleClose = async (task: MaestroTask) => {
+    setClosing(true);
+    try {
+      const next = await closeMaestroTask({ data: { filename: task.filename } });
+      setTasks(next);
+      setActiveFile(null);
+      toast(`Closed ${task.title}`);
+    } finally {
+      setClosing(false);
+    }
+  };
 
   const isEmpty = tasks.length === 0;
 
@@ -145,24 +160,36 @@ function MaestroTasksPage() {
                       {active.title}
                     </h2>
                   </div>
-                  <CopyableText
-                    text={promptFor(active)}
-                    copiedText="Prompt copied!"
-                    previewText="Copy prompt for Claude Code"
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-primary bg-(--primary-dim) px-3 py-1.5 text-[12px] font-medium text-(--ink) transition-colors hover:brightness-110 data-[copied]:border-(--green) data-[copied]:bg-(--green-dim) data-[copied]:text-(--green)"
-                  >
-                    {(copied) =>
-                      copied ? (
-                        <>
-                          <Check size={13} /> Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={13} /> Copy prompt
-                        </>
-                      )
-                    }
-                  </CopyableText>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {active.status !== "done" && (
+                      <button
+                        type="button"
+                        onClick={() => handleClose(active)}
+                        disabled={closing}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-(--line) px-3 py-1.5 text-[12px] font-medium text-(--ink-3) transition-colors hover:border-(--green) hover:text-(--green) disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        <CheckCheck size={13} /> Close task
+                      </button>
+                    )}
+                    <CopyableText
+                      text={promptFor(active)}
+                      copiedText="Prompt copied!"
+                      previewText="Copy prompt for Claude Code"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-(--primary-dim) px-3 py-1.5 text-[12px] font-medium text-(--ink) transition-colors hover:brightness-110 data-[copied]:border-(--green) data-[copied]:bg-(--green-dim) data-[copied]:text-(--green)"
+                    >
+                      {(copied) =>
+                        copied ? (
+                          <>
+                            <Check size={13} /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} /> Copy prompt
+                          </>
+                        )
+                      }
+                    </CopyableText>
+                  </div>
                 </div>
 
                 <div className="prose prose-neutral max-w-none">

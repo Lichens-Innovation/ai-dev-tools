@@ -61,57 +61,122 @@ function readStatusMap(dir: string): StatusMap {
   }
 }
 
+// Atomic write, sorted keys — mirrors writeStatus() in
+// plugins/ai-tools-manager/scripts/lib/maestro-tasks.cjs so a save from either
+// side produces a stable, reviewable diff.
+function writeStatusMap(dir: string, statusMap: StatusMap): void {
+  fs.mkdirSync(dir, { recursive: true });
+  const ordered: StatusMap = {};
+  for (const k of Object.keys(statusMap).sort((a, b) => a.localeCompare(b))) {
+    ordered[k] = statusMap[k];
+  }
+  const target = path.join(dir, STATUS_FILE);
+  const tmp = `${target}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(ordered, null, 2)}\n`);
+  fs.renameSync(tmp, target);
+}
+
+function listTaskFiles(dir: string): string[] {
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
+  } catch {
+    return [];
+  }
+  // Numbered files sort lexicographically into their topological run order.
+  return files.sort((a, b) => a.localeCompare(b));
+}
+
+// Recompute the full status map from the files on disk plus an authoritative
+// done-set — the single source of cascade logic, kept in sync with
+// buildStatusMap() in lib/maestro-tasks.cjs.
+function buildStatusMap(dir: string, files: string[], doneSet: Set<string>): StatusMap {
+  const fileSet = new Set(files);
+  const out: StatusMap = {};
+  for (const filename of files) {
+    let content = "";
+    try {
+      content = fs.readFileSync(path.join(dir, filename), "utf8");
+    } catch {
+      content = "";
+    }
+    const blockedBy = parseBlockedBy(content);
+    const status: TaskStatus = doneSet.has(filename)
+      ? "done"
+      : blockedBy.every((b) => doneSet.has(b) || !fileSet.has(b))
+        ? "ready"
+        : "blocked";
+    out[filename] = { status, blockedBy };
+  }
+  return out;
+}
+
+function tasksFromFiles(dir: string, files: string[], statusMap: StatusMap): MaestroTask[] {
+  const fileSet = new Set(files);
+  const doneSet = new Set(files.filter((f) => statusMap[f]?.status === "done"));
+
+  return files.map((filename) => {
+    let content = "";
+    try {
+      content = fs.readFileSync(path.join(dir, filename), "utf8");
+    } catch {
+      content = "";
+    }
+    const entry = statusMap[filename];
+    const blockedBy = entry?.blockedBy ?? parseBlockedBy(content);
+    let status: TaskStatus;
+    if (entry?.status) {
+      status = entry.status; // materialized in status.json — read it directly
+    } else if (doneSet.has(filename)) {
+      status = "done";
+    } else {
+      // Derive: ready when every blocker is done or no longer exists.
+      const satisfied = blockedBy.every((b) => doneSet.has(b) || !fileSet.has(b));
+      status = satisfied ? "ready" : "blocked";
+    }
+    return {
+      filename,
+      relativePath: path.posix.join(".claude", "maestro-tasks", filename),
+      title: parseTitle(content, filename),
+      blockedBy,
+      status,
+      content,
+    };
+  });
+}
+
+function tasksDirFor(cwd: string): string {
+  return path.join(mountedProjectPath(cwd), TASKS_SUBDIR);
+}
+
 export const getMaestroTasks = createServerFn({ method: "GET" }).handler(
   async (): Promise<MaestroTask[]> => {
     const cwd = readCwd();
     if (!cwd) return [];
-    const dir = path.join(mountedProjectPath(cwd), TASKS_SUBDIR);
-
-    let files: string[];
-    try {
-      files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
-    } catch {
-      return [];
-    }
-
-    // Numbered files sort lexicographically into their topological run order.
-    files.sort((a, b) => a.localeCompare(b));
-
-    const statusMap = readStatusMap(dir);
-    const fileSet = new Set(files);
-    // Done-set drives the live fallback derivation for any file status.json
-    // doesn't cover, so a partially-synced queue still renders coherently.
-    const doneSet = new Set(
-      files.filter((f) => statusMap[f]?.status === "done")
-    );
-
-    return files.map((filename) => {
-      let content = "";
-      try {
-        content = fs.readFileSync(path.join(dir, filename), "utf8");
-      } catch {
-        content = "";
-      }
-      const entry = statusMap[filename];
-      const blockedBy = entry?.blockedBy ?? parseBlockedBy(content);
-      let status: TaskStatus;
-      if (entry?.status) {
-        status = entry.status; // materialized in status.json — read it directly
-      } else if (doneSet.has(filename)) {
-        status = "done";
-      } else {
-        // Derive: ready when every blocker is done or no longer exists.
-        const satisfied = blockedBy.every((b) => doneSet.has(b) || !fileSet.has(b));
-        status = satisfied ? "ready" : "blocked";
-      }
-      return {
-        filename,
-        relativePath: path.posix.join(".claude", "maestro-tasks", filename),
-        title: parseTitle(content, filename),
-        blockedBy,
-        status,
-        content,
-      };
-    });
+    const dir = tasksDirFor(cwd);
+    const files = listTaskFiles(dir);
+    return tasksFromFiles(dir, files, readStatusMap(dir));
   }
 );
+
+// Mark one task file done, then recompute the ready/blocked cascade for every
+// task (a dependent whose only blocker just closed flips to ready) and persist
+// to status.json — the same operation `maestro-task-status.cjs done` performs,
+// so a close from the UI and one from the orchestrator can't disagree.
+export const closeMaestroTask = createServerFn({ method: "POST" })
+  .inputValidator((data: { filename: string }) => data)
+  .handler(async ({ data }): Promise<MaestroTask[]> => {
+    const cwd = readCwd();
+    if (!cwd) return [];
+    const dir = tasksDirFor(cwd);
+    const files = listTaskFiles(dir);
+    const existingStatus = readStatusMap(dir);
+    const filename = path.basename(data.filename);
+    if (!files.includes(filename)) return tasksFromFiles(dir, files, existingStatus);
+
+    const doneSet = new Set(files.filter((f) => existingStatus[f]?.status === "done"));
+    doneSet.add(filename);
+    const statusMap = buildStatusMap(dir, files, doneSet);
+    writeStatusMap(dir, statusMap);
+    return tasksFromFiles(dir, files, statusMap);
+  });
