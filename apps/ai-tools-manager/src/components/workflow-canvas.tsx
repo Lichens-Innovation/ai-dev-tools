@@ -46,6 +46,9 @@ interface WorkflowCanvasProps {
   onInstancesChange: (instances: MaestroInstanceV3[]) => void;
 }
 
+// Vertical gap between a node and the step added below it.
+const INSERT_ROW_HEIGHT = 160;
+
 // ── Dagre layout ────────────────────────────────────────────────────
 
 // Estimated rendered height of a node, so dagre spaces skill-heavy agent nodes apart
@@ -157,6 +160,27 @@ function findSuccessTerminalId(edges: Edge[]): string {
 // Enforces the "at most one success edge per node" constraint.
 function replaceSuccessEdgeFrom(edges: Edge[], sourceId: string): Edge[] {
   return edges.filter((e) => !(e.source === sourceId && isSuccessEdge(e)));
+}
+
+// Build a success edge (bottom → top) between two nodes.
+function makeSuccessEdge(from: string, to: string): Edge {
+  return {
+    id: `e-${from}-${to}`,
+    source: from,
+    sourceHandle: "bottom",
+    target: to,
+    targetHandle: "top",
+    type: "successEdge",
+    data: {
+      maestroEdge: {
+        from,
+        to,
+        kind: "success",
+        sourceHandle: "bottom",
+        targetHandle: "top",
+      } as MaestroEdgeV3,
+    },
+  };
 }
 
 // Generate a unique human-review node id of the form "human_review-N"
@@ -384,12 +408,25 @@ function HumanStepNode({
 }: NodeProps & {
   data: {
     maestroNode: MaestroNodeV3;
+    onDelete?: (id: string) => void;
     onAddNext?: (id: string) => void;
     onAddConditionEdge?: (id: string) => void;
     isPickingConditionSource?: boolean;
   };
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const maestro = data.maestroNode;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   // Side condition "+" buttons let a human-review step route corrections back to the
   // agent that produced the work under review (e.g. "human requested code corrections" → @backend).
   const sideButtonClass = `w-5 h-5 rounded-full bg-white border-2 text-orange-500 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm focus:outline-none transition-all ${
@@ -436,6 +473,35 @@ function HumanStepNode({
           style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", width: 120, height: 60 }}
         >
           <span className="text-[11px] font-medium text-amber-800">Review</span>
+        </div>
+
+        {/* Kebab menu — sibling of the clipped diamond so it isn't cut off by the clipPath */}
+        <div className="absolute" style={{ right: -6, top: -14 }} ref={menuRef}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            className="w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none text-amber-500 hover:bg-amber-100"
+            title="Step options"
+          >
+            ⋮
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-6 z-50 w-40 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
+              <button
+                type="button"
+                className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
+                onClick={() => {
+                  data.onDelete?.(maestro.id);
+                  setMenuOpen(false);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
         </div>
         {/* Bottom "+" — add next step */}
         <button
@@ -836,13 +902,19 @@ export default function WorkflowCanvas({
 
   const deleteNode = useCallback(
     (nodeId: string) => {
-      setRfNodes((nds) => {
-        const next = nds.filter((n) => n.id !== nodeId);
-        const nextEdges = rfEdgesRef.current.filter((e) => e.source !== nodeId && e.target !== nodeId);
-        setRfEdges(nextEdges);
-        pushChange(next, nextEdges);
-        return next;
-      });
+      const edges = rfEdgesRef.current;
+      const nextNodes = rfNodesRef.current.filter((n) => n.id !== nodeId);
+      let nextEdges = edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+      // Removing a node from the middle of the success path would leave the chain severed —
+      // re-join its predecessor to its successor so the happy path stays connected.
+      const incoming = edges.find((e) => e.target === nodeId && isSuccessEdge(e));
+      const outgoing = edges.find((e) => e.source === nodeId && isSuccessEdge(e));
+      if (incoming && outgoing && incoming.source !== outgoing.target) {
+        nextEdges = [...replaceSuccessEdgeFrom(nextEdges, incoming.source), makeSuccessEdge(incoming.source, outgoing.target)];
+      }
+      setRfNodes(nextNodes);
+      setRfEdges(nextEdges);
+      pushChange(nextNodes, nextEdges);
     },
     [pushChange]
   );
@@ -1026,7 +1098,8 @@ export default function WorkflowCanvas({
       const resolved = resolveInstanceFromPicker(conditionPicker, {
         instances,
         placedNames: placedInstanceNames,
-        availableAgents,
+        // Fall back only to a subagent not already placed in this workflow.
+        availableAgents: availableAgents.filter((a) => !placedAgentTypes.has(a)),
       });
       if (!resolved) return;
       const instanceName = resolved.instance.name;
@@ -1082,6 +1155,7 @@ export default function WorkflowCanvas({
     rfEdges,
     instances,
     availableAgents,
+    placedAgentTypes,
     placedInstanceNames,
     onInstancesChange,
     pushChange,
@@ -1119,7 +1193,7 @@ export default function WorkflowCanvas({
     const sourceNode = rfNodes.find((n) => n.id === addStepSourceId);
     const position = {
       x: sourceNode?.position.x ?? 0,
-      y: (sourceNode?.position.y ?? 0) + 160,
+      y: (sourceNode?.position.y ?? 0) + INSERT_ROW_HEIGHT,
     };
 
     let newRfNode: Node;
@@ -1129,7 +1203,8 @@ export default function WorkflowCanvas({
       const resolved = resolveInstanceFromPicker(addStepPicker, {
         instances,
         placedNames: placedInstanceNames,
-        availableAgents,
+        // Fall back only to a subagent not already placed in this workflow.
+        availableAgents: availableAgents.filter((a) => !placedAgentTypes.has(a)),
       });
       if (!resolved) return;
       nodeId = resolved.instance.name;
@@ -1148,27 +1223,26 @@ export default function WorkflowCanvas({
       newRfNode = { id: nodeId, type: "humanStep", position, data: { maestroNode } };
     }
 
-    const newEdge: Edge = {
-      id: `e-${addStepSourceId}-${nodeId}`,
-      source: addStepSourceId,
-      sourceHandle: "bottom",
-      target: nodeId,
-      targetHandle: "top",
-      type: "successEdge",
-      data: {
-        maestroEdge: {
-          from: addStepSourceId,
-          to: nodeId,
-          kind: "success",
-          sourceHandle: "bottom",
-          targetHandle: "top",
-        } as MaestroEdgeV3,
-      },
-    };
+    // The step is inserted *between* the source and whatever it already pointed at, so the
+    // downstream link has to be re-attached to the new node — not just dropped.
+    const displaced = rfEdges.find((e) => e.source === addStepSourceId && isSuccessEdge(e));
 
-    const nextNodes = [...rfNodes, newRfNode];
     // Enforce single success edge per source: replace any existing success edge from addStepSourceId
-    const nextEdges = [...replaceSuccessEdgeFrom(rfEdges, addStepSourceId), newEdge];
+    const nextEdges = [...replaceSuccessEdgeFrom(rfEdges, addStepSourceId), makeSuccessEdge(addStepSourceId, nodeId)];
+    if (displaced && displaced.target !== nodeId) nextEdges.push(makeSuccessEdge(nodeId, displaced.target));
+
+    // Push the rest of the column down so the inserted node doesn't land on top of the
+    // node it displaced (only when inserting mid-chain — appending needs no reflow).
+    const nextNodes = [
+      ...(displaced
+        ? rfNodes.map((n) =>
+            n.id !== addStepSourceId && n.position.y >= position.y
+              ? { ...n, position: { ...n.position, y: n.position.y + INSERT_ROW_HEIGHT } }
+              : n
+          )
+        : rfNodes),
+      newRfNode,
+    ];
     setRfNodes(nextNodes);
     setRfEdges(nextEdges);
     pushChange(nextNodes, nextEdges);
@@ -1183,6 +1257,7 @@ export default function WorkflowCanvas({
     rfEdges,
     instances,
     availableAgents,
+    placedAgentTypes,
     placedInstanceNames,
     onInstancesChange,
     pushChange,
@@ -1374,6 +1449,7 @@ export default function WorkflowCanvas({
                 value={conditionPicker}
                 onChange={setConditionPicker}
                 availableAgents={availableAgentsForNew}
+                unavailableAgents={Array.from(placedAgentTypes)}
                 availableSkills={availableSkills}
                 reusableInstances={availableForReuse}
                 existingInstanceNames={existingInstanceNames}
@@ -1437,6 +1513,7 @@ export default function WorkflowCanvas({
                 value={addStepPicker}
                 onChange={setAddStepPicker}
                 availableAgents={availableAgentsForNew}
+                unavailableAgents={Array.from(placedAgentTypes)}
                 availableSkills={availableSkills}
                 reusableInstances={availableForReuse}
                 existingInstanceNames={existingInstanceNames}

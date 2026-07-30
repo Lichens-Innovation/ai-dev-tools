@@ -28,10 +28,12 @@ export function resolveInstanceFromPicker(
   const name = v.newName.trim();
   if (!name) return null;
   if (opts.instances.some((i) => i.name === name)) return null; // name already used
+  const agent = v.newAgent || opts.availableAgents[0];
+  if (!agent) return null; // no subagent picked and none free to fall back on
   return {
     instance: {
       name,
-      agent: v.newAgent || opts.availableAgents[0] || "agent",
+      agent,
       loaded_skills: v.newSkills.loaded,
       referenced_skills: v.newSkills.referenced,
     },
@@ -45,6 +47,7 @@ export default function InstancePicker({
   value,
   onChange,
   availableAgents,
+  unavailableAgents = [],
   availableSkills,
   reusableInstances,
   existingInstanceNames = [],
@@ -54,6 +57,9 @@ export default function InstancePicker({
   value: InstancePickerValue;
   onChange: (next: InstancePickerValue) => void;
   availableAgents: string[];
+  // Subagents already placed in this workflow — listed but disabled, so the dropdown
+  // explains itself instead of appearing empty/broken.
+  unavailableAgents?: string[];
   availableSkills: string[];
   reusableInstances: MaestroInstanceV3[];
   // All instance names already in the config — used to flag duplicate new names.
@@ -64,6 +70,9 @@ export default function InstancePicker({
   const set = (patch: Partial<InstancePickerValue>) => onChange({ ...value, ...patch });
   const trimmedName = value.newName.trim();
   const nameTaken = trimmedName !== "" && existingInstanceNames.includes(trimmedName);
+  // Show the taken subagents too (disabled) so the list is never mysteriously empty.
+  const allAgents = Array.from(new Set([...availableAgents, ...unavailableAgents]));
+  const noFreeAgents = allAgents.length > 0 && allAgents.every((a) => unavailableAgents.includes(a));
   const tabClass = (active: boolean) =>
     `flex-1 py-1 text-[11px] font-medium cursor-pointer focus:outline-none transition-colors ${
       active ? "bg-primary text-white" : "bg-(--bg-elev) text-(--ink-2) hover:bg-(--bg)"
@@ -108,12 +117,19 @@ export default function InstancePicker({
             className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
           >
             <option value="">Pick subagent…</option>
-            {availableAgents.map((a) => (
-              <option key={a} value={a}>
-                {a}
+            {allAgents.map((a) => (
+              <option key={a} value={a} disabled={unavailableAgents.includes(a)}>
+                {unavailableAgents.includes(a) ? `${a} (already in this workflow)` : a}
               </option>
             ))}
           </select>
+          {noFreeAgents && (
+            <p className="text-[11px] text-subtle m-0">
+              Every available subagent is already placed in this workflow — a subagent can only appear once, since the
+              runtime routes handoffs by agent type. Add another subagent from the left panel, or reuse an existing
+              instance.
+            </p>
+          )}
           <input
             type="text"
             placeholder="Instance name (e.g. backend_default)"
