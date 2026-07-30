@@ -20,11 +20,12 @@ $ARGUMENTS
 
 1. **Analyze the repository to pick the implementation agent(s).** Before opening the form, inspect the project to decide which bundled agent(s) build the application code in the seeded workflows' happy path. Read `package.json` (plus framework configs and directory layout — `src/components`, `src/routes`, `server/`, `api/`, `requirements.txt`, `go.mod`, `Cargo.toml`, etc.) and classify:
    - **Backend** (APIs, services, DB access, no UI framework) → `backend`
-   - **Frontend** (React/Vue/Svelte/Angular/Next/etc., UI-focused) → `frontend`
-   - **Fullstack** (both a UI framework *and* server/API code) → `backend,frontend` — the happy path's implementation step becomes `@backend → @frontend`
-   - **Non-web** (CLI, library, data pipeline, mobile, …) → there is no obvious bundled implementation agent. **Ask the user** which agent(s) they use to implement code. If none is suitable, suggest they run `/create-subagent` to make one, then re-run `/maestro-install`.
+   - **Frontend** (React/Vue/Svelte/Angular/Next/etc., web UI-focused) → `frontend`
+   - **Mobile** (Expo / React Native — `expo` or `react-native` in `package.json` dependencies, an `app.json`/`app.config.{js,ts}` with an `expo` key, or an `App.tsx`/`app/` tree with no web bundler) → `mobile`
+   - **Fullstack** (a UI framework — web or mobile — *and* server/API code) → `backend,frontend` or `backend,mobile` — the happy path's implementation step becomes `@backend → @frontend` (or `@backend → @mobile`)
+   - **Other non-web** (CLI, library, data pipeline, …) → there is no obvious bundled implementation agent. **Ask the user** which agent(s) they use to implement code. If none is suitable, suggest they run `/create-subagent` to make one, then re-run `/maestro-install`.
 
-   The result is a comma-separated `implAgents` list (e.g. `backend`, `frontend`, or `backend,frontend`). This only sets the *starting* default on the canvas — the user can still adjust it before submitting.
+   The result is a comma-separated `implAgents` list (e.g. `backend`, `frontend`, `mobile`, or `backend,mobile`). This only sets the *starting* default on the canvas — the user can still adjust it before submitting.
 
 2. **Offer to attach the repo's local skills to the seeded agents.** This pre-populates the canvas so the user doesn't have to hunt for relevant skills. **Skip this step entirely** if `${CLAUDE_PROJECT_DIR:-.}/.claude/maestro.json` already exists — that's a re-install, and the canvas already owns the user's skill assignments (the seed only applies on a fresh install).
 
