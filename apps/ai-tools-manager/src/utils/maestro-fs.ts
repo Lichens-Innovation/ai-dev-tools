@@ -37,3 +37,19 @@ export function mountedProjectPath(cwd: string): string {
   }
   return cwd;
 }
+
+/**
+ * Resolve the absolute path to maestro_session.log.jsonl, or null if cwd is unavailable.
+ *
+ * Lives here rather than next to the /session-log server fns on purpose: this module is
+ * server-only (it imports node fs/path and re-exports @repo/claude-fs), whereas
+ * maestro-session-log.ts is imported by the client for its server-fn stubs and types.
+ * An *exported* plain function in that module survives the createServerFn split and would
+ * drag @repo/claude-fs into the browser bundle — where its top-level path.join() throws
+ * "node:path has been externalized" and blanks the page.
+ */
+export function resolveLogFile(): string | null {
+  const cwd = mountedProjectPath(readCwd());
+  if (!cwd) return null;
+  return path.join(cwd, ".claude", "maestro_session.log.jsonl");
+}

@@ -123,6 +123,20 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `plugins/ai-tools-manager/skills/{create-skill,create-subagent,create-plugin,create-marketplace}/SKILL.md` — the prompts that consume the form result (now scaffold-aware: finish only the remaining content when `scaffolded: true`)
 - `packages/claude-fs/src/index.ts` — shared `~/.claude/` reading utilities used by server functions
 
+## Server-only code and the client bundle
+
+`routeTree.gen.ts` statically imports **every** route, so on any page the browser loads all route modules and whatever they transitively import. TanStack Start strips `createServerFn().handler()` bodies from the client build, and Rolldown/Vite then drop any import only that body used — which is why a module whose node-touching helpers are **unexported** (`maestro.ts`, `maestro-tasks.ts`, `maestro-tree.ts`) comes out clean.
+
+An **exported** plain function is different: it survives the split, and so do its imports. If it reaches `maestro-fs.ts` or `@repo/claude-fs`, the browser loads `packages/claude-fs/src/config/directories.ts`, whose top-level `path.join(process.env.HOME …)` throws `Module "node:path" has been externalized for browser compatibility` — the route renders as a blank page with only that console error. (This is what broke `/workflows`: `session-log.tsx` imports `getProjectCwd`, and `maestro-session-log.ts` still exported `resolveLogFile`.)
+
+Rules when adding server-side helpers:
+
+1. Keep node-builtin / `@repo/claude-fs` work either **inside** a `createServerFn` handler or in an **unexported** helper in the same module.
+2. If a helper must be shared across modules, put it in `maestro-fs.ts` (server-only by contract) and import it from other server fns — never from a component, route body, or type-only client module.
+3. `scaffold.ts` and `create-result.ts` also export plain node-touching functions. They are safe today only because the `create-*` server fns are their sole importers — importing anything from them in client code would blank that route.
+
+To verify, crawl the dev module graph from `/src/routeTree.gen.ts` and assert no module resolves a `__vite-browser-external:` specifier; a clean production build is not sufficient evidence, since Rolldown tree-shakes what dev serves eagerly.
+
 ### Maestro config editor (workflows & rules)
 
 - `src/routes/workflows.tsx` — `/workflows` route: left agents/skills pane, save, workflow CRUD
@@ -132,7 +146,7 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/components/top-nav.tsx` — top bar: Workflows/Rules nav, workflow selector
 - `src/components/rule-tree.tsx` / `src/components/chip-multi-select.tsx` — `/rules` directory tree (per-path rule chips + add picker) and the left-pane rule selector
 - `src/utils/maestro.ts` — `MaestroConfigV3` types, `getMaestroConfig` loader, `submitMaestroConfig` (slice merge into `.claude/maestro.json`)
-- `src/utils/maestro-fs.ts` — shared `readCwd` + `parseFrontmatter` used by the Maestro server fns
+- `src/utils/maestro-fs.ts` — **server-only** module (imports node `fs`/`path`, re-exports `@repo/claude-fs`): shared `readCwd`, `mountedProjectPath`, `resolveLogFile`, `parseFrontmatter` used by the Maestro server fns. Never import it from a client-reachable module — see "Server-only code and the client bundle" below
 - `src/utils/maestro-tree.ts` / `src/utils/maestro-rules.ts` / `src/utils/maestro-vibe.ts` — `/rules` loaders: `getProjectTree` (directory walk), `getProjectRules` (scans every `<cwd>/**/.claude/rules/*.md`, returns each rule's current `dir`), and `getVibeRules` (`vibe-rules list`; reads the pre-computed list under Docker)
 - `plugins/ai-tools-manager/skills/maestro-install/SKILL.md` — `/maestro-install`: analyzes the repo for impl agent(s), runs the (scaffold-only) orchestrator installer, then invokes the `/maestro-app` skill to author the config
 - `plugins/ai-tools-manager/skills/maestro-app/SKILL.md` — `/maestro-app`: the visual-editor entry point (guards on the orchestrator being installed). Opens the form, writes `maestro.json`, re-renders the orchestrator (`maestro-render-orchestrator.cjs`), then runs `maestro-apply-rules.js`
@@ -158,7 +172,7 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/components/session-log-detail.tsx` — right detail panel: Input/Process/Output sections for the selected step
 - `src/routes/api/session-log-stream.ts` — SSE server route (`server.handlers.GET`): tails `maestro_session.log.jsonl` every 1 s and emits `init`/`entry`/`reset` events to connected browsers
 - `src/utils/session-log-context.tsx` — `SessionLogProvider` (mounted in `__root.tsx`): one app-wide `EventSource`, exposes `{ entries, connected }` via `useSessionLog()`
-- `src/utils/maestro-session-log.ts` — `getMaestroSessionLog` server fn + `resolveLogFile` + `parseLogLines` helpers (shared by server fn and SSE route)
+- `src/utils/maestro-session-log.ts` — `getMaestroSessionLog` / `getProjectCwd` server fns, the `SessionLogEntry` type, and the pure `parseLogLines` helper. Client-reachable (`session-log.tsx` imports `getProjectCwd`), so it must stay free of exported node-touching helpers; `resolveLogFile` lives in `maestro-fs.ts` for that reason
 - `src/utils/session-log.ts` — pure client-safe helpers: `buildInstances` (segments entries by origin change, correlates input/output via agent_id), `humanizeLog` (tool name → readable verb)
 
 ### Maestro Tasks (`/maestro-tasks`)

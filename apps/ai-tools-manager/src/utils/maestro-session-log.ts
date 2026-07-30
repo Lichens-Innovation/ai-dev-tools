@@ -1,7 +1,12 @@
+// NOTE: this module is reachable from the client (session-log.tsx imports getProjectCwd,
+// session-log-context.tsx imports SessionLogEntry). The createServerFn split strips handler
+// bodies — so node fs/path usage confined to a handler is fine — but any *exported* plain
+// function survives into the browser bundle along with its imports. Keep server-only path
+// helpers in maestro-fs.ts (see resolveLogFile there); only pure, dependency-free helpers
+// like parseLogLines belong here.
 import { createServerFn } from "@tanstack/react-start";
 import fs from "fs";
-import path from "path";
-import { readCwd, mountedProjectPath } from "./maestro-fs";
+import { readCwd, resolveLogFile } from "./maestro-fs";
 
 export interface SessionLogEntry {
   ts: string;
@@ -18,13 +23,6 @@ export interface SessionLogEntry {
   status?: "success" | "condition" | "unknown";
   label?: string | null;
   output?: string;     // full final message (agent → main session)
-}
-
-/** Resolve the absolute path to maestro_session.log.jsonl, or null if cwd is unavailable. */
-export function resolveLogFile(): string | null {
-  const cwd = mountedProjectPath(readCwd());
-  if (!cwd) return null;
-  return path.join(cwd, ".claude", "maestro_session.log.jsonl");
 }
 
 /** Parse a JSONL string into SessionLogEntry[], skipping malformed lines. */

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import fs from "fs";
-import { resolveLogFile, parseLogLines } from "../../utils/maestro-session-log";
+import { resolveLogFile } from "../../utils/maestro-fs";
+import { parseLogLines } from "../../utils/maestro-session-log";
 
 export const Route = createFileRoute("/api/session-log-stream")({
   server: {
