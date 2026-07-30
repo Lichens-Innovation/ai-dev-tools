@@ -11,9 +11,9 @@
   },
   "plugins": [
     {
-      "name": "ci",
-      "source": "./plugins/ci",
-      "description": "CI/CD tools and skills for Claude Code"
+      "name": "git",
+      "source": "./plugins/git",
+      "description": "Git and version control tools and skills for Claude Code"
     },
     {
       "name": "react",
