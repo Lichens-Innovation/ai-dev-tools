@@ -1,0 +1,26 @@
+{
+  "name": "@repo/maestro-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts"
+  },
+  "scripts": {
+    "build:plugin-libs": "node scripts/build-plugin-libs.mjs",
+    "test": "vitest run",
+    "check": "prettier --check ."
+  },
+  "dependencies": {
+    "@repo/claude-fs": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "22.10.2",
+    "esbuild": "^0.25.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.5"
+  }
+}
