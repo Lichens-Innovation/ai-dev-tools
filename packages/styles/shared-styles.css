@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Bodoni+Moda:ital,opsz,wght@1,6..96,600;1,6..96,700&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
+/*
+ * Fonts are vendored under ./fonts and served same-origin. This was a Google CDN `@import`,
+ * which the Maestro renderer's `default-src 'self'` CSP blocked on every load — the app rendered
+ * in fallbacks. Do not put the remote URL back: see README.md, and regenerate with
+ * `node scripts/vendor-fonts.mjs` rather than editing ./fonts.css by hand.
+ */
+@import './fonts.css';
 @import 'tailwindcss';
 @source '../ui/src/**/*.{tsx,ts}';
 @plugin '@tailwindcss/typography';
@@ -14,7 +20,12 @@
     'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     sans-serif;
   --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
-  --font-serif: 'Domine', Georgia, serif;
+  /*
+   * 'Bodoni Moda', not 'Domine': the CDN import only ever fetched Bodoni Moda italic 600/700 —
+   * exactly what .display-title and .display-num ask for — while Domine was never loaded by
+   * anything, so display text has been falling back to Georgia since the var was written.
+   */
+  --font-serif: 'Bodoni Moda', Georgia, serif;
   --color-background: var(--bg);
   --color-foreground: var(--ink);
   --color-card: var(--bg-2);

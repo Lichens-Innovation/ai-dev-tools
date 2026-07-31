@@ -360,22 +360,58 @@ correct but would change working code on a theoretical argument, which is the op
 
 ---
 
-## Still open
+## Closed after this review
 
-### `@repo/styles` pulls fonts from Google's CDN, and the renderer CSP blocks it
+### `@repo/styles` pulled fonts from Google's CDN, and the renderer CSP blocked it — now vendored
 
-`packages/styles/shared-styles.css` opens with
+**Was:** `packages/styles/shared-styles.css` opened with
 `@import url('https://fonts.googleapis.com/css2?family=Inter…')`. Under the renderer's
-`style-src 'self' 'unsafe-inline'` that is blocked on every load — the one console error left in
-a clean run — and the app renders in fallback fonts.
+`style-src 'self' 'unsafe-inline'` that was blocked on every load — the one console error left in
+a clean run — and the app rendered in fallback fonts. Left open here because every option looked
+like a decision this review had no standing to make.
 
-**Not fixed here, deliberately.** Every option is a decision this task has no standing to make:
-loosening the CSP to allow `fonts.googleapis.com` + `fonts.gstatic.com` contradicts the policy's
-own stated intent ("this app needs neither at runtime") and makes a desktop app's typography
-depend on the network; stripping the `@import` changes a package `ai-tools-manager` and
-`help-server` also consume, where the CDN load is legitimate; self-hosting the three families is
-the right answer for a desktop app but is real work (fetch, subset, vendor, wire up `font-src`).
-Consequence is cosmetic only — no functional impact was observed.
+**Decided:** self-host. The CSP is unchanged, and the three families are vendored into
+`packages/styles/fonts/` and served same-origin. Widening the CSP was rejected for the reason
+recorded above — it contradicts the policy's own stated intent and makes a desktop app's
+typography depend on the network — and dropping the import was rejected because it changes the
+look of every app in the monorepo. Files are fetched from Google's CSS API by
+`packages/styles/scripts/vendor-fonts.mjs`, so they are byte-for-byte what the CDN was serving and
+the typography is exactly what the `@import` intended. All three are SIL OFL 1.1; each `OFL.txt`
+is committed beside the binaries. Provenance and the refresh procedure are in
+`packages/styles/README.md`.
+
+Only the referenced faces ship — Inter 300–700 upright, Bodoni Moda 600/700 italic, IBM Plex Mono
+300–600 upright, Latin cuts only. Inter and Bodoni Moda turned out to be variable fonts served as
+one file per style: a naive vendoring wrote five identical copies of Inter, so the script groups
+faces by resolved file and emits a `font-weight: 300 700` range instead. 12 files, ~372 kB.
+
+Verified by driving windows, not by the absence of an error:
+
+| | before | after |
+|---|---|---|
+| CSP violations (packaged `file://`) | 3 `style-src-elem` blocks | **0** |
+| Off-origin requests | 2 to `fonts.googleapis.com` | **0** |
+| `<h1>` painted with | Ubuntu Sans | **Inter** |
+| Mono text painted with | Liberation Mono | **IBM Plex Mono** |
+
+"Painted with" is `CSS.getPlatformFontsForNode` — the fonts the engine actually resolved for the
+glyphs it drew. `getComputedStyle().fontFamily` reads identically in both columns, which is why
+the original bug survived so long. The before column was produced by temporarily restoring the
+CDN `@import` and rebuilding, to prove the probe was not passing vacuously.
+
+Checked over HTTP as well as `file://` — help-server serves `url(/assets/…)` where Maestro's
+packaged build serves `url(./…)`, and all 12 files load in both. help-server was the find that
+mattered: its `.display-title` was the only consumer of `--font-serif`, which named `'Domine'` —
+a family nothing ever loaded — while the CDN import fetched Bodoni Moda. So display headings had
+been falling back to Georgia independently of the CSP. `--font-serif` now names `'Bodoni Moda'`,
+and `Command Center` on the help-server landing page paints in it.
+
+`apps/maestro/test/isolation.test.ts` gained two assertions: the built renderer CSS references
+nothing off-origin, and the woff2 files are emitted beside it.
+
+---
+
+## Still open
 
 ### Seeded starter graph: condition labels overlap nodes
 

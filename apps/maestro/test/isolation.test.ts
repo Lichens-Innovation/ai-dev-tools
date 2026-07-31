@@ -203,3 +203,34 @@ describe("built renderer bundle", () => {
     }
   });
 });
+
+describe("built renderer stylesheets", () => {
+  // The renderer CSP is `default-src 'self'`, so any remote reference that reaches the built CSS
+  // is not a slow load — it is a hard block plus a console error, and the app silently renders in
+  // fallback fonts. That is exactly what `@repo/styles`' Google Fonts `@import` did until the
+  // families were vendored into the package. Restoring it, or adding any other CDN reference,
+  // looks perfectly fine in a browser and breaks only here.
+  const outDir = path.join(appRoot, "out", "renderer", "assets");
+  const sheets = fs.existsSync(outDir)
+    ? fs.readdirSync(outDir).filter((f) => f.endsWith(".css")).map((f) => path.join(outDir, f))
+    : [];
+
+  it.runIf(sheets.length > 0)("reference nothing off-origin", () => {
+    for (const file of sheets) {
+      const src = fs.readFileSync(file, "utf8");
+      const remote = [...src.matchAll(/url\(\s*["']?(https?:)?\/\/[^)]*\)/g)].map((m) => m[0]);
+      expect(remote, `${path.basename(file)} loads a remote asset`).toEqual([]);
+      expect(src).not.toContain("fonts.googleapis.com");
+      expect(src).not.toContain("fonts.gstatic.com");
+    }
+  });
+
+  it.runIf(sheets.length > 0)("emit the vendored font files alongside them", () => {
+    // A `@font-face` whose file never got emitted resolves to nothing and falls back silently.
+    const emitted = fs.readdirSync(outDir).filter((f) => f.endsWith(".woff2"));
+    expect(emitted.length).toBeGreaterThan(0);
+    for (const family of ["inter", "bodoni-moda", "ibm-plex-mono"]) {
+      expect(emitted.some((f) => f.startsWith(family)), `no ${family} woff2 emitted`).toBe(true);
+    }
+  });
+});
