@@ -3,8 +3,6 @@ paths:
   - "**/*.tsx"
 ---
 
-# React component rules
-
 ## HIGH
 
 | Avoid | Prefer |

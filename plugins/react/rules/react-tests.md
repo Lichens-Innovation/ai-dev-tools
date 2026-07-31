@@ -6,7 +6,6 @@ paths:
   - "**/*.spec.tsx"
 ---
 
-# Unit testing rules
 
 | Avoid | Prefer |
 |-------|--------|

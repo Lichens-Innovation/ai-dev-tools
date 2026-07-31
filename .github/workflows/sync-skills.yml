@@ -6,6 +6,7 @@ on:
     paths:
       - 'plugins/*/skills/**'
       - 'plugins/*/agents/**'
+      - 'plugins/*/rules/**'
   workflow_dispatch:
 
 jobs:
@@ -36,11 +37,24 @@ jobs:
             cp -r "$agent_dir" "agents/$agent_name"
           done
 
+      - name: Enforce single source of truth for plugin rules/
+        run: |
+          shopt -s nullglob
+          for rule_file in plugins/*/rules/*.md; do
+            plugin_dir=$(dirname "$(dirname "$rule_file")")
+            name=$(basename "$rule_file")
+            matches=("$plugin_dir"/skills/*/references/"$name")
+            if [ -f "${matches[0]:-}" ]; then
+              cp "${matches[0]}" "$rule_file"
+            fi
+          done
+
       - name: Commit and push if changed
         run: |
+          shopt -s nullglob
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add skills/ agents/
+          git add skills/ agents/ plugins/*/rules/*.md
           git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "chore: sync skills and agents from plugins"
+          git commit -m "chore: sync skills, agents, and rules from plugins"
           git push
