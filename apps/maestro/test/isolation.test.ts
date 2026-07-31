@@ -135,6 +135,28 @@ describe("session log tail ownership", () => {
   });
 });
 
+describe("saving refreshes loader data", () => {
+  // `seeded` is decided by the loader from whether maestro.json existed at load time, and nothing
+  // re-runs a loader on its own after a save: saving doesn't navigate, and the `project:changed`
+  // broadcast ProjectProvider invalidates on doesn't fire. Without an explicit invalidation the
+  // "starter configuration, not saved" banner stays up after a successful save — telling the user
+  // their config is unsaved while it sits on disk. Verified in a running window; there is no
+  // render test that would catch it, hence this source-level guard.
+  for (const route of ["workflows", "rules"] as const) {
+    it(`/${route} invalidates the router after a successful save`, () => {
+      const src = read(`src/renderer/src/routes/${route}.tsx`);
+      expect(src).toMatch(/useRouter/);
+      expect(src).toMatch(/router\.invalidate\(\)/);
+      // The invalidation must be on the success path — after the `!res.ok` bail-out, so a
+      // rejected save doesn't re-run the loader and stomp the editor's state.
+      const bail = src.indexOf("if (!res.ok)");
+      const invalidate = src.indexOf("router.invalidate()");
+      expect(bail).toBeGreaterThan(-1);
+      expect(invalidate).toBeGreaterThan(bail);
+    });
+  }
+});
+
 describe("built main and preload bundles", () => {
   // `electron` is a devDependency, so externalizeDepsPlugin (which reads `dependencies`) does not
   // cover it, and electron.vite.config.ts externalizes it by hand. If that ever comes out, the
