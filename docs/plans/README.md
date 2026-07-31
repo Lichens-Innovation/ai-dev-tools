@@ -3,16 +3,26 @@
 Turning the containerised `apps/ai-tools-manager` web app into `apps/maestro`, an Electron desktop
 app that configures Maestro with no Claude session in the loop.
 
-| Plan | Status |
-|---|---|
-| M1 — extract `packages/maestro-core` | **done** |
-| M2 — Electron shell (`apps/maestro`) | **done** |
-| [Review of M1 + M2](review-m1-m2.md) | recommended next |
-| [M3 — in-app install / update / uninstall](m3-in-app-install.md) | not started |
-| [M4 — the `claude -p` bridge and the create-\* routes](m4-claude-bridge.md) | not started |
-| [M5 — retire the Docker path](m5-retire-docker.md) | not started |
-| [Core absorption — fold `maestro-core` into the app](core-absorption.md) | after M5, before M6 |
-| [M6 — fold in help-server](m6-help-server-merge.md) | last |
+| Plan | Status | Queued as |
+|---|---|---|
+| M1 — extract `packages/maestro-core` | **done** | — |
+| M2 — Electron shell (`apps/maestro`) | **done** | — |
+| [Review of M1 + M2](review-m1-m2.md) | **done** — see [outcome](review-m1-m2-outcome.md) | `001` (done), `002`, `003` |
+| [M3 — in-app install / update / uninstall](m3-in-app-install.md) | not started | `004`, `005`, `006` |
+| [M4 — the `claude -p` bridge and the create-\* routes](m4-claude-bridge.md) | not started | `007`, `008` |
+| [M5 — retire the Docker path](m5-retire-docker.md) | not started | `009` |
+| [Core absorption — fold `maestro-core` into the app](core-absorption.md) | after M5, before M6 | `010`, `011` |
+| [M6 — fold in help-server](m6-help-server-merge.md) | last | `012`, `013`, `014` |
+
+These plans are the design; `.claude/maestro-tasks/` is the runnable decomposition of them, and
+`status.json` there holds the dependency graph and each task's ready/blocked state. The task files
+carry the decisions and traps and point back here for the rest — **the plans stay the source of
+truth**, so revise them here and let the tasks reference them rather than restating them.
+
+Task numbering is topologically sorted, so running the queue in numeric order is always a valid
+path; the `Blocked by` sections record the precise graph, including the two edges this page's
+prose only implies — M5 needs M4's marketplace rework (it deletes the last consumer of the Docker
+precompute file), and M6's chat must be rebuilt on M4's bridge.
 
 ## The split that does not move
 
