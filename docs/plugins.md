@@ -78,6 +78,12 @@ From Claude Code:
 4. Load the directory with `claude --plugin-dir ./my-plugin`
 5. Call your skill and other tools like you would normally (ex: `/my-skill`, `@my-agent`).
 
+## Generated Directories (`skills/`, `agents/`, plugin `rules/`)
+
+Top-level `skills/` and `agents/` are **build artifacts**, not source. `.github/workflows/sync-skills.yml` rebuilds them from every `plugins/*/skills/*/` and `plugins/*/agents/*/` on each push to `main` that touches those paths (`rm -rf` + copy), so they always mirror the plugins. Never edit `skills/<name>/` or `agents/<name>/` directly — your changes get wiped on the next sync. Edit under `plugins/<plugin>/skills/<name>/` or `plugins/<plugin>/agents/<name>/` instead.
+
+Some plugins also duplicate content a second time inside their own `rules/` folder (see [rules](./rules.md)) — e.g. `plugins/react/rules/react-typescript.md` is a copy of `plugins/react/skills/react-coding-standards/references/react-typescript.md`, kept as a separate file so Claude Code can auto-attach it via `paths:` frontmatter without the `react-coding-standards` skill being invoked. The same workflow enforces which copy is canonical: on every run it overwrites each `plugins/*/rules/<name>.md` with the matching `plugins/*/skills/*/references/<name>.md` (matched by filename). **Single source of truth is the `references/` file** — edit that, never the `rules/` copy directly (also wiped on next sync).
+
 ## Hooks
 
 You can add hooks directly to `plugin.json` or in `hooks/hooks.json` and define them as you would in your project’s `.claude/setting.json`. When a user enables the plugin, those hooks activate automatically and run alongside any user-defined hooks.

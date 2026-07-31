@@ -1,5 +1,7 @@
 # Rules
 
+> A plugin's `rules/*.md` may be a generated copy of a skill's `references/*.md` — see [Generated Directories](./plugins.md#generated-directories-skills-agents-plugin-rules) before editing one.
+
 Rules are there as general guidelines for your overall project or for a part of it. The rules files need to be kept concise. Rules normally apply to your whole project and are loaded to your main context (and subagents) automatically. Here is an example of a rule file for a python project.
 
 ```

@@ -1,5 +1,7 @@
 # Skills
 
+> Top-level `skills/` is generated from `plugins/*/skills/` — see [Generated Directories](./plugins.md#generated-directories-skills-agents-plugin-rules) before editing a file in it.
+
 Per the [Agent Skills specification](https://agentskills.io/specification), a **skill** is a directory containing a `SKILL.md` (name, description, instructions). Agents inject it into context when the task matches its usage. Skills add domain knowledge, step-by-step instructions, and optional scripts or references so the agent can follow best practices and handle specific tasks (e.g. code review, PDFs, APIs) consistently.
 
 For the skills timeline and ecosystem evolution, see [skills history](./SKILLS-HISTORY.md).
