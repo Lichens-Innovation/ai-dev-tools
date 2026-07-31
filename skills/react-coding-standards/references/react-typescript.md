@@ -8,9 +8,9 @@ paths:
 
 | Avoid | Prefer |
 | --- | --- |
+| Functions with 2+ positional parameters `const foo = (a: number, b: string) => {...}`  | Single object param with `interface FooArgs` immediately above the function, then `const foo = ({ a, b }: FooArgs) => {...}` (one positional param is OK) |
 | Chained ternaries 2+ levels deep in one expression | Early `return` per branch |
 | `any` for function params, returns or variables | `interface` for object shapes; `type` for unions / aliases / `Record` |
-| Functions with 2+ positional parameters `const foo = (a: number, b: string) => {...}`  | Single object param with `interface FooArgs` immediately above the function, then `const foo = ({ a, b }: FooArgs) => {...}` (one positional param is OK) |
 | `try { ... } catch (e) {}` empty / silenced catch | Log via structured logger; if you only rethrow unchanged, drop the `try/catch` |
 | `!=` / `==` loose equality | `!==` / `===` strict equality |
 | `enum Foo { A, B }` implicit ordinals | `enum Foo { A = 1, B = 2 }` explicit numeric values |
@@ -50,6 +50,7 @@ paths:
 | `import _ from "lodash"` whole-package default import | `import { groupBy } from "lodash-es"` named tree-shakeable import |
 | `console.log(...)` calls in production code paths | Structured `logger.info(...)` with explicit safe fields |
 | `user?.address?.location?.city` dangling deep optional chain | `user?.address?.location?.city ?? "Unknown"` ending with a `?? fallback` |
+| `import { X } from "./x"; export { X };` importing then re-exporting the same symbol under one name in a file | `export { X } from "./x";` direct re-export (or drop the passthrough, import `X` straight from `./x` at call sites) |
 
 ## LOW
 

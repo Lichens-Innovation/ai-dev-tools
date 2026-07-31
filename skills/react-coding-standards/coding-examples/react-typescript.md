@@ -155,42 +155,46 @@
     - [❌ Avoid Deep Optional Chains With No Default Value](#-avoid-deep-optional-chains-with-no-default-value)
     - [✅ Prefer Adding a `?? fallback` at the End of Deep Chains](#-prefer-adding-a--fallback-at-the-end-of-deep-chains)
     - [ℹ️ Explanation](#ℹ️-explanation-35)
+  - [*MEDIUM* Avoid Re-exporting an Import Under the Same Name in One File](#medium-avoid-re-exporting-an-import-under-the-same-name-in-one-file)
+    - [❌ Avoid Importing and Re-exporting the Same Symbol in a Single File](#-avoid-importing-and-re-exporting-the-same-symbol-in-a-single-file)
+    - [✅ Prefer a Direct Re-export or Importing Directly from the Source](#-prefer-a-direct-re-export-or-importing-directly-from-the-source)
+    - [ℹ️ Explanation](#ℹ️-explanation-36)
   - [*LOW* Prefer `Array.some()` Over Checking `Array.find()` for Undefined](#low-prefer-arraysome-over-checking-arrayfind-for-undefined)
     - [❌ Avoid Checking `Array.find()` for Undefined](#-avoid-checking-arrayfind-for-undefined)
     - [✅ Prefer Using `Array.some()` for Better Readability](#-prefer-using-arraysome-for-better-readability)
-    - [ℹ️ Explanation](#ℹ️-explanation-36)
+    - [ℹ️ Explanation](#ℹ️-explanation-37)
   - [*LOW* Prefer Explicit Time Periods (PeriodsInMS) from @lichens-innovation/ts-common](#low-prefer-explicit-time-periods-periodsinms-from-lichens-innovationts-common)
     - [❌ Avoid Magic Numbers for Durations in Milliseconds](#-avoid-magic-numbers-for-durations-in-milliseconds)
     - [✅ Prefer PeriodsInMS for Readable Time Periods](#-prefer-periodsinms-for-readable-time-periods)
-    - [ℹ️ Explanation](#ℹ️-explanation-37)
+    - [ℹ️ Explanation](#ℹ️-explanation-38)
   - [*LOW* Prefer Using Optional Parameters Over `Type | undefined`](#low-prefer-using-optional-parameters-over-type--undefined)
     - [❌ Avoid Using `param: Type | undefined` for Optional Parameters](#-avoid-using-param-type--undefined-for-optional-parameters)
     - [✅ Prefer Using Optional Parameters with `param?: Type`](#-prefer-using-optional-parameters-with-param-type)
-    - [ℹ️ Explanation](#ℹ️-explanation-38)
+    - [ℹ️ Explanation](#ℹ️-explanation-39)
   - [*LOW* Prefer Using Object Destructuring for readability and clarity](#low-prefer-using-object-destructuring-for-readability-and-clarity)
     - [❌ Avoid Complex Interpolation Without Destructuring](#-avoid-complex-interpolation-without-destructuring)
     - [✅ Prefer Using Object Destructuring for Clarity](#-prefer-using-object-destructuring-for-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-39)
+    - [ℹ️ Explanation](#ℹ️-explanation-40)
   - [*LOW* Prefer Using TypeScript `Record` Utility Type over Custom Index Signatures](#low-prefer-using-typescript-record-utility-type-over-custom-index-signatures)
     - [❌ Avoid Custom Index Signatures for Object Types](#-avoid-custom-index-signatures-for-object-types)
     - [✅ Prefer Using TypeScript `Record` Utility Type for Simplicity and Clarity](#-prefer-using-typescript-record-utility-type-for-simplicity-and-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-40)
+    - [ℹ️ Explanation](#ℹ️-explanation-41)
   - [*LOW* Prefer Interfaces Over Types for Object Shapes](#low-prefer-interfaces-over-types-for-object-shapes)
     - [❌ Avoid Using `type` for Object Shapes When `interface` Fits](#-avoid-using-type-for-object-shapes-when-interface-fits)
     - [✅ Prefer `interface`; Use `type` Only When It Simplifies Syntax](#-prefer-interface-use-type-only-when-it-simplifies-syntax)
-    - [ℹ️ Explanation](#ℹ️-explanation-41)
+    - [ℹ️ Explanation](#ℹ️-explanation-42)
   - [*LOW* Prefer Adding a Task Ticket ID to `TODO` Comments for Better Tracking](#low-prefer-adding-a-task-ticket-id-to-todo-comments-for-better-tracking)
     - [❌ Avoid Using `TODO` Comments Without a Ticket Reference](#-avoid-using-todo-comments-without-a-ticket-reference)
     - [✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability](#-prefer-adding-a-task-management-ticket-id-to-todo-comments-for-better-traceability)
-    - [ℹ️ Explanation](#ℹ️-explanation-42)
+    - [ℹ️ Explanation](#ℹ️-explanation-43)
   - [*LOW* Prefer Using `??` Over `||` for Handling `null` and `undefined`](#low-prefer-using--over--for-handling-null-and-undefined)
     - [❌ Avoid Using `||` to Handle `null` and `undefined` Exclusively](#-avoid-using--to-handle-null-and-undefined-exclusively)
     - [✅ Prefer Using `??` to Handle `null` and `undefined`](#-prefer-using--to-handle-null-and-undefined)
-    - [ℹ️ Explanation](#ℹ️-explanation-43)
+    - [ℹ️ Explanation](#ℹ️-explanation-44)
   - [*LOW* Prefer Using `useWindowDimensions` Hook Over `Dimensions.get` in React Native](#low-prefer-using-usewindowdimensions-hook-over-dimensionsget-in-react-native)
     - [❌ Avoid Using `Dimensions.get` for Getting Window Dimensions](#-avoid-using-dimensionsget-for-getting-window-dimensions)
     - [✅ Prefer Using `useWindowDimensions` Hook for Getting Window Dimensions](#-prefer-using-usewindowdimensions-hook-for-getting-window-dimensions)
-    - [ℹ️ Explanation](#ℹ️-explanation-44)
+    - [ℹ️ Explanation](#ℹ️-explanation-45)
 
 # Typescript coding guidelines
 
@@ -1831,6 +1835,37 @@ const city = user?.address?.location?.city ?? "Unknown";
 - **Avoid dangling `undefined`:** A long optional chain like `a?.b?.c?.d` silently produces `undefined` when any link is absent. Every consumer then has to guard against it, spreading the problem.
 - **Add `?? fallback`:** The nullish coalescing operator provides a meaningful default at the source, making the type concrete and the intent clear.
 - **Choose a meaningful default:** Pick a value that makes sense for the domain (`""`, `0`, `[]`, `"Unknown"`) rather than always defaulting to `undefined` or `null`.
+
+---
+
+## *MEDIUM* Avoid Re-exporting an Import Under the Same Name in One File
+
+### ❌ Avoid Importing and Re-exporting the Same Symbol in a Single File
+
+```ts
+// This file imports `formatDate` only to immediately re-export it under the same name
+import { formatDate } from "./formatDate";
+
+export { formatDate };
+```
+
+### ✅ Prefer a Direct Re-export or Importing Directly from the Source
+
+```ts
+// Re-export directly from the source module, without a separate local import
+export { formatDate } from "./formatDate";
+```
+
+```ts
+// Or, if this file has no other reason to reference `formatDate`, drop the passthrough
+// entirely and have callers import it straight from "./formatDate"
+```
+
+### ℹ️ Explanation
+
+- **Redundant Indirection:** Importing a symbol only to export it again under the same name adds an extra hop with no behavioral difference from re-exporting directly, forcing callers to trace through an unnecessary file.
+- **Prefer Direct Re-export Syntax:** `export { X } from "./module"` achieves the same result in one line, without binding `X` into the local module scope.
+- **Barrel Files Are the Exception:** This pattern is expected in a dedicated barrel/index file that intentionally re-exports many symbols; avoid it in ordinary modules where the import would otherwise be unused.
 
 ---
 
