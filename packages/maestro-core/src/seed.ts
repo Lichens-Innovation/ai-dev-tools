@@ -5,6 +5,7 @@
 // here it is just a parameter, and the caller decides where it comes from (M3 replaces the
 // ["backend"] default with repo detection).
 
+import { placeConditionLabels } from "./label-layout.js";
 import type {
   MaestroConfigV3,
   MaestroEdgeV3,
@@ -139,7 +140,7 @@ export function buildWorkflow(
     for (const a of impl) edges.push(cond("human_review-1", a, `human requested ${a} corrections`));
   }
 
-  return { name, nodes, edges };
+  return placeConditionLabels({ name, nodes, edges }, skillCount);
 }
 
 // Build a simple linear happy-path workflow: main-session → each step in order, success edges only.
@@ -166,7 +167,7 @@ export function linearWorkflow(name: string, steps: string[], skillCount: SkillC
   const seq = ["main-session", ...nodes.map((n) => n.id)];
   const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
-  return { name, nodes, edges };
+  return placeConditionLabels({ name, nodes, edges }, skillCount);
 }
 
 // "Tests" workflow: happy path @test → @reviewer → @scribe, plus two reviewer fix routes through
@@ -207,7 +208,7 @@ export function buildTestsWorkflow(name: string, impl: string[], skillCount: Ski
     for (const a of impl) edges.push(cond(a, "test", `${a} fix applied; re-run the tests`));
   }
 
-  return { name, nodes, edges };
+  return placeConditionLabels({ name, nodes, edges }, skillCount);
 }
 
 // Best-fit project-skill → seeded-agent assignments discovered at install time by the
