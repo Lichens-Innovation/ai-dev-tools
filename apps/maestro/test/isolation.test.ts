@@ -8,8 +8,12 @@
 
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// The barrel, deliberately: this is a node-side test, and the point of the prompt-drift check
+// below is to compare the renderer's literal against what the MAIN process actually builds.
+import { previewClaudeRun } from "@repo/maestro-core";
 import { IPC, IPC_EVENTS } from "../src/shared/ipc.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -119,6 +123,78 @@ describe("@repo/maestro-core boundary", () => {
     // The preload is a node context, but it deliberately imports nothing but electron — keeping
     // it that way is what makes the bridge auditable at a glance.
     expect(offenders.map((f) => path.relative(appRoot, f))).toEqual([]);
+  });
+});
+
+describe("the claude bridge across the process boundary", () => {
+  // The bridge's guarantee — the only executable prompts are ones the user was shown — rests on
+  // `claude:run` accepting a token AND NOTHING ELSE. `@repo/maestro-core`'s test covers the core
+  // half (preview cannot spawn; a forged or replayed token is refused). What it cannot see is this
+  // side of the wire: a preload that helpfully forwarded a prompt, an argv or a cwd alongside the
+  // token would reopen the hole in a diff that looks like a convenience, and every core test would
+  // still pass.
+  const preload = read("src/preload/index.ts");
+  const main = read("src/main/ipc.ts");
+
+  it("sends the token and nothing else on the run channel", () => {
+    const invoke = preload.match(/ipcRenderer\s*\n?\s*\.invoke\(IPC\.claudeRun[^)]*\)/);
+    expect(invoke, "preload does not invoke IPC.claudeRun").not.toBeNull();
+    expect(invoke![0]).toMatch(/invoke\(IPC\.claudeRun,\s*token\s*\)/);
+  });
+
+  it("never lets the renderer supply prompt text to either channel", () => {
+    // preview takes a REQUEST (a shape main knows how to build a prompt from), never a prompt.
+    expect(preload).toMatch(/invoke\(IPC\.claudePreview,\s*request\s*\)/);
+    expect(preload).not.toMatch(/claudePreview,\s*(prompt|argv|cwd)/);
+  });
+
+  it("builds the prompt in the main process, from the open project", () => {
+    // `previewClaudeRun(root, request)` — the cwd comes from main's project state, so a renderer
+    // cannot aim a run at a directory the window is not showing.
+    expect(main).toMatch(/previewClaudeRun\(root,\s*request\)/);
+    expect(main).toMatch(/const root = currentRoot\(\);/);
+  });
+
+  it("drops outstanding preview tokens when the project changes", () => {
+    // A token names the OUTGOING project's cwd. Left live, a modal open across a switch could
+    // still spawn Claude against the repo the window has moved off.
+    const announce = main.slice(main.indexOf("function announce("), main.indexOf("export function registerIpc"));
+    expect(announce).toContain("clearInvocations()");
+  });
+
+  it("offers a Copy prompt identical to the prompt that would execute", () => {
+    // The sentence exists twice on purpose. /maestro-tasks' Copy prompt is the paste-into-your-own-
+    // session path and lives in the renderer; the executable one is built in the main process,
+    // because the renderer must never be the source of a prompt the app will run. The cost of that
+    // is silent drift — a reworded Copy prompt would quietly stop matching what Run does, and a
+    // user comparing the two would be looking at a lie. So the two are compared here rather than
+    // deduplicated: this asserts the renderer's LITERAL against what the builder actually returns,
+    // not against a third copy of the string.
+    const literal = read("src/renderer/src/routes/maestro-tasks.tsx").match(/`(Use \/maestro[^`]*)`/);
+    expect(literal, "no Use /maestro template literal in the route").not.toBeNull();
+
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), "maestro-prompt-drift-"));
+    try {
+      const filename = "001-a-task.md";
+      const tasksDir = path.join(project, ".claude", "maestro-tasks");
+      fs.mkdirSync(tasksDir, { recursive: true });
+      fs.writeFileSync(path.join(tasksDir, filename), "# A task\n");
+
+      const relativePath = path.posix.join(".claude", "maestro-tasks", filename);
+      const fromRenderer = literal![1].replace("${task.relativePath}", relativePath);
+      // No CLI is needed: preview returns the prompt whether or not one was found.
+      const { prompt } = previewClaudeRun(project, { kind: "maestro-task", filename });
+
+      expect(fromRenderer).toBe(prompt);
+    } finally {
+      fs.rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it("kills runs in flight when the app quits", () => {
+    // The child is spawned detached so its process group can be signalled; the flip side is that
+    // it outlives the app unless something kills it.
+    expect(main).toMatch(/export function disposeIpc[\s\S]*disposeClaudeRuns\(\)/);
   });
 });
 

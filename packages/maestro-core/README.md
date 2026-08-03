@@ -27,6 +27,12 @@ a graph.
 | `session-runtime.ts` | Ephemeral session file + append-only log helpers |
 | `install.ts` | Installs/updates the runtime into a project, and reports whether it is stale |
 | `uninstall.ts` | Removes it again, at two levels — the mirror of `install.ts` |
+| `seed.ts` | The starter workflows an unconfigured project's canvas opens with (pure) |
+| `detect.ts` | Which implementation agent(s) the repo needs, and the evidence for it |
+| `claude-cli.ts` | Where the `claude` CLI is, decided with `fs` and not with PATH alone |
+| `claude-preview.ts` | Builds the prompt and issues a token. **Cannot spawn** |
+| `claude-tokens.ts` | The single-use, expiring authorisation between preview and run |
+| `claude-run.ts` | The only module that spawns Claude, and only for a token preview issued |
 
 ### `install.ts` — the project owns its runtime
 
@@ -80,6 +86,74 @@ location and is never touched.
 `success_path` is **derived**, never stored — `successPathSteps()` is the sole source of truth for
 "what steps this workflow has, in order".
 
+### `detect.ts` — the seed reads the repo
+
+`defaultV3Config()` takes the implementation-agent chain as a parameter, and the app used to pass
+the constant `["backend"]`. A frontend project therefore opened on a canvas whose happy path was
+wrong about its own codebase. `detectImplAgents(root)` replaces the constant.
+
+Three constraints shape it:
+
+- **No model, no network.** It runs on the first open of *every* project, so an LLM refinement
+  (deferred to the confirmation modal in a later milestone) cannot be a prerequisite. It is
+  `readdirSync` + `JSON.parse`.
+- **Bounded, not a tree walk.** It reads the root and its workspace members — `workspaces` globs,
+  `pnpm-workspace.yaml`, plus the `apps/*`, `packages/*`, `services/*` conventions — capped at 48
+  directories. Cost tracks the number of packages, not the number of files: measured at 1–3 ms on a
+  64,000-file checkout of this repo.
+- **It returns its reasons.** `evidence` is a list of lines like ``"`fastify` in
+  apps/api/package.json → backend"``, which the canvas shows beside the chain. The heuristic is
+  occasionally wrong; the evidence is what lets a user see *why* and correct it. Correcting it
+  re-seeds the graph, and nothing is on disk until Save.
+
+`react` is deliberately not a frontend marker on its own — React Native and Expo apps depend on it
+too, so `react-dom` is the web tell and bare `react` only counts when nothing in the same manifest
+says native. Non-JavaScript manifests (`pyproject.toml`, `go.mod`, `Cargo.toml`, `*.csproj`, …) are
+their own signal class, because a dependency-only detector would fall straight through to the
+default on a repo that is perfectly clear about what it is. An unrecognised repo still gets
+`["backend"]`, but flagged `fallback: true` and labelled as a default rather than a conclusion —
+an empty chain would seed a workflow with no implementation step at all.
+
+### The `claude -p` bridge — preview and run are two operations
+
+The app may spawn `claude -p` on the user's behalf, **but it asks first and shows the prompt it will
+send**. That was the decision taken when this migration was planned, and it is why the bridge is
+four modules instead of one function.
+
+```
+previewClaudeRun(root, request) → { prompt, argv, cwd, targets, available, searched, token }
+runPreviewedClaude(token, events) → streams stdout/stderr, resolves with how it ended
+```
+
+**Preview cannot spawn.** Not "does not" — `claude-preview.ts` imports no `child_process`, and
+neither does anything it imports; `test/claude.test.ts` walks its transitive import graph and fails
+on the file that introduces one. Availability is therefore decided with `fs` (the file exists and
+carries `+x`), which is what lets preview answer "is the CLI installed?" while remaining incapable
+of starting anything.
+
+**Run cannot invent.** `runPreviewedClaude` takes a token and *nothing else* — no prompt, no argv,
+no cwd. There is consequently no argument by which a caller could make the run differ from the
+preview the user confirmed, which is a stronger guarantee than validating that it doesn't. Tokens
+are single-use, expire after ten minutes, and live only in this process's memory. The property all
+of that buys: **the only executable prompts are ones the user was shown.** Collapsing preview and
+run into one "run this prompt" call removes it while looking like a simplification.
+
+The prompt is built here, from a `ClaudeRequest` — a small union describing *what the user asked
+for* — never from text the caller supplies. So the set of prompts the app can execute is the set of
+cases in one `switch`, and a renderer bug cannot widen it.
+
+**PATH is not trusted.** A GUI app does not inherit a login shell's PATH: a Linux desktop launcher
+and macOS `launchd` both hand the process something much shorter, and the installer puts `claude` in
+`~/.local/bin` — on every shell's PATH and almost no GUI app's. So `claude-cli.ts` searches PATH
+*plus* the known install locations (including `~/.nvm/versions/node/*/bin`, which has to be read),
+and returns the list of directories it looked in so a "not found" can name them. The failure this
+prevents does not reproduce from a terminal, which is why the search list is data rather than a
+constant hidden in a resolver.
+
+Cancellation kills the **process group**: the child is spawned `detached`, because the CLI spawns
+its own children and signalling only the process we started leaves them running with the UI
+reporting the run as stopped.
+
 ## Generated plugin libs
 
 ```bash
@@ -118,6 +192,12 @@ Two kinds:
   only what went: the config after a default uninstall, the user's hooks and keys after either, a
   same-named script outside `.claude/scripts/`, `.claude/handoffs/`, and that install-after-
   uninstall returns a working installation.
+- **The bridge** (`test/claude.test.ts`) — the token contract including its negative cases (forged,
+  replayed, expired), that the child's argv and cwd are exactly what the preview returned, that
+  output streams rather than arriving at the end, that a cancel kills the CLI's *own* child, and
+  that a non-zero exit and a failed spawn are distinguishable. Plus the structural one no
+  behavioural test can make: preview's import graph contains no `child_process`. Runs execute a
+  fake `claude` script in a temp directory, which is what makes any of it fast and deterministic.
 - **Byte-identity** (`test/render.test.ts`) — runs the snapshotted legacy renderer as a
   subprocess against a temp project and asserts the rendered `SKILL.md` matches ours byte for
   byte, plus that `maestro.json` keeps its canonical format (2-space indent, **no trailing

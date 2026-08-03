@@ -9,6 +9,7 @@ import {
   readConfig,
   blankConfig,
   defaultV3Config,
+  detectImplAgents,
   saveConfig,
   discoverAgents,
   discoverSkills,
@@ -23,9 +24,18 @@ import {
   installRuntime,
   uninstallPlan,
   uninstallRuntime,
+  previewClaudeRun,
+  runPreviewedClaude,
+  cancelClaudeRun,
+  disposeClaudeRuns,
+  clearInvocations,
 } from "@repo/maestro-core";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
+  ClaudePreview,
+  ClaudeRequest,
+  ClaudeRunResult,
+  MaestroConfigV3,
   InstallReport,
   InstallStatus,
   UninstallPlan,
@@ -93,6 +103,11 @@ function startTail(webContentsId: number): void {
 function announce(state: ProjectState): ProjectState {
   broadcast(IPC_EVENTS.projectChanged, state);
   retargetTails();
+  // Outstanding previews name the OUTGOING project's working directory. A modal left open across
+  // a project switch would otherwise still hold a runnable token, and pressing Run would spawn
+  // Claude against the repo the window is no longer showing — the same class of bug the workflow
+  // store's projectRoot key exists for. Runs already in flight keep their own cwd and are left alone.
+  clearInvocations();
   return state;
 }
 
@@ -116,19 +131,35 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.workflowsData, async (): Promise<WorkflowsData> => {
     const projectRoot = currentRoot();
     if (!projectRoot) {
-      return { projectRoot: "", config: blankConfig(), seeded: false, agents: [], skills: [] };
+      return { projectRoot: "", config: blankConfig(), seeded: false, detection: null, agents: [], skills: [] };
     }
     const [agents, skills] = await Promise.all([discoverAgents(projectRoot), discoverSkills(projectRoot)]);
     const onDisk = readConfig(projectRoot);
+    if (onDisk) return { projectRoot, config: onDisk, seeded: false, detection: null, agents, skills };
+
+    // First open of an unconfigured project: hand back the starter workflows so the canvas isn't
+    // empty — with the implementation chain READ OFF THE REPO rather than hardcoded to
+    // ["backend"], which gave a frontend project a backend agent and made the first thing the
+    // user saw wrong about their own codebase. The detection travels with the seed so the UI can
+    // show what it matched and let the user correct the chain before anything is written.
+    const detection = detectImplAgents(projectRoot);
     return {
       projectRoot,
-      // First open of an unconfigured project: hand back the starter workflows so the canvas
-      // isn't empty. M3 replaces the hardcoded impl chain with repo detection.
-      config: onDisk ?? defaultV3Config(["backend"]),
-      seeded: onDisk === null,
+      config: defaultV3Config(detection.implAgents),
+      seeded: true,
+      detection,
       agents,
       skills,
     };
+  });
+
+  // The user amending the detection. Pure — nothing is written, so the chain can be corrected as
+  // many times as it takes and the project stays unconfigured until Save.
+  ipcMain.handle(IPC.workflowsReseed, (_e, implAgents: string[]): MaestroConfigV3 => {
+    const clean = (Array.isArray(implAgents) ? implAgents : [])
+      .map((a) => String(a).trim())
+      .filter(Boolean);
+    return defaultV3Config(clean);
   });
 
   ipcMain.handle(IPC.rulesData, async (): Promise<RulesData> => {
@@ -201,6 +232,33 @@ export function registerIpc(): void {
     return uninstallRuntime(root, { purge: opts?.purge === true });
   });
 
+  // ── the claude -p bridge ─────────────────────────────────────────────
+  // Two handlers, and which one can spawn is the point. `previewClaudeRun` comes from a module
+  // that imports no child_process (asserted by a test in @repo/maestro-core), so the channel the
+  // renderer calls to BUILD a prompt has no path to a process. `runPreviewedClaude` takes the
+  // token that preview issued and nothing else — there is no argument on this channel by which a
+  // renderer could describe a different run, which is why "the only executable prompts are ones
+  // the user was shown" is a property of the wiring rather than of the UI behaving itself.
+  ipcMain.handle(IPC.claudePreview, (_e, request: ClaudeRequest): ClaudePreview => {
+    const root = currentRoot();
+    if (!root) throw new Error("No project is open.");
+    return previewClaudeRun(root, request);
+  });
+
+  ipcMain.handle(IPC.claudeRun, async (e, token: string): Promise<ClaudeRunResult> =>
+    runPreviewedClaude(token, {
+      // Chunk by chunk, as it arrives. The token identifies the run on both sides, so the renderer
+      // can route output from the first byte without waiting for this handler to resolve.
+      output: (chunk) => {
+        if (!e.sender.isDestroyed()) e.sender.send(IPC_EVENTS.claudeOutput, { token, ...chunk });
+      },
+    }),
+  );
+
+  ipcMain.handle(IPC.claudeCancel, (_e, token: string): void => {
+    cancelClaudeRun(token);
+  });
+
   // ── session log ──────────────────────────────────────────────────────
   // No separate snapshot channel: `subscribe` emits the full snapshot as its first `init`, so a
   // second way to ask for the same bytes is surface with no consumer.
@@ -219,4 +277,8 @@ export function registerIpc(): void {
 
 export function disposeIpc(): void {
   for (const id of [...tails.keys()]) stopTail(id);
+  // A cancelled run's child is spawned detached, so it outlives us by design unless it is killed.
+  // Without this, quitting the app leaves Claude running against the user's repo with no window
+  // left to stop it from.
+  disposeClaudeRuns();
 }

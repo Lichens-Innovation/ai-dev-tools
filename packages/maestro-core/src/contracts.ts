@@ -98,6 +98,22 @@ export interface ApplyRulesSummary {
   errors: Array<{ id: string; error: string }>;
 }
 
+/**
+ * What the repo looks like it is, and why — the seed for an unconfigured project's happy path.
+ *
+ * `evidence` is the half that makes this usable. The heuristic is occasionally wrong; a user shown
+ * "`react`, `express` in package.json → …" can see *why* it was wrong and correct the chain before
+ * saving. The same result with no evidence would just be an unexplained choice to trust.
+ */
+export interface RepoDetection {
+  /** The implementation-agent chain, in happy-path order. Never empty. */
+  implAgents: string[];
+  /** Human-readable lines naming what matched, e.g. "`react-dom` in package.json → frontend". */
+  evidence: string[];
+  /** Nothing matched: `implAgents` is the safe default rather than a conclusion about this repo. */
+  fallback: boolean;
+}
+
 /** What installing the orchestrator skill did to an existing file. All four are load-bearing. */
 export type OrchestratorSkillAction = "installed" | "synced" | "unchanged" | "migrated";
 
@@ -214,6 +230,97 @@ export interface UninstallReport {
   warnings: string[];
   /** Recomputed after the deletions, so the caller can refresh its badge without a second call. */
   status: InstallStatus;
+}
+
+/**
+ * What the user is asking Claude to do, as a shape the MAIN process knows how to turn into a
+ * prompt — never the prompt itself.
+ *
+ * This is the reason the bridge is safe. If the renderer handed over prompt text, the set of
+ * prompts the app can execute would be "any string a renderer bug can produce". Because it hands
+ * over a request, the set is the small, enumerable list of things this union can express, and every
+ * member of it is built by code in `claude-preview.ts` that a reviewer can read end to end.
+ *
+ * The four `create-*` kinds join this union when those routes are ported; each new member is a new
+ * prompt builder and a new entry in the preview's `targets`.
+ */
+export type ClaudeRequest = {
+  kind: "maestro-task";
+  /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
+  filename: string;
+};
+
+/** A path the run may write, and how. Shown in the confirmation before anything is spawned. */
+export interface ClaudeWriteTarget {
+  /** Absolute path. A directory means "somewhere under here". */
+  path: string;
+  action: "create" | "modify" | "unknown";
+  /** Why it's uncertain, when it is — the modal renders this verbatim rather than guessing. */
+  note?: string;
+}
+
+/**
+ * Everything the confirmation modal needs, and the token that makes the run possible.
+ *
+ * Producing one of these spawns nothing. That is not a description of the current implementation —
+ * it is enforced by `claude-preview.ts` importing no module that can start a process.
+ */
+export interface ClaudePreview {
+  /**
+   * Single-use, time-limited authorisation to run exactly `argv` in exactly `cwd`.
+   *
+   * Null when the CLI is unavailable: there is nothing to authorise, so the UI has nothing to
+   * enable. The prompt is still returned in full — copying it into a session by hand is the
+   * documented fallback, and it must work in every state.
+   */
+  token: string | null;
+  /** The full prompt text, shown verbatim and scrollable. Never a summary. */
+  prompt: string;
+  /** argv[0] is the resolved binary. This is exactly what is spawned — the modal shows it as-is. */
+  argv: string[];
+  cwd: string;
+  targets: ClaudeWriteTarget[];
+  available: boolean;
+  /** Absolute path of the resolved CLI, or null. */
+  bin: string | null;
+  /** Directories searched to decide `available`, in order. */
+  searched: string[];
+  /** Set only when `available` is false: a message naming what was looked for and where. */
+  unavailable: string | null;
+  /** Epoch ms after which the token is refused. */
+  expiresAt: number;
+}
+
+/** One piece of output as it arrives. Streamed; the UI never waits for completion to show output. */
+export interface ClaudeOutputChunk {
+  stream: "stdout" | "stderr";
+  chunk: string;
+}
+
+/**
+ * How a run ended.
+ *
+ * The four outcomes are distinguishable on purpose. "Non-zero exit" means the CLI ran and disagreed
+ * with the request — its stderr is the explanation and is worth reading. "Crashed" means it never
+ * ran, or died on a signal — the message is about the machine, not the prompt. Collapsing them into
+ * `ok: false` throws away which of those two the user is looking at.
+ */
+export interface ClaudeRunResult {
+  outcome: "ok" | "failed" | "crashed" | "cancelled";
+  /** Exit status, null when the process died on a signal or never started. */
+  code: number | null;
+  signal: string | null;
+  /** Spawn-level failure ("crashed"), with the path that could not be executed. */
+  error: string | null;
+  /** Everything the run wrote, also delivered as it arrived. Both are surfaced on every outcome. */
+  stdout: string;
+  stderr: string;
+  /** Output exceeded the retained cap; the tail is kept and the head dropped. */
+  truncated: boolean;
+  durationMs: number;
+  /** What actually ran — diffable against the argv the modal displayed. */
+  argv: string[];
+  cwd: string;
 }
 
 export interface SaveResult {

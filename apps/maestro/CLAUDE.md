@@ -69,13 +69,31 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | Route | Purpose |
 |---|---|
 | `/` | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose. |
-| `/workflows` | React Flow canvas. Writes the workflow slice. |
+| `/workflows` | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it. |
 | `/rules` | Assign rules to the project root / directories. Writes the rules slice. |
 | `/session-log` | Live view of `maestro_session.log.jsonl`. |
-| `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. |
+| `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
 | `/install` | Install / update / remove the project's Maestro runtime, and say what changed on disk. |
 
-The four `create-*` routes are **not** ported yet — they need the `claude -p` bridge (M4).
+The four `create-*` routes are **not** ported yet. The `claude -p` bridge they need now exists
+(below); porting the routes onto it is the next slice.
+
+## The `claude -p` bridge
+
+The app can run Claude on the user's behalf, and asks first. Three channels:
+
+```
+claude:preview  → { prompt, argv, cwd, targets, available, searched, token }   // spawns nothing
+claude:run      → streams stdout/stderr, resolves with the outcome             // token only
+claude:cancel   → kills the child's process group
+```
+
+`ClaudeRunDialog` is the user-facing half: full prompt (scrollable, selectable — never a summary),
+exact argv, working directory, what may be written, then Copy prompt / Cancel / Run, then streamed
+output with a Stop. See `@repo/maestro-core`'s README for why preview and run are two operations and
+what breaks if they become one. Everything a route needs is `window.maestro.claude.preview(request)`
+plus rendering `<ClaudeRunDialog>` with the result — a route that shells out on its own has opted
+out of the confirmation, which is the whole point.
 
 ## Things that bite
 
@@ -148,6 +166,39 @@ The four `create-*` routes are **not** ported yet — they need the `claude -p` 
 - **Staleness is content, never mtime.** `installedRuntimeId`/`shippedRuntimeId` are sha-256 over
   the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
   fresh checkout as stale and make the badge noise the user learns to ignore.
+- **The seeded chain is detected, and only proposed while nothing is on disk.** `data:workflows`
+  calls `detectImplAgents()` (in `@repo/maestro-core`) instead of the old hardcoded
+  `defaultV3Config(["backend"])`, and returns the `RepoDetection` on the same payload as the seed —
+  one round trip, so the evidence cannot describe a different chain than the canvas is showing.
+  `DetectedChain` renders only when `seeded`: once `maestro.json` exists the chain is the user's
+  saved answer, and re-proposing a detected one over a graph they built would be offering to
+  overwrite their work. Correcting the chain goes back to main (`data:reseed`) to rebuild the seed
+  with the *same* `defaultV3Config`, rather than duplicating the builder in the renderer — it is
+  pure, but it lives behind the barrel that re-exports `fs`. The round trip is why
+  `replaceConfig()` takes a project root and drops a result whose root no longer matches: a
+  re-seed in flight across a project switch would otherwise land project A's starter graph on B's
+  canvas, the same failure `seedWorkflowStore`'s guard exists for.
+- **`claude:run` takes a token and nothing else, and the preload must keep it that way.** The
+  bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
+  run channel having no argument that could describe a different run. A preload that "helpfully"
+  forwarded the prompt or argv alongside the token would reopen that in a diff that reads as a
+  convenience, and every test in `@repo/maestro-core` would still pass, because none of them can
+  see this side of the wire. `test/isolation.test.ts` pins the call to `invoke(IPC.claudeRun,
+  token)` for that reason. The same applies to `claude:preview`, which takes a **request** —
+  main builds the prompt; the renderer never supplies one.
+- **Preview tokens are dropped on a project switch** (`clearInvocations()` in `announce()`). A
+  token names the outgoing project's cwd, so a modal left open across a switch would otherwise
+  still have a live token and Run would spawn Claude against the repo the window has moved off —
+  the same failure shape as the `seedWorkflowStore` keying above.
+- **A cancelled run's child is detached, so quitting must kill it.** The child is spawned into its
+  own process group (that is how Stop reaches the CLI's *own* children), which also means it
+  outlives the app. `disposeIpc` calls `disposeClaudeRuns()`; without it, closing the window leaves
+  Claude running against the user's repo with nothing left to stop it from.
+- **`claude` is resolved explicitly, never off `process.env.PATH` alone.** A GUI-launched Electron
+  app gets a PATH that does not include `~/.local/bin`, which is where the CLI installs — so the
+  app reported "not installed" on machines where `which claude` answers instantly. This does not
+  reproduce from a terminal, and no unit test in this app can see it. Verified by launching from a
+  desktop entry; see `@repo/maestro-core`'s `claude-cli.ts`.
 - **The log tail is retargeted on a project switch**, in `main/ipc.ts`. Otherwise a window keeps
   streaming the previously-opened repo's session log.
 - **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id`
