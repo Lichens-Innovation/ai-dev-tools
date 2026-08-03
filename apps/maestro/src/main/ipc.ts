@@ -21,11 +21,15 @@ import {
   tailSessionLog,
   installStatus,
   installRuntime,
+  uninstallPlan,
+  uninstallRuntime,
 } from "@repo/maestro-core";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   InstallReport,
   InstallStatus,
+  UninstallPlan,
+  UninstallReport,
   ProjectState,
   RulesData,
   SaveInput,
@@ -180,6 +184,21 @@ export function registerIpc(): void {
     const root = currentRoot();
     if (!root) throw new Error("No project is open.");
     return installRuntime(root);
+  });
+
+  ipcMain.handle(IPC.installUninstallPlan, (): UninstallPlan => {
+    const root = currentRoot();
+    if (!root) throw new Error("No project is open.");
+    return uninstallPlan(root);
+  });
+
+  // Two levels, and the destructive one is opt-in on this side of the boundary as well: `purge`
+  // comes off the payload with an explicit `=== true`, so a malformed or absent argument can only
+  // ever produce the level that keeps maestro.json.
+  ipcMain.handle(IPC.installUninstall, async (_e, opts?: { purge?: boolean }): Promise<UninstallReport> => {
+    const root = currentRoot();
+    if (!root) throw new Error("No project is open.");
+    return uninstallRuntime(root, { purge: opts?.purge === true });
   });
 
   // ── session log ──────────────────────────────────────────────────────

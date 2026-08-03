@@ -73,7 +73,7 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/rules` | Assign rules to the project root / directories. Writes the rules slice. |
 | `/session-log` | Live view of `maestro_session.log.jsonl`. |
 | `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. |
-| `/install` | Install / update the project's Maestro runtime, and say what changed on disk. |
+| `/install` | Install / update / remove the project's Maestro runtime, and say what changed on disk. |
 
 The four `create-*` routes are **not** ported yet — they need the `claude -p` bridge (M4).
 
@@ -137,6 +137,14 @@ The four `create-*` routes are **not** ported yet — they need the `claude -p` 
   every subagent gets its context injected twice. `InstallStatus.pluginHooksActive` detects it and
   the route says so — it does not "fix" it, because the fix is in the user's global configuration
   and the app does not write there.
+- **Uninstall has two levels and the destructive one is never the default.** Plain uninstall
+  unregisters the hooks and deletes the ephemeral session files, and **keeps `maestro.json`** —
+  a user turning the hooks off has not asked to lose their workflow graph and rule assignments.
+  Only purge deletes the skill, the copied scripts and the config, and it is reachable *only*
+  through the confirmation dialog, which lists the exact files first. The `purge` flag is explicit
+  at every hop — `uninstall(purge: boolean)` in the context takes no default, and the IPC handler
+  reads `opts?.purge === true` — so no malformed or missing argument can escalate a call into a
+  purge. `packages/maestro-core/test/uninstall.test.ts` asserts what each level *leaves*.
 - **Staleness is content, never mtime.** `installedRuntimeId`/`shippedRuntimeId` are sha-256 over
   the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
   fresh checkout as stale and make the badge noise the user learns to ignore.

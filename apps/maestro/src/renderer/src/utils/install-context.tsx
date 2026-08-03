@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { callMain, type CallResult } from "./call-main";
 import { useProject } from "./project-context";
-import type { InstallReport, InstallStatus } from "../../../shared/ipc";
+import type { InstallReport, InstallStatus, UninstallPlan, UninstallReport } from "../../../shared/ipc";
 
 interface InstallContextValue {
   /** null until the first status lands, and whenever no project is open. */
@@ -10,13 +10,25 @@ interface InstallContextValue {
   error: string | null;
   refresh(): Promise<void>;
   install(): Promise<CallResult<InstallReport>>;
+  /** What each level of an uninstall would remove. Reads only; deletes nothing. */
+  uninstallPlan(): Promise<CallResult<UninstallPlan>>;
+  /**
+   * Remove the runtime. `purge` is a required argument, not an option with a default: every call
+   * site has to state which of the two levels it means, and the destructive one cannot be reached
+   * by leaving something out.
+   */
+  uninstall(purge: boolean): Promise<CallResult<UninstallReport>>;
 }
+
+const noProject = { ok: false, error: "No project is open." } as const;
 
 const InstallContext = createContext<InstallContextValue>({
   status: null,
   error: null,
   refresh: async () => {},
-  install: async () => ({ ok: false, error: "No project is open." }),
+  install: async () => noProject,
+  uninstallPlan: async () => noProject,
+  uninstall: async () => noProject,
 });
 
 /**
@@ -66,8 +78,24 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     return res;
   }, [refresh]);
 
+  const uninstallPlan = useCallback(async (): Promise<CallResult<UninstallPlan>> => {
+    return callMain(() => window.maestro.install.uninstallPlan());
+  }, []);
+
+  const uninstall = useCallback(
+    async (purge: boolean): Promise<CallResult<UninstallReport>> => {
+      const res = await callMain(() => window.maestro.install.uninstall({ purge }));
+      if (res.ok) setStatus(res.value.status);
+      else await refresh();
+      return res;
+    },
+    [refresh],
+  );
+
   return (
-    <InstallContext.Provider value={{ status, error, refresh, install }}>{children}</InstallContext.Provider>
+    <InstallContext.Provider value={{ status, error, refresh, install, uninstallPlan, uninstall }}>
+      {children}
+    </InstallContext.Provider>
   );
 }
 

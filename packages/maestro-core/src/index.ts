@@ -124,6 +124,15 @@ export {
 } from "./install.js";
 
 export {
+  uninstallRuntime,
+  uninstallPlan,
+  purgeTargets,
+  type UninstallOptions,
+  type UninstallPlan,
+  type UninstallReport,
+} from "./uninstall.js";
+
+export {
   defaultV3Config,
   buildWorkflow,
   linearWorkflow,

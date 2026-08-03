@@ -161,6 +161,61 @@ export interface InstallReport {
   status: InstallStatus;
 }
 
+/**
+ * What each level of an uninstall would remove from the project, as it stands right now.
+ *
+ * This exists so the UI can NAME the files before it deletes them. "Are you sure?" is not informed
+ * consent when `.claude/maestro.json` — hand-authored workflow and rule configuration — is on the
+ * list, so the confirmation renders `purgeFiles` verbatim.
+ */
+export interface UninstallPlan {
+  projectRoot: string;
+  /** Hook ids (`<Event>:<script>`) currently registered that a default uninstall would remove. */
+  hooks: string[];
+  /** Project-relative paths of the ephemeral session files that exist right now. */
+  sessionFiles: string[];
+  /** `agent: "maestro"`, left in settings.json by installs that predate the hook registration. */
+  legacyAgentSetting: boolean;
+  /**
+   * Project-relative paths a purge would delete ON TOP of the default — the orchestrator skill,
+   * the copied runtime scripts, the installed handoff protocols, and `maestro.json`. Only paths
+   * that exist are listed, so the confirmation never names a file the user doesn't have.
+   */
+  purgeFiles: string[];
+  /** True when `maestro.json` exists — i.e. when purge has something irreplaceable to delete. */
+  purgeRemovesConfig: boolean;
+  /** Neither level has anything to do: uninstalling would be a no-op. */
+  empty: boolean;
+  /** `.claude/settings.json` exists but is not valid JSON — uninstall would refuse to touch it. */
+  settingsUnreadable: boolean;
+}
+
+/** What an uninstall actually removed from disk. */
+export interface UninstallReport {
+  projectRoot: string;
+  /** Which level ran. `false` is the default and never deletes `maestro.json`. */
+  purge: boolean;
+  /** Hook ids removed from the project's `.claude/settings.json`. */
+  hooksRemoved: string[];
+  /** Project-relative paths of the ephemeral session files deleted. */
+  sessionFilesRemoved: string[];
+  legacyAgentSettingRemoved: boolean;
+  /** Project-relative paths deleted by a purge — empty on a default uninstall. */
+  purged: string[];
+  /** Directories left empty by the deletions and pruned. Never `.claude` itself. */
+  dirsPruned: string[];
+  /**
+   * `.claude/maestro.json` is still on disk. Always true after a default uninstall of a project
+   * that had one — the whole point of the two levels.
+   */
+  configKept: boolean;
+  /** There was nothing installed to remove. Nothing was written; this is not an error. */
+  noop: boolean;
+  warnings: string[];
+  /** Recomputed after the deletions, so the caller can refresh its badge without a second call. */
+  status: InstallStatus;
+}
+
 export interface SaveResult {
   /** Absolute path of the file written. */
   configPath: string;
