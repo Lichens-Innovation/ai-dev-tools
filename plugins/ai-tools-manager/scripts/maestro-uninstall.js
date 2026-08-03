@@ -4,7 +4,7 @@
 //
 //   node maestro-uninstall.js [projectDir] [--purge]
 //
-// Default: removes the bash-validation PreToolUse hook from
+// Default: removes every Maestro hook registered against .claude/scripts/ from
 //   <project>/.claude/settings.json (only the keys Maestro added; all other keys
 //   are preserved), deletes the ephemeral session files (maestro_session.json,
 //   maestro_session.log.jsonl, maestro_session_tasks.json), and cleans up any
@@ -26,48 +26,78 @@ const args = process.argv.slice(2);
 const purge = args.includes("--purge");
 const projectDir = args.find((a) => !a.startsWith("--")) || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-const BASH_VALIDATION_COMMAND = "$CLAUDE_PROJECT_DIR/.claude/scripts/bash-validation.sh";
+// Every runtime script the install path registers a hook for. Keep in sync with
+// HOOK_REGISTRATIONS in packages/maestro-core/src/install.ts — the desktop app's
+// installer registers all of these in the PROJECT's settings.json (pointing at
+// $CLAUDE_PROJECT_DIR/.claude/scripts/), where the old skill-based install only
+// ever registered bash-validation.sh and left the rest to the plugin's hooks.json.
+// An uninstall that removed only the latter would leave a project firing hooks at
+// scripts --purge has just deleted.
+const HOOK_SCRIPTS = [
+  "bash-validation.sh",
+  "maestro-session-log.cjs",
+  "maestro-subagent-log.cjs",
+  "maestro-inject-agent-context.cjs",
+  "maestro-validate-tasks.cjs",
+  "maestro-session-cleanup.cjs",
+];
 
-// Strip our bash-validation hook from the PreToolUse list, dropping any Bash
-// matcher entry left empty afterwards. Returns true if anything changed.
-function removeBashValidationHook(settings) {
-  const pre = settings.hooks && settings.hooks.PreToolUse;
-  if (!Array.isArray(pre)) return false;
+// Strip every Maestro hook from settings.json, dropping entries left empty and
+// events left with no entries. Matched on the script basename inside the command
+// (not on an exact string) so a hand-requoted command is still removed — the same
+// key the installer uses to decide a hook is already present.
+function removeMaestroHooks(settings) {
+  const hooks = settings.hooks;
+  if (!hooks || typeof hooks !== "object") return false;
   let changed = false;
-  for (const entry of pre) {
-    if (!entry || !Array.isArray(entry.hooks)) continue;
-    const before = entry.hooks.length;
-    entry.hooks = entry.hooks.filter((h) => !(h && h.command === BASH_VALIDATION_COMMAND));
-    if (entry.hooks.length !== before) changed = true;
+  for (const event of Object.keys(hooks)) {
+    const entries = hooks[event];
+    if (!Array.isArray(entries)) continue;
+    let touched = false;
+    for (const entry of entries) {
+      if (!entry || !Array.isArray(entry.hooks)) continue;
+      const before = entry.hooks.length;
+      entry.hooks = entry.hooks.filter(
+        (h) =>
+          !(
+            h &&
+            typeof h.command === "string" &&
+            h.command.includes(".claude/scripts/") &&
+            HOOK_SCRIPTS.some((s) => h.command.includes(s))
+          )
+      );
+      if (entry.hooks.length !== before) touched = true;
+    }
+    if (!touched) continue; // leave events we didn't touch exactly as the user wrote them
+    changed = true;
+    const kept = entries.filter((e) => !(e && Array.isArray(e.hooks) && e.hooks.length === 0));
+    if (kept.length === 0) delete hooks[event];
+    else hooks[event] = kept;
   }
-  if (changed) {
-    settings.hooks.PreToolUse = pre.filter(
-      (e) => !(e && e.matcher === "Bash" && Array.isArray(e.hooks) && e.hooks.length === 0)
-    );
-  }
+  if (changed && Object.keys(hooks).length === 0) delete settings.hooks;
   return changed;
 }
 
-// Removes the bash-validation hook (and any legacy `agent: "maestro"` from older
-// installs) from settings.json in one read/write. Returns which keys were touched.
+// Removes the Maestro hooks (and any legacy `agent: "maestro"` from older installs)
+// from settings.json in one read/write. Returns which keys were touched.
 function cleanSettings(settingsPath) {
-  if (!fs.existsSync(settingsPath)) return { removedAgentSetting: false, removedBashHook: false };
+  if (!fs.existsSync(settingsPath)) return { removedAgentSetting: false, removedHooks: false };
   let settings;
   try {
     settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
   } catch {
-    return { removedAgentSetting: false, removedBashHook: false };
+    return { removedAgentSetting: false, removedHooks: false };
   }
   let removedAgentSetting = false;
   if (settings.agent === "maestro") {
     delete settings.agent;
     removedAgentSetting = true;
   }
-  const removedBashHook = removeBashValidationHook(settings);
-  if (removedAgentSetting || removedBashHook) {
+  const removedHooks = removeMaestroHooks(settings);
+  if (removedAgentSetting || removedHooks) {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   }
-  return { removedAgentSetting, removedBashHook };
+  return { removedAgentSetting, removedHooks };
 }
 
 function removeIfPresent(p) {
@@ -79,7 +109,7 @@ function removeIfPresent(p) {
 try {
   const claudeDir = path.join(projectDir, ".claude");
 
-  const { removedAgentSetting, removedBashHook } = cleanSettings(path.join(claudeDir, "settings.json"));
+  const { removedAgentSetting, removedHooks } = cleanSettings(path.join(claudeDir, "settings.json"));
   const removedSession = [
     removeIfPresent(path.join(claudeDir, "maestro_session.json")),
     removeIfPresent(path.join(claudeDir, "maestro_session.log.jsonl")),
@@ -96,9 +126,19 @@ try {
       path.join(claudeDir, "scripts", "maestro-render-orchestrator.cjs"),
       path.join(claudeDir, "scripts", "maestro-task-status.cjs"),
       path.join(claudeDir, "scripts", "bash-validation.sh"),
+      // Hook scripts the desktop app copies in (as .cjs, so they run under a
+      // "type": "module" project) instead of running them from the plugin root.
+      path.join(claudeDir, "scripts", "maestro-session-log.cjs"),
+      path.join(claudeDir, "scripts", "maestro-subagent-log.cjs"),
+      path.join(claudeDir, "scripts", "maestro-inject-agent-context.cjs"),
+      path.join(claudeDir, "scripts", "maestro-validate-tasks.cjs"),
+      path.join(claudeDir, "scripts", "maestro-session-cleanup.cjs"),
       path.join(claudeDir, "scripts", "lib", "maestro-session.cjs"),
       path.join(claudeDir, "scripts", "lib", "maestro-tasks.cjs"),
       path.join(claudeDir, "scripts", "lib", "maestro-skill-regions.cjs"),
+      // Handoff protocols the app installs. NOT .claude/handoffs/ — that path is
+      // the user's own override and nothing here put it there.
+      path.join(claudeDir, "templates", "handoffs"),
       path.join(claudeDir, "maestro.json"),
     ];
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));
@@ -108,7 +148,7 @@ try {
     JSON.stringify({
       ok: true,
       removedAgentSetting,
-      removedBashHook,
+      removedHooks,
       removedSession,
       purged: purge ? purged : null,
       keptConfig: !purge,

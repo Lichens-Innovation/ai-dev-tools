@@ -2,6 +2,7 @@ import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { Toaster } from "@repo/ui/toast";
 import { SessionLogProvider } from "../utils/session-log-context";
 import { ProjectProvider } from "../utils/project-context";
+import { InstallProvider } from "../utils/install-context";
 
 // No `shellComponent` here, unlike the web app: TanStack Start rendered the whole <html>
 // document server-side, so the root route owned <head>/<body>/<Scripts> and injected the theme
@@ -14,10 +15,12 @@ export const Route = createRootRoute({
 function RootLayout() {
   return (
     <ProjectProvider>
-      <SessionLogProvider>
-        <Outlet />
-        <Toaster />
-      </SessionLogProvider>
+      <InstallProvider>
+        <SessionLogProvider>
+          <Outlet />
+          <Toaster />
+        </SessionLogProvider>
+      </InstallProvider>
     </ProjectProvider>
   );
 }

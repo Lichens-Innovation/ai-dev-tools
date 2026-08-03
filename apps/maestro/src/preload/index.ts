@@ -32,6 +32,7 @@ const api: MaestroApi = {
   },
   install: {
     status: () => ipcRenderer.invoke(IPC.installStatus),
+    run: () => ipcRenderer.invoke(IPC.installRun),
   },
   log: {
     subscribe: (handlers) => {

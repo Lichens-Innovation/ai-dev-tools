@@ -50,12 +50,17 @@ what actually changed on disk. Gone: `RESULT_FILE`, `aiToolsAction`, `hookSpecif
 
 ## What still requires Claude Code
 
-The **runtime** half. These are hook scripts that fire inside a session and have no desktop
-equivalent — the desktop app writes the config they read and tails the log they write:
+The **runtime** half — hook scripts that fire inside a session: `maestro-inject-agent-context`
+(SubagentStart), `maestro-subagent-log` (SubagentStart/Stop), `maestro-session-log` (PreToolUse),
+`maestro-validate-tasks` (PostToolUse), `maestro-session-cleanup` (SessionEnd),
+`maestro-set-session-workflow.cjs`, `bash-validation.sh`.
 
-`maestro-inject-agent-context.js` (SubagentStart), `maestro-subagent-log.js`,
-`maestro-session-log.js` (PreToolUse), `maestro-validate-tasks.js` (PostToolUse),
-`maestro-set-session-workflow.cjs`, `bash-validation.sh`, `maestro-session-cleanup.sh`.
+They still need a session to *run*, but no longer to be **installed**: `/install` copies them into
+`<project>/.claude/scripts/` and registers them in the project's own `.claude/settings.json`
+(`installRuntime()` in `@repo/maestro-core`). See that package's README for why project-local
+registration exists at all — the plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a
+version-keyed marketplace cache, so runtime fixes shipped without a `plugin.json` bump never
+reached an installed project.
 
 The split is the one the `maestro-architecture` skill already draws, at `maestro.json`.
 
@@ -68,6 +73,7 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/rules` | Assign rules to the project root / directories. Writes the rules slice. |
 | `/session-log` | Live view of `maestro_session.log.jsonl`. |
 | `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. |
+| `/install` | Install / update the project's Maestro runtime, and say what changed on disk. |
 
 The four `create-*` routes are **not** ported yet — they need the `claude -p` bridge (M4).
 
@@ -120,6 +126,20 @@ The four `create-*` routes are **not** ported yet — they need the `claude -p` 
   dark mode — invisible, and invisible to every test that isn't a screenshot. `workflow-canvas.tsx`
   drives `colorMode` off the `light`/`dark` class on `<html>` via a `MutationObserver`, because
   "auto" resolves against the OS and the toggle can change it while the canvas is mounted.
+- **Hook scripts are copied into a project as `.cjs`, never `.js`.** The plugin runs them as
+  `.js` because its directory has no package.json declaring a module type. A project's does, and
+  `"type": "module"` makes node parse their `require()` as ESM — the hook then fails on *every
+  tool call* with "require is not defined in ES module scope". Nothing catches this but running a
+  copied script from inside such a project, which `test/install.test.ts` does.
+- **Two things can register Maestro's hooks, and both firing is a visible bug.** A project
+  installed from `/install` has them in its own settings; the `ai-tools-manager` plugin registers
+  the same ones globally from its `hooks.json`. With both, every tool call is logged twice and
+  every subagent gets its context injected twice. `InstallStatus.pluginHooksActive` detects it and
+  the route says so — it does not "fix" it, because the fix is in the user's global configuration
+  and the app does not write there.
+- **Staleness is content, never mtime.** `installedRuntimeId`/`shippedRuntimeId` are sha-256 over
+  the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
+  fresh checkout as stale and make the badge noise the user learns to ignore.
 - **The log tail is retargeted on a project switch**, in `main/ipc.ts`. Otherwise a window keeps
   streaming the previously-opened repo's session log.
 - **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id`

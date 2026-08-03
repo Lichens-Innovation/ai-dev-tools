@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, FolderOpen } from "lucide-react";
+import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, FolderOpen, Download } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSessionLog } from "../utils/session-log-context";
 import { useProject } from "../utils/project-context";
+import { installBadge, useInstall } from "../utils/install-context";
 
 interface WorkflowSelectorProps {
   workflows: string[];
@@ -20,6 +21,7 @@ export default function TopNav({
   workflowSelector?: WorkflowSelectorProps;
 }) {
   const { connected } = useSessionLog();
+  const badge = installBadge(useInstall().status);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +107,26 @@ export default function TopNav({
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
       >
         <ListChecks size={13} /> Maestro Tasks
+      </Link>
+      {/*
+        The runtime badge lives here, not only on /install: a project running an older runtime
+        than the app ships is precisely the thing a user never goes looking for, so it has to be
+        visible from whatever route they are already on.
+      */}
+      <Link
+        to="/install"
+        activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)"
+      >
+        <Download size={13} /> Runtime
+        {badge !== "none" && (
+          <span
+            title={badge === "missing" ? "Maestro is not installed in this project" : "The app ships a newer runtime than this project has"}
+            className="text-[7px] leading-none text-amber-500"
+          >
+            ●
+          </span>
+        )}
       </Link>
 
       {/* Centered workflow selector */}

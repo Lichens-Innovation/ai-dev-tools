@@ -5,8 +5,6 @@
 // the renderer is allowed to ask for.
 
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
-import fs from "node:fs";
-import path from "node:path";
 import {
   readConfig,
   blankConfig,
@@ -21,11 +19,12 @@ import {
   listTasks,
   closeTask,
   tailSessionLog,
-  orchestratorSkillPath,
-  maestroJsonPath,
+  installStatus,
+  installRuntime,
 } from "@repo/maestro-core";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
+  InstallReport,
   InstallStatus,
   ProjectState,
   RulesData,
@@ -167,15 +166,20 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.tasksList, () => listTasks(currentRoot()));
   ipcMain.handle(IPC.tasksClose, (_e, filename: string) => closeTask(currentRoot(), filename));
 
-  // ── install status ───────────────────────────────────────────────────
-  ipcMain.handle(IPC.installStatus, (): InstallStatus => {
+  // ── install ──────────────────────────────────────────────────────────
+  // The other half of the milestone: a project's Maestro runtime — the orchestrator skill, the
+  // hook scripts, and the hook registrations in the project's OWN .claude/settings.json — is
+  // installed and updated from here rather than by /maestro-install in a Claude session.
+  ipcMain.handle(IPC.installStatus, async (): Promise<InstallStatus> => {
     const root = currentRoot();
-    if (!root) return { orchestratorSkill: false, scriptsDir: false, configFile: false };
-    return {
-      orchestratorSkill: fs.existsSync(orchestratorSkillPath(root)),
-      scriptsDir: fs.existsSync(path.join(root, ".claude", "scripts")),
-      configFile: fs.existsSync(maestroJsonPath(root)),
-    };
+    if (!root) throw new Error("No project is open.");
+    return installStatus(root);
+  });
+
+  ipcMain.handle(IPC.installRun, async (): Promise<InstallReport> => {
+    const root = currentRoot();
+    if (!root) throw new Error("No project is open.");
+    return installRuntime(root);
   });
 
   // ── session log ──────────────────────────────────────────────────────

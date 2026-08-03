@@ -13,6 +13,7 @@ import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as SessionLogRouteImport } from './routes/session-log'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
+import { Route as InstallRouteImport } from './routes/install'
 import { Route as IndexRouteImport } from './routes/index'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
@@ -35,6 +36,11 @@ const MaestroTasksRoute = MaestroTasksRouteImport.update({
   path: '/maestro-tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InstallRoute = InstallRouteImport.update({
+  id: '/install',
+  path: '/install',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
@@ -65,12 +74,25 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/maestro-tasks' | '/rules' | '/session-log' | '/workflows'
+  fullPaths:
+    | '/'
+    | '/install'
+    | '/maestro-tasks'
+    | '/rules'
+    | '/session-log'
+    | '/workflows'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/maestro-tasks' | '/rules' | '/session-log' | '/workflows'
+  to:
+    | '/'
+    | '/install'
+    | '/maestro-tasks'
+    | '/rules'
+    | '/session-log'
+    | '/workflows'
   id:
     | '__root__'
     | '/'
+    | '/install'
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
@@ -79,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InstallRoute: typeof InstallRoute
   MaestroTasksRoute: typeof MaestroTasksRoute
   RulesRoute: typeof RulesRoute
   SessionLogRoute: typeof SessionLogRoute
@@ -115,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MaestroTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/install': {
+      id: '/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof InstallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -127,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InstallRoute: InstallRoute,
   MaestroTasksRoute: MaestroTasksRoute,
   RulesRoute: RulesRoute,
   SessionLogRoute: SessionLogRoute,
