@@ -9,14 +9,10 @@ interface SessionLogCardsProps {
 }
 
 function StatusIcon({ status }: { status: Instance["status"] }) {
-  if (status === "success")
-    return <CircleCheck size={16} className="text-(--green) shrink-0" />;
-  if (status === "condition")
-    return <CircleX size={16} className="text-(--red) shrink-0" />;
-  if (status === "unknown")
-    return <AlertTriangle size={16} className="text-(--yellow) shrink-0" />;
-  if (status === "transition")
-    return <Circle size={16} className="text-(--ink-3) shrink-0" />;
+  if (status === "success") return <CircleCheck size={16} className="text-(--green) shrink-0" />;
+  if (status === "condition") return <CircleX size={16} className="text-(--red) shrink-0" />;
+  if (status === "unknown") return <AlertTriangle size={16} className="text-(--yellow) shrink-0" />;
+  if (status === "transition") return <Circle size={16} className="text-(--ink-3) shrink-0" />;
   return <CircleCheck size={16} className="text-(--green) shrink-0" />;
 }
 
@@ -30,9 +26,7 @@ function underlineColor(status: Instance["status"]): string {
 export default function SessionLogCards({ instances, activeId, onSelect }: SessionLogCardsProps) {
   return (
     <div className="border-r border-(--line) overflow-y-auto py-4 px-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-(--ink-3) mb-3 px-1">
-        Workflow
-      </div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-(--ink-3) mb-3 px-1">Workflow</div>
       {instances.map((inst) => {
         const isActive = inst.id === activeId;
 
@@ -48,14 +42,9 @@ export default function SessionLogCards({ instances, activeId, onSelect }: Sessi
             }`}
           >
             <StatusIcon status={inst.status} />
-            <span className="text-[13px] text-(--ink) truncate">
-              {inst.displayName}
-            </span>
+            <span className="text-[13px] text-(--ink) truncate">{inst.displayName}</span>
             {inst.skillsTriage && (
-              <span
-                className="ml-auto shrink-0 text-[10px] font-mono"
-                title="skills loaded / skipped / unaccounted"
-              >
+              <span className="ml-auto shrink-0 text-[10px] font-mono" title="skills loaded / skipped / unaccounted">
                 <span className="text-(--green)">{inst.skillsTriage.loaded.length}</span>
                 {inst.skillsTriage.skipped.length > 0 && (
                   <span className="text-(--yellow)">/{inst.skillsTriage.skipped.length}</span>

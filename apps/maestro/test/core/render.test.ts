@@ -63,7 +63,7 @@ function runLegacyRenderer(projectRoot: string): string {
     fs.mkdirSync(path.join(scriptDir, "lib"), { recursive: true });
     fs.copyFileSync(
       path.join(LEGACY_DIR, "maestro-render-orchestrator.cjs"),
-      path.join(scriptDir, "maestro-render-orchestrator.cjs"),
+      path.join(scriptDir, "maestro-render-orchestrator.cjs")
     );
     for (const lib of ["maestro-session.cjs", "maestro-skill-regions.cjs"]) {
       fs.copyFileSync(path.join(LEGACY_DIR, lib), path.join(scriptDir, "lib", lib));
@@ -132,7 +132,7 @@ describe("renderOrchestrator", () => {
 
   it("renders the empty-workflow placeholder", () => {
     expect(handoffTable({ workflow_instances: [], workflows: [] })).toBe(
-      "# No workflows configured yet. Run /maestro-install to set up.",
+      "# No workflows configured yet. Run /maestro-install to set up."
     );
   });
 

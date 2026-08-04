@@ -64,10 +64,7 @@ function MaestroTasksPage() {
   const openCount = useMemo(() => tasks.filter(isOpen).length, [tasks]);
   const closedCount = tasks.length - openCount;
 
-  const visible = useMemo(
-    () => tasks.filter((t) => (filter === "open" ? isOpen(t) : !isOpen(t))),
-    [tasks, filter]
-  );
+  const visible = useMemo(() => tasks.filter((t) => (filter === "open" ? isOpen(t) : !isOpen(t))), [tasks, filter]);
 
   // Keep a valid selection within the current filter; default to the first row.
   const active = visible.find((t) => t.filename === activeFile) ?? visible[0];
@@ -79,7 +76,12 @@ function MaestroTasksPage() {
       // reach the user rather than vanish into an unhandled rejection.
       const res = await callMain(() => closeMaestroTask({ data: { filename: task.filename } }));
       if (!res.ok) {
-        toast(<>Could not close {task.title}: {res.error}</>, { variant: "error" });
+        toast(
+          <>
+            Could not close {task.title}: {res.error}
+          </>,
+          { variant: "error" }
+        );
         return;
       }
       setTasks(res.value);
@@ -99,7 +101,7 @@ function MaestroTasksPage() {
     setPreviewing(true);
     try {
       const res = await callMain(() =>
-        window.maestro.claude.preview({ kind: "maestro-task", filename: task.filename }),
+        window.maestro.claude.preview({ kind: "maestro-task", filename: task.filename })
       );
       if (!res.ok) {
         toast(<>Could not prepare the run: {res.error}</>, { variant: "error" });
@@ -125,8 +127,8 @@ function MaestroTasksPage() {
           <div>
             <p className="text-[13px] font-medium text-(--ink) mb-1">No Maestro tasks found</p>
             <p className="text-[12px] text-(--ink-3) max-w-xs">
-              Run <span className="font-mono">/to-maestro-tasks</span> to break a plan into task files
-              under <span className="font-mono">.claude/maestro-tasks/</span>.
+              Run <span className="font-mono">/to-maestro-tasks</span> to break a plan into task files under{" "}
+              <span className="font-mono">.claude/maestro-tasks/</span>.
             </p>
           </div>
         </div>
@@ -151,9 +153,7 @@ function MaestroTasksPage() {
             </div>
 
             {visible.length === 0 ? (
-              <div className="text-[12px] text-(--ink-3) px-1 py-4 text-center">
-                No {filter} tasks.
-              </div>
+              <div className="text-[12px] text-(--ink-3) px-1 py-4 text-center">No {filter} tasks.</div>
             ) : (
               visible.map((task) => (
                 <button
@@ -197,14 +197,10 @@ function MaestroTasksPage() {
                 <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-(--line)">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <div className="font-mono text-[11px] text-(--ink-3) truncate">
-                        {active.relativePath}
-                      </div>
+                      <div className="font-mono text-[11px] text-(--ink-3) truncate">{active.relativePath}</div>
                       <StatusBadge status={active.status} />
                     </div>
-                    <h2 className="text-[16px] font-semibold text-(--ink) mt-0.5 truncate">
-                      {active.title}
-                    </h2>
+                    <h2 className="text-[16px] font-semibold text-(--ink) mt-0.5 truncate">{active.title}</h2>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
                     {/*
@@ -263,13 +259,7 @@ function MaestroTasksPage() {
         </div>
       )}
 
-      {preview && (
-        <ClaudeRunDialog
-          preview={preview.preview}
-          title={preview.title}
-          onClose={() => setPreview(null)}
-        />
-      )}
+      {preview && <ClaudeRunDialog preview={preview.preview} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
 }

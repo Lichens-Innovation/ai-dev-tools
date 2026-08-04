@@ -41,7 +41,7 @@ re-runs the install:
 
 **Copied scripts are `.cjs`, never `.js`.** The plugin can run them as `.js` because its directory
 has no `package.json` declaring a module type; a project's does, and `"type": "module"` makes node
-parse their `require()` as ESM — the hook then fails on *every tool call* with "require is not
+parse their `require()` as ESM — the hook then fails on _every tool call_ with "require is not
 defined in ES module scope".
 
 ## Path 2 — the plugin's own hooks, and the version trap
@@ -61,7 +61,7 @@ normally** — `/maestro-install`, `/create-skill` all work. But a snapshot take
 `scripts/` existed has no `hooks/hooks.json` and no hook scripts at all, so `SubagentStart` (skill
 injection + handoff routing), `PreToolUse`/`SubagentStop` logging, and the `TaskCreate` validator
 **silently never fire** — no error, the files just aren't there. Meanwhile `bash-validation.sh`
-keeps working, because the installer copies *that one into the project*. That asymmetry is what
+keeps working, because the installer copies _that one into the project_. That asymmetry is what
 makes the failure look random: one Maestro hook works, the rest don't.
 
 This exact gap froze `lichens-ordonnancement-ui` at a May-2026 snapshot — the plugin had been edited
@@ -100,14 +100,14 @@ installs them by file copy, so they must exist in the repo.
 
 ## Diagnosing "my hook/script change isn't taking effect"
 
-| Check | Command |
-|---|---|
-| Which path is this project on? | `cat <project>/.claude/settings.json` — Maestro hooks present ⇒ project-local; absent ⇒ plugin-global |
-| Project-local and stale? | the `/install` route's badge, or just re-run `/maestro-update` |
-| What plugin version is installed? | `cat ~/.claude/plugins/installed_plugins.json` (`installPath` + `version` + `installedAt`) |
-| Does the cached copy even have the files? | `ls ~/.claude/plugins/cache/lichens-ai-dev-tools/<plugin>/<version>/{hooks,scripts}` |
-| Is the cache older than the change? | compare `installedAt` / dir mtime against the commit that added the file |
-| Everything logged twice? | both paths are registered — see `pluginHooksActive` above |
+| Check                                     | Command                                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Which path is this project on?            | `cat <project>/.claude/settings.json` — Maestro hooks present ⇒ project-local; absent ⇒ plugin-global |
+| Project-local and stale?                  | the `/install` route's badge, or just re-run `/maestro-update`                                        |
+| What plugin version is installed?         | `cat ~/.claude/plugins/installed_plugins.json` (`installPath` + `version` + `installedAt`)            |
+| Does the cached copy even have the files? | `ls ~/.claude/plugins/cache/lichens-ai-dev-tools/<plugin>/<version>/{hooks,scripts}`                  |
+| Is the cache older than the change?       | compare `installedAt` / dir mtime against the commit that added the file                              |
+| Everything logged twice?                  | both paths are registered — see `pluginHooksActive` above                                             |
 
 If skills work but `hooks/`/`scripts/` are absent from the cache → **stale cache, version was never
 bumped.**

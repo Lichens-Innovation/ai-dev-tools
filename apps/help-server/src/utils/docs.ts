@@ -61,8 +61,7 @@ export const getDocContent = createServerFn({ method: 'GET' })
     const filePath = path.join(DOCS_DIR, `${slug}.md`)
     const content = await readFile(filePath, 'utf-8')
     return { content, title: extractTitle(content, slug) }
-  },
-)
+  })
 
 export const getAllDocsForSearch = createServerFn({ method: 'GET' }).handler(
   async (): Promise<DocSection[]> => {

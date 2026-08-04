@@ -53,9 +53,7 @@ function writeSession(p, session) {
 function resolveSearchList(cfg, session) {
   const workflows = (cfg && cfg.workflows) || [];
   const activeWorkflowName = (session && session.workflow) || null;
-  const activeMatches = activeWorkflowName
-    ? workflows.filter((w) => w.name === activeWorkflowName)
-    : [];
+  const activeMatches = activeWorkflowName ? workflows.filter((w) => w.name === activeWorkflowName) : [];
   let warning = null;
   let searchList;
   if (activeWorkflowName && activeMatches.length > 0) {

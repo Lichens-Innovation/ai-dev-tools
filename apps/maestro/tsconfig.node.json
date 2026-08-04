@@ -1,12 +1,6 @@
 {
   "extends": "@repo/typescript-config/base.json",
-  "include": [
-    "electron.vite.config.ts",
-    "src/main/**/*",
-    "src/preload/**/*",
-    "src/shared/**/*",
-    "src/core/**/*"
-  ],
+  "include": ["electron.vite.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "src/core/**/*"],
   "compilerOptions": {
     "composite": true,
     "lib": ["ES2023"],

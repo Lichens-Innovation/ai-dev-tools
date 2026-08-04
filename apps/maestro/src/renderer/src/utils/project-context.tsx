@@ -48,37 +48,34 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
    * silently does nothing is the most confusing failure the app has, since every route's data
    * then belongs to the wrong repo.
    */
-  const apply = useCallback(
-    async (what: string, op: () => Promise<ProjectState | null>) => {
-      const res = await callMain(op);
-      if (!res.ok) {
-        toast(<>Could not {what}: {res.error}</>, { variant: "error" });
-        return;
-      }
-      // null is the user cancelling the picker, not a failure.
-      if (res.value) setState(res.value);
-    },
-    [],
-  );
+  const apply = useCallback(async (what: string, op: () => Promise<ProjectState | null>) => {
+    const res = await callMain(op);
+    if (!res.ok) {
+      toast(
+        <>
+          Could not {what}: {res.error}
+        </>,
+        { variant: "error" }
+      );
+      return;
+    }
+    // null is the user cancelling the picker, not a failure.
+    if (res.value) setState(res.value);
+  }, []);
 
-  const pick = useCallback(
-    () => apply("open the project", () => window.maestro.project.pick()),
-    [apply],
-  );
+  const pick = useCallback(() => apply("open the project", () => window.maestro.project.pick()), [apply]);
 
   const open = useCallback(
     (root: string) => apply("open that project", () => window.maestro.project.open(root)),
-    [apply],
+    [apply]
   );
 
   const forget = useCallback(
     (root: string) => apply("forget that project", () => window.maestro.project.forget(root)),
-    [apply],
+    [apply]
   );
 
-  return (
-    <ProjectContext.Provider value={{ ...state, pick, open, forget }}>{children}</ProjectContext.Provider>
-  );
+  return <ProjectContext.Provider value={{ ...state, pick, open, forget }}>{children}</ProjectContext.Provider>;
 }
 
 export function useProject(): ProjectContextValue {

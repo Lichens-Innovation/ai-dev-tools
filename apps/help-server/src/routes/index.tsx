@@ -13,7 +13,14 @@ import StatsTab from '../components/tabs/StatsTab'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const [sections, installedPlugins, marketplace, rules, curatedPlugins, commands] = await Promise.all([
+    const [
+      sections,
+      installedPlugins,
+      marketplace,
+      rules,
+      curatedPlugins,
+      commands,
+    ] = await Promise.all([
       getAllDocsForSearch(),
       getInstalledPlugins(),
       getProjectMarketplace(),
@@ -43,7 +50,14 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 
 function Home() {
-  const { sections, installedPlugins, marketplace, rules, curatedPlugins, commands } = Route.useLoaderData()
+  const {
+    sections,
+    installedPlugins,
+    marketplace,
+    rules,
+    curatedPlugins,
+    commands,
+  } = Route.useLoaderData()
   const [activeTab, setActiveTab] = useState<TabId>('command-center')
 
   useEffect(() => {
@@ -59,7 +73,9 @@ function Home() {
           <h1 className="display-title mb-3 text-center text-5xl italic leading-[1.1] text-(--ink) sm:text-6xl">
             Command Center
           </h1>
-          <p className="text-sm text-subtle">Manage plugins, commands, and marketplace tools.</p>
+          <p className="text-sm text-subtle">
+            Manage plugins, commands, and marketplace tools.
+          </p>
         </div>
 
         {/* Tabs */}
@@ -80,9 +96,16 @@ function Home() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'command-center' && <CommandCenter installedPlugins={installedPlugins} commands={commands} />}
+        {activeTab === 'command-center' && (
+          <CommandCenter
+            installedPlugins={installedPlugins}
+            commands={commands}
+          />
+        )}
         {activeTab === 'usage-stats' && <StatsTab />}
-        {activeTab === 'marketplace' && <MarketplaceTab plugins={marketplace} rules={rules} />}
+        {activeTab === 'marketplace' && (
+          <MarketplaceTab plugins={marketplace} rules={rules} />
+        )}
         {activeTab === 'curated' && <CuratedTab plugins={curatedPlugins} />}
       </div>
     </main>

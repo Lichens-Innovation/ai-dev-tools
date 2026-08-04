@@ -78,7 +78,7 @@ function filesUnder(dir: string, base = dir): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .flatMap((e) =>
-      e.isDirectory() ? filesUnder(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name))],
+      e.isDirectory() ? filesUnder(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name))]
     )
     .sort();
 }
@@ -113,7 +113,7 @@ describe("differential against the legacy installer", () => {
     }
 
     expect(fs.readFileSync(path.join(mine, ".gitignore"), "utf8")).toBe(
-      fs.readFileSync(path.join(theirs, ".gitignore"), "utf8"),
+      fs.readFileSync(path.join(theirs, ".gitignore"), "utf8")
     );
 
     // settings.json is where the port deliberately does more. The legacy entry has to survive
@@ -132,7 +132,7 @@ describe("differential against the legacy installer", () => {
       .readFileSync(skillPath, "utf8")
       .replace(
         /<!-- Maestro:HANDOFFS:START -->[\s\S]*?<!-- Maestro:HANDOFFS:END -->/,
-        "<!-- Maestro:HANDOFFS:START -->\n| default | @backend |\n<!-- Maestro:HANDOFFS:END -->",
+        "<!-- Maestro:HANDOFFS:START -->\n| default | @backend |\n<!-- Maestro:HANDOFFS:END -->"
       );
     fs.writeFileSync(skillPath, rendered + "\n\n## My own section\n");
 
@@ -276,8 +276,8 @@ describe("installRuntime", () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     await installRuntime(root, PLUGIN_ROOT);
@@ -454,7 +454,9 @@ describe("the installed hooks actually run", () => {
 
     // Under `"type": "module"` a copied .js hook would throw "require is not defined in ES module
     // scope" on every single tool call. Nothing but running it from inside the project catches it.
-    expect(() => runHook(root, "maestro-session-log.cjs", { cwd: root, tool_name: "Read", tool_input: {} })).not.toThrow();
+    expect(() =>
+      runHook(root, "maestro-session-log.cjs", { cwd: root, tool_name: "Read", tool_input: {} })
+    ).not.toThrow();
     expect(fs.existsSync(path.join(root, ".claude", "maestro_session.log.jsonl"))).toBe(true);
   });
 });

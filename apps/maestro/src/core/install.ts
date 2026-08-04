@@ -78,7 +78,7 @@ export function requirePluginRoot(pluginRoot?: string): string {
   if (!root) {
     throw new Error(
       "Cannot find the Maestro runtime files the app ships (plugins/ai-tools-manager). " +
-        "Set MAESTRO_PLUGIN_ROOT to that directory and retry.",
+        "Set MAESTRO_PLUGIN_ROOT to that directory and retry."
     );
   }
   return root;
@@ -145,7 +145,9 @@ function handoffAssets(pluginRoot: string): RuntimeAsset[] {
   if (!fs.existsSync(base)) return [];
   const out: RuntimeAsset[] = [];
   const walk = (rel: string) => {
-    for (const entry of fs.readdirSync(path.join(base, rel), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of fs
+      .readdirSync(path.join(base, rel), { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))) {
       const next = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) walk(next);
       else if (entry.name.endsWith(".md")) {
@@ -252,7 +254,7 @@ function hasHook(settings: Settings, reg: HookRegistration): boolean {
     (e) =>
       e &&
       Array.isArray(e.hooks) &&
-      e.hooks.some((h) => h && typeof h.command === "string" && h.command.includes(reg.script)),
+      e.hooks.some((h) => h && typeof h.command === "string" && h.command.includes(reg.script))
   );
 }
 
@@ -297,7 +299,7 @@ export function readSettings(settingsPath: string): Settings {
   } catch {
     throw new Error(
       `${settingsPath} is not valid JSON, so installing would overwrite it. ` +
-        "Fix or move that file, then run the install again. Nothing has been written.",
+        "Fix or move that file, then run the install again. Nothing has been written."
     );
   }
 }
@@ -332,7 +334,7 @@ function sha256(data: string | Buffer): string {
  */
 export function installOrchestratorSkill(
   templatePath: string,
-  destPath: string,
+  destPath: string
 ): { action: OrchestratorSkillAction; regions: string[]; backup: string | null } {
   const template = fs.readFileSync(templatePath, "utf8");
   ensureDir(path.dirname(destPath));
@@ -356,8 +358,7 @@ export function installOrchestratorSkill(
   return { action: "synced", regions: synced, backup: null };
 }
 
-const GITIGNORE_HEADER =
-  "# Maestro ephemeral session state — recreated each session, removed at SessionEnd";
+const GITIGNORE_HEADER = "# Maestro ephemeral session state — recreated each session, removed at SessionEnd";
 
 const GITIGNORE_ENTRIES = [
   "**/.claude/maestro_session.json",
@@ -417,7 +418,10 @@ function runtimeDigest(assets: RuntimeAsset[], read: (a: RuntimeAsset) => Buffer
   const h = createHash("sha256");
   for (const asset of assets) {
     const bytes = read(asset);
-    h.update(asset.dest).update("\0").update(bytes ? sha256(bytes) : "absent").update("\n");
+    h.update(asset.dest)
+      .update("\0")
+      .update(bytes ? sha256(bytes) : "absent")
+      .update("\n");
   }
   // Hook registration is part of the runtime's identity: adding a hook to HOOK_REGISTRATIONS
   // without touching a script still makes every installed project out of date.
@@ -432,7 +436,7 @@ async function pluginHooksActive(projectRoot: string): Promise<boolean> {
     return installed.some(
       (p) =>
         p.pluginName === "ai-tools-manager" &&
-        (!p.projectPath || path.resolve(p.projectPath) === path.resolve(projectRoot)),
+        (!p.projectPath || path.resolve(p.projectPath) === path.resolve(projectRoot))
     );
   } catch {
     return false;
@@ -532,7 +536,7 @@ export async function installRuntime(projectRoot: string, pluginRoot?: string): 
 
   const orchestratorSkill = installOrchestratorSkill(
     path.join(root, "templates", "maestro", "SKILL.md"),
-    orchestratorSkillPath(projectRoot),
+    orchestratorSkillPath(projectRoot)
   );
 
   // Copy only what differs. "Always refreshed" in the legacy script meant an unconditional
@@ -561,12 +565,12 @@ export async function installRuntime(projectRoot: string, pluginRoot?: string): 
   const warnings: string[] = [];
   if (orchestratorSkill.action === "migrated") {
     warnings.push(
-      `The orchestrator skill predates Maestro's managed regions, so it was replaced. Your previous version is at ${orchestratorSkill.backup} — copy any custom prose back across.`,
+      `The orchestrator skill predates Maestro's managed regions, so it was replaced. Your previous version is at ${orchestratorSkill.backup} — copy any custom prose back across.`
     );
   }
   if (status.pluginHooksActive) {
     warnings.push(
-      "The ai-tools-manager plugin is also installed on this machine and registers the same hooks globally, so tool calls will be logged twice in this project. Disable the plugin to let the project-local install take over — the app does not edit your global Claude configuration.",
+      "The ai-tools-manager plugin is also installed on this machine and registers the same hooks globally, so tool calls will be logged twice in this project. Disable the plugin to let the project-local install take over — the app does not edit your global Claude configuration."
     );
   }
 

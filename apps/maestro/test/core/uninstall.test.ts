@@ -61,7 +61,7 @@ function readSettings(root: string): Record<string, any> {
 /** Every hook command string in the file, across every event. */
 function allCommands(settings: Record<string, any>): string[] {
   return Object.values(settings.hooks ?? {}).flatMap((entries: any) =>
-    (entries ?? []).flatMap((e: any) => (e.hooks ?? []).map((h: any) => h.command)),
+    (entries ?? []).flatMap((e: any) => (e.hooks ?? []).map((h: any) => h.command))
   );
 }
 
@@ -71,7 +71,7 @@ function filesUnder(dir: string, base = dir): string[] {
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .flatMap((e) =>
-      e.isDirectory() ? filesUnder(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name))],
+      e.isDirectory() ? filesUnder(path.join(dir, e.name), base) : [path.relative(base, path.join(dir, e.name))]
     )
     .sort();
 }
@@ -167,8 +167,8 @@ describe("default uninstall", () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     const report = await uninstallRuntime(root, { pluginRoot: PLUGIN_ROOT });
@@ -254,9 +254,7 @@ describe("hooks and settings the app did not add", () => {
     const settingsPath = path.join(root, ".claude", "settings.json");
     fs.writeFileSync(settingsPath, '{ "model": "opus", }  // trailing comma\n');
 
-    await expect(uninstallRuntime(root, { purge: true, pluginRoot: PLUGIN_ROOT })).rejects.toThrow(
-      /not valid JSON/,
-    );
+    await expect(uninstallRuntime(root, { purge: true, pluginRoot: PLUGIN_ROOT })).rejects.toThrow(/not valid JSON/);
 
     // Nothing half-removed: a purge that deleted the scripts and then failed to unregister the
     // hooks would leave the project firing hooks at files that no longer exist.
@@ -334,7 +332,7 @@ describe("purge", () => {
     await uninstallRuntime(root, { purge: true, pluginRoot: PLUGIN_ROOT });
 
     expect(fs.readFileSync(path.join(root, ".claude", "handoffs", "backend", "frontend.md"), "utf8")).toBe(
-      "my protocol\n",
+      "my protocol\n"
     );
     // But the copies the app installed under templates/ are gone.
     expect(fs.existsSync(path.join(root, ".claude", "templates", "handoffs"))).toBe(false);
@@ -375,9 +373,9 @@ describe("a project with nothing installed", () => {
   });
 
   it("rejects a project root that does not exist rather than reporting success", async () => {
-    await expect(
-      uninstallRuntime(path.join(tmp, "nope"), { pluginRoot: PLUGIN_ROOT }),
-    ).rejects.toThrow(/does not exist/);
+    await expect(uninstallRuntime(path.join(tmp, "nope"), { pluginRoot: PLUGIN_ROOT })).rejects.toThrow(
+      /does not exist/
+    );
   });
 });
 

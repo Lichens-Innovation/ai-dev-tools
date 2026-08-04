@@ -255,7 +255,7 @@ export function uninstallPlan(projectRoot: string, pluginRoot?: string): Uninsta
 
   const hooks = settingsUnreadable ? [] : maestroHookIds(settings);
   const sessionFiles = SESSION_FILES.map((f) => `.claude/${f}`).filter((f) =>
-    fs.existsSync(projectPath(projectRoot, f)),
+    fs.existsSync(projectPath(projectRoot, f))
   );
   const legacyAgentSetting = !settingsUnreadable && settings.agent === "maestro";
   const purgeFiles = purgeTargets(projectRoot, pluginRoot);
@@ -283,10 +283,7 @@ export function uninstallPlan(projectRoot: string, pluginRoot?: string): Uninsta
  * then fail to unregister the hooks that point at them, leaving the project firing hooks at files
  * that no longer exist.
  */
-export async function uninstallRuntime(
-  projectRoot: string,
-  options: UninstallOptions = {},
-): Promise<UninstallReport> {
+export async function uninstallRuntime(projectRoot: string, options: UninstallOptions = {}): Promise<UninstallReport> {
   const { purge = false } = options;
   if (!projectRoot) throw new Error("No project is open.");
   if (!fs.existsSync(projectRoot)) throw new Error(`${projectRoot} does not exist.`);
@@ -335,7 +332,7 @@ export async function uninstallRuntime(
   const warnings: string[] = [];
   if (status.pluginHooksActive) {
     warnings.push(
-      "The ai-tools-manager plugin is also installed on this machine and registers Maestro's hooks globally, so they will keep firing in this project. Disable the plugin to stop them — the app does not edit your global Claude configuration.",
+      "The ai-tools-manager plugin is also installed on this machine and registers Maestro's hooks globally, so they will keep firing in this project. Disable the plugin to stop them — the app does not edit your global Claude configuration."
     );
   }
   if (purge && status.configFile) {

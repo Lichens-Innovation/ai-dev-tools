@@ -17,7 +17,7 @@ export function blankInstancePicker(defaultAgent = ""): InstancePickerValue {
 // is invalid (no reuse target, blank/duplicate new name, already-placed instance).
 export function resolveInstanceFromPicker(
   v: InstancePickerValue,
-  opts: { instances: MaestroInstanceV3[]; placedNames: Set<string>; availableAgents: string[] },
+  opts: { instances: MaestroInstanceV3[]; placedNames: Set<string>; availableAgents: string[] }
 ): { instance: MaestroInstanceV3; isNew: boolean } | null {
   if (v.mode === "reuse") {
     if (!v.reuseInstanceName || opts.placedNames.has(v.reuseInstanceName)) return null;

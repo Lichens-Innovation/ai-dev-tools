@@ -53,9 +53,7 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
   const [phase, setPhase] = useState<Phase>("idle");
 
   // IDs of rules the user has "selected" (toggled on) — the pool the tree can assign.
-  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>(
-    loaderData.config.rules.map((r) => r.id),
-  );
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>(loaderData.config.rules.map((r) => r.id));
 
   const projectRuleIds = useMemo(() => availableRules.map((r) => r.id), [availableRules]);
 
@@ -69,10 +67,7 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
     return map;
   }, [projectRuleIds, vibeRules]);
 
-  const vibeOnlyIds = useMemo(
-    () => vibeRules.filter((id) => ruleSource[id] === "vibe-rules"),
-    [vibeRules, ruleSource],
-  );
+  const vibeOnlyIds = useMemo(() => vibeRules.filter((id) => ruleSource[id] === "vibe-rules"), [vibeRules, ruleSource]);
 
   const selectedProject = selectedRuleIds.filter((id) => projectRuleIds.includes(id));
   const selectedVibe = selectedRuleIds.filter((id) => vibeOnlyIds.includes(id));
@@ -117,7 +112,7 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
             sliceType: "rules",
             slice: { rules: config.rules },
           },
-        }),
+        })
       );
 
       if (!res.ok) {
@@ -141,7 +136,7 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
         <>
           Rules saved to <span className="font-mono text-(--ink)">{result.configPath}</span>
           {placed > 0 ? ` and ${placed} rule file${placed === 1 ? "" : "s"} placed.` : "."}
-        </>,
+        </>
       );
     } finally {
       setPhase("idle");
@@ -153,26 +148,19 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
       <TopNav />
 
       {loaderData.seeded && (
-        <SeededBanner>
-          Assignments start empty, and are written only when you press Save rules.
-        </SeededBanner>
+        <SeededBanner>Assignments start empty, and are written only when you press Save rules.</SeededBanner>
       )}
 
-      <div
-        className="flex-1 grid overflow-hidden"
-        style={{ gridTemplateColumns: "280px 1fr" }}
-      >
+      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "280px 1fr" }}>
         {/* Left pane */}
         <div className="border-r border-(--line) overflow-y-auto flex flex-col p-4 gap-4">
           <div>
-            <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">
-              Available rules
-            </div>
+            <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">Available rules</div>
             {projectRuleIds.length === 0 ? (
               <p className="text-[12px] text-subtle">
                 No rules found under{" "}
-                <span className="font-mono">{(projectRoot || "<project>").replace(/\/+$/, "")}/.claude/rules/</span>. Create{" "}
-                <span className="font-mono">.md</span> files there to see them here.
+                <span className="font-mono">{(projectRoot || "<project>").replace(/\/+$/, "")}/.claude/rules/</span>.
+                Create <span className="font-mono">.md</span> files there to see them here.
               </p>
             ) : (
               <ChipMultiSelect
@@ -194,13 +182,13 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
               <p className="text-[12px] text-subtle">
                 {vibeRulesAvailable ? (
                   <>
-                    None found via <span className="font-mono">vibe-rules list</span>. These are installed into
-                    the assigned directory with <span className="font-mono">vibe-rules load</span> on save.
+                    None found via <span className="font-mono">vibe-rules list</span>. These are installed into the
+                    assigned directory with <span className="font-mono">vibe-rules load</span> on save.
                   </>
                 ) : (
                   <>
-                    The <span className="font-mono">vibe-rules</span> CLI isn&rsquo;t installed, so no installable
-                    rules can be listed. Project rules below still work.
+                    The <span className="font-mono">vibe-rules</span> CLI isn&rsquo;t installed, so no installable rules
+                    can be listed. Project rules below still work.
                   </>
                 )}
               </p>
@@ -216,8 +204,8 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
 
           {selectedRuleIds.length > 0 && (
             <p className="text-[12px] text-subtle">
-              Use the directory tree on the right to assign selected rules to paths. Each rule lives in one
-              place — assigning it elsewhere moves it.
+              Use the directory tree on the right to assign selected rules to paths. Each rule lives in one place —
+              assigning it elsewhere moves it.
             </p>
           )}
 

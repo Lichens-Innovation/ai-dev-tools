@@ -29,7 +29,7 @@ export async function saveConfig(projectRoot: string, input: ConfigSlice): Promi
   const warnings: string[] = [];
   if (!render.ok && render.reason === "maestro/SKILL.md not found") {
     warnings.push(
-      "Maestro is not installed in this project yet — the config was saved but no orchestrator skill exists to render into.",
+      "Maestro is not installed in this project yet — the config was saved but no orchestrator skill exists to render into."
     );
   }
   if (rules.missing.length > 0) {

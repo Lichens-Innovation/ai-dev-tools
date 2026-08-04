@@ -46,7 +46,7 @@ export function buildDesc(
   mode: "auto" | "manual",
   idea: string,
   triggers: string[],
-  opts: { manualFallback?: string; whatFallback?: string } = {},
+  opts: { manualFallback?: string; whatFallback?: string } = {}
 ): string {
   const { manualFallback = "<short description of what this does>", whatFallback = "<what this does>" } = opts;
   if (mode === "manual") return idea.trim() || manualFallback;

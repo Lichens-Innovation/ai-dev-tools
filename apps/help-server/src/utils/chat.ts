@@ -6,7 +6,10 @@ import os from 'node:os'
 import { isPluginInstalled } from '@repo/claude-fs'
 
 // Resolves to monorepo root regardless of cwd (works locally and in Docker)
-const PROJECT_ROOT = path.resolve(new URL(import.meta.url).pathname, '../../../../..')
+const PROJECT_ROOT = path.resolve(
+  new URL(import.meta.url).pathname,
+  '../../../../..',
+)
 
 const HISTORY_PATH = path.join(os.tmpdir(), 'claude-chat-history.md')
 
@@ -73,11 +76,11 @@ function buildPrompt(message: string, history: ChatHistoryEntry[]): string {
   return `Use the /super-help skill to answer the user's question: ${message}. Before this question, the following exchange was captured in the history.md file:\n\n${historyText}`
 }
 
-export const checkSuperHelpAvailable = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<boolean> => {
-    return isSuperHelpAvailable()
-  },
-)
+export const checkSuperHelpAvailable = createServerFn({
+  method: 'GET',
+}).handler(async (): Promise<boolean> => {
+  return isSuperHelpAvailable()
+})
 
 export interface ChatResponse {
   response: string
@@ -113,7 +116,11 @@ export const sendChatMessage = createServerFn({ method: 'POST' })
           (err, stdout, stderr) => {
             if (err) {
               const nodeErr = err as NodeJS.ErrnoException
-              reject(Object.assign(new Error(stderr || err.message), { code: nodeErr.code }))
+              reject(
+                Object.assign(new Error(stderr || err.message), {
+                  code: nodeErr.code,
+                }),
+              )
             } else {
               resolve(stdout)
             }

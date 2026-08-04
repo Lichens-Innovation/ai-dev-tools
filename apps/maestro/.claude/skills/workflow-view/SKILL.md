@@ -75,20 +75,20 @@ The terminal path (`/maestro-install`) seeds the identical config from the ident
 
 Paths are relative to `apps/maestro/`.
 
-| Concern                                                                  | File                                                                       |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Route, left pane, save, workflow CRUD                                    | `src/renderer/src/routes/workflows.tsx`                                    |
-| Canvas state kept across re-renders, keyed by project                    | `src/renderer/src/store/workflow-store.ts`                                 |
-| The canvas (React Flow nodes/edges, all interactions)                    | `src/renderer/src/components/workflow-canvas.tsx`                          |
+| Concern                                                                | File                                                                                                          |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Route, left pane, save, workflow CRUD                                  | `src/renderer/src/routes/workflows.tsx`                                                                       |
+| Canvas state kept across re-renders, keyed by project                  | `src/renderer/src/store/workflow-store.ts`                                                                    |
+| The canvas (React Flow nodes/edges, all interactions)                  | `src/renderer/src/components/workflow-canvas.tsx`                                                             |
 | Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/renderer/src/components/instance-picker.tsx`, `.../instance-skill-picker.tsx` (loaded/referenced toggle) |
-| Detected-chain banner + correction chips                                 | `src/renderer/src/components/detected-chain.tsx`, `.../seeded-banner.tsx`  |
-| Top bar — nav links, workflow selector, Create menu                      | `src/renderer/src/components/top-nav.tsx`                                  |
-| Renderer-side loader + save wrappers over the IPC bridge                 | `src/renderer/src/utils/maestro.ts`                                        |
-| The typed channel contract                                               | `src/shared/ipc.ts` (`data:workflows`, `data:reseed`, `config:save`)       |
-| Main-process handlers (the only side that touches `fs`)                  | `src/main/ipc.ts`                                                          |
-| Read/merge/write, render, apply — all of it                              | `saveConfig()`, `seed.ts`, `render.ts`, `rules.ts` in `apps/maestro/src/core/` |
-| Bundled subagents (source of the Agents list)                            | `plugins/ai-tools-manager/agents/*.md`                                     |
-| Project skills (source of the Skills list)                               | `<projectRoot>/.claude/skills/*/SKILL.md`                                  |
+| Detected-chain banner + correction chips                               | `src/renderer/src/components/detected-chain.tsx`, `.../seeded-banner.tsx`                                     |
+| Top bar — nav links, workflow selector, Create menu                    | `src/renderer/src/components/top-nav.tsx`                                                                     |
+| Renderer-side loader + save wrappers over the IPC bridge               | `src/renderer/src/utils/maestro.ts`                                                                           |
+| The typed channel contract                                             | `src/shared/ipc.ts` (`data:workflows`, `data:reseed`, `config:save`)                                          |
+| Main-process handlers (the only side that touches `fs`)                | `src/main/ipc.ts`                                                                                             |
+| Read/merge/write, render, apply — all of it                            | `saveConfig()`, `seed.ts`, `render.ts`, `rules.ts` in `apps/maestro/src/core/`                                |
+| Bundled subagents (source of the Agents list)                          | `plugins/ai-tools-manager/agents/*.md`                                                                        |
+| Project skills (source of the Skills list)                             | `<projectRoot>/.claude/skills/*/SKILL.md`                                                                     |
 
 ## The data model (MaestroConfigV3)
 
@@ -153,8 +153,8 @@ Built on `@xyflow/react` (React Flow). Four node types and two edge types are re
 
 - **Add Agent** (bottom Panel bar) — walks the success path from `main-session` to the terminal node (`findSuccessTerminalId`), then opens the Add step modal anchored at the terminal so the new step extends the path.
 - **Add step** (bottom `+` on every node) — every node has a bottom-center `+` button that calls `openAddStep(nodeId)`. This opens the **Add step modal**: a segmented **Agent / Human Review** picker. For Agent it renders the shared `InstancePicker` (`src/renderer/src/components/instance-picker.tsx`) — a **Reuse instance / New instance** toggle. Reuse lists unplaced instances; New takes a subagent + instance name + an `InstanceSkillPicker` (check to select a skill — referenced by default — then a per-row Loaded/Ref toggle). Human Review needs no extra input. Confirming calls `confirmAddStep()` → `resolveInstanceFromPicker` to get/create the instance, places the node at `y + INSERT_ROW_HEIGHT` below the source, and adds a `success` edge `source.bottom → new.top`. State: `addStepSourceId`, `addStepType`, `addStepPicker`; reset by `resetAddStep()`.
-  - **Inserting mid-chain relinks both sides.** If the source already had an outgoing success edge, that edge is *displaced*, not dropped: `confirmAddStep` re-adds it as `new → oldTarget` (via `makeSuccessEdge`) and shifts every node at or below the insertion row down by `INSERT_ROW_HEIGHT` so the new node doesn't land on the one it displaced. The mirror case lives in `deleteNode` — removing a node that has both an incoming and an outgoing success edge re-joins predecessor → successor instead of severing the path.
-  - **Already-placed subagents stay listed but disabled.** A subagent may appear at most once per workflow (the `SubagentStart` hook keys off `agent_type`), so `availableAgentsForNew` filters them out — which left the "New instance" dropdown *empty* on the seeded workflows, where every agent is already placed. `InstancePicker` therefore also takes `unavailableAgents` and renders those as disabled `… (already in this workflow)` options, plus an explanatory line when none are free. `resolveInstanceFromPicker` returns `null` rather than falling back to an already-placed agent.
+  - **Inserting mid-chain relinks both sides.** If the source already had an outgoing success edge, that edge is _displaced_, not dropped: `confirmAddStep` re-adds it as `new → oldTarget` (via `makeSuccessEdge`) and shifts every node at or below the insertion row down by `INSERT_ROW_HEIGHT` so the new node doesn't land on the one it displaced. The mirror case lives in `deleteNode` — removing a node that has both an incoming and an outgoing success edge re-joins predecessor → successor instead of severing the path.
+  - **Already-placed subagents stay listed but disabled.** A subagent may appear at most once per workflow (the `SubagentStart` hook keys off `agent_type`), so `availableAgentsForNew` filters them out — which left the "New instance" dropdown _empty_ on the seeded workflows, where every agent is already placed. `InstancePicker` therefore also takes `unavailableAgents` and renders those as disabled `… (already in this workflow)` options, plus an explanatory line when none are free. `resolveInstanceFromPicker` returns `null` rather than falling back to an already-placed agent.
 - **Add condition** — two entry points, both opening the condition modal:
   1. Bottom-bar "Add condition" enters `__picking__` mode (crosshair cursor, source `+` buttons pulse); click a node to pick the source.
   2. A node's own left/right `+` button opens the modal for that node directly.

@@ -54,10 +54,7 @@ export function buildInstances(entries: SessionLogEntry[]): Instance[] {
       current = {
         id: instances.length,
         origin: entry.origin,
-        displayName:
-          entry.origin === "main_session"
-            ? "Main Session"
-            : titleFromName(stripNamespace(entry.origin)),
+        displayName: entry.origin === "main_session" ? "Main Session" : titleFromName(stripNamespace(entry.origin)),
         startIndex: i,
         entries: [],
         status: null,
@@ -105,9 +102,7 @@ export function buildInstances(entries: SessionLogEntry[]): Instance[] {
     const handoff = inst.entries.find((e) => e.kind === "handoff" && e.agent_id);
     let dispatch = handoff?.agent_id ? dispatchByAgentId.get(handoff.agent_id) : undefined;
     if (!dispatch) {
-      dispatch = entries.find(
-        (e) => e.kind === "dispatch" && e.agent === inst.origin && e.input
-      );
+      dispatch = entries.find((e) => e.kind === "dispatch" && e.agent === inst.origin && e.input);
     }
     if (dispatch) {
       inst.input = dispatch.input ?? null;
@@ -130,10 +125,7 @@ export function buildInstances(entries: SessionLogEntry[]): Instance[] {
 export function unaccountedSkills(inst: Instance): string[] {
   if (!inst.offeredSkills || !inst.skillsTriage) return [];
   const offered = [...inst.offeredSkills.loaded, ...inst.offeredSkills.referenced];
-  const accounted = new Set([
-    ...inst.skillsTriage.loaded,
-    ...inst.skillsTriage.skipped.map((s) => s.id),
-  ]);
+  const accounted = new Set([...inst.skillsTriage.loaded, ...inst.skillsTriage.skipped.map((s) => s.id)]);
   return offered.filter((id) => !accounted.has(id));
 }
 
@@ -171,9 +163,7 @@ function extractTriage(raw: string): SkillsTriage | null {
   if (!t || typeof t !== "object") return null;
   const obj = t as Record<string, unknown>;
 
-  const loaded = Array.isArray(obj.loaded)
-    ? obj.loaded.filter((x): x is string => typeof x === "string")
-    : [];
+  const loaded = Array.isArray(obj.loaded) ? obj.loaded.filter((x): x is string => typeof x === "string") : [];
 
   const skipped = Array.isArray(obj.skipped)
     ? obj.skipped

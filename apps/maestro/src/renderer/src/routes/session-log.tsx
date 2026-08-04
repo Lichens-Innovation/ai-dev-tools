@@ -83,11 +83,7 @@ function SessionLogPage() {
             ...right.style,
           }}
         >
-          <SessionLogCards
-            instances={instances}
-            activeId={activeId}
-            onSelect={handleSelect}
-          />
+          <SessionLogCards instances={instances} activeId={activeId} onSelect={handleSelect} />
           <SessionLogView
             instances={instances}
             activeId={activeId}

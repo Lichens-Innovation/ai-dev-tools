@@ -69,9 +69,7 @@ function TreeRow({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
     >
       {/* Dir icon */}
-      <span className="text-(--ink-4) text-[12px] shrink-0">
-        {depth === 0 ? "⊟" : "▸"}
-      </span>
+      <span className="text-(--ink-4) text-[12px] shrink-0">{depth === 0 ? "⊟" : "▸"}</span>
       <span className="text-[13px] text-(--ink) font-mono shrink-0 min-w-0 truncate">
         {isRoot ? "(project root)" : name}
       </span>
@@ -197,9 +195,7 @@ export default function RuleTree({
           onUnassign={onUnassign}
         />
       ))}
-      {tree.length === 0 && (
-        <p className="text-[12px] text-subtle px-2 py-4">No subdirectories found.</p>
-      )}
+      {tree.length === 0 && <p className="text-[12px] text-subtle px-2 py-4">No subdirectories found.</p>}
     </div>
   );
 }

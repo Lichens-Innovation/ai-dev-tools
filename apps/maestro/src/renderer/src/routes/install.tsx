@@ -2,16 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import Button from "@repo/ui/button";
 import { toast } from "@repo/ui/toast";
-import {
-  AlertTriangle,
-  Check,
-  Download,
-  FolderOpen,
-  PowerOff,
-  RefreshCw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertTriangle, Check, Download, FolderOpen, PowerOff, RefreshCw, Trash2, X } from "lucide-react";
 import TopNav from "../components/top-nav";
 import { useInstall } from "../utils/install-context";
 import { useProject } from "../utils/project-context";
@@ -24,9 +15,7 @@ export const Route = createFileRoute("/install")({
 type Phase = "idle" | "installing" | "uninstalling" | "purging";
 
 /** The last thing that ran, so the page reports install and removal in the same slot. */
-type Outcome =
-  | { kind: "install"; report: InstallReport }
-  | { kind: "uninstall"; report: UninstallReport };
+type Outcome = { kind: "install"; report: InstallReport } | { kind: "uninstall"; report: UninstallReport };
 
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: React.ReactNode }) {
   return (
@@ -61,9 +50,7 @@ function ReportCard({ report }: { report: InstallReport }) {
     <div className="flex flex-col gap-2 p-4 rounded-lg border border-(--line) bg-(--bg-elev)">
       <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide">What changed on disk</div>
       {report.unchanged ? (
-        <p className="text-[12px] text-(--ink-2) m-0">
-          Nothing — this project already has the runtime the app ships.
-        </p>
+        <p className="text-[12px] text-(--ink-2) m-0">Nothing — this project already has the runtime the app ships.</p>
       ) : (
         <ul className="list-none p-0 m-0 flex flex-col gap-1 text-[12px] text-(--ink-2)">
           {skill.action !== "unchanged" && (
@@ -162,15 +149,15 @@ function RemovalCard({ report }: { report: UninstallReport }) {
       <div className="pt-2 mt-1 border-t border-(--line) text-[12px] text-(--ink-3)">
         {report.configKept ? (
           <>
-            Kept: <span className="font-mono text-(--ink-2)">.claude/maestro.json</span> — your workflow and
-            rule configuration. Install again to switch the hooks back on.
+            Kept: <span className="font-mono text-(--ink-2)">.claude/maestro.json</span> — your workflow and rule
+            configuration. Install again to switch the hooks back on.
           </>
         ) : report.purge ? (
-          <>
-            Nothing of Maestro&rsquo;s is left in this project. Installing again starts from a fresh config.
-          </>
+          <>Nothing of Maestro&rsquo;s is left in this project. Installing again starts from a fresh config.</>
         ) : (
-          <>This project had no <span className="font-mono text-(--ink-2)">.claude/maestro.json</span> to keep.</>
+          <>
+            This project had no <span className="font-mono text-(--ink-2)">.claude/maestro.json</span> to keep.
+          </>
         )}
       </div>
     </div>
@@ -217,15 +204,15 @@ function PurgeDialog({
         <p className="text-[12px] text-(--ink-2) m-0">
           This permanently deletes {plan.purgeFiles.length} file
           {plan.purgeFiles.length === 1 ? "" : "s"} from{" "}
-          <span className="font-mono text-(--ink)">{plan.projectRoot}</span>, plus the registered hooks and
-          the session files. It cannot be undone from the app.
+          <span className="font-mono text-(--ink)">{plan.projectRoot}</span>, plus the registered hooks and the session
+          files. It cannot be undone from the app.
         </p>
         {plan.purgeRemovesConfig && (
           <div className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px] bg-red-500/10 text-red-500">
             <AlertTriangle size={14} className="shrink-0 mt-px" />
             <span className="text-(--ink-2)">
-              <span className="font-mono text-(--ink)">.claude/maestro.json</span> is included — your workflow
-              graph and rule assignments go with it. Plain <b>Uninstall</b> keeps that file.
+              <span className="font-mono text-(--ink)">.claude/maestro.json</span> is included — your workflow graph and
+              rule assignments go with it. Plain <b>Uninstall</b> keeps that file.
             </span>
           </div>
         )}
@@ -376,7 +363,7 @@ function InstallPage() {
             <>Maestro was deleted from this project.</>
           ) : (
             <>Maestro&rsquo;s hooks are off. Your maestro.json was kept.</>
-          ),
+          )
         );
       }
     } finally {
@@ -414,8 +401,7 @@ function InstallPage() {
               <span className="font-mono">
                 {current ? `${current.root.replace(/\/+$/, "")}/.claude/` : "the open project"}
               </span>
-              . Registered in this project&rsquo;s own settings — your global Claude configuration is
-              never touched.
+              . Registered in this project&rsquo;s own settings — your global Claude configuration is never touched.
             </p>
           </div>
 
@@ -425,18 +411,16 @@ function InstallPage() {
 
           {status?.settingsUnreadable && (
             <Note variant="error">
-              <span className="font-mono">.claude/settings.json</span> is not valid JSON. Installing would
-              overwrite it, so nothing will be written until you fix or move that file — then press the
-              button again.
+              <span className="font-mono">.claude/settings.json</span> is not valid JSON. Installing would overwrite it,
+              so nothing will be written until you fix or move that file — then press the button again.
             </Note>
           )}
 
           {status?.pluginHooksActive && (
             <Note variant="warn">
-              The <span className="font-mono">ai-tools-manager</span> plugin is also installed on this
-              machine and registers the same hooks globally, so tool calls would be logged twice here.
-              Disable the plugin to let this project-local install take over — the app will not edit your
-              global configuration for you.
+              The <span className="font-mono">ai-tools-manager</span> plugin is also installed on this machine and
+              registers the same hooks globally, so tool calls would be logged twice here. Disable the plugin to let
+              this project-local install take over — the app will not edit your global configuration for you.
             </Note>
           )}
 
@@ -491,9 +475,9 @@ function InstallPage() {
                 </Button>
               </div>
               <p className="text-[12px] text-(--ink-3) m-0">
-                Unregisters the hooks and deletes the ephemeral session files, so nothing fires in a
-                Claude session any more. <span className="font-mono">.claude/maestro.json</span>, the
-                orchestrator skill and the copied scripts all stay — installing again switches it back on.
+                Unregisters the hooks and deletes the ephemeral session files, so nothing fires in a Claude session any
+                more. <span className="font-mono">.claude/maestro.json</span>, the orchestrator skill and the copied
+                scripts all stay — installing again switches it back on.
               </p>
             </div>
 
@@ -511,8 +495,8 @@ function InstallPage() {
               </div>
               <p className="text-[12px] text-(--ink-3) m-0">
                 Everything above, plus the orchestrator skill, the copied scripts and{" "}
-                <span className="font-mono">.claude/maestro.json</span> — your workflow graph and rule
-                assignments. You will see the exact list of files before anything is deleted.
+                <span className="font-mono">.claude/maestro.json</span> — your workflow graph and rule assignments. You
+                will see the exact list of files before anything is deleted.
               </p>
             </div>
           </div>

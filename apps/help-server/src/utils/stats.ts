@@ -192,7 +192,9 @@ export const getUsageStats = createServerFn({ method: 'POST' })
     let result: Partial<UsageStats> = {}
 
     if (view === 'daily' && dailyData?.daily) {
-      const sortedDaily = [...dailyData.daily].sort((a, b) => b.date.localeCompare(a.date))
+      const sortedDaily = [...dailyData.daily].sort((a, b) =>
+        b.date.localeCompare(a.date),
+      )
       const latestDaily = sortedDaily[0]
       const weekDaily = sortedDaily.slice(0, 7)
       lastUpdated = latestDaily.date
@@ -207,7 +209,9 @@ export const getUsageStats = createServerFn({ method: 'POST' })
         weekCost: weekDaily.reduce((s, d) => s + d.totalCost, 0),
       }
     } else if (view === 'session' && sessionData?.sessions) {
-      const sortedSessions = [...sessionData.sessions].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity))
+      const sortedSessions = [...sessionData.sessions].sort((a, b) =>
+        b.lastActivity.localeCompare(a.lastActivity),
+      )
       const latestSession = sortedSessions[0]
       lastUpdated = latestSession.lastActivity.slice(0, 10)
       result = {
@@ -216,13 +220,27 @@ export const getUsageStats = createServerFn({ method: 'POST' })
         latestSessionOutputTokens: latestSession.outputTokens,
         latestSessionTotalTokens: latestSession.totalTokens,
         latestSessionCost: latestSession.totalCost,
-        totalSessionInputTokens: sortedSessions.reduce((s, sess) => s + sess.inputTokens, 0),
-        totalSessionOutputTokens: sortedSessions.reduce((s, sess) => s + sess.outputTokens, 0),
-        totalSessionTotalTokens: sortedSessions.reduce((s, sess) => s + sess.totalTokens, 0),
-        totalSessionCost: sortedSessions.reduce((s, sess) => s + sess.totalCost, 0),
+        totalSessionInputTokens: sortedSessions.reduce(
+          (s, sess) => s + sess.inputTokens,
+          0,
+        ),
+        totalSessionOutputTokens: sortedSessions.reduce(
+          (s, sess) => s + sess.outputTokens,
+          0,
+        ),
+        totalSessionTotalTokens: sortedSessions.reduce(
+          (s, sess) => s + sess.totalTokens,
+          0,
+        ),
+        totalSessionCost: sortedSessions.reduce(
+          (s, sess) => s + sess.totalCost,
+          0,
+        ),
       }
     } else if (view === 'blocks' && blocksData?.blocks) {
-      const sortedBlocks = [...blocksData.blocks].sort((a, b) => b.startTime.localeCompare(a.startTime))
+      const sortedBlocks = [...blocksData.blocks].sort((a, b) =>
+        b.startTime.localeCompare(a.startTime),
+      )
       const latestBlock = sortedBlocks[0]
       const activeBlocks = sortedBlocks.filter((b) => b.isActive).length
       lastUpdated = latestBlock.startTime.slice(0, 10)
@@ -233,13 +251,24 @@ export const getUsageStats = createServerFn({ method: 'POST' })
         latestBlockOutputTokens: latestBlock.tokenCounts.outputTokens,
         latestBlockTotalTokens: latestBlock.totalTokens,
         latestBlockCost: latestBlock.costUSD,
-        totalBlockInputTokens: sortedBlocks.reduce((s, b) => s + b.tokenCounts.inputTokens, 0),
-        totalBlockOutputTokens: sortedBlocks.reduce((s, b) => s + b.tokenCounts.outputTokens, 0),
-        totalBlockTotalTokens: sortedBlocks.reduce((s, b) => s + b.totalTokens, 0),
+        totalBlockInputTokens: sortedBlocks.reduce(
+          (s, b) => s + b.tokenCounts.inputTokens,
+          0,
+        ),
+        totalBlockOutputTokens: sortedBlocks.reduce(
+          (s, b) => s + b.tokenCounts.outputTokens,
+          0,
+        ),
+        totalBlockTotalTokens: sortedBlocks.reduce(
+          (s, b) => s + b.totalTokens,
+          0,
+        ),
         totalBlockCost: sortedBlocks.reduce((s, b) => s + b.costUSD, 0),
       }
     } else if (view === 'monthly' && monthlyData?.monthly) {
-      const sortedMonthly = [...monthlyData.monthly].sort((a, b) => b.month.localeCompare(a.month))
+      const sortedMonthly = [...monthlyData.monthly].sort((a, b) =>
+        b.month.localeCompare(a.month),
+      )
       const latestMonthly = sortedMonthly[0]
       lastUpdated = latestMonthly.month ? `${latestMonthly.month}-01` : ''
       result = {
@@ -249,9 +278,18 @@ export const getUsageStats = createServerFn({ method: 'POST' })
         latestMonthOutputTokens: latestMonthly.outputTokens,
         latestMonthTotalTokens: latestMonthly.totalTokens,
         latestMonthCost: latestMonthly.totalCost,
-        totalMonthlyInputTokens: sortedMonthly.reduce((s, m) => s + m.inputTokens, 0),
-        totalMonthlyOutputTokens: sortedMonthly.reduce((s, m) => s + m.outputTokens, 0),
-        totalMonthlyTotalTokens: sortedMonthly.reduce((s, m) => s + m.totalTokens, 0),
+        totalMonthlyInputTokens: sortedMonthly.reduce(
+          (s, m) => s + m.inputTokens,
+          0,
+        ),
+        totalMonthlyOutputTokens: sortedMonthly.reduce(
+          (s, m) => s + m.outputTokens,
+          0,
+        ),
+        totalMonthlyTotalTokens: sortedMonthly.reduce(
+          (s, m) => s + m.totalTokens,
+          0,
+        ),
         totalMonthlyCost: sortedMonthly.reduce((s, m) => s + m.totalCost, 0),
       }
     }

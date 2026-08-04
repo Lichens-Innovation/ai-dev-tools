@@ -89,7 +89,7 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
       else await refresh();
       return res;
     },
-    [refresh],
+    [refresh]
   );
 
   return (

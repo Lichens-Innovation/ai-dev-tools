@@ -3,7 +3,13 @@ import { useStore } from '@tanstack/react-store'
 import { RotateCw, Loader2 } from 'lucide-react'
 import { getUsageStats } from '../../utils/stats'
 import type { UsageStats, StatsView } from '../../utils/stats'
-import { statsStore, setStatsView, setStatsCache, setStatsError, clearStatsCache } from '../../store/stats-store'
+import {
+  statsStore,
+  setStatsView,
+  setStatsCache,
+  setStatsError,
+  clearStatsCache,
+} from '../../store/stats-store'
 
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const VIEWS: StatsView[] = ['session', 'blocks', 'daily', 'monthly']
@@ -20,13 +26,23 @@ function formatTimeAgo(ms: number): string {
   return `${days}d ago`
 }
 
-function StatCard({ label, value, formatter }: { label: string; value: number; formatter?: (v: number) => string }) {
+function StatCard({
+  label,
+  value,
+  formatter,
+}: {
+  label: string
+  value: number
+  formatter?: (v: number) => string
+}) {
   return (
     <div className="rounded-lg border border-(--line) bg-(--bg-2) px-5 py-4 shadow-(--shadow-1) transition-colors hover:border-border-strong hover:bg-(--bg-3) hover:shadow-(--shadow-2)">
       <div className="mb-1.5 font-mono text-2xl font-light text-primary">
         {formatter ? formatter(value) : value.toLocaleString('en-US')}
       </div>
-      <div className="text-[12px] font-medium uppercase tracking-[0.12em] text-subtle">{label}</div>
+      <div className="text-[12px] font-medium uppercase tracking-[0.12em] text-subtle">
+        {label}
+      </div>
     </div>
   )
 }
@@ -84,7 +100,10 @@ export default function StatsTab() {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setStatsError(statsView, err instanceof Error ? err.message : 'Failed to load usage stats.')
+          setStatsError(
+            statsView,
+            err instanceof Error ? err.message : 'Failed to load usage stats.',
+          )
         }
       })
       .finally(() => {
@@ -109,7 +128,9 @@ export default function StatsTab() {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10)
-  const isStale = usage?.lastUpdated && (usage.lastUpdated < todayStr || usage.lastUpdated > todayStr)
+  const isStale =
+    usage?.lastUpdated &&
+    (usage.lastUpdated < todayStr || usage.lastUpdated > todayStr)
 
   const lastFetched = fetchTimeCache[statsView]
   const timeAgo = formatTimeAgo(lastFetched)
@@ -124,7 +145,9 @@ export default function StatsTab() {
               key={v}
               onClick={() => setStatsView(v)}
               className={`px-2.5 py-1 text-[11px] font-medium rounded transition ${
-                statsView === v ? 'bg-primary text-(--bg)' : 'text-subtle hover:text-(--ink-2)'
+                statsView === v
+                  ? 'bg-primary text-(--bg)'
+                  : 'text-subtle hover:text-(--ink-2)'
               }`}
               title={`${v.charAt(0).toUpperCase() + v.slice(1)} (press ${i + 1})`}
             >
@@ -138,12 +161,20 @@ export default function StatsTab() {
           className="flex items-center gap-1 rounded-md border border-(--line) bg-(--bg-2) px-2 py-1 text-[11px] font-medium text-subtle transition hover:text-(--ink-2) disabled:opacity-50"
           title="Refresh stats"
         >
-          {isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+          {isFetching ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RotateCw className="h-3 w-3" />
+          )}
           Refresh
         </button>
-        {timeAgo && <span className="text-[11px] text-subtle">Refreshed {timeAgo}</span>}
+        {timeAgo && (
+          <span className="text-[11px] text-subtle">Refreshed {timeAgo}</span>
+        )}
         {statsView === 'monthly' && usage?.latestMonth && (
-          <span className="rounded-full bg-(--bg-3) px-2 py-0.5 text-[12px] text-subtle">{usage.latestMonth}</span>
+          <span className="rounded-full bg-(--bg-3) px-2 py-0.5 text-[12px] text-subtle">
+            {usage.latestMonth}
+          </span>
         )}
         {isStale && (
           <span className="rounded-full bg-(--bg-3) px-2 py-0.5 text-[12px] text-subtle">
@@ -159,18 +190,45 @@ export default function StatsTab() {
         </div>
       )}
 
-      {viewError && !usage && <div className="py-20 text-center text-[13px] text-subtle">{viewError}</div>}
+      {viewError && !usage && (
+        <div className="py-20 text-center text-[13px] text-subtle">
+          {viewError}
+        </div>
+      )}
 
       {usage && statsView === 'session' && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Sessions" value={usage.sessionCount} />
-          <StatCard label="Input tokens (latest)" value={usage.latestSessionInputTokens} />
-          <StatCard label="Output tokens (latest)" value={usage.latestSessionOutputTokens} />
-          <StatCard label="Cost (latest)" value={usage.latestSessionCost} formatter={(v) => `$${v.toFixed(2)}`} />
-          <StatCard label="Total tokens (latest)" value={usage.latestSessionTotalTokens} />
-          <StatCard label="Input tokens (total)" value={usage.totalSessionInputTokens} />
-          <StatCard label="Output tokens (total)" value={usage.totalSessionOutputTokens} />
-          <StatCard label="Cost (total)" value={usage.totalSessionCost} formatter={(v) => `$${v.toFixed(2)}`} />
+          <StatCard
+            label="Input tokens (latest)"
+            value={usage.latestSessionInputTokens}
+          />
+          <StatCard
+            label="Output tokens (latest)"
+            value={usage.latestSessionOutputTokens}
+          />
+          <StatCard
+            label="Cost (latest)"
+            value={usage.latestSessionCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
+          <StatCard
+            label="Total tokens (latest)"
+            value={usage.latestSessionTotalTokens}
+          />
+          <StatCard
+            label="Input tokens (total)"
+            value={usage.totalSessionInputTokens}
+          />
+          <StatCard
+            label="Output tokens (total)"
+            value={usage.totalSessionOutputTokens}
+          />
+          <StatCard
+            label="Cost (total)"
+            value={usage.totalSessionCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
         </div>
       )}
 
@@ -178,40 +236,106 @@ export default function StatsTab() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Blocks" value={usage.blockCount} />
           <StatCard label="Active blocks" value={usage.activeBlockCount} />
-          <StatCard label="Input tokens (latest)" value={usage.latestBlockInputTokens} />
-          <StatCard label="Output tokens (latest)" value={usage.latestBlockOutputTokens} />
-          <StatCard label="Total tokens (latest)" value={usage.latestBlockTotalTokens} />
-          <StatCard label="Cost (latest)" value={usage.latestBlockCost} formatter={(v) => `$${v.toFixed(2)}`} />
-          <StatCard label="Input tokens (total)" value={usage.totalBlockInputTokens} />
-          <StatCard label="Output tokens (total)" value={usage.totalBlockOutputTokens} />
-          <StatCard label="Total tokens (total)" value={usage.totalBlockTotalTokens} />
-          <StatCard label="Cost (total)" value={usage.totalBlockCost} formatter={(v) => `$${v.toFixed(2)}`} />
+          <StatCard
+            label="Input tokens (latest)"
+            value={usage.latestBlockInputTokens}
+          />
+          <StatCard
+            label="Output tokens (latest)"
+            value={usage.latestBlockOutputTokens}
+          />
+          <StatCard
+            label="Total tokens (latest)"
+            value={usage.latestBlockTotalTokens}
+          />
+          <StatCard
+            label="Cost (latest)"
+            value={usage.latestBlockCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
+          <StatCard
+            label="Input tokens (total)"
+            value={usage.totalBlockInputTokens}
+          />
+          <StatCard
+            label="Output tokens (total)"
+            value={usage.totalBlockOutputTokens}
+          />
+          <StatCard
+            label="Total tokens (total)"
+            value={usage.totalBlockTotalTokens}
+          />
+          <StatCard
+            label="Cost (total)"
+            value={usage.totalBlockCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
         </div>
       )}
 
       {usage && statsView === 'daily' && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Input tokens (latest)" value={usage.todayInputTokens} />
-          <StatCard label="Output tokens (latest)" value={usage.todayOutputTokens} />
-          <StatCard label="Total tokens (latest)" value={usage.todayTotalTokens} />
-          <StatCard label="Cost (latest)" value={usage.todayCost} formatter={(v) => `$${v.toFixed(2)}`} />
+          <StatCard
+            label="Input tokens (latest)"
+            value={usage.todayInputTokens}
+          />
+          <StatCard
+            label="Output tokens (latest)"
+            value={usage.todayOutputTokens}
+          />
+          <StatCard
+            label="Total tokens (latest)"
+            value={usage.todayTotalTokens}
+          />
+          <StatCard
+            label="Cost (latest)"
+            value={usage.todayCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
           <StatCard label="Input tokens (7d)" value={usage.weekInputTokens} />
           <StatCard label="Output tokens (7d)" value={usage.weekOutputTokens} />
           <StatCard label="Total tokens (7d)" value={usage.weekTotalTokens} />
-          <StatCard label="Cost (7d)" value={usage.weekCost} formatter={(v) => `$${v.toFixed(2)}`} />
+          <StatCard
+            label="Cost (7d)"
+            value={usage.weekCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
         </div>
       )}
 
       {usage && statsView === 'monthly' && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Months tracked" value={usage.monthCount} />
-          <StatCard label="Input tokens (latest)" value={usage.latestMonthInputTokens} />
-          <StatCard label="Output tokens (latest)" value={usage.latestMonthOutputTokens} />
-          <StatCard label="Total tokens (latest)" value={usage.latestMonthTotalTokens} />
-          <StatCard label="Cost (latest)" value={usage.latestMonthCost} formatter={(v) => `$${v.toFixed(2)}`} />
-          <StatCard label="Input tokens (total)" value={usage.totalMonthlyInputTokens} />
-          <StatCard label="Output tokens (total)" value={usage.totalMonthlyOutputTokens} />
-          <StatCard label="Cost (total)" value={usage.totalMonthlyCost} formatter={(v) => `$${v.toFixed(2)}`} />
+          <StatCard
+            label="Input tokens (latest)"
+            value={usage.latestMonthInputTokens}
+          />
+          <StatCard
+            label="Output tokens (latest)"
+            value={usage.latestMonthOutputTokens}
+          />
+          <StatCard
+            label="Total tokens (latest)"
+            value={usage.latestMonthTotalTokens}
+          />
+          <StatCard
+            label="Cost (latest)"
+            value={usage.latestMonthCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
+          <StatCard
+            label="Input tokens (total)"
+            value={usage.totalMonthlyInputTokens}
+          />
+          <StatCard
+            label="Output tokens (total)"
+            value={usage.totalMonthlyOutputTokens}
+          />
+          <StatCard
+            label="Cost (total)"
+            value={usage.totalMonthlyCost}
+            formatter={(v) => `$${v.toFixed(2)}`}
+          />
         </div>
       )}
 
@@ -222,7 +346,8 @@ export default function StatsTab() {
       )}
       {isStale && (
         <p className="mt-3 text-[12px] text-subtle">
-          Latest entry dated <code>{usage.lastUpdated}</code>. Stats read via <code>ccusage</code>.
+          Latest entry dated <code>{usage.lastUpdated}</code>. Stats read via{' '}
+          <code>ccusage</code>.
         </p>
       )}
 

@@ -59,35 +59,35 @@ which the SKILL.md handles by gathering the fields conversationally.
 
 Renderer paths are relative to `apps/maestro/`.
 
-| Concern | File |
-|---|---|
-| Form (route): schema, fields, preview, shortcut map | `src/renderer/src/routes/create-<name>.tsx` |
-| Shared chrome: layout, header, shortcuts, submit row | `src/renderer/src/components/create-shell.tsx` |
-| The scaffold → preview → dialog path, shared by all four | `src/renderer/src/utils/create-flow.tsx` |
-| What landed on disk, plus **Finish with Claude** | `src/renderer/src/components/create-result.tsx` |
-| The confirmation: prompt, argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx` |
-| Live file preview components | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
-| The typed channel contract | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`) |
-| Main-process handlers | `src/main/ipc.ts` |
-| **Deterministic scaffold** + `resolveCreateTarget` | `scaffold.ts` in `apps/maestro/src/core/` |
-| Prompt + argv + cwd construction, and the token | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/` |
-| Spawn, stream, cancel, dispose | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/` |
-| Marketplace discovery for the selectors | `marketplaces.ts` in `apps/maestro/src/core/` |
-| `buildDesc` and friends — ONE implementation | `text.ts` in `apps/maestro/src/core/` |
-| Shared UI primitives | `packages/ui/src/` |
-| Consuming prompt | `plugins/ai-tools-manager/skills/create-<name>/SKILL.md` |
-| Shared prompt contract the four SKILL.md link to | `docs/ai-tools-create-shared.md` |
+| Concern                                                       | File                                                                                                             |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Form (route): schema, fields, preview, shortcut map           | `src/renderer/src/routes/create-<name>.tsx`                                                                      |
+| Shared chrome: layout, header, shortcuts, submit row          | `src/renderer/src/components/create-shell.tsx`                                                                   |
+| The scaffold → preview → dialog path, shared by all four      | `src/renderer/src/utils/create-flow.tsx`                                                                         |
+| What landed on disk, plus **Finish with Claude**              | `src/renderer/src/components/create-result.tsx`                                                                  |
+| The confirmation: prompt, argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx`                                                              |
+| Live file preview components                                  | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
+| The typed channel contract                                    | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`)       |
+| Main-process handlers                                         | `src/main/ipc.ts`                                                                                                |
+| **Deterministic scaffold** + `resolveCreateTarget`            | `scaffold.ts` in `apps/maestro/src/core/`                                                                        |
+| Prompt + argv + cwd construction, and the token               | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/`                                              |
+| Spawn, stream, cancel, dispose                                | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/`                                                     |
+| Marketplace discovery for the selectors                       | `marketplaces.ts` in `apps/maestro/src/core/`                                                                    |
+| `buildDesc` and friends — ONE implementation                  | `text.ts` in `apps/maestro/src/core/`                                                                            |
+| Shared UI primitives                                          | `packages/ui/src/`                                                                                               |
+| Consuming prompt                                              | `plugins/ai-tools-manager/skills/create-<name>/SKILL.md`                                                         |
+| Shared prompt contract the four SKILL.md link to              | `docs/ai-tools-create-shared.md`                                                                                 |
 
 ## The four flows compared
 
-| | create-skill | create-subagent | create-plugin | create-marketplace |
-|---|---|---|---|---|
-| Mode toggle (auto / manual) | yes | yes | no | no |
-| Target toggle (marketplace / project) | yes | yes | no | no |
-| Chip-array fields | `useWhen` | `triggers`, `tools` | `keywords` | — |
-| File generated | `SKILL.md` | `AGENTS.md` or `<name>.md` | `plugin.json` | `marketplace.json` |
-| Preview type | YAML frontmatter + markdown | YAML frontmatter + markdown | JSON | JSON |
-| Dialog opens on submit | auto mode only | auto mode only | no | yes |
+|                                       | create-skill                | create-subagent             | create-plugin | create-marketplace |
+| ------------------------------------- | --------------------------- | --------------------------- | ------------- | ------------------ |
+| Mode toggle (auto / manual)           | yes                         | yes                         | no            | no                 |
+| Target toggle (marketplace / project) | yes                         | yes                         | no            | no                 |
+| Chip-array fields                     | `useWhen`                   | `triggers`, `tools`         | `keywords`    | —                  |
+| File generated                        | `SKILL.md`                  | `AGENTS.md` or `<name>.md`  | `plugin.json` | `marketplace.json` |
+| Preview type                          | YAML frontmatter + markdown | YAML frontmatter + markdown | JSON          | JSON               |
+| Dialog opens on submit                | auto mode only              | auto mode only              | no            | yes                |
 
 `create-skill` and `create-subagent` are deeply parallel — they share the description-building
 algorithm (`buildDesc`: first sentence of the idea + Oxford-joined chips, clipped to 140 chars).
@@ -109,26 +109,26 @@ The `target` toggle changes where the file lands:
   `<projectRoot>/.claude/agents/<name>.md` (subagent — single file, no enclosing directory).
 
 The toggle survived the container's retirement; only its Docker half did not. Marketplace vs.
-project is a real choice about where a skill lives. What went is the *path ambiguity* that existed
+project is a real choice about where a skill lives. What went is the _path ambiguity_ that existed
 only because the container could not write outside its mount — there is no longer any target the
 app can see but cannot reach.
 
 ## Common edits — where to make them
 
-| Want to… | Edit |
-|---|---|
-| Add a field to a form | the route's zod schema **and** `scaffold.ts` **and** the prompt builder in `claude-preview.ts` **and** the matching `SKILL.md` — all four must agree on the payload shape |
-| Change validation rules | the zod schema at the top of the route |
-| Change the live preview | the `<name>-preview.tsx` component |
-| Change the description algorithm | `text.ts` in `src/core` — affects skill & subagent, preview and file, at once |
-| Change keyboard shortcuts | the route's `SHORTCUT_SECTIONS` and `create-shell.tsx` |
-| Add a new shared UI primitive | new file in `packages/ui/src/`, then an export in `packages/ui/package.json` |
-| Add a new create-* flow | new route + a `scaffold*` function + a preview builder + a `SKILL.md`; wire it into the Create menu in `top-nav.tsx` |
+| Want to…                         | Edit                                                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add a field to a form            | the route's zod schema **and** `scaffold.ts` **and** the prompt builder in `claude-preview.ts` **and** the matching `SKILL.md` — all four must agree on the payload shape |
+| Change validation rules          | the zod schema at the top of the route                                                                                                                                    |
+| Change the live preview          | the `<name>-preview.tsx` component                                                                                                                                        |
+| Change the description algorithm | `text.ts` in `src/core` — affects skill & subagent, preview and file, at once                                                                                             |
+| Change keyboard shortcuts        | the route's `SHORTCUT_SECTIONS` and `create-shell.tsx`                                                                                                                    |
+| Add a new shared UI primitive    | new file in `packages/ui/src/`, then an export in `packages/ui/package.json`                                                                                              |
+| Add a new create-\* flow         | new route + a `scaffold*` function + a preview builder + a `SKILL.md`; wire it into the Create menu in `top-nav.tsx`                                                      |
 
 ## Things that bite
 
 - **Don't change the payload in just one place.** A field rename must hit the form schema, the
-  scaffold, the prompt builder, *and* the consuming `SKILL.md` — otherwise data silently drops.
+  scaffold, the prompt builder, _and_ the consuming `SKILL.md` — otherwise data silently drops.
 - **Preview and scaffold must resolve the same path.** Both go through `resolveCreateTarget` in
   `src/core`, and the confirmation dialog names the file it returns. A second resolution
   anywhere — a path computed in the renderer, a `path.join` inlined into a prompt builder — makes the

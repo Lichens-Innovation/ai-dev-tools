@@ -25,14 +25,14 @@ Here a save is one IPC call.
 Six of them, moved here when the web app was deleted. They are the long-form reference; this file
 is the short one.
 
-| Skill | Covers |
-|---|---|
-| `maestro-architecture` | the **runtime** — install pipeline, orchestrator + hook lifecycle, the four config/state files, the HANDOFF routing contract |
-| `workflow-view` | `/workflows` — the React Flow canvas and how the diagram maps to `maestro.json` |
-| `rule-view` | `/rules` — the two rule selectors, the directory tree, and how a save moves rule files |
-| `log-view` | `/session-log` — the three panes, how entries become instances, and how the hooks write the log it reads |
-| `create-skills-architecture` | the four `create-*` flows — scaffold, confirmation dialog, consuming prompts |
-| `updating-maestro` | how a runtime change actually reaches a project, on either delivery path |
+| Skill                        | Covers                                                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `maestro-architecture`       | the **runtime** — install pipeline, orchestrator + hook lifecycle, the four config/state files, the HANDOFF routing contract |
+| `workflow-view`              | `/workflows` — the React Flow canvas and how the diagram maps to `maestro.json`                                              |
+| `rule-view`                  | `/rules` — the two rule selectors, the directory tree, and how a save moves rule files                                       |
+| `log-view`                   | `/session-log` — the three panes, how entries become instances, and how the hooks write the log it reads                     |
+| `create-skills-architecture` | the four `create-*` flows — scaffold, confirmation dialog, consuming prompts                                                 |
+| `updating-maestro`           | how a runtime change actually reaches a project, on either delivery path                                                     |
 
 ## Process layout
 
@@ -50,29 +50,29 @@ second.
 
 ## `src/core/` — the node side
 
-| Module | What it owns |
-|---|---|
-| `types.ts` | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json` |
-| `contracts.ts` | Every type that crosses a process boundary. **Renderer-safe** — interfaces only |
-| `text.ts` | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it |
-| `success-path.ts` | Success-path derivation, node labels, agent→skill resolution (pure) |
-| `skill-regions.ts` | Managed/rendered region markers in the orchestrator `SKILL.md` (pure) |
-| `config.ts` | Read / merge-slice / write of `maestro.json` |
-| `render.ts` | Rewrites the `Maestro:HANDOFFS` table from `maestro.json` |
-| `save.ts` | The three-step save the `config:save` channel is a wrapper around |
-| `seed.ts` / `label-layout.ts` | The starter workflows an unconfigured project opens with (pure) |
-| `detect.ts` | Which implementation agent(s) the repo needs, and the evidence for it |
-| `discovery.ts` / `fs-scan.ts` | The agents, skills, rules and directory tree a project can pick from |
-| `install.ts` / `uninstall.ts` | Installs the runtime into a project, reports staleness, removes it |
-| `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail |
-| `claude-cli.ts` | Where the `claude` CLI is, decided with `fs` and not with PATH alone |
-| `claude-preview.ts` | Builds the prompt and issues a token. **Cannot spawn** |
-| `claude-tokens.ts` | The single-use, expiring authorisation between preview and run |
-| `claude-run.ts` | The only module that spawns Claude, and only for a token preview issued |
-| `marketplaces.ts` | The user's local plugin marketplaces, read from `~/.claude/` at call time |
-| `scaffold.ts` | The deterministic half of the four create-* flows, all-or-nothing |
-| `tasks.ts` | The `/maestro-tasks` queue |
-| `plugin-entries/` | esbuild entry points for the plugin's generated CJS libs — see below |
+| Module                                  | What it owns                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `types.ts`                              | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json`            |
+| `contracts.ts`                          | Every type that crosses a process boundary. **Renderer-safe** — interfaces only      |
+| `text.ts`                               | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it |
+| `success-path.ts`                       | Success-path derivation, node labels, agent→skill resolution (pure)                  |
+| `skill-regions.ts`                      | Managed/rendered region markers in the orchestrator `SKILL.md` (pure)                |
+| `config.ts`                             | Read / merge-slice / write of `maestro.json`                                         |
+| `render.ts`                             | Rewrites the `Maestro:HANDOFFS` table from `maestro.json`                            |
+| `save.ts`                               | The three-step save the `config:save` channel is a wrapper around                    |
+| `seed.ts` / `label-layout.ts`           | The starter workflows an unconfigured project opens with (pure)                      |
+| `detect.ts`                             | Which implementation agent(s) the repo needs, and the evidence for it                |
+| `discovery.ts` / `fs-scan.ts`           | The agents, skills, rules and directory tree a project can pick from                 |
+| `install.ts` / `uninstall.ts`           | Installs the runtime into a project, reports staleness, removes it                   |
+| `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail                                    |
+| `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                 |
+| `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                               |
+| `claude-tokens.ts`                      | The single-use, expiring authorisation between preview and run                       |
+| `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued              |
+| `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time            |
+| `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                   |
+| `tasks.ts`                              | The `/maestro-tasks` queue                                                           |
+| `plugin-entries/`                       | esbuild entry points for the plugin's generated CJS libs — see below                 |
 
 It was `packages/maestro-core` until it was folded in here (`docs/plans/core-absorption.md`).
 The package existed so "the same code could serve two
@@ -97,7 +97,7 @@ Bundles `src/core/plugin-entries/*.ts` to CJS and writes them over:
 **Those three files are generated. Do not hand-edit them** — edit the TypeScript source and re-run
 the build. They are committed because a project installs them by file copy, so they must exist in
 the repo rather than being produced at install time. (`lib/maestro-tasks.cjs` in the same directory
-is *not* generated; it is hand-written and has no banner.)
+is _not_ generated; it is hand-written and has no banner.)
 
 This script is load-bearing and **fails quietly**: if it stops producing correct output, the
 committed `.cjs` files keep working and every test keeps passing — the symptom is that an edit to
@@ -189,7 +189,7 @@ The **runtime** half — hook scripts that fire inside a session: `maestro-injec
 `maestro-validate-tasks` (PostToolUse), `maestro-session-cleanup` (SessionEnd),
 `maestro-set-session-workflow.cjs`, `bash-validation.sh`.
 
-They still need a session to *run*, but no longer to be **installed**: `/install` copies them into
+They still need a session to _run_, but no longer to be **installed**: `/install` copies them into
 `<project>/.claude/scripts/` and registers them in the project's own `.claude/settings.json`
 (`installRuntime()` in `src/core/install.ts`). Why project-local registration exists at all: the
 plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a version-keyed marketplace cache, so runtime
@@ -199,15 +199,15 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 
 ## Routes
 
-| Route | Purpose |
-|---|---|
-| `/` | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose. |
-| `/workflows` | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it. |
-| `/rules` | Assign rules to the project root / directories. Writes the rules slice. |
-| `/session-log` | Live view of `maestro_session.log.jsonl`. |
-| `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
-| `/install` | Install / update / remove the project's Maestro runtime, and say what changed on disk. |
-| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right. |
+| Route                                                                        | Purpose                                                                                                                                                           |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                                          | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose.                            |
+| `/workflows`                                                                 | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it.  |
+| `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                           |
+| `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                         |
+| `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
+| `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                            |
+| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                    |
 
 ## The create-\* routes
 
@@ -231,7 +231,7 @@ Per-route files are the schema, the fields and the preview. The chrome is shared
 (the scaffold → preview → dialog path), `components/create-result.tsx` (what landed on disk).
 
 The `target` toggle survived; only its Docker half did not. Marketplace vs. project is a real
-choice about where a skill lives — what went is the path ambiguity that existed *because* the
+choice about where a skill lives — what went is the path ambiguity that existed _because_ the
 container could not reach outside its mount.
 
 ## The `claude -p` bridge
@@ -258,16 +258,16 @@ out of the confirmation, which is the whole point.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.
-- **`@repo/claude-fs` must be bundled into main, not externalized.** It's a workspace *source*
+- **`@repo/claude-fs` must be bundled into main, not externalized.** It's a workspace _source_
   package with no build artifact, so `require` can't resolve it at runtime — hence the
   `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`. The node-side Maestro
   logic used to be a second such package; it is `src/core/` now, ordinary app source that gets
   bundled without anyone having to ask.
-- **Project switches invalidate the router.** Every route loader reads the *current* project from
+- **Project switches invalidate the router.** Every route loader reads the _current_ project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.
 - **Editor state must be keyed by `projectRoot`, or a switch writes one project into another.**
-  The invalidation above only re-runs the *loader*. Any state seeded from loader data and then
+  The invalidation above only re-runs the _loader_. Any state seeded from loader data and then
   edited in place has to decide whether an incoming payload replaces it — and "did I already seed?"
   is the wrong question, because a project switch and a mid-edit re-render are both invalidations.
   Guarding on `config !== null` (`/workflows`) and on `useState(loaderData.…)` never re-running
@@ -280,8 +280,8 @@ out of the confirmation, which is the whole point.
   on invalidation, and a save is neither: it doesn't navigate, and the `project:changed` broadcast
   above doesn't fire. So everything the loader computed stays pinned at its load-time value, and
   `seeded` is the visible one — after a successful save the banner kept telling the user their
-  config was "not saved" while it sat on disk. `/rules` was worse, since a rules save *moves rule
-  files*, leaving its tree and rule pool describing a layout that no longer exists. Both routes
+  config was "not saved" while it sat on disk. `/rules` was worse, since a rules save _moves rule
+  files_, leaving its tree and rule pool describing a layout that no longer exists. Both routes
   now call `router.invalidate()` on the success path, after the `!res.ok` bail-out. This is safe
   only because of the keying in the entry above — `/workflows` keeps its in-memory config
   (`seedWorkflowStore` bails on an unchanged `projectRoot`) and `/rules` doesn't remount
@@ -304,8 +304,8 @@ out of the confirmation, which is the whole point.
   "auto" resolves against the OS and the toggle can change it while the canvas is mounted.
 - **Hook scripts are copied into a project as `.cjs`, never `.js`.** The plugin runs them as
   `.js` because its directory has no package.json declaring a module type. A project's does, and
-  `"type": "module"` makes node parse their `require()` as ESM — the hook then fails on *every
-  tool call* with "require is not defined in ES module scope". Nothing catches this but running a
+  `"type": "module"` makes node parse their `require()` as ESM — the hook then fails on _every
+  tool call_ with "require is not defined in ES module scope". Nothing catches this but running a
   copied script from inside such a project, which `test/install.test.ts` does.
 - **Two things can register Maestro's hooks, and both firing is a visible bug.** A project
   installed from `/install` has them in its own settings; the `ai-tools-manager` plugin registers
@@ -316,11 +316,11 @@ out of the confirmation, which is the whole point.
 - **Uninstall has two levels and the destructive one is never the default.** Plain uninstall
   unregisters the hooks and deletes the ephemeral session files, and **keeps `maestro.json`** —
   a user turning the hooks off has not asked to lose their workflow graph and rule assignments.
-  Only purge deletes the skill, the copied scripts and the config, and it is reachable *only*
+  Only purge deletes the skill, the copied scripts and the config, and it is reachable _only_
   through the confirmation dialog, which lists the exact files first. The `purge` flag is explicit
   at every hop — `uninstall(purge: boolean)` in the context takes no default, and the IPC handler
   reads `opts?.purge === true` — so no malformed or missing argument can escalate a call into a
-  purge. `test/core/uninstall.test.ts` asserts what each level *leaves*.
+  purge. `test/core/uninstall.test.ts` asserts what each level _leaves_.
 - **Staleness is content, never mtime.** `installedRuntimeId`/`shippedRuntimeId` are sha-256 over
   the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
   fresh checkout as stale and make the badge noise the user learns to ignore.
@@ -331,7 +331,7 @@ out of the confirmation, which is the whole point.
   `DetectedChain` renders only when `seeded`: once `maestro.json` exists the chain is the user's
   saved answer, and re-proposing a detected one over a graph they built would be offering to
   overwrite their work. Correcting the chain goes back to main (`data:reseed`) to rebuild the seed
-  with the *same* `defaultV3Config`, rather than duplicating the builder in the renderer — it is
+  with the _same_ `defaultV3Config`, rather than duplicating the builder in the renderer — it is
   pure, but it lives behind the barrel that re-exports `fs`. The round trip is why
   `replaceConfig()` takes a project root and drops a result whose root no longer matches: a
   re-seed in flight across a project switch would otherwise land project A's starter graph on B's
@@ -343,12 +343,12 @@ out of the confirmation, which is the whole point.
   user is being asked to consent to the wrong thing. `test/create-preview.test.ts` and
   `test/scaffold.test.ts` in that package compare the two.
 - **The renderer's `utils/text.ts` re-exports and must never implement.** `buildDesc` decides the
-  `description:` frontmatter, and the form's live preview shows it *before* the file exists while
+  `description:` frontmatter, and the form's live preview shows it _before_ the file exists while
   the node-side scaffold writes it after. Two implementations means a preview that can silently
   stop matching the file — and it looks fine right up until someone edits one of them.
   `src/core/text.ts` is the one home; note that module rather than the barrel, which re-exports
   `fs`. `test/isolation.test.ts` fails on a re-implementation anywhere under `src/renderer`.
-- **A create-* run's working directory is not always the open project.** A skill written into a
+- **A create-\* run's working directory is not always the open project.** A skill written into a
   marketplace repo, or a brand-new marketplace, lives outside it — and a headless run whose edits
   are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
   nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path;
@@ -365,14 +365,14 @@ out of the confirmation, which is the whole point.
   forwarded the prompt or argv alongside the token would reopen that in a diff that reads as a
   convenience, and every test under `test/core/` would still pass, because none of them can
   see this side of the wire. `test/isolation.test.ts` pins the call to `invoke(IPC.claudeRun,
-  token)` for that reason. The same applies to `claude:preview`, which takes a **request** —
+token)` for that reason. The same applies to `claude:preview`, which takes a **request** —
   main builds the prompt; the renderer never supplies one.
 - **Preview tokens are dropped on a project switch** (`clearInvocations()` in `announce()`). A
   token names the outgoing project's cwd, so a modal left open across a switch would otherwise
   still have a live token and Run would spawn Claude against the repo the window has moved off —
   the same failure shape as the `seedWorkflowStore` keying above.
 - **A cancelled run's child is detached, so quitting must kill it.** The child is spawned into its
-  own process group (that is how Stop reaches the CLI's *own* children), which also means it
+  own process group (that is how Stop reaches the CLI's _own_ children), which also means it
   outlives the app. `disposeIpc` calls `disposeClaudeRuns()`; without it, closing the window leaves
   Claude running against the user's repo with nothing left to stop it from.
 - **`claude` is resolved explicitly, never off `process.env.PATH` alone.** A GUI-launched Electron
@@ -419,8 +419,8 @@ sudo chown root:root node_modules/.pnpm/electron@*/node_modules/electron/dist/ch
 sudo chmod 4755 node_modules/.pnpm/electron@*/node_modules/electron/dist/chrome-sandbox
 ```
 
-Without it `dev` aborts with *"The SUID sandbox helper binary was found, but is not configured
-correctly"*. pnpm doesn't preserve the setuid bit, and both `node_modules/electron` and
+Without it `dev` aborts with _"The SUID sandbox helper binary was found, but is not configured
+correctly"_. pnpm doesn't preserve the setuid bit, and both `node_modules/electron` and
 `apps/maestro/node_modules/electron` symlink into the store — so fix the store copy, not the
 links. Do **not** work around it with `--no-sandbox`: the renderer's isolation from the OS is the
 premise `test/isolation.test.ts` exists to defend. (`gits/farel` documents the same fix for an
@@ -436,7 +436,7 @@ pnpm --filter maestro build:plugin-libs   # after ANY edit under src/core/plugin
 
 `test/core/` is the former `packages/maestro-core/test/`, and it is where the differential tests
 live: parity against the last hand-written `.cjs` implementations (snapshotted under
-`test/core/fixtures/legacy/`, deliberately *not* read from `plugins/…/scripts/lib/`, which
+`test/core/fixtures/legacy/`, deliberately _not_ read from `plugins/…/scripts/lib/`, which
 `build:plugin-libs` overwrites — that comparison would be tautological), a byte-identity check on
 the rendered `SKILL.md`, and the import-graph walk that proves `claude-preview.ts` cannot spawn.
 
@@ -455,7 +455,7 @@ cd apps/maestro
 speaks the protocol with no dependency added to the repo. `Runtime.evaluate` reads the DOM,
 `Input.dispatchMouseEvent` (press → several moves → release) does a drag React Flow will honour,
 `Page.captureScreenshot` with a `clip` gives a zoomed crop, and
-`Page.addScriptToEvaluateOnNewDocument` installs a per-frame sampler *before* any page script runs
+`Page.addScriptToEvaluateOnNewDocument` installs a per-frame sampler _before_ any page script runs
 — that last one is how the `mounted` flag was settled. `window.maestro.project.open(path)` is
 exposed to the renderer, so a probe can switch projects without the native folder dialog.
 

@@ -1,0 +1,21 @@
+# Prettier's ignore scope for the whole workspace. Every `check` script points here with
+# --ignore-path, so build output and generated code are excluded once, at the root, instead of
+# once per app. Patterns are gitignore syntax; the ones without a slash match at any depth, so
+# they hold whichever directory prettier runs from.
+
+# Dependencies and package-manager state
+node_modules/
+pnpm-lock.yaml
+
+# Build output — `build` rewrites it, so any formatting applied here is undone by the next run
+out/
+dist/
+.output/
+.vite/
+.tanstack/
+.turbo/
+coverage/
+
+# Generated code — owned by its generator, which rewrites it wholesale
+routeTree.gen.ts
+plugins/*/scripts/lib/

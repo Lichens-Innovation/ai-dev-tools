@@ -52,7 +52,7 @@
     ]
   },
   "011-make-prettier-check-pass.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "010-fold-maestro-core-into-the-app.md"
     ]

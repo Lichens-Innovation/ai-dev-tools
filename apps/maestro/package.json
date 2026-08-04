@@ -9,7 +9,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "check": "prettier --check .",
+    "check": "prettier --check . --ignore-path ../../.prettierignore",
     "test": "vitest run",
     "build:plugin-libs": "node scripts/build-plugin-libs.mjs"
   },

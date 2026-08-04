@@ -80,7 +80,7 @@ function alreadyInstalled(file: string, id: string): boolean {
  */
 export async function applyRules(
   projectRoot: string,
-  cfg: Pick<MaestroConfigV3, "rules"> | null,
+  cfg: Pick<MaestroConfigV3, "rules"> | null
 ): Promise<ApplyRulesSummary> {
   const summary = emptySummary();
   if (!cfg || !Array.isArray(cfg.rules)) return summary;

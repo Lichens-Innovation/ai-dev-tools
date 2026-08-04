@@ -114,13 +114,13 @@ function CreateSkill() {
         flow.create({ kind: "create-skill", ...values }, () =>
           // Back to blank for the next artifact, keeping the destination the user chose — the
           // result card above the form still names what was just written.
-          reset({ ...values, name: "", idea: "", useWhen: [] }),
+          reset({ ...values, name: "", idea: "", useWhen: [] })
         ),
       (errs) => {
         if (errs.idea) jumpToField(FIELD_IDS, ROW_IDS, 2);
         else if (errs.name) jumpToField(FIELD_IDS, ROW_IDS, 1);
         else if (errs.marketplace) jumpToField(FIELD_IDS, ROW_IDS, 4);
-      },
+      }
     )();
 
   return (
@@ -209,8 +209,8 @@ function CreateSkill() {
           <div className="flex-1 leading-normal">
             {mode === "auto" ? (
               <>
-                <strong className="text-(--ink)">Auto.</strong> The frontmatter is written now; Claude fills in the
-                body from your idea + triggers.
+                <strong className="text-(--ink)">Auto.</strong> The frontmatter is written now; Claude fills in the body
+                from your idea + triggers.
               </>
             ) : (
               <>

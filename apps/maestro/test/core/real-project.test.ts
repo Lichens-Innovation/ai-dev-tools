@@ -95,16 +95,14 @@ describe("save against a really-installed project", () => {
       expect(strip(after)).toBe(strip(before));
     }
     // Frontmatter and any prose outside the regions survive verbatim.
-    expect(after.split("<!-- Maestro:STEPS:START -->")[0]).toBe(
-      before.split("<!-- Maestro:STEPS:START -->")[0],
-    );
+    expect(after.split("<!-- Maestro:STEPS:START -->")[0]).toBe(before.split("<!-- Maestro:STEPS:START -->")[0]);
   });
 
   it("places a rule file and keeps the workflow slice", async () => {
     fs.mkdirSync(path.join(root, ".claude", "rules"), { recursive: true });
     fs.writeFileSync(
       path.join(root, ".claude", "rules", "python.md"),
-      "---\nname: python\ndescription: py style\n---\n\nUse type hints.\n",
+      "---\nname: python\ndescription: py style\n---\n\nUse type hints.\n"
     );
 
     const seeded = defaultV3Config(["backend"]);
@@ -131,9 +129,7 @@ describe("save against a really-installed project", () => {
       },
     ]);
     // The picker must still find it in its new home.
-    expect(discoverProjectRules(root).map((r) => [r.id, r.dir])).toEqual([
-      ["python", path.join("src", "backend")],
-    ]);
+    expect(discoverProjectRules(root).map((r) => [r.id, r.dir])).toEqual([["python", path.join("src", "backend")]]);
     // …and the rules save must not have clobbered the workflows written a moment ago.
     expect(readConfig(root)!.workflows).toHaveLength(seeded.workflows.length);
   });

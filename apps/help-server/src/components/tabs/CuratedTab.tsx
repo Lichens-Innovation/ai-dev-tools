@@ -14,10 +14,17 @@ interface CuratedTabProps {
   plugins: CuratedPlugin[]
 }
 
-const nameSearchFilter: FilterFn<CuratedPlugin> = (row, _columnId, filterValue: string) => {
+const nameSearchFilter: FilterFn<CuratedPlugin> = (
+  row,
+  _columnId,
+  filterValue: string,
+) => {
   if (!filterValue) return true
   const lower = filterValue.toLowerCase()
-  return row.original.name.toLowerCase().includes(lower) || row.original.description.toLowerCase().includes(lower)
+  return (
+    row.original.name.toLowerCase().includes(lower) ||
+    row.original.description.toLowerCase().includes(lower)
+  )
 }
 
 const columnHelper = createColumnHelper<CuratedPlugin>()
@@ -49,7 +56,9 @@ const columns = [
       return (
         <span
           className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-            isAnthropic ? 'border-ring bg-(--primary-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
+            isAnthropic
+              ? 'border-ring bg-(--primary-dim) text-primary'
+              : 'border-(--line) bg-(--bg-3) text-subtle'
           }`}
         >
           {label}
@@ -59,7 +68,9 @@ const columns = [
   }),
   columnHelper.accessor('description', {
     header: 'Description',
-    cell: ({ getValue }) => <span className="text-[13px] text-(--ink-2)">{getValue()}</span>,
+    cell: ({ getValue }) => (
+      <span className="text-[13px] text-(--ink-2)">{getValue()}</span>
+    ),
   }),
   columnHelper.accessor('isInstalled', {
     header: 'Install',
@@ -102,7 +113,13 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
     getFilteredRowModel: getFilteredRowModel(),
   })
 
-  const marketplaces = useMemo(() => ['all', ...Array.from(new Set(plugins.map((p) => p.marketplaceLabel)))], [plugins])
+  const marketplaces = useMemo(
+    () => [
+      'all',
+      ...Array.from(new Set(plugins.map((p) => p.marketplaceLabel))),
+    ],
+    [plugins],
+  )
 
   const installedCount = plugins.filter((p) => p.isInstalled).length
 
@@ -113,7 +130,9 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
 
   function handleMarketplaceFilter(value: string) {
     setMarketplaceFilter(value)
-    table.getColumn('marketplaceLabel')?.setFilterValue(value === 'all' ? undefined : value)
+    table
+      .getColumn('marketplaceLabel')
+      ?.setFilterValue(value === 'all' ? undefined : value)
   }
 
   function handleStatusFilter(value: string) {
@@ -134,7 +153,9 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
               {visibleCount} shown · {installedCount} installed
             </span>
           </div>
-          <p className="mt-1.5 text-[12px] text-subtle">Verified plugins from trusted sources.</p>
+          <p className="mt-1.5 text-[12px] text-subtle">
+            Verified plugins from trusted sources.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -152,8 +173,19 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
               aria-hidden="true"
               className="shrink-0 text-subtle"
             >
-              <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle
+                cx="8.5"
+                cy="8.5"
+                r="5.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M13.5 13.5L17 17"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
             <input
               type="search"
@@ -192,7 +224,9 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
 
       {/* Table */}
       {visibleCount === 0 ? (
-        <p className="text-[13px] text-subtle">No plugins match the current filters.</p>
+        <p className="text-[13px] text-subtle">
+          No plugins match the current filters.
+        </p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-(--line) shadow-(--shadow-1)">
           <table className="w-full border-collapse">
@@ -202,10 +236,17 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
                   {hg.headers.map((header) => (
                     <th
                       key={header.id}
-                      style={header.column.id === 'isInstalled' ? { minWidth: '20em' } : undefined}
+                      style={
+                        header.column.id === 'isInstalled'
+                          ? { minWidth: '20em' }
+                          : undefined
+                      }
                       className="border-b border-(--line) px-4 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-(--ink-2)"
                     >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -213,14 +254,24 @@ export default function CuratedTab({ plugins }: CuratedTabProps) {
             </thead>
             <tbody>
               {table.getFilteredRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-(--line) last:border-0 hover:bg-(--bg-3) transition-colors">
+                <tr
+                  key={row.id}
+                  className="border-b border-(--line) last:border-0 hover:bg-(--bg-3) transition-colors"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      style={cell.column.id === 'isInstalled' ? { minWidth: '20em' } : undefined}
+                      style={
+                        cell.column.id === 'isInstalled'
+                          ? { minWidth: '20em' }
+                          : undefined
+                      }
                       className="px-4 py-2.5 align-top"
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </td>
                   ))}
                 </tr>

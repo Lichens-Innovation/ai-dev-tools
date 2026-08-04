@@ -65,7 +65,7 @@ export interface SessionLogTailEvents {
 export function tailSessionLog(
   projectRoot: string,
   events: Partial<SessionLogTailEvents>,
-  intervalMs = 1000,
+  intervalMs = 1000
 ): () => void {
   let lineCount = 0;
   /**
