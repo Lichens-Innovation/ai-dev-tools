@@ -134,6 +134,37 @@ export {
 
 export { detectImplAgents, type RepoDetection } from "./detect.js";
 
+export {
+  listMarketplaces,
+  marketplacePath,
+  marketplaceOwner,
+  marketplacePlugins,
+  type MarketplaceEntry,
+  type MarketplaceOptions,
+} from "./marketplaces.js";
+
+// The deterministic half of the create-* flows. `@repo/maestro-core/text` is the renderer's half —
+// the same `buildDesc`/`clip` the scaffold writes with, so a form's live preview and the file that
+// lands cannot disagree.
+export {
+  scaffoldCreate,
+  resolveCreateTarget,
+  validateCreateRequest,
+  type CreateRequest,
+  type CreateTarget,
+  type ScaffoldResult,
+} from "./scaffold.js";
+
+export {
+  buildDesc,
+  clip,
+  deriveName,
+  firstSentence,
+  joinOxford,
+  stripNamespace,
+  titleFromName,
+} from "./text.js";
+
 // The `claude -p` bridge, in three modules on purpose: preview cannot spawn, run cannot invent.
 // Import `claude-preview.js` directly if you want that guarantee at the import level — pulling
 // preview off this barrel re-exports the spawn path alongside it.

@@ -1,10 +1,61 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, FolderOpen, Download } from "lucide-react";
+import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, FolderOpen, Download, Sparkles, Bot, Package, Store } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSessionLog } from "../utils/session-log-context";
 import { useProject } from "../utils/project-context";
 import { installBadge, useInstall } from "../utils/install-context";
+
+const CREATE_ROUTES = [
+  { to: "/create-skill", label: "Skill", Icon: Sparkles },
+  { to: "/create-subagent", label: "Subagent", Icon: Bot },
+  { to: "/create-plugin", label: "Plugin", Icon: Package },
+  { to: "/create-marketplace", label: "Marketplace", Icon: Store },
+] as const;
+
+/** The four create-* routes as one dropdown. Closes on an outside click, like the workflow menu. */
+function CreateMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as globalThis.Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        data-testid="create-menu"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+      >
+        <Plus size={13} /> Create
+        <ChevronDown size={12} className="text-(--ink-3)" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-8 z-50 w-44 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
+          {CREATE_ROUTES.map(({ to, label, Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              onClick={() => setOpen(false)}
+              activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
+              className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink)"
+            >
+              <Icon size={13} /> {label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface WorkflowSelectorProps {
   workflows: string[];
@@ -128,6 +179,12 @@ export default function TopNav({
           </span>
         )}
       </Link>
+      {/*
+        The four create-* routes, behind one menu rather than four more top-level links: they are
+        the things a user does occasionally, and four more items would push the runtime badge —
+        which is the one thing here they never go looking for — off the end of a narrow window.
+      */}
+      <CreateMenu />
 
       {/* Centered workflow selector */}
       <div className="flex-1 flex items-center justify-center">

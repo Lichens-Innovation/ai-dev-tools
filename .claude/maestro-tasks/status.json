@@ -32,7 +32,7 @@
     "blockedBy": []
   },
   "008-port-the-create-routes-onto-the-bridge.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "007-the-claude-bridge-preview-and-run.md"
     ]

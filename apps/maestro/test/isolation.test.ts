@@ -198,6 +198,57 @@ describe("the claude bridge across the process boundary", () => {
   });
 });
 
+describe("the create-* routes", () => {
+  const routes = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"] as const;
+  const routeSrc = (name: string) => read(`src/renderer/src/routes/${name}.tsx`);
+
+  it("are reachable from the app's navigation", () => {
+    // Every other route in the app is a link in the top bar; a route with no way in is a route
+    // nobody finds. The four live behind the Create menu there.
+    const nav = read("src/renderer/src/components/top-nav.tsx");
+    for (const route of routes) expect(nav, `no nav entry for /${route}`).toContain(`"/${route}"`);
+  });
+
+  it("reach a model only through the bridge, never through a spawn of their own", () => {
+    // The acceptance criterion, asserted where it can regress. The renderer has no child_process to
+    // reach for (the bundle test above), so what this actually guards is the OTHER way to lose the
+    // confirmation: a route that called some future "just run it" channel instead of previewing.
+    // `useCreateFlow` is the one place that touches `window.maestro.claude`, and it previews first.
+    const flow = read("src/renderer/src/utils/create-flow.tsx");
+    expect(flow).toContain("window.maestro.claude.preview(request)");
+    expect(flow).toContain("ClaudeRunDialog");
+
+    for (const route of routes) {
+      const src = routeSrc(route);
+      expect(src, `${route} talks to window.maestro.claude directly`).not.toMatch(/window\.maestro\.claude/);
+      expect(src, `${route} builds an invocation`).not.toMatch(/claude\s+-p\b|--permission-mode|child_process/);
+    }
+  });
+
+  it("send a request to the scaffold channel, never a destination path", () => {
+    // Main resolves every path it writes from the open project plus a marketplace NAME. A preload
+    // that forwarded a path would let a renderer aim a write anywhere on disk, and no test in
+    // @repo/maestro-core can see this side of the wire.
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.createScaffold,\s*request\s*\)/);
+    expect(preload).not.toMatch(/createScaffold,\s*(path|dir|target|cwd)/);
+  });
+
+  it("preview the same description the scaffold writes, from one implementation", () => {
+    // `buildDesc` decides the `description:` frontmatter. The preview pane shows it before the file
+    // exists and the node-side scaffold writes it — two copies means a preview that can lie. The
+    // renderer's text module must therefore only RE-EXPORT.
+    const text = read("src/renderer/src/utils/text.ts");
+    expect(text).toContain("@repo/maestro-core/text");
+    expect(text).not.toMatch(/function\s+buildDesc/);
+
+    const reimplemented = sourcesUnder("src/renderer")
+      .filter((f) => /function\s+(buildDesc|clip|firstSentence|joinOxford)\b/.test(fs.readFileSync(f, "utf8")))
+      .map((f) => path.relative(appRoot, f));
+    expect(reimplemented).toEqual([]);
+  });
+});
+
 describe("session log tail ownership", () => {
   // The main process keeps one tail per webContents id and stops the old one before starting a
   // new one, so `log.subscribe` is single-owner by construction. A second subscriber anywhere in

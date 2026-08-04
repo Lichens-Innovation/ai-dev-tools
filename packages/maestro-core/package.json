@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./text": "./src/text.ts"
   },
   "scripts": {
     "build:plugin-libs": "node scripts/build-plugin-libs.mjs",

@@ -21,8 +21,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { cliNotFoundMessage, resolveClaudeCli, type ResolveOptions } from "./claude-cli.js";
 import { issueInvocation } from "./claude-tokens.js";
+import { resolveCreateTarget } from "./scaffold.js";
 import { tasksDirFor } from "./tasks.js";
-import type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget } from "./contracts.js";
+import { joinOxford } from "./text.js";
+import type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget, CreateRequest } from "./contracts.js";
 
 export type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget };
 
@@ -43,6 +45,125 @@ export const CLAUDE_BASE_FLAGS = ["-p", "--permission-mode", "acceptEdits"] as c
 interface BuiltRequest {
   prompt: string;
   targets: ClaudeWriteTarget[];
+  /**
+   * Where to run, when that is not the open project.
+   *
+   * A create-* flow can write into a marketplace repo or a brand-new marketplace directory, both of
+   * which sit outside the project the window has open. Running there anyway would put every edit
+   * outside the CLI's working directory, where `--permission-mode acceptEdits` does not reach and a
+   * headless run has no one to ask — so the run would stall or refuse rather than finish the file
+   * it was started for. The cwd is derived here, from the same resolution that chose the path, and
+   * the modal shows it; it is never taken from the caller.
+   */
+  cwd?: string;
+}
+
+/**
+ * The finishing prompt for a create-* flow, and the file it may touch.
+ *
+ * Shape, and why it is this shape:
+ *
+ *   • It names an artifact that ALREADY EXISTS. The deterministic scaffold ran when the form was
+ *     submitted, so the run's job is to finish a file, not to create one — and the path comes from
+ *     `resolveCreateTarget`, the same resolution the scaffold wrote with, so the prompt cannot name
+ *     a different file than the one on disk.
+ *   • It forbids touching the frontmatter. The `description:` was computed by `buildDesc` and shown
+ *     in the form's live preview; a model rewriting it would silently replace the string the user
+ *     approved with one they never saw.
+ *   • It is self-contained prose, NOT `/create-skill`. Invoking the slash command would re-run the
+ *     skill's own create flow — including the plugin's `UserPromptExpansion` hook, which launches
+ *     the Docker app and blocks waiting for a form submission that a headless run can never make.
+ *     The instructions the skill would have supplied are inlined here instead.
+ */
+function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveOptions): BuiltRequest {
+  const target = resolveCreateTarget(projectRoot, request, { home: opts.home });
+  // Marketplace-bound artifacts (and a brand-new marketplace) live outside the open project, so
+  // that repo is the working directory — see `BuiltRequest.cwd`.
+  const cwd = target.marketplacePath || projectRoot;
+  const preamble = [
+    `The deterministic scaffold has already written ${target.path}, with its frontmatter/manifest complete.`,
+    `Do not recreate it, do not move it, and do not change its frontmatter — the description shown there is the one the user approved.`,
+    "",
+  ];
+  const only = (file: string, note: string): ClaudeWriteTarget[] => [{ path: file, action: "modify", note }];
+
+  switch (request.kind) {
+    case "create-skill":
+      return {
+        prompt: [
+          ...preamble,
+          `Author the body of that SKILL.md from the idea below, replacing the placeholder comment.`,
+          `Write it as a domain expert would: a clear workflow, concrete steps, and any reference tables or`,
+          `decision trees that help. Leave no placeholder text.`,
+          "",
+          `Skill name: ${target.name}`,
+          `Idea: ${request.idea.trim()}`,
+          `Use when: ${request.useWhen.length ? joinOxford(request.useWhen) : "(no triggers given)"}`,
+        ].join("\n"),
+        targets: only(target.path, "The scaffolded skill file — its body is rewritten, its frontmatter is not."),
+        cwd,
+      };
+
+    case "create-subagent":
+      return {
+        prompt: [
+          ...preamble,
+          `Author the body of that agent file from the idea below, replacing the placeholder comment.`,
+          `Follow the agents.md structure: a role description, "When to apply", a step-by-step workflow, and`,
+          `the expected output format. Write it as a domain expert would, with no placeholder text.`,
+          "",
+          `Subagent name: ${target.name}`,
+          `Idea: ${(request.mode === "auto" ? request.idea : request.description).trim()}`,
+          `When to apply: ${request.triggers.length ? joinOxford(request.triggers) : "(no triggers given)"}`,
+          `Tools: ${request.tools.length ? request.tools.join(", ") : "(unrestricted)"}`,
+        ].join("\n"),
+        targets: only(target.path, "The scaffolded agent file — its body is rewritten, its frontmatter is not."),
+        cwd,
+      };
+
+    case "create-plugin":
+      return {
+        prompt: [
+          ...preamble,
+          `The plugin.json manifest and the skills/ directory exist, and the plugin is registered in the`,
+          `marketplace's marketplace.json. Write ${path.join(target.path, "README.md")}: a title, what the plugin`,
+          `provides, and how to install it from this marketplace. Change nothing else.`,
+          "",
+          `Plugin name: ${target.name}`,
+          `Description: ${request.description.trim()}`,
+          `Keywords: ${request.keywords.length ? request.keywords.join(", ") : "(none)"}`,
+        ].join("\n"),
+        targets: [
+          { path: path.join(target.path, "README.md"), action: "create", note: "The plugin's README." },
+        ],
+        cwd,
+      };
+
+    case "create-marketplace":
+      return {
+        prompt: [
+          ...preamble,
+          `Finish the marketplace: enrich the starter README.md (title, what it offers, and the`,
+          `\`claude plugin marketplace add\` / \`claude plugin install\` instructions), and write a CLAUDE.md`,
+          `explaining that this repo is a marketplace catalog, pointing at .claude-plugin/marketplace.json and`,
+          `describing the plugins/<name>/ source layout. Do not edit marketplace.json.`,
+          request.privateRepo
+            ? `\nThis marketplace will live in a PRIVATE repository: document the token env vars (GITHUB_TOKEN / GH_TOKEN, GITLAB_TOKEN / GL_TOKEN, BITBUCKET_TOKEN) that background auto-update needs, since credential helpers are skipped there.`
+            : "",
+          "",
+          `Marketplace name: ${target.name}`,
+          `Description: ${request.description.trim()}`,
+          `Owner: ${request.ownerName.trim()} <${request.ownerEmail.trim()}>`,
+        ]
+          .filter((line) => line !== "")
+          .join("\n"),
+        targets: [
+          { path: path.join(target.path, "README.md"), action: "modify", note: "The starter README, enriched." },
+          { path: path.join(target.path, "CLAUDE.md"), action: "create", note: "Context for sessions opened here." },
+        ],
+        cwd,
+      };
+  }
 }
 
 /**
@@ -51,7 +172,7 @@ interface BuiltRequest {
  * Every branch here is a prompt the app can execute; there is no branch that takes text from the
  * caller. Adding a kind means adding a case, which is the review surface this design is for.
  */
-function build(projectRoot: string, request: ClaudeRequest): BuiltRequest {
+function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions): BuiltRequest {
   switch (request?.kind) {
     case "maestro-task": {
       // basename, not the path as given: a request must not be able to name a file outside the
@@ -77,6 +198,11 @@ function build(projectRoot: string, request: ClaudeRequest): BuiltRequest {
         ],
       };
     }
+    case "create-skill":
+    case "create-subagent":
+    case "create-plugin":
+    case "create-marketplace":
+      return buildCreate(projectRoot, request, opts);
     default:
       throw new Error(`Unsupported Claude request: ${JSON.stringify(request)}`);
   }
@@ -94,7 +220,11 @@ export function previewClaudeRun(
   opts: ResolveOptions = {}
 ): ClaudePreview {
   if (!projectRoot) throw new Error("No project is open.");
-  const { prompt, targets } = build(projectRoot, request);
+  const built = build(projectRoot, request, opts);
+  const { prompt, targets } = built;
+  // The open project unless the request resolved somewhere else — a create-* flow writing into a
+  // marketplace repo runs there, so its edits are inside the CLI's working directory.
+  const cwd = built.cwd ?? projectRoot;
   const cli = resolveClaudeCli(opts);
 
   // argv[0] is the resolved path rather than the bare name, so what the modal shows is the exact
@@ -109,7 +239,7 @@ export function previewClaudeRun(
       token: null,
       prompt,
       argv,
-      cwd: projectRoot,
+      cwd,
       targets,
       available: false,
       bin: null,
@@ -119,12 +249,12 @@ export function previewClaudeRun(
     };
   }
 
-  const invocation = issueInvocation({ bin: cli.bin!, args, cwd: projectRoot, prompt });
+  const invocation = issueInvocation({ bin: cli.bin!, args, cwd, prompt });
   return {
     token: invocation.token,
     prompt,
     argv,
-    cwd: projectRoot,
+    cwd,
     targets,
     available: true,
     bin: cli.bin,

@@ -74,9 +74,32 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/session-log` | Live view of `maestro_session.log.jsonl`. |
 | `/maestro-tasks` | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
 | `/install` | Install / update / remove the project's Maestro runtime, and say what changed on disk. |
+| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right. |
 
-The four `create-*` routes are **not** ported yet. The `claude -p` bridge they need now exists
-(below); porting the routes onto it is the next slice.
+## The create-\* routes
+
+They are the last part of the web app to come across, and the only one where a model is genuinely
+required — not to write files, but to author a **body**: the prose of a `SKILL.md`, an agent's
+system prompt. So each submit is two operations, in this order:
+
+1. `create:scaffold` writes everything deterministic — directory, frontmatter, plugin manifest,
+   marketplace registration — and returns what it wrote. No model, and none reachable: the module
+   behind it (`scaffold.ts` in `@repo/maestro-core`) calls nothing.
+2. Whatever is left goes out as a `ClaudeRequest` through `claude:preview` and `ClaudeRunDialog`.
+
+**The ordering is the design.** The artifact is on disk before Claude is mentioned, so cancelling
+the confirmation — or having no CLI at all — still leaves the user with the thing they asked for.
+The confirmation opens by itself only when `needsModel` says something is actually left to write
+(auto mode, or a new marketplace's docs); a manual skeleton and a plugin manifest are complete as
+written, and **Finish with Claude** on the result card stays available either way.
+
+Per-route files are the schema, the fields and the preview. The chrome is shared:
+`components/create-shell.tsx` (layout, header, shortcut map, submit row), `utils/create-flow.tsx`
+(the scaffold → preview → dialog path), `components/create-result.tsx` (what landed on disk).
+
+The `target` toggle survived; only its Docker half did not. Marketplace vs. project is a real
+choice about where a skill lives — what went is the path ambiguity that existed *because* the
+container could not reach outside its mount.
 
 ## The `claude -p` bridge
 
@@ -178,6 +201,27 @@ out of the confirmation, which is the whole point.
   `replaceConfig()` takes a project root and drops a result whose root no longer matches: a
   re-seed in flight across a project switch would otherwise land project A's starter graph on B's
   canvas, the same failure `seedWorkflowStore`'s guard exists for.
+- **The create routes' preview and their scaffold must resolve the same path.** Both go through
+  `resolveCreateTarget` in `@repo/maestro-core`, and the confirmation dialog names the file it
+  returns. A second resolution anywhere — a path computed in the renderer, a `path.join` inlined
+  into a prompt builder — makes the modal describe a file other than the one on disk, and the
+  user is being asked to consent to the wrong thing. `test/create-preview.test.ts` and
+  `test/scaffold.test.ts` in that package compare the two.
+- **The renderer's `utils/text.ts` re-exports and must never implement.** `buildDesc` decides the
+  `description:` frontmatter, and the form's live preview shows it *before* the file exists while
+  the node-side scaffold writes it after. Two implementations means a preview that can silently
+  stop matching the file — and it looks fine right up until someone edits one of them.
+  `@repo/maestro-core/text` is the one home; note the **subpath**, since the barrel re-exports
+  `fs`. `test/isolation.test.ts` fails on a re-implementation anywhere under `src/renderer`.
+- **A create-* run's working directory is not always the open project.** A skill written into a
+  marketplace repo, or a brand-new marketplace, lives outside it — and a headless run whose edits
+  are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
+  nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path;
+  the dialog shows it. Verified in the window: a marketplace-target skill runs in the marketplace.
+- **The prompt is prose, never `/create-skill`.** A slash command in a headless run would fire the
+  plugin's `UserPromptExpansion` hook, which launches the Docker app and blocks waiting for a form
+  submission that can never arrive. The instructions the skill would have supplied are inlined into
+  the prompt instead, and a test asserts no create prompt contains a slash command.
 - **`claude:run` takes a token and nothing else, and the preload must keep it that way.** The
   bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
   run channel having no argument that could describe a different run. A preload that "helpfully"
