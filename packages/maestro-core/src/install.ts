@@ -196,11 +196,14 @@ function nodeHook(event: HookEvent, matcher: string, script: string): HookRegist
 /**
  * What the app registers in the project's `.claude/settings.json`.
  *
- * Mirrors the plugin's hooks.json, minus two entries that are the plugin's own business:
- * SessionStart (registers the session with the per-project web-app container) and
- * UserPromptExpansion (launches that app for the `create-*` commands). SubagentStop IS included
- * even though the plan lists only four events — without it the session log has dispatch entries
- * with no matching handoff, and /session-log renders half a conversation.
+ * Mirrors the plugin's hooks.json one-for-one. It used to be "minus two": a SessionStart that
+ * refcounted live sessions against the per-project web-app container, and the four
+ * UserPromptExpansion entries that launched that container for the `create-*` commands. M5 deleted
+ * both from the plugin, so there is no longer any divergence to explain — if this list and
+ * hooks.json ever differ again, that is a bug in one of them.
+ *
+ * SubagentStop IS included even though the plan lists only four events — without it the session log
+ * has dispatch entries with no matching handoff, and /session-log renders half a conversation.
  */
 export const HOOK_REGISTRATIONS: HookRegistration[] = [
   nodeHook("SubagentStart", ".*", "maestro-inject-agent-context.cjs"),

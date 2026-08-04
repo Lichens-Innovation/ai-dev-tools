@@ -15,11 +15,11 @@ $ARGUMENTS
 
 ## References & shared contract
 
-See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (subagents, plugins, hooks, marketplace, …), where the form payload comes from, and the **scaffold-finishing contract** (`scaffolded: true` → finish the `remaining` work in place at `path`, don't recreate; `scaffolded: false` → create from scratch).
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (subagents, plugins, hooks, marketplace, …), where the payload comes from, and the **scaffold-finishing contract** (`scaffolded: true` → finish the `remaining` work in place at `path`, don't recreate; `scaffolded: false` → create from scratch).
 
 ## Workflow
 
-1. **Create agent file** — parse the form payload (a JSON object with `mode` and `target` fields; see the shared contract above for its source and the scaffold-finishing rules).
+1. **Create agent file** — parse the payload (a JSON object with `mode` and `target` fields; see the shared contract above for its source and the scaffold-finishing rules).
 
    **Target dispatch** — the JSON includes a `target` field that determines where the subagent lives:
    - `target: "marketplace"` — the JSON has `marketplacePath` and `plugin`. Write to `<marketplacePath>/plugins/<plugin>/agents/<name>/AGENTS.md`.

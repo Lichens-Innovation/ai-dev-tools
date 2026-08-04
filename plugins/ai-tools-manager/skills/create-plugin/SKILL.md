@@ -13,11 +13,11 @@ $ARGUMENTS
 
 ## References & shared contract
 
-See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (plugins, marketplace, skills, …), where the form payload comes from, and the **scaffold-finishing contract**.
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (plugins, marketplace, skills, …), where the payload comes from, and the **scaffold-finishing contract**.
 
 ## Workflow
 
-Parse the form payload — the JSON object `{ name, description, keywords, marketplacePath }` (see the shared contract above for its source) — and proceed.
+Parse the payload — the JSON object `{ name, description, keywords, marketplacePath }` (see the shared contract above for its source) — and proceed.
 
 **Applying the scaffold contract here:** when `scaffolded: true`, the app has **already** written `plugin.json` (author inherited from the marketplace owner), created `skills/`, and registered the plugin in `marketplace.json` — verify those (steps 1–2, 4) and skip recreating them; you may still add the README (step 3) and any hooks. When `scaffolded: false` (`reason` says why), perform all steps below from scratch.
 

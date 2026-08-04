@@ -6,14 +6,10 @@
 //   maestro_session.json, maestro_session.log.jsonl, maestro_session_tasks.json
 // The source of truth (.claude/maestro.json) and the orchestrator skill are kept.
 //
-// Why this exists next to maestro-session-cleanup.sh: that one ALSO tears down the per-project
-// ai-tools-manager container (reference-counted docker compose down) and sources
-// lib/maestro-app-paths.sh. Both are the plugin's business. A project-local copy would `source`
-// a file the project doesn't have and, under `set -euo pipefail`, fail the hook on every session
-// end — and a project configured from the desktop app has no container to tear down anyway.
-//
-// Node rather than bash: every other project-local hook is node, and the .sh shells out to
-// python3 to parse the payload, which a project cannot assume is installed.
+// Why this exists next to maestro-session-cleanup.sh, now that both do the same thing: the .sh
+// runs from the plugin, this runs from the project, and node rather than bash is what makes the
+// project-local copy portable — the .sh shells out to python3 to parse the hook payload, which a
+// project cannot assume is installed.
 //
 // Reads the hook payload on stdin; no-op when it carries no cwd.
 

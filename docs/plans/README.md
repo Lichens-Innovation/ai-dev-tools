@@ -1,16 +1,18 @@
 # Maestro desktop migration — plans
 
 Turning the containerised `apps/ai-tools-manager` web app into `apps/maestro`, an Electron desktop
-app that configures Maestro with no Claude session in the loop.
+app that configures Maestro with no Claude session in the loop. As of M5 that web app is deleted:
+the container, its port allocation, the `/tmp` channel files and the launcher scripts are gone, and
+the plugin keeps only the runtime hooks.
 
 | Plan | Status | Queued as |
 |---|---|---|
 | M1 — extract `packages/maestro-core` | **done** | — |
 | M2 — Electron shell (`apps/maestro`) | **done** | — |
 | [Review of M1 + M2](review-m1-m2.md) | **done** — see [outcome](review-m1-m2-outcome.md) | `001` (done), `002`, `003` |
-| [M3 — in-app install / update / uninstall](m3-in-app-install.md) | not started | `004`, `005`, `006` |
-| [M4 — the `claude -p` bridge and the create-\* routes](m4-claude-bridge.md) | not started | `007`, `008` |
-| [M5 — retire the Docker path](m5-retire-docker.md) | not started | `009` |
+| [M3 — in-app install / update / uninstall](m3-in-app-install.md) | **done** | `004`, `005`, `006` |
+| [M4 — the `claude -p` bridge and the create-\* routes](m4-claude-bridge.md) | **done** | `007`, `008` |
+| [M5 — retire the Docker path](m5-retire-docker.md) | **done** | `009` |
 | [Core absorption — fold `maestro-core` into the app](core-absorption.md) | after M5, before M6 | `010`, `011` |
 | [M6 — fold in help-server](m6-help-server-merge.md) | last | `012`, `013`, `014` |
 

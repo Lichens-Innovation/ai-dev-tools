@@ -1,6 +1,6 @@
 # manage-marketplace
 
-Reference skill for managing Claude Code plugins and marketplaces — installing, updating, removing plugins, and adding/removing/listing marketplaces. No web form: it's a command-reference prompt that Claude consults to answer the user's question or run the right CLI invocation.
+Reference skill for managing Claude Code plugins and marketplaces — installing, updating, removing plugins, and adding/removing/listing marketplaces. It is a command-reference prompt that Claude consults to answer the user's question or run the right CLI invocation.
 
 ## Triggers
 

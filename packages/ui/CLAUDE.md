@@ -1,6 +1,6 @@
 # @repo/ui
 
-Shared React component library for the monorepo. Consumed by `apps/ai-tools-manager` and `apps/help-server`.
+Shared React component library for the monorepo. Consumed by `apps/maestro` and `apps/help-server`.
 
 ## Conventions
 

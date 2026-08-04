@@ -1,6 +1,6 @@
 ---
 name: maestro-update
-description: "Refreshes the Maestro runtime scripts from the plugin and re-renders the Maestro orchestrator skill (.claude/skills/maestro/SKILL.md) from .claude/maestro.json. Use after hand-editing maestro.json, when the orchestrator's handoff table looks out of date, or to pull script updates from a newer plugin version. Run /maestro-app instead if you want to edit the config visually."
+description: "Refreshes the Maestro runtime scripts from the plugin and re-renders the Maestro orchestrator skill (.claude/skills/maestro/SKILL.md) from .claude/maestro.json. Use after hand-editing maestro.json, when the orchestrator's handoff table looks out of date, or to pull script updates from a newer plugin version. To edit the config visually, open the project in the Maestro desktop app (apps/maestro) instead — a save there renders the orchestrator itself."
 ---
 
 # Maestro Update

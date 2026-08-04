@@ -14,23 +14,56 @@
 //   4. adds an `# Maestro` section to the repo-root .gitignore ignoring every nested
 //      .claude/maestro_session*.{json,jsonl} across the repo / monorepo (the `**/` glob covers
 //      root-level .claude/ too, so no per-package .gitignore is needed)
+//   5. seeds <project>/.claude/maestro.json from defaultV3Config — ONLY when absent. An existing
+//      config is the user's authored graph and is never touched.
 //
-// Scaffolding only — it does NOT render the orchestrator skill's managed region. Rendering
-// needs maestro.json (written by the form) and is done afterwards by maestro-render-orchestrator.cjs
-// (the /maestro-app skill runs it; /maestro-update wraps it standalone). The /maestro-install skill
-// runs this first to lay down the skill, then hands off to /maestro-app to author + render.
+// It does NOT render the orchestrator skill's managed region: rendering consumes maestro.json,
+// so it runs afterwards via maestro-render-orchestrator.cjs (the /maestro-install and
+// /maestro-update skills both do this as their next step).
 //
-//   node maestro-install.js [projectDir]
+//   node maestro-install.js [projectDir] [--impl-agents backend,frontend] [--skill-map '{"frontend":["react"]}']
 //
-// Run by the maestro-install skill before the config is authored. Prints a JSON summary to stdout.
+// The two flags only affect a fresh seed. The /maestro-install skill fills them in from its repo
+// analysis; omitted, the seed falls back to ["backend"] with no skills attached. Editing the graph
+// afterwards is the desktop app's job (apps/maestro) — or a hand-edit plus /maestro-update.
+//
+// Prints a JSON summary to stdout.
 
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const { syncManagedRegions } = require("./lib/maestro-skill-regions.cjs");
+const { defaultV3Config } = require("./lib/maestro-seed.cjs");
 
-const projectDir = process.argv[2] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+// argv: [projectDir] [--impl-agents a,b] [--skill-map '{"agent":["skill"]}']
+// Parsed positionally-first so the long-standing `maestro-install.js <dir>` call still works.
+const argv = process.argv.slice(2);
+const positional = [];
+const flags = {};
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i].startsWith("--")) flags[argv[i].slice(2)] = argv[++i] ?? "";
+  else positional.push(argv[i]);
+}
+
+const projectDir = positional[0] || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const pluginRoot = path.resolve(__dirname, "..");
+
+const implAgents = (flags["impl-agents"] || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+let skillMap = {};
+if (flags["skill-map"]) {
+  try {
+    const parsed = JSON.parse(flags["skill-map"]);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) skillMap = parsed;
+  } catch {
+    // A malformed skill map seeds an empty one rather than failing the install — the user can
+    // still attach skills in the desktop app, and losing the install over a quoting mistake in a
+    // prompt-built argument is the worse outcome.
+  }
+}
 
 const GITIGNORE_HEADER = "# Maestro ephemeral session state — recreated each session, removed at SessionEnd";
 
@@ -199,6 +232,17 @@ try {
   const { setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
   const wroteRepoGitignore = ensureRepoRootGitignore(findRepoRoot(projectDir));
 
+  // Seed maestro.json only when there isn't one. An existing config is the user's own graph —
+  // re-seeding it would silently discard every workflow and rule assignment they authored.
+  // The format matches @repo/maestro-core's writeConfig exactly (2-space indent, NO trailing
+  // newline), so a project seeded here and then saved from the desktop app shows no diff.
+  const configPath = path.join(claudeDir, "maestro.json");
+  let seededConfig = false;
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify(defaultV3Config(implAgents, skillMap), null, 2));
+    seededConfig = true;
+  }
+
   process.stdout.write(
     JSON.stringify({
       ok: true,
@@ -206,6 +250,8 @@ try {
       orchestratorSkill,
       setBashHook,
       wroteRepoGitignore,
+      seededConfig,
+      implAgents: seededConfig ? implAgents : undefined,
     }) + "\n"
   );
 } catch (err) {
