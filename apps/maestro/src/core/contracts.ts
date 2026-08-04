@@ -1,11 +1,13 @@
 // Every type that crosses a process boundary, in one dependency-free module.
 //
 // Why this is separate from the modules that produce these values: the desktop renderer needs
-// the shapes, but must never pull in the code. `@repo/maestro-core`'s barrel re-exports fs,
-// child_process, and import.meta.dirname; a renderer that imports a type from it drags all of
-// that into its type graph (and, if anyone ever writes a value import by mistake, into its
-// bundle). Importing from `@repo/maestro-core/contracts` cannot do that — there is nothing here
-// but interfaces.
+// the shapes, but must never pull in the code. `./index.js` re-exports fs and child_process; a
+// renderer that imports a type from it drags all of that into its type graph (and, if anyone ever
+// writes a value import by mistake, into its bundle). Importing from `./contracts.js` cannot do
+// that — there is nothing here but interfaces.
+//
+// The two differ by one word in an import line, which is why the boundary is asserted rather than
+// left to review: see the "src/core boundary" block in test/isolation.test.ts.
 //
 // The implementation modules import these back, so there is still exactly one definition of each.
 

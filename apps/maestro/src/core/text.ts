@@ -7,9 +7,10 @@
 // preview that renders one `buildDesc` and a scaffold that writes another is a lie the user only
 // finds after the file is on disk.
 //
-// It lives here rather than in the app so both processes can reach it: the renderer imports
-// `@repo/maestro-core/text` (a subpath with no node imports — the package BARREL re-exports fs and
-// child_process and must never cross into the renderer), and the scaffold imports it relatively.
+// It lives beside the node-side modules rather than in the renderer so both processes can reach
+// it, and it is one of the two modules under src/core the renderer is allowed to import — this
+// file has no imports at all. Not `./index.js`, which re-exports fs and child_process and must
+// never cross into the renderer; test/isolation.test.ts holds the line.
 
 export function firstSentence(s: string): string {
   const m = s.match(/^[^.!?]+[.!?]/);

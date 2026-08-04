@@ -1,8 +1,8 @@
 // IPC handlers — the whole node-side surface of the app.
 //
-// Every handler is a thin adapter over @repo/maestro-core. Deliberately so: the logic is tested
-// in that package without an Electron runtime, and this file stays readable as a list of what
-// the renderer is allowed to ask for.
+// Every handler is a thin adapter over ../core. Deliberately so: the logic is tested under
+// test/core/ without an Electron runtime, and this file stays readable as a list of what the
+// renderer is allowed to ask for.
 
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import {
@@ -31,7 +31,7 @@ import {
   cancelClaudeRun,
   disposeClaudeRuns,
   clearInvocations,
-} from "@repo/maestro-core";
+} from "../core/index.js";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   ClaudePreview,
@@ -50,6 +50,7 @@ import type {
   SaveInput,
   WorkflowsData,
 } from "../shared/ipc.js";
+import { bundledAgentsDir } from "./bundled-assets.js";
 import { currentRoot, forgetProject, getState, openProject } from "./project-store.js";
 
 /**
@@ -138,7 +139,7 @@ export function registerIpc(): void {
     if (!projectRoot) {
       return { projectRoot: "", config: blankConfig(), seeded: false, detection: null, agents: [], skills: [] };
     }
-    const [agents, skills] = await Promise.all([discoverAgents(projectRoot), discoverSkills(projectRoot)]);
+    const [agents, skills] = await Promise.all([discoverAgents(projectRoot, bundledAgentsDir()), discoverSkills(projectRoot)]);
     const onDisk = readConfig(projectRoot);
     if (onDisk) return { projectRoot, config: onDisk, seeded: false, detection: null, agents, skills };
 
@@ -263,7 +264,7 @@ export function registerIpc(): void {
 
   // ── the claude -p bridge ─────────────────────────────────────────────
   // Two handlers, and which one can spawn is the point. `previewClaudeRun` comes from a module
-  // that imports no child_process (asserted by a test in @repo/maestro-core), so the channel the
+  // that imports no child_process (asserted by test/core/claude.test.ts), so the channel the
   // renderer calls to BUILD a prompt has no path to a process. `runPreviewedClaude` takes the
   // token that preview issued and nothing else — there is no argument on this channel by which a
   // renderer could describe a different run, which is why "the only executable prompts are ones

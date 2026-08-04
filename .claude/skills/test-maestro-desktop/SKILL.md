@@ -5,7 +5,7 @@ description: "Drive the Maestro desktop app (apps/maestro) in a real Electron wi
 
 # Test the Maestro desktop app in a real window
 
-`apps/maestro` has two test suites (`apps/maestro/test/`, `packages/maestro-core/test/`) and
+`apps/maestro` has two test suites (`apps/maestro/test/`, `apps/maestro/test/core/`) and
 neither can reach the canvas. React Flow measures the DOM, dagre lays out against real dimensions,
 and drag-to-persist only means something with actual pointer events. Anything of the form *"does
 it look right / lay out right / respond right"* has to be answered by driving a window.

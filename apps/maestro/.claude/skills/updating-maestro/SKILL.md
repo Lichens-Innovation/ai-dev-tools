@@ -93,8 +93,8 @@ Then `/hooks` should list **SubagentStart → maestro-inject-agent-context.js**.
 ## Generated files that need a build, not just an edit
 
 `scripts/lib/maestro-session.cjs`, `scripts/lib/maestro-skill-regions.cjs` and
-`scripts/lib/maestro-seed.cjs` are **generated** from `@repo/maestro-core` by
-`pnpm --filter @repo/maestro-core build:plugin-libs`. Editing the `.cjs` directly is overwritten on
+`scripts/lib/maestro-seed.cjs` are **generated** from `apps/maestro/src/core/plugin-entries/` by
+`pnpm --filter maestro build:plugin-libs`. Editing the `.cjs` directly is overwritten on
 the next build; edit the TypeScript source and rebuild. They are committed because a project
 installs them by file copy, so they must exist in the repo.
 

@@ -13,15 +13,15 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { saveConfig } from "../src/save.js";
-import { readConfig } from "../src/config.js";
-import { defaultV3Config } from "../src/seed.js";
-import { discoverProjectRules } from "../src/discovery.js";
-import { orchestratorSkillPath } from "../src/render.js";
-import { extractRegion } from "../src/skill-regions.js";
+import { saveConfig } from "../../src/core/save.js";
+import { readConfig } from "../../src/core/config.js";
+import { defaultV3Config } from "../../src/core/seed.js";
+import { discoverProjectRules } from "../../src/core/discovery.js";
+import { orchestratorSkillPath } from "../../src/core/render.js";
+import { extractRegion } from "../../src/core/skill-regions.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PLUGIN_SCRIPTS = path.resolve(here, "../../../plugins/ai-tools-manager/scripts");
+const PLUGIN_SCRIPTS = path.resolve(here, "../../../../plugins/ai-tools-manager/scripts");
 const INSTALLER = path.join(PLUGIN_SCRIPTS, "maestro-install.js");
 
 let tmp: string;

@@ -18,9 +18,9 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { installRuntime, installStatus, findUpPluginRoot, HOOK_REGISTRATIONS } from "../src/install.js";
-import { uninstallRuntime, uninstallPlan } from "../src/uninstall.js";
-import { readConfig, writeConfig, maestroJsonPath } from "../src/config.js";
+import { installRuntime, installStatus, findUpPluginRoot, HOOK_REGISTRATIONS } from "../../src/core/install.js";
+import { uninstallRuntime, uninstallPlan } from "../../src/core/uninstall.js";
+import { readConfig, writeConfig, maestroJsonPath } from "../../src/core/config.js";
 import { defaultish } from "./fixtures/configs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

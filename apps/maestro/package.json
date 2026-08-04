@@ -10,10 +10,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "check": "prettier --check .",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@repo/maestro-core": "workspace:*"
+    "test": "vitest run",
+    "build:plugin-libs": "node scripts/build-plugin-libs.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -34,6 +32,7 @@
     "@xyflow/react": "^12.11.0",
     "dagre": "^0.8.5",
     "electron": "^40.0.0",
+    "esbuild": "^0.25.0",
     "electron-vite": "^4.0.0",
     "lucide-react": "^1.16.0",
     "react": "19.2.0",

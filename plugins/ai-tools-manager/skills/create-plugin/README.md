@@ -5,7 +5,7 @@ Scaffolds a new plugin inside a local marketplace: creates the directory, writes
 ## How it works
 
 1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Plugin** from the top bar and fills the form (name, description, keywords, marketplace).
-2. On submit the route calls `scaffoldPlugin` in `@repo/maestro-core`, which writes `plugin.json`, creates `skills/`, and registers the plugin in the marketplace manifest — all deterministic, no model involved.
+2. On submit the route calls `scaffoldPlugin` in `apps/maestro/src/core`, which writes `plugin.json`, creates `skills/`, and registers the plugin in the marketplace manifest — all deterministic, no model involved.
 3. A plugin manifest is complete as written, so the confirmation does **not** open by itself; **Finish with Claude** on the result card is what runs this prompt, for the README and any hooks.
 4. Invoked directly in a session instead (`/create-plugin`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 

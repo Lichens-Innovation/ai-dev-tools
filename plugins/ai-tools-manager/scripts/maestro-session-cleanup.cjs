@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SessionEnd hook — the PROJECT-LOCAL cleanup, copied into <project>/.claude/scripts/ by the
-// desktop app's installer (packages/maestro-core/src/install.ts).
+// desktop app's installer (apps/maestro/src/core/install.ts).
 //
 // It removes the ephemeral Maestro session files and nothing else:
 //   maestro_session.json, maestro_session.log.jsonl, maestro_session_tasks.json

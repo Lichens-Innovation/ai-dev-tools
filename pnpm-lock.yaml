@@ -152,10 +152,6 @@ importers:
         version: 4.1.5(@types/node@22.10.2)(jsdom@28.1.0)(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0))
 
   apps/maestro:
-    dependencies:
-      '@repo/maestro-core':
-        specifier: workspace:*
-        version: link:../../packages/maestro-core
     devDependencies:
       '@hookform/resolvers':
         specifier: ^5.2.2
@@ -213,7 +209,10 @@ importers:
         version: 40.10.6
       electron-vite:
         specifier: ^4.0.0
-        version: 4.0.1(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0))
+        version: 4.0.1(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0))
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
       lucide-react:
         specifier: ^1.16.0
         version: 1.21.0(react@19.2.0)
@@ -255,28 +254,6 @@ importers:
       '@tanstack/eslint-config':
         specifier: latest
         version: 0.4.0(@typescript-eslint/utils@8.61.1(eslint@9.20.0(jiti@2.7.0))(typescript@6.0.2))(eslint@9.20.0(jiti@2.7.0))(typescript@6.0.2)
-
-  packages/maestro-core:
-    dependencies:
-      '@repo/claude-fs':
-        specifier: workspace:*
-        version: link:../claude-fs
-    devDependencies:
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: 22.10.2
-        version: 22.10.2
-      esbuild:
-        specifier: ^0.25.0
-        version: 0.25.12
-      typescript:
-        specifier: 6.0.2
-        version: 6.0.2
-      vitest:
-        specifier: 4.1.5
-        version: 4.1.5(@types/node@22.10.2)(jsdom@28.1.0)(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0))
 
   packages/styles:
     dependencies:
@@ -5129,7 +5106,7 @@ snapshots:
 
   electron-to-chromium@1.5.376: {}
 
-  electron-vite@4.0.1(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0)):
+  electron-vite@4.0.1(vite@8.0.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@22.10.2)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.89.0)(yaml@2.9.0)):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-arrow-functions': 7.29.7(@babel/core@7.29.7)

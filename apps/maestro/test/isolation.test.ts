@@ -13,12 +13,22 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 // The barrel, deliberately: this is a node-side test, and the point of the prompt-drift check
 // below is to compare the renderer's literal against what the MAIN process actually builds.
-import { previewClaudeRun } from "@repo/maestro-core";
+import { previewClaudeRun } from "../src/core/index.js";
 import { IPC, IPC_EVENTS } from "../src/shared/ipc.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, "..");
 const read = (rel: string) => fs.readFileSync(path.join(appRoot, rel), "utf8");
+
+/**
+ * Drop comments before scanning for imports.
+ *
+ * Prose talks about imports: a JSDoc line reading ``derives one from `idea` `` matches an
+ * import-specifier pattern exactly as well as a real import line does, and so does a comment
+ * naming the very module a check exists to forbid. Line comments only for `//`, so a `"https://"`
+ * inside a string survives.
+ */
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
 /** Every .ts/.tsx under a src subtree, excluding generated files. */
 function sourcesUnder(rel: string): string[] {
@@ -86,30 +96,99 @@ describe("preload bridge", () => {
   });
 });
 
-describe("@repo/maestro-core boundary", () => {
-  // src/shared/ipc.ts pulls its types from the `/contracts` subpath rather than the package
-  // barrel. The barrel re-exports modules that import fs, child_process and import.meta.dirname;
-  // a type pulled from it drags all of that into the renderer's type graph, and a value pulled
-  // from it drags it into the renderer's BUNDLE. The failure is quiet — types still resolve and
-  // tsc still passes whenever @types/node happens to be in scope — so nothing but an assertion
-  // catches the day someone writes `from "@repo/maestro-core"` in shared/.
+describe("src/core boundary", () => {
+  // THE REPLACEMENT FOR A PACKAGE EXPORT.
+  //
+  // `src/core` was `packages/maestro-core`, and the renderer-safe surface used to be enforced by
+  // the package's `exports` map: the renderer imported `@repo/maestro-core/contracts`, and
+  // reaching for the barrel instead was a different-looking import line that a reviewer would
+  // catch. Both are relative paths now, and `../core/contracts.js` differs from
+  // `../core/index.js` by one word. That is a real loss of safety, and this is what replaces it.
+  //
+  // What it costs to get wrong: the barrel re-exports modules that import fs and child_process.
+  // A type pulled from it drags all of that into the renderer's type graph, and a value pulled
+  // from it drags it into the renderer's BUNDLE. Quietly — types still resolve and tsc still
+  // passes whenever @types/node is in scope — so nothing but an assertion catches it.
+  //
+  // Exactly two modules are renderer-safe, and both are self-contained by construction:
+  // `contracts.ts` is interfaces only, `text.ts` has no imports at all. Adding a third means
+  // proving it imports nothing that reaches the filesystem, so the list is deliberately short and
+  // deliberately here rather than derived.
+  const RENDERER_SAFE = ["contracts", "text"];
+
   const outsideMain = [...sourcesUnder("src/shared"), ...sourcesUnder("src/preload"), ...sourcesUnder("src/renderer")];
+  const coreDir = path.join(appRoot, "src", "core");
+
+  /** Every module specifier in `file`, from static imports, `export … from`, and `require()`. */
+  function specifiersIn(file: string): string[] {
+    const src = stripComments(fs.readFileSync(file, "utf8"));
+    return [
+      ...[...src.matchAll(/(?:from|import)\s*\(?\s*["'`]([^"'`]+)["'`]/g)].map((m) => m[1]),
+      ...[...src.matchAll(/require\(\s*["'`]([^"'`]+)["'`]/g)].map((m) => m[1]),
+    ];
+  }
+
+  /**
+   * The module under src/core a specifier names, or null if it points elsewhere.
+   *
+   * Resolved on the filesystem rather than pattern-matched, so `../core/index.js`,
+   * `../../../core/index.js` and a `./` chain that happens to land in core are all the same
+   * finding — the check must not be evadable by writing the path differently.
+   */
+  function coreModule(fromFile: string, spec: string): string | null {
+    if (!spec.startsWith(".")) return null;
+    const resolved = path.resolve(path.dirname(fromFile), spec);
+    const rel = path.relative(coreDir, resolved);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+    return rel.replace(/\.(js|ts|tsx)$/, "");
+  }
 
   it("has files to check", () => {
     expect(outsideMain.length).toBeGreaterThan(0);
   });
 
-  it("never imports the package barrel outside the main process", () => {
-    const offenders = outsideMain.filter((file) =>
-      /from\s*["'`]@repo\/maestro-core["'`]|require\(\s*["'`]@repo\/maestro-core["'`]/.test(
-        fs.readFileSync(file, "utf8"),
-      ),
-    );
-    expect(offenders.map((f) => path.relative(appRoot, f))).toEqual([]);
+  it("reaches src/core only through the renderer-safe modules", () => {
+    const offenders: string[] = [];
+    for (const file of outsideMain) {
+      for (const spec of specifiersIn(file)) {
+        const mod = coreModule(file, spec);
+        if (mod !== null && !RENDERER_SAFE.includes(mod)) {
+          offenders.push(`${path.relative(appRoot, file)} → src/core/${mod}`);
+        }
+      }
+    }
+    // Named in the failure so the message says which file and which module, not just "false".
+    expect(offenders, `only src/core/{${RENDERER_SAFE.join(",")}} may be imported outside src/main`).toEqual([]);
+  });
+
+  it("still finds the imports it is supposed to be checking", () => {
+    // A guard that silently stopped matching anything would pass forever. src/shared/ipc.ts
+    // imports contracts and src/renderer/src/utils/text.ts re-exports text; if the resolver
+    // regressed, this is what notices before the check above quietly becomes a no-op.
+    const seen = new Set<string>();
+    for (const file of outsideMain) {
+      for (const spec of specifiersIn(file)) {
+        const mod = coreModule(file, spec);
+        if (mod !== null) seen.add(mod);
+      }
+    }
+    expect([...seen].sort()).toEqual(RENDERER_SAFE);
+  });
+
+  it("keeps the renderer-safe modules free of imports that could reach the filesystem", () => {
+    // The other half of the boundary. `contracts.ts` and `text.ts` are safe to import only for as
+    // long as they stay self-contained — a `import fs from "node:fs"` added to either would let
+    // node through the front door with every import line in the app still looking correct.
+    for (const mod of RENDERER_SAFE) {
+      const specs = specifiersIn(path.join(coreDir, `${mod}.ts`));
+      // ./types.js is the model contracts re-exports; it is interfaces only, same as this file.
+      const allowed = new Set(["./types.js"]);
+      expect(specs.filter((s) => !allowed.has(s)), `src/core/${mod}.ts imports something new`).toEqual([]);
+    }
   });
 
   it("never imports @repo/claude-fs outside the main process", () => {
-    // Same hazard, one layer down: claude-fs is the package maestro-core reads the filesystem with.
+    // Same hazard, one layer down: claude-fs is the package src/core reads the filesystem with.
     const offenders = outsideMain.filter((file) =>
       /["'`]@repo\/claude-fs/.test(fs.readFileSync(file, "utf8")),
     );
@@ -128,7 +207,7 @@ describe("@repo/maestro-core boundary", () => {
 
 describe("the claude bridge across the process boundary", () => {
   // The bridge's guarantee — the only executable prompts are ones the user was shown — rests on
-  // `claude:run` accepting a token AND NOTHING ELSE. `@repo/maestro-core`'s test covers the core
+  // `claude:run` accepting a token AND NOTHING ELSE. `test/core/claude.test.ts` covers the core
   // half (preview cannot spawn; a forged or replayed token is refused). What it cannot see is this
   // side of the wire: a preload that helpfully forwarded a prompt, an argv or a cwd alongside the
   // token would reopen the hole in a diff that looks like a convenience, and every core test would
@@ -228,7 +307,7 @@ describe("the create-* routes", () => {
   it("send a request to the scaffold channel, never a destination path", () => {
     // Main resolves every path it writes from the open project plus a marketplace NAME. A preload
     // that forwarded a path would let a renderer aim a write anywhere on disk, and no test in
-    // @repo/maestro-core can see this side of the wire.
+    // test/core/ can see this side of the wire.
     const preload = read("src/preload/index.ts");
     expect(preload).toMatch(/invoke\(IPC\.createScaffold,\s*request\s*\)/);
     expect(preload).not.toMatch(/createScaffold,\s*(path|dir|target|cwd)/);
@@ -239,7 +318,7 @@ describe("the create-* routes", () => {
     // exists and the node-side scaffold writes it — two copies means a preview that can lie. The
     // renderer's text module must therefore only RE-EXPORT.
     const text = read("src/renderer/src/utils/text.ts");
-    expect(text).toContain("@repo/maestro-core/text");
+    expect(text).toContain("../../../core/text.js");
     expect(text).not.toMatch(/function\s+buildDesc/);
 
     const reimplemented = sourcesUnder("src/renderer")
@@ -311,13 +390,9 @@ describe("built renderer bundle", () => {
     ? fs.readdirSync(outDir).filter((f) => f.endsWith(".js")).map((f) => path.join(outDir, f))
     : [];
 
-  /**
-   * Drop comments before scanning. Bundled dependencies ship JSDoc containing lines like
-   * `* import process from 'node:process'`, which is documentation, not a resolved import —
-   * matching it would fail this test for a bundle that is actually clean.
-   */
-  const stripComments = (src: string) =>
-    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  // stripComments (module scope) matters doubly here: bundled dependencies ship JSDoc containing
+  // lines like `* import process from 'node:process'`, which is documentation, not a resolved
+  // import — matching it would fail this test for a bundle that is actually clean.
 
   it.runIf(bundles.length > 0)("imports no node builtins and no electron", () => {
     for (const file of bundles) {

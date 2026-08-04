@@ -3,7 +3,7 @@
 // non-agent nodes on the success path (human_review, skill), a cycle created by a condition edge
 // routing backwards, and an instance whose agent carries a plugin namespace prefix.
 
-import type { MaestroConfigV3 } from "../src/types.js";
+import type { MaestroConfigV3 } from "../../../src/core/types.js";
 
 const succ = (from: string, to: string) =>
   ({ from, to, kind: "success", sourceHandle: "bottom", targetHandle: "top" }) as const;

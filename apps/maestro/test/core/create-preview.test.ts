@@ -20,10 +20,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../src/claude-preview.js";
-import { scaffoldCreate } from "../src/scaffold.js";
-import { clearInvocations } from "../src/claude-tokens.js";
-import type { CreateRequest } from "../src/contracts.js";
+import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../../src/core/claude-preview.js";
+import { scaffoldCreate } from "../../src/core/scaffold.js";
+import { clearInvocations } from "../../src/core/claude-tokens.js";
+import type { CreateRequest } from "../../src/core/contracts.js";
 
 let tmp: string;
 let home: string;

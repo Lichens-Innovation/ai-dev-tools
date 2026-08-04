@@ -26,7 +26,7 @@ runs.
 
 Two paths produce the same result, and both end at a rendered orchestrator over a seeded `maestro.json`.
 
-**The desktop app** (`apps/maestro`, `/install` route) — `installRuntime()` in `@repo/maestro-core`. No session involved. This is the path to prefer; it also reports what changed on disk and detects the double-registration case below.
+**The desktop app** (`apps/maestro`, `/install` route) — `installRuntime()` in `src/core`. No session involved. This is the path to prefer; it also reports what changed on disk and detects the double-registration case below.
 
 **`/maestro-install`** — the terminal path, for a machine with no desktop app:
 
@@ -53,7 +53,7 @@ node .claude/scripts/maestro-render-orchestrator.cjs
         rewrites the Maestro:HANDOFFS table in maestro/SKILL.md from maestro.json
 ```
 
-Step 5 requires `lib/maestro-seed.cjs`, generated from `defaultV3Config` in `@repo/maestro-core` — the *same* function the app seeds a fresh canvas with, so both paths produce a byte-identical starting config (`JSON.stringify(cfg, null, 2)`, no trailing newline). The seed is guarded on absence: an existing `maestro.json` is the user's authored graph and is never overwritten.
+Step 5 requires `lib/maestro-seed.cjs`, generated from `defaultV3Config` in `src/core` — the *same* function the app seeds a fresh canvas with, so both paths produce a byte-identical starting config (`JSON.stringify(cfg, null, 2)`, no trailing newline). The seed is guarded on absence: an existing `maestro.json` is the user's authored graph and is never overwritten.
 
 Why render is a separate step from scaffold: the renderer *consumes* `maestro.json` and writes into `maestro/SKILL.md`, so both files must already exist. `/maestro-update` does the same two things standalone — refresh the project-copied scripts from the plugin, then re-render — which is what you run after a hand-edit to `maestro.json` or after a plugin version bump.
 
@@ -153,7 +153,7 @@ Note: protocol templates live **only** in the agent template files, never in `ma
 | The handoff table is stale | run `/maestro-update` (re-renders from `maestro.json`) |
 | How do I turn Maestro off? | `/maestro-uninstall` (removes the bash-validation hook + session files); `--purge` to also remove the orchestrator skill + scripts |
 | How did this session go / what could have gone better? | `/maestro-post-mortem` — `maestro-post-mortem.js` digests `maestro_session.log.jsonl` (read-only) and the skill couples it with the main session's context to flag avoidable work, false checks, bad assumptions, and handoff issues, then proposes fixes. Run mid-session (the log is wiped at `SessionEnd`). |
-| Where's the install logic? | `installRuntime()`/`uninstallRuntime()` in `@repo/maestro-core` (the app's `/install` route), and `plugins/ai-tools-manager/scripts/maestro-install.js` for the terminal path |
+| Where's the install logic? | `installRuntime()`/`uninstallRuntime()` in `src/core` (the app's `/install` route), and `plugins/ai-tools-manager/scripts/maestro-install.js` for the terminal path |
 | How do I edit the graph without a session? | Open the project in the Maestro desktop app (`apps/maestro`) → `/workflows` for the canvas, `/rules` for rule placement. A save renders the orchestrator and applies rules in the same call. |
 
 ## Things that bite

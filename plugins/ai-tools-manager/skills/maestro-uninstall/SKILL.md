@@ -44,7 +44,7 @@ The uninstaller script only touches **files** in `.claude/` — it never touches
 - **The desktop app does this without a session.** `apps/maestro`'s `/install` route has both
   levels: **Uninstall** (hooks + session files, keeps `maestro.json`) and **Delete everything**,
   which names every file in a confirmation before deleting it. That path is `uninstallRuntime()`
-  in `@repo/maestro-core`, and it is the one to prefer — it removes files the manifest knows about
+  in `apps/maestro/src/core`, and it is the one to prefer — it removes files the manifest knows about
   *plus* anything an older release left in `.claude/scripts/`, and it refuses to run at all on a
   `settings.json` that doesn't parse instead of silently skipping the hook removal (which this
   script does). Step 3 below — deleting the Maestro tasks from the task list — is the only part

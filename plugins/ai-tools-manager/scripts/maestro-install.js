@@ -234,7 +234,7 @@ try {
 
   // Seed maestro.json only when there isn't one. An existing config is the user's own graph —
   // re-seeding it would silently discard every workflow and rule assignment they authored.
-  // The format matches @repo/maestro-core's writeConfig exactly (2-space indent, NO trailing
+  // The format matches apps/maestro/src/core's writeConfig exactly (2-space indent, NO trailing
   // newline), so a project seeded here and then saved from the desktop app shows no diff.
   const configPath = path.join(claudeDir, "maestro.json");
   let seededConfig = false;

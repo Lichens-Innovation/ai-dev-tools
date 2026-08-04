@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { tailSessionLog, sessionLogFileFor, parseLogLines } from "../src/session-log.js";
+import { tailSessionLog, sessionLogFileFor, parseLogLines } from "../../src/core/session-log.js";
 
 const TICK = 1000;
 

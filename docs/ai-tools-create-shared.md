@@ -45,7 +45,7 @@ describing that, it is stale.
 
 When the run came from the desktop app, the artifact is **already on disk**: the route calls
 `scaffoldSkill` / `scaffoldSubagent` / `scaffoldPlugin` / `scaffoldMarketplace` in
-`@repo/maestro-core` *before* Claude is mentioned, so cancelling the confirmation still leaves the
+`apps/maestro/src/core` *before* Claude is mentioned, so cancelling the confirmation still leaves the
 user with the thing they asked for. The payload therefore carries a `Deterministic scaffold` object
 `{ scaffolded, path, remaining, reason? }`:
 

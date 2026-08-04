@@ -7,8 +7,8 @@
 
 import { describe, it, expect } from "vitest";
 
-import { defaultV3Config, buildWorkflow, buildTestsWorkflow } from "../src/seed.js";
-import type { MaestroWorkflowV3 } from "../src/types.js";
+import { defaultV3Config, buildWorkflow, buildTestsWorkflow } from "../../src/core/seed.js";
+import type { MaestroWorkflowV3 } from "../../src/core/types.js";
 
 // Mirrors the render metrics in label-layout.ts. Kept as a separate copy on purpose: if the two
 // drift, that is a real signal about the canvas, not a refactor to DRY away.

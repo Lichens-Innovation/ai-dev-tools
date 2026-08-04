@@ -5,7 +5,7 @@ Scaffolds a new Claude Code subagent (AGENTS.md format) — either inside a mark
 ## How it works
 
 1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Subagent** from the top bar and fills the split-pane form (auto/manual mode, marketplace/project target, name, idea/description, triggers, tools) with a live preview on the right.
-2. On submit the route calls `scaffoldSubagent` in `@repo/maestro-core`: the agent file and its frontmatter are written **immediately**, with no model involved.
+2. On submit the route calls `scaffoldSubagent` in `apps/maestro/src/core`: the agent file and its frontmatter are written **immediately**, with no model involved.
 3. If a body is still to be authored, the route builds a prose prompt carrying the payload and the scaffold result, shows it in full for confirmation, and runs it through `claude -p`. This file (`SKILL.md`) is what that prompt asks Claude to follow.
 4. Invoked directly in a session instead (`/create-subagent`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 

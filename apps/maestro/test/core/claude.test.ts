@@ -16,13 +16,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../src/claude-preview.js";
-import { resolveClaudeCli, claudeSearchDirs, cliNotFoundMessage } from "../src/claude-cli.js";
-import { runPreviewedClaude, cancelClaudeRun, TokenRefused } from "../src/claude-run.js";
-import { clearInvocations, TOKEN_TTL_MS } from "../src/claude-tokens.js";
-import type { ClaudeOutputChunk } from "../src/contracts.js";
+import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../../src/core/claude-preview.js";
+import { resolveClaudeCli, claudeSearchDirs, cliNotFoundMessage } from "../../src/core/claude-cli.js";
+import { runPreviewedClaude, cancelClaudeRun, TokenRefused } from "../../src/core/claude-run.js";
+import { clearInvocations, TOKEN_TTL_MS } from "../../src/core/claude-tokens.js";
+import type { ClaudeOutputChunk } from "../../src/core/contracts.js";
 
-const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
+const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "core");
 
 let tmp: string;
 

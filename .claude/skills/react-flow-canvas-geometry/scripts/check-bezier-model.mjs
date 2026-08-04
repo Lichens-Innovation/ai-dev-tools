@@ -36,7 +36,7 @@ const { getBezierPath, Position } = await import(pathToFileURL(dist).href);
 console.log(`checking against ${dist.replace(REPO + "/", "")}\n`);
 
 // ── The model under test ────────────────────────────────────────────────────────────────────
-// This mirrors packages/maestro-core/src/label-layout.ts. Swap in your own to check it.
+// This mirrors apps/maestro/src/core/label-layout.ts. Swap in your own to check it.
 
 const CURVATURE = 0.25;
 

@@ -37,21 +37,21 @@ function dedupeById<T extends { id: string }>(items: T[]): T[] {
   return out;
 }
 
-/** Where the plugin's agents live, relative to whichever repo root we find. */
-const BUNDLED_AGENTS_REL = path.join("plugins", "ai-tools-manager", "agents");
+/** Where the plugin's agents live, relative to whichever root holds the plugin. */
+export const BUNDLED_AGENTS_REL = path.join("plugins", "ai-tools-manager", "agents");
 
 /**
  * Walk up from `start` looking for `plugins/ai-tools-manager/agents`.
  *
- * A fixed `../../../` from `import.meta.dirname` does NOT work: this module runs from
- * `packages/maestro-core/src/` under vitest but from `apps/maestro/out/main/index.js` once
- * electron-vite has bundled it into the main process — including in `dev`, since electron-vite
- * builds main to `out/` there too. Those are different depths, and the fixed hop silently
- * resolved to `apps/plugins/…`, so the bundled subagents vanished from the picker in every
- * launched build. Searching upward is depth-independent.
+ * `start` is supplied by the caller and is deliberately NOT `import.meta.dirname`. This module is
+ * bundled into the main process by electron-vite — for `dev` as well as `build` — so
+ * `import.meta.dirname` is `apps/maestro/out/main`, the build OUTPUT directory, and in a packaged
+ * app it is a path inside `app.asar`. Walking up from the module's own location therefore searched
+ * a different tree in every mode, and the bundled subagents silently vanished from the picker in
+ * launched builds. Main passes `app.getAppPath()` instead — see `src/main/bundled-assets.ts`.
  *
- * Exported so a test can drive it from the depth the bundle actually runs at, which is the only
- * thing that was ever wrong here.
+ * Still a search rather than a fixed number of `../` hops, because the app root sits at a
+ * different depth from the repo root in the monorepo than it does in a packaged tree.
  */
 export function findUpBundledAgents(start: string): string | null {
   let dir = start;
@@ -65,26 +65,16 @@ export function findUpBundledAgents(start: string): string | null {
 }
 
 /**
- * The Maestro plugin's bundled subagents.
- *
- * Found by walking up to the monorepo root when running from source or from a `dev`/`build`
- * bundle. A packaged desktop build ships the plugin inside its resources directory, outside any
- * such tree — it sets MAESTRO_BUNDLED_AGENTS_DIR instead. Deliberately env-driven rather than
- * reading Electron's `process.resourcesPath`, so this package stays free of Electron types.
- */
-export function defaultBundledAgentsDir(): string | null {
-  const fromEnv = process.env.MAESTRO_BUNDLED_AGENTS_DIR;
-  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
-  return findUpBundledAgents(import.meta.dirname);
-}
-
-/**
  * All agents the user can choose from: project-scoped, global (~/.claude), the bundled Maestro
  * subagents, and every installed plugin's agents — each tagged with its `source`.
+ *
+ * `bundledDir` has no default on purpose. A default would have to resolve from this module's own
+ * location, which is exactly the resolution that was wrong; making the caller name the directory
+ * puts the decision in the one process that knows where the app was installed.
  */
 export async function discoverAgents(
   projectRoot: string,
-  bundledDir: string | null = defaultBundledAgentsDir(),
+  bundledDir: string | null,
 ): Promise<DiscoveredDefinition[]> {
   const [project, user, bundled, plugins] = await Promise.all([
     projectRoot ? readAgentsFromDir(path.join(projectRoot, ".claude", "agents")) : Promise.resolve([]),

@@ -17,8 +17,8 @@ import {
   resolveSearchList,
   resolveWorkflowName,
   bareAgentName,
-} from "../src/success-path.js";
-import { replaceRegion, extractRegion, syncManagedRegions } from "../src/skill-regions.js";
+} from "../../src/core/success-path.js";
+import { replaceRegion, extractRegion, syncManagedRegions } from "../../src/core/skill-regions.js";
 import { allConfigs } from "./fixtures/configs.js";
 
 const require = createRequire(import.meta.url);

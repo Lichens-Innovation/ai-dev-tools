@@ -27,7 +27,7 @@ const purge = args.includes("--purge");
 const projectDir = args.find((a) => !a.startsWith("--")) || process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
 // Every runtime script the install path registers a hook for. Keep in sync with
-// HOOK_REGISTRATIONS in packages/maestro-core/src/install.ts — the desktop app's
+// HOOK_REGISTRATIONS in apps/maestro/src/core/install.ts — the desktop app's
 // installer registers all of these in the PROJECT's settings.json (pointing at
 // $CLAUDE_PROJECT_DIR/.claude/scripts/), where the old skill-based install only
 // ever registered bash-validation.sh and left the rest to the plugin's hooks.json.

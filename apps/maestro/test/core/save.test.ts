@@ -10,12 +10,12 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { saveConfig } from "../src/save.js";
-import { applyRules, targetDirFor } from "../src/rules.js";
-import { readConfig, writeConfig } from "../src/config.js";
-import { discoverProjectRules, discoverProjectTree } from "../src/discovery.js";
+import { saveConfig } from "../../src/core/save.js";
+import { applyRules, targetDirFor } from "../../src/core/rules.js";
+import { readConfig, writeConfig } from "../../src/core/config.js";
+import { discoverProjectRules, discoverProjectTree } from "../../src/core/discovery.js";
 import { defaultish } from "./fixtures/configs.js";
-import type { MaestroConfigV3 } from "../src/types.js";
+import type { MaestroConfigV3 } from "../../src/core/types.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // Snapshotted as .cjs, not .js: this package is "type": "module", so node would otherwise

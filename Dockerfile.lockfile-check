@@ -11,7 +11,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/help-server/package.json ./apps/help-server/
 COPY apps/maestro/package.json ./apps/maestro/
 COPY packages/ui/package.json ./packages/ui/
-COPY packages/maestro-core/package.json ./packages/maestro-core/
 COPY packages/styles/package.json ./packages/styles/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
