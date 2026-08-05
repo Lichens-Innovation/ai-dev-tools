@@ -108,9 +108,13 @@ into `apps/maestro/CLAUDE.md` — the same "move the docs before deleting the ap
 
 ## Verification
 
-1. **Both apps' data matches.** Run the Docker help-server and the desktop app side by side against
+**This plan is done — help-server is deleted (task `014`).** Step 1 below is no longer runnable and
+is kept for the record; there is no container to bring up and no port 3008. Everything else is now
+verified against the desktop app alone, in a window, via the `test-maestro-desktop` skill.
+
+1. ~~**Both apps' data matches.** Run the Docker help-server and the desktop app side by side against
    the same machine; the plugin list, marketplace, curated tools, rules, and command table must be
-   identical. Do this *before* deleting anything.
+   identical. Do this *before* deleting anything.~~
 2. **Docs search still works** — `getAllDocsForSearch`'s per-heading sections and the highlight
    behaviour are easy to break in a port and not covered by types.
 3. **No node in the renderer**, still — `test/isolation.test.ts` must pass unchanged with the new

@@ -19,7 +19,9 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 
 1. If you are new to Claude Code, start by reading the [Claude Code](./docs/claude-code.md)
 2. Install the `ai-tools-manager` plugin following the [plugin installation](#plugin)
-3. Start a claude code session and launch the help server using the `/help-server`
+3. Browse what you now have installed — plugins, commands, rules, usage and these docs — from the
+   **Library** menu of the [Maestro desktop app](./apps/maestro) (see below), or ask the
+   `/super-help` skill from any Claude Code session
 
 ## Maestro
 

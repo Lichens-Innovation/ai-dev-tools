@@ -1,6 +1,6 @@
 # claude-fs
 
-A shared utility package for reading Claude Code's `~/.claude/` filesystem. Consumed by the Maestro desktop app's **main process** (which is where its node-side logic lives, under `apps/maestro/src/core/`) and by `apps/help-server` — to populate selectors and discovery lists with live data from the machine.
+A shared utility package for reading Claude Code's `~/.claude/` filesystem. Consumed by the Maestro desktop app's **main process** (which is where its node-side logic lives, under `apps/maestro/src/core/`) — to populate selectors, discovery lists and the `/tools` dashboard with live data from the machine. `apps/help-server` was its second consumer until that app was folded into Maestro; the plugin, marketplace and curated-plugin reads it did are now `src/core/plugins.ts` and `src/core/curated.ts`.
 
 ## Purpose
 

@@ -4,31 +4,31 @@
     "blockedBy": []
   },
   "002-self-host-the-ui-fonts.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": []
   },
   "003-keep-seeded-condition-labels-off-nodes.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": []
   },
   "004-install-and-update-the-runtime-from-the-app.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": []
   },
   "005-uninstall-the-runtime-from-a-project.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "004-install-and-update-the-runtime-from-the-app.md"
     ]
   },
   "006-detect-the-repo-instead-of-seeding-backend.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "004-install-and-update-the-runtime-from-the-app.md"
     ]
   },
   "007-the-claude-bridge-preview-and-run.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": []
   },
   "008-port-the-create-routes-onto-the-bridge.md": {
@@ -46,7 +46,7 @@
     ]
   },
   "010-fold-maestro-core-into-the-app.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "009-retire-the-docker-path.md"
     ]
@@ -58,20 +58,20 @@
     ]
   },
   "012-fold-in-help-servers-read-only-surface.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "010-fold-maestro-core-into-the-app.md"
     ]
   },
   "013-put-chat-and-stats-behind-the-bridge.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "007-the-claude-bridge-preview-and-run.md",
       "012-fold-in-help-servers-read-only-surface.md"
     ]
   },
   "014-delete-help-server-and-re-home-its-docs.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "013-put-chat-and-stats-behind-the-bridge.md"
     ]
