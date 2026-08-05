@@ -5,11 +5,11 @@
 // there would be describing a machine and a project the user has not chosen yet. So the dashboard
 // is a route like any other, reached from the top bar's Library menu.
 //
-// THREE TABS, NOT FOUR. help-server's fourth was Usage Stats, which shells out to
-// `npx ccusage@latest` on every view. That is a spawn, and spawns in this app go through the
-// `claude -p` bridge's preview-then-confirm path; wiring it up is the next slice
-// (.claude/maestro-tasks/013). A tab that existed but could not answer would be worse than one
-// that arrives with the mechanism it needs.
+// FOUR TABS, AND THE FOURTH IS NOT LIKE THE OTHERS. Three are pure reads of this machine, served
+// by the one `data:tools` round trip in the loader. Usage Stats is a COMMAND — help-server ran
+// `npx ccusage@latest` on every view of it, downloading and executing a package from the network
+// unannounced. It therefore has no loader data at all: it previews what it would run, shows that,
+// and runs only when the user says so. See src/core/ccusage.ts.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import TopNav from "../components/top-nav";
 import CommandCenter from "../components/tabs/command-center";
 import ProjectMarketplace from "../components/tabs/project-marketplace";
 import CuratedTools from "../components/tabs/curated-tools";
+import UsageStatsTab from "../components/tabs/usage-stats";
 import { callMain } from "../utils/call-main";
 import { getToolsData } from "../utils/tools";
 
@@ -29,10 +30,11 @@ export const Route = createFileRoute("/tools")({
   component: ToolsPage,
 });
 
-type TabId = "command-center" | "marketplace" | "curated";
+type TabId = "command-center" | "stats" | "marketplace" | "curated";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "command-center", label: "Command Center" },
+  { id: "stats", label: "Usage Stats" },
   { id: "marketplace", label: "Project Marketplace" },
   { id: "curated", label: "Curated Tools" },
 ];
@@ -109,6 +111,8 @@ function ToolsPage() {
           {tab === "command-center" && (
             <CommandCenter installedPlugins={data.installedPlugins} commands={data.commands} />
           )}
+          {/* No loader data: this tab reads nothing until the user asks it to run something. */}
+          {tab === "stats" && <UsageStatsTab />}
           {tab === "marketplace" && (
             <ProjectMarketplace plugins={data.projectMarketplace} ruleLibrary={data.ruleLibrary} />
           )}

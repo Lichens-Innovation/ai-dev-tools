@@ -24,12 +24,12 @@ import { issueInvocation } from "./claude-tokens.js";
 import { resolveCreateTarget } from "./scaffold.js";
 import { tasksDirFor } from "./tasks.js";
 import { joinOxford } from "./text.js";
-import type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget, CreateRequest } from "./contracts.js";
+import type { ChatTurn, ClaudePreview, ClaudeRequest, ClaudeWriteTarget, CreateRequest } from "./contracts.js";
 
 export type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget };
 
 /**
- * Flags every invocation carries, before the prompt.
+ * Flags an authoring invocation carries, before the prompt.
  *
  * `-p` is headless print mode: one prompt, output to stdout, no interactive session.
  *
@@ -42,9 +42,31 @@ export type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget };
  */
 export const CLAUDE_BASE_FLAGS = ["-p", "--permission-mode", "acceptEdits"] as const;
 
+/**
+ * Flags for a run that only has to ANSWER — the help chat.
+ *
+ * `acceptEdits` is left off, and that is the point rather than an omission. The flag exists so a
+ * create-\* run can finish the file it was started for; a question is not an authoring job, and
+ * pre-accepting edits for one would hand a chat message the same write authority as a form submit
+ * the user filled in on purpose. Without it the run falls back to the default permission mode,
+ * where an edit in print mode has nobody to ask and simply does not happen. The chat therefore
+ * reads and answers; if it decides something should be written, it says so and the user goes and
+ * does it from a surface that asks about writes.
+ */
+export const CLAUDE_ASK_FLAGS = ["-p"] as const;
+
+/** Turns of chat history that ride along in the prompt. Older ones are dropped. */
+const CHAT_HISTORY_TURNS = 10;
+
+/** Per-turn and per-message caps, so the prompt the user is shown stays a thing they can read. */
+const CHAT_MESSAGE_MAX = 4000;
+const CHAT_TURN_MAX = 1500;
+
 interface BuiltRequest {
   prompt: string;
   targets: ClaudeWriteTarget[];
+  /** Flags before the prompt. Defaults to `CLAUDE_BASE_FLAGS` — the authoring set. */
+  flags?: readonly string[];
   /**
    * Where to run, when that is not the open project.
    *
@@ -167,13 +189,63 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
 }
 
 /**
+ * The help chat's prompt: one question, plus the exchange it follows.
+ *
+ * The chat is the one request kind whose payload is free prose the user typed, so it is worth
+ * being precise about what that does and does not change. It does not make the renderer the source
+ * of a prompt: the sentence around the question — "Use the /super-help skill to answer" — is built
+ * here and nowhere else, and there is no field on the request that can reach argv. It is the same
+ * arrangement `create-skill`'s `idea` has always had. What makes it safe is the other half of the
+ * bridge: whatever comes out of here is shown to the user, in full, before it can run.
+ *
+ * History travels ON THE REQUEST rather than being kept in this process, and that is deliberate
+ * too. A transcript held in main would be prompt text the user could not see accumulating; carried
+ * on the request, it is part of the string the preview displays, so "the user saw what ran" stays
+ * literally true on the tenth message as much as the first. It is capped for the same reason — a
+ * prompt too long to read is one nobody reads.
+ */
+function buildChat(message: unknown, history: unknown): BuiltRequest {
+  const question = String(message ?? "")
+    .trim()
+    .slice(0, CHAT_MESSAGE_MAX);
+  if (!question) throw new Error("Ask a question first — the chat has nothing to send.");
+
+  const turns: ChatTurn[] = (Array.isArray(history) ? history : [])
+    .filter((t): t is ChatTurn => !!t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string")
+    .slice(-CHAT_HISTORY_TURNS)
+    .map((t) => ({ role: t.role, content: t.content.trim().slice(0, CHAT_TURN_MAX) }))
+    .filter((t) => t.content !== "");
+
+  const head = `Use the /super-help skill to answer the user's question: ${question}`;
+  const prompt = turns.length
+    ? [
+        head,
+        "",
+        "Earlier in this conversation:",
+        "",
+        ...turns.map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`),
+      ].join("\n")
+    : head;
+
+  return {
+    prompt,
+    // Nothing. The chat runs without `--permission-mode acceptEdits` (see CLAUDE_ASK_FLAGS), so
+    // this is a claim about the invocation rather than a hope about the model's behaviour.
+    targets: [],
+    flags: CLAUDE_ASK_FLAGS,
+  };
+}
+
+/**
  * The prompt for one request kind, and the paths it may touch.
  *
- * Every branch here is a prompt the app can execute; there is no branch that takes text from the
- * caller. Adding a kind means adding a case, which is the review surface this design is for.
+ * Every branch here is a prompt the app can execute; there is no branch that takes prompt text from
+ * the caller. Adding a kind means adding a case, which is the review surface this design is for.
  */
 function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions): BuiltRequest {
   switch (request?.kind) {
+    case "help-chat":
+      return buildChat(request.message, request.history);
     case "maestro-task": {
       // basename, not the path as given: a request must not be able to name a file outside the
       // tasks directory, and `filename` crosses a process boundary.
@@ -229,7 +301,7 @@ export function previewClaudeRun(
 
   // argv[0] is the resolved path rather than the bare name, so what the modal shows is the exact
   // executable that will run — "claude" would be a claim about PATH resolution the user cannot check.
-  const args = [...CLAUDE_BASE_FLAGS, prompt];
+  const args = [...(built.flags ?? CLAUDE_BASE_FLAGS), prompt];
   const argv = [cli.bin ?? "claude", ...args];
 
   if (!cli.available) {
@@ -249,7 +321,7 @@ export function previewClaudeRun(
     };
   }
 
-  const invocation = issueInvocation({ bin: cli.bin!, args, cwd, prompt });
+  const invocation = issueInvocation({ purpose: "claude", bin: cli.bin!, args, cwd, prompt });
   return {
     token: invocation.token,
     prompt,

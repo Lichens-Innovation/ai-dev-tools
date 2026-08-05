@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import ChatPanel from "./chat-panel";
+import { useChat } from "../utils/chat-context";
 import { useSessionLog } from "../utils/session-log-context";
 import { useProject } from "../utils/project-context";
 import { installBadge, useInstall } from "../utils/install-context";
@@ -141,7 +142,8 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
+  // Not local state: the chat session outlives this component, which remounts on every navigation.
+  const chat = useChat();
   const { current, pick } = useProject();
 
   // Reset editing + close menu when active workflow changes
@@ -373,19 +375,21 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
         shows which project is open and switches it.
       */}
       {/*
-        The chat toggle. A panel rather than a route, and inert in this slice — see
-        ./chat-panel.tsx for why asking it anything has to wait for the bridge wiring.
+        The chat toggle. A panel rather than a route: it is consulted *while* reading something
+        else, and every question it asks goes through the bridge — see ./chat-panel.tsx.
+        The dot marks a run still streaming behind a closed panel, which is otherwise invisible.
       */}
       <button
         type="button"
         data-chat-toggle
-        onClick={() => setChatOpen((v) => !v)}
-        title="Help chat"
-        className="flex items-center justify-center w-7 h-7 rounded-md border bg-(--bg-elev) border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+        onClick={() => chat.setOpen(!chat.open)}
+        title={chat.running ? "Help chat — a run is in progress" : "Help chat"}
+        className="relative flex items-center justify-center w-7 h-7 rounded-md border bg-(--bg-elev) border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
       >
         <MessageCircle size={13} />
+        {chat.running && <span className="absolute -top-0.5 -right-0.5 text-[7px] leading-none text-(--green)">●</span>}
       </button>
-      <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+      <ChatPanel />
 
       <button
         type="button"

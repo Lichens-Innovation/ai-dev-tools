@@ -362,6 +362,11 @@ export interface ScaffoldResult {
  * growing a spawn of their own: each is a prompt builder and an entry in the preview's `targets`,
  * and each names the artifact the deterministic scaffold has ALREADY written, so the run's job is
  * finishing a file rather than creating one.
+ *
+ * `help-chat` is here for the same reason and is the interesting one: help-server ran the chat by
+ * spawning `claude` itself, with no preview and no confirmation. It carries the user's own prose,
+ * which `create-skill`'s `idea` always did too — what matters is that the SENTENCE AROUND it is
+ * still built in `claude-preview.ts`, and that the result is shown before it can run.
  */
 export type ClaudeRequest =
   | {
@@ -369,7 +374,26 @@ export type ClaudeRequest =
       /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
       filename: string;
     }
+  | {
+      kind: "help-chat";
+      /** The question, as typed. Trimmed, length-capped and wrapped into a prompt by preview. */
+      message: string;
+      /**
+       * The exchange so far, so a follow-up question means something.
+       *
+       * Sent from the renderer rather than remembered in main, ON PURPOSE: it is then part of the
+       * prompt the preview displays, and "the user saw exactly what ran" holds on the tenth
+       * message as much as the first. Only the last few turns survive into the prompt.
+       */
+      history: ChatTurn[];
+    }
   | CreateRequest;
+
+/** One side of a help-chat exchange, as it rides along on the next question. */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
 
 /** A path the run may write, and how. Shown in the confirmation before anything is spawned. */
 export interface ClaudeWriteTarget {
@@ -566,4 +590,97 @@ export interface DocContent {
   slug: string;
   title: string;
   content: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usage stats — the one feature in the app whose tool may be FETCHED FROM THE NETWORK.
+// See `src/core/ccusage.ts` for the decision and its reasoning; these shapes exist to let the UI
+// state, before anything runs, which of the two it is about to do.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Which slice of usage to ask ccusage for. Each is one subcommand. */
+export type UsageStatsView = "session" | "blocks" | "daily" | "monthly";
+
+/**
+ * Where the `ccusage` that would run comes from.
+ *
+ * `local` — an executable already on this machine. Nothing is downloaded.
+ * `npx` — no local copy, so a PINNED version would be fetched from npm and executed.
+ * `none` — neither a local copy nor `npx`. Nothing can run, and the UI says so instead of
+ *          discovering it at spawn time.
+ */
+export type CcusageSource = "local" | "npx" | "none";
+
+/** Tokens and cost for one slice of usage. */
+export interface UsageTotals {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+/**
+ * What `ccusage <view> --json` reduces to.
+ *
+ * Deliberately not help-server's forty flat fields (`latestSessionInputTokens`,
+ * `totalMonthlyTotalTokens`, …), which were one naming scheme per view for the same four numbers.
+ * The view is a field, the numbers are a shape, and a tab that adds a view adds no contract.
+ */
+export interface UsageStats {
+  view: UsageStatsView;
+  /** Rows ccusage returned: sessions, blocks, days or months. */
+  entryCount: number;
+  /** What the most recent row is called — a date, a month, a session id. "" when there are none. */
+  latestLabel: string;
+  /** The most recent row. */
+  latest: UsageTotals;
+  /** Every row summed. */
+  total: UsageTotals;
+  /** `blocks` only: how many are still open. */
+  activeBlocks: number;
+  /** `daily` only: the last seven days summed. Null for every other view. */
+  recent: UsageTotals | null;
+  /** ISO date (`YYYY-MM-DD`) of the newest row, "" when there are none. */
+  lastUpdated: string;
+}
+
+/**
+ * What would run to produce those stats — returned BEFORE anything is spawned.
+ *
+ * The whole reason this channel exists separately from a "get me the stats" call: with `source:
+ * "npx"` the act of answering downloads a package from npm and executes it on the user's machine,
+ * and that is a thing to be told about rather than to discover from a network graph.
+ */
+export interface UsageStatsPreview {
+  /** Single-use, time-limited authorisation to run exactly `argv`. Null when nothing can run. */
+  token: string | null;
+  view: UsageStatsView;
+  source: CcusageSource;
+  /** Exactly what will be spawned, argv[0] resolved. Shown verbatim. */
+  argv: string[];
+  cwd: string;
+  /** True when running `argv` fetches a package from the network. Drives what the UI has to say. */
+  network: boolean;
+  /** The version a network fetch would install — pinned, never `@latest`. */
+  pinnedVersion: string;
+  /** Absolute path of the local `ccusage`, when one was found. */
+  bin: string | null;
+  /** Directories searched, in order — the "we looked here" of a not-found message. */
+  searched: string[];
+  /** Set only when `source` is "none": what is missing and what to install. */
+  unavailable: string | null;
+  expiresAt: number;
+}
+
+/** How a usage-stats run ended. Every failure is a value here, never an exception at the UI. */
+export interface UsageStatsResult {
+  view: UsageStatsView;
+  ok: boolean;
+  /** Null when the run failed. */
+  stats: UsageStats | null;
+  /** Why it failed, in a sentence the UI shows as-is. Null on success. */
+  error: string | null;
+  /** What actually ran — diffable against the argv the preview displayed. */
+  argv: string[];
+  durationMs: number;
 }

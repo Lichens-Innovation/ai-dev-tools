@@ -39,6 +39,8 @@ import {
   cancelClaudeRun,
   disposeClaudeRuns,
   clearInvocations,
+  previewUsageStats,
+  runUsageStats,
 } from "../core/index.js";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
@@ -59,6 +61,9 @@ import type {
   ProjectState,
   RulesData,
   SaveInput,
+  UsageStatsPreview,
+  UsageStatsResult,
+  UsageStatsView,
   WorkflowsData,
 } from "../shared/ipc.js";
 import { bundledAgentsDir } from "./bundled-assets.js";
@@ -345,6 +350,26 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.claudeCancel, (_e, token: string): void => {
     cancelClaudeRun(token);
   });
+
+  // ── usage stats ──────────────────────────────────────────────────────
+  // The same two-handler shape, and for a reason of its own: with no `ccusage` installed locally,
+  // answering this question DOWNLOADS A PACKAGE FROM NPM AND EXECUTES IT. help-server did that on
+  // every view of its Stats tab, silently, on `@latest`. Here `stats:preview` reads the machine
+  // and reports what would run — including `network: true` and the pinned version — without
+  // spawning, and `stats:run` accepts only the token it issued. src/core/ccusage.ts has the
+  // decision in full.
+  //
+  // Never rejects: a machine with neither ccusage nor npx is a normal machine, and the tab says so
+  // rather than handing the renderer an error boundary.
+  ipcMain.handle(
+    IPC.statsPreview,
+    (_e, view: UsageStatsView): UsageStatsPreview => previewUsageStats(currentRoot() ?? "", view)
+  );
+
+  ipcMain.handle(
+    IPC.statsRun,
+    async (_e, token: string, view: UsageStatsView): Promise<UsageStatsResult> => runUsageStats(token, view)
+  );
 
   // ── session log ──────────────────────────────────────────────────────
   // No separate snapshot channel: `subscribe` emits the full snapshot as its first `init`, so a

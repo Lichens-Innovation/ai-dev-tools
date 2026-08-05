@@ -67,8 +67,9 @@ second.
 | `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail                                      |
 | `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                   |
 | `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                                 |
-| `claude-tokens.ts`                      | The single-use, expiring authorisation between preview and run                         |
+| `claude-tokens.ts`                      | The single-use, expiring, purpose-tagged authorisation between preview and run         |
 | `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued                |
+| `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
 | `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
 | `tasks.ts`                              | The `/maestro-tasks` queue                                                             |
@@ -217,7 +218,7 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
 | `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                            |
 | `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                    |
-| `/tools`                                                                     | help-server's tabbed dashboard: installed plugins + CLI commands, the project's marketplace + rule library, curated plugins. One `data:tools` round trip.         |
+| `/tools`                                                                     | help-server's tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).   |
 | `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                 |
 
 ### The top bar is grouped, not a list
@@ -271,6 +272,68 @@ and run are two operations and what breaks if they become one. Everything a rout
 plus rendering `<ClaudeRunDialog>` with the result — a route that shells out on its own has opted
 out of the confirmation, which is the whole point.
 
+Tokens carry a **purpose** (`claude-tokens.ts`). The usage-stats reader below shares this store —
+one expiry rule, one single-use rule, one place to clear on a project switch — but not its tokens:
+without the tag, a stats preview would hand the renderer something `claude:run` would claim, and
+the app would spawn `npx` while every message on screen said Claude.
+
+### The help chat is a bridge consumer, not a second spawn path
+
+help-server ran its chat by calling `execFile("claude", ["-p", prompt, …])` from a server
+function, once per message, with no preview and no confirmation. That is precisely the thing the
+bridge exists to prevent, so the port rebuilt it rather than moving it:
+`utils/chat-context.tsx` previews a `{ kind: "help-chat", message, history }` request and runs the
+token that comes back. `components/chat-panel.tsx` is a view of that context and may not touch
+`window.maestro.claude` at all.
+
+Four things about it are decisions rather than styling:
+
+- **The confirmation is inline in the transcript**, not `ClaudeRunDialog`. In a chat the answer
+  belongs in the conversation, so the consent does too — a modal would put the prompt in one place
+  and the streamed reply behind a dialog the user has to dismiss. It shows the same list: full
+  prompt verbatim, exact argv, working directory.
+- **The chat runs without `--permission-mode acceptEdits`** (`CLAUDE_ASK_FLAGS`). That flag exists
+  so a create-\* run can finish the file it was started for; a question is not an authoring job,
+  and pre-accepting edits for one would give a chat message the same write authority as a form the
+  user filled in deliberately. `targets` is empty because nothing is writable, not because nobody
+  worked it out.
+- **History travels on the request**, not in main's memory. It is then part of the string the
+  preview displays, so "the user saw exactly what ran" stays literally true on the tenth message.
+  It is capped (ten turns, clipped) for the same reason: a prompt too long to read is one nobody
+  reads.
+- **"Don't ask again" defaults to asking, dies with the session, and is on screen.** It is
+  `useState(true)` in the context — nothing persists it, and a project switch resets it along with
+  the transcript. The checkbox renders in both states, so it can always be turned back on, and the
+  prompt is kept under each answer even when the confirmation is off: not being interrupted is not
+  the same as not being told what ran. `test/isolation.test.ts` pins all three properties.
+
+### Running a tool from the network — the usage-stats decision
+
+`/tools`' Usage Stats tab is the one feature whose tool may be **fetched from npm and executed**.
+help-server ran `npx --yes ccusage@latest <view> --json` on every view of it, silently. Under
+Docker that was already true; on a desktop app pointed at the user's own machine it is a more
+pointed choice, so it did not survive the move unchanged. `src/core/ccusage.ts` carries the
+argument in full; the shape of it:
+
+1. **A local copy wins.** The open project's `node_modules/.bin` first (a repo that pinned ccusage
+   has already made this decision), then the same expanded directory list `claude` is resolved
+   against — a GUI-launched app's PATH is not the user's PATH.
+2. **A remote fetch is pinned**, to `PINNED_CCUSAGE_VERSION` in that file. `@latest` means the
+   app's behaviour changes without the app changing: a release published this afternoon runs
+   tonight, with output `reduceUsage` has never seen and a supply chain nobody reviewed. Bumping
+   it is a diff, and the reduction is written against that version.
+3. **It is shown first.** `stats:preview` resolves and returns the exact argv plus
+   `network: true/false`, and spawns nothing; `stats:run` accepts only the token preview issued.
+   So "the user was told a package would be fetched and executed" is a property of the wiring.
+4. **It degrades in the preview.** A machine with neither `ccusage` nor `npx` gets a message naming
+   the tool and where it was looked for, while the Run button is still un-pressed — not an ENOENT
+   after a spawn.
+
+What was **not** done, and why: the fetch was not removed. ccusage parses `~/.claude`'s own JSONL,
+and reimplementing that here would be a second reader of someone else's file format, drifting in
+silence. It was also not vendored — a dependency of the app is one the app ships, and a user who
+never opens this tab should not carry it.
+
 ## Things that bite
 
 - **Hash history, not browser history.** A packaged build loads the renderer over `file://`,
@@ -295,6 +358,12 @@ out of the confirmation, which is the whole point.
   so they were deliberately not unified; the names and the return types (`RuleLibraryEntry` with
   `title`/`paths` vs `ProjectRule` with `id`/`dir`) are what keep the next reader from assuming one
   view manages the other's files.
+- **The chat's state cannot live in the panel — `TopNav` remounts on every navigation.** The
+  toggle and the panel are rendered by the top bar, which each route mounts for itself, so a
+  transcript held in `chat-panel.tsx` would be discarded the moment the user clicked Docs to look
+  something up. Worse, `runningToken` is the only handle on a run in flight: losing it leaves
+  Claude running with no Stop to press. Hence `ChatProvider` in `__root.tsx`, inside
+  `ProjectProvider` (a project switch ends the chat session) and above the `Outlet`.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.

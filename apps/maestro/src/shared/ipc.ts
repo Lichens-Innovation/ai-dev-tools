@@ -37,6 +37,7 @@ import type {
   ClaudeWriteTarget,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  ChatTurn,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -50,6 +51,12 @@ import type {
   DocMeta,
   DocSection,
   DocContent,
+  CcusageSource,
+  UsageStats,
+  UsageStatsPreview,
+  UsageStatsResult,
+  UsageStatsView,
+  UsageTotals,
 } from "../core/contracts.js";
 
 export type {
@@ -77,6 +84,7 @@ export type {
   ClaudeWriteTarget,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  ChatTurn,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -90,6 +98,12 @@ export type {
   DocMeta,
   DocSection,
   DocContent,
+  CcusageSource,
+  UsageStats,
+  UsageStatsPreview,
+  UsageStatsResult,
+  UsageStatsView,
+  UsageTotals,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -203,6 +217,12 @@ export const IPC = {
   claudePreview: "claude:preview",
   claudeRun: "claude:run",
   claudeCancel: "claude:cancel",
+
+  // Usage stats, in the same two halves and for the same reason: with no local `ccusage`, running
+  // one means fetching a package from npm and executing it, so what would run is returned before
+  // anything does. See src/core/ccusage.ts.
+  statsPreview: "stats:preview",
+  statsRun: "stats:run",
 
   logSubscribe: "log:subscribe",
   logUnsubscribe: "log:unsubscribe",
@@ -322,6 +342,25 @@ export interface MaestroApi {
     run(token: string, onOutput: (chunk: ClaudeOutputChunk) => void): Promise<ClaudeRunResult>;
     /** Stop a run. Signals the child's whole process group, so the CLI's own children go too. */
     cancel(token: string): Promise<void>;
+  };
+  /**
+   * Usage stats, behind the same preview-then-run split as the bridge.
+   *
+   * The split is not ceremony copied from above: with no local `ccusage`, answering "what have I
+   * spent?" downloads a package from npm and executes it on this machine. `preview` says so —
+   * `network: true`, plus the exact argv and the PINNED version — and spawns nothing. `run` takes
+   * the token that preview issued and nothing else, so the command that executes is the one that
+   * was on screen. help-server did neither: `npx ccusage@latest` on every view, unannounced.
+   */
+  stats: {
+    /** What would run, and whether it touches the network. Never rejects. */
+    preview(view: UsageStatsView): Promise<UsageStatsPreview>;
+    /**
+     * Run the previewed command and reduce its output. Rejects only when the token is refused
+     * (forged, replayed, expired, or issued for a Claude run rather than this one); a ccusage that
+     * fails or answers in an unrecognised shape resolves with `ok: false` and a reason.
+     */
+    run(token: string, view: UsageStatsView): Promise<UsageStatsResult>;
   };
   log: {
     /**

@@ -66,6 +66,14 @@ const api: MaestroApi = {
     },
     cancel: (token) => ipcRenderer.invoke(IPC.claudeCancel, token),
   },
+  stats: {
+    // A view name, never an argv: main resolves `ccusage` and builds the command, exactly as it
+    // builds a prompt for the claude channels. The renderer picks a tab; it cannot pick a binary.
+    preview: (view) => ipcRenderer.invoke(IPC.statsPreview, view),
+    // The token decides what runs. `view` rides along only so the result can be filed against the
+    // tab that asked — the invocation itself comes from the token, same as `claude:run`.
+    run: (token, view) => ipcRenderer.invoke(IPC.statsRun, token, view),
+  },
   log: {
     subscribe: (handlers) => {
       const onInit = (_e: unknown, entries: SessionLogEntry[]) => handlers.onInit(entries);
