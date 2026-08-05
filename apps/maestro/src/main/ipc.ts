@@ -14,6 +14,7 @@ import {
   discoverAgents,
   discoverSkills,
   discoverProjectRules,
+  discoverRuleLibrary,
   discoverProjectTree,
   discoverVibeRules,
   hasVibeRules,
@@ -26,6 +27,13 @@ import {
   installRuntime,
   uninstallPlan,
   uninstallRuntime,
+  listInstalledPlugins,
+  readProjectMarketplace,
+  listCuratedPlugins,
+  readClaudeCommands,
+  listDocs,
+  readDoc,
+  docSections,
   previewClaudeRun,
   runPreviewedClaude,
   cancelClaudeRun,
@@ -38,9 +46,12 @@ import type {
   ClaudeRequest,
   CreateOptions,
   CreateRequest,
+  DocContent,
+  DocsData,
   ScaffoldResult,
   ClaudeRunResult,
   MaestroConfigV3,
+  ToolsData,
   InstallReport,
   InstallStatus,
   UninstallPlan,
@@ -193,6 +204,46 @@ export function registerIpc(): void {
       vibeRules,
       vibeRulesAvailable,
     };
+  });
+
+  // ── the read-only surface folded in from help-server ──────────────────
+  // Two loaders, four tabs and two doc views. help-server ran six server functions for the same
+  // screens, two of which each re-read `installed_plugins.json` to compute their own `isInstalled`
+  // column; here the machine is read once per view and the tabs cannot disagree.
+  //
+  // Neither of these rejects. Every part is optional in a real project — no `.claude-plugin/`, no
+  // `rules/`, no `docs/` — so an absent directory is an empty section, and the route says which
+  // parts are empty. `data:doc` below is the exception, and deliberately so.
+  ipcMain.handle(IPC.toolsData, async (): Promise<ToolsData> => {
+    const projectRoot = currentRoot() ?? "";
+    const [installedPlugins, projectMarketplace, curated] = await Promise.all([
+      listInstalledPlugins(),
+      readProjectMarketplace(projectRoot),
+      listCuratedPlugins(),
+    ]);
+    return {
+      projectRoot,
+      installedPlugins,
+      projectMarketplace,
+      curated,
+      ruleLibrary: discoverRuleLibrary(projectRoot),
+      commands: readClaudeCommands(projectRoot),
+    };
+  });
+
+  ipcMain.handle(IPC.docsData, (): DocsData => {
+    const projectRoot = currentRoot() ?? "";
+    return { projectRoot, docs: listDocs(projectRoot), sections: docSections(projectRoot) };
+  });
+
+  // Throws on an invalid slug, a missing file and an unreadable one — three states a reader that
+  // returned "" would render identically, as an empty page with no explanation. `readDoc` also
+  // refuses any slug carrying a separator or a dot, so the only file this can open is one directly
+  // inside the open project's `docs/`.
+  ipcMain.handle(IPC.docContent, (_e, slug: string): DocContent => {
+    const root = currentRoot();
+    if (!root) throw new Error("No project is open.");
+    return readDoc(root, slug);
   });
 
   // ── save ─────────────────────────────────────────────────────────────

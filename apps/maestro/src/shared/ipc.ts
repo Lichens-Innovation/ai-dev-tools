@@ -41,6 +41,15 @@ import type {
   CreateRequest,
   MarketplaceEntry,
   ScaffoldResult,
+  InstalledPluginInfo,
+  MarketplacePluginInfo,
+  DefinitionSummary,
+  CuratedPlugin,
+  RuleLibraryEntry,
+  ClaudeCommand,
+  DocMeta,
+  DocSection,
+  DocContent,
 } from "../core/contracts.js";
 
 export type {
@@ -72,6 +81,15 @@ export type {
   CreateRequest,
   MarketplaceEntry,
   ScaffoldResult,
+  InstalledPluginInfo,
+  MarketplacePluginInfo,
+  DefinitionSummary,
+  CuratedPlugin,
+  RuleLibraryEntry,
+  ClaudeCommand,
+  DocMeta,
+  DocSection,
+  DocContent,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -120,6 +138,37 @@ export interface RulesData {
   vibeRulesAvailable: boolean;
 }
 
+/**
+ * Everything the /tools dashboard needs, in one round trip.
+ *
+ * ONE channel for four tabs, not four channels. help-server fetched each of these from its own
+ * `createServerFn` and paid for it twice over: `getProjectMarketplace` and `getCuratedPlugins`
+ * each re-read `installed_plugins.json` to decide their own `isInstalled` flags. The same lesson
+ * as /rules in M2 — a view's tabs are one view, and a payload assembled in one pass cannot have
+ * two tabs disagreeing about what is installed.
+ */
+export interface ToolsData {
+  /** "" when no project is open; the route says so rather than rendering four empty tables. */
+  projectRoot: string;
+  installedPlugins: InstalledPluginInfo[];
+  projectMarketplace: MarketplacePluginInfo[];
+  curated: CuratedPlugin[];
+  ruleLibrary: RuleLibraryEntry[];
+  commands: ClaudeCommand[];
+}
+
+/** The doc list and the search corpus — both of which every docs view needs at once. */
+export interface DocsData {
+  projectRoot: string;
+  docs: DocMeta[];
+  /**
+   * Every doc split at its headings. Carried alongside the list rather than fetched when the user
+   * starts typing: search has to answer on the first keystroke, and the corpus is the same bytes
+   * the list was built from, so a second read could only introduce a disagreement.
+   */
+  sections: DocSection[];
+}
+
 export type SaveInput =
   | { sliceType: "workflows"; slice: MaestroWorkflowsSlice }
   | { sliceType: "rules"; slice: MaestroRulesSlice };
@@ -133,6 +182,9 @@ export const IPC = {
   workflowsData: "data:workflows",
   workflowsReseed: "data:reseed",
   rulesData: "data:rules",
+  toolsData: "data:tools",
+  docsData: "data:docs",
+  docContent: "data:doc",
   configSave: "config:save",
 
   tasksList: "tasks:list",
@@ -186,6 +238,16 @@ export interface MaestroApi {
      */
     reseed(implAgents: string[]): Promise<MaestroConfigV3>;
     rules(): Promise<RulesData>;
+    /** The /tools dashboard's four tabs. Never rejects: an absent file is an empty section. */
+    tools(): Promise<ToolsData>;
+    /** The doc list plus the search corpus. Never rejects; a project with no docs/ returns []. */
+    docs(): Promise<DocsData>;
+    /**
+     * One doc's body. REJECTS — on a bad slug, a missing file, or an unreadable one — because a
+     * reader that renders a blank page for all three tells the user nothing. Call it through
+     * `callMain` and show the reason.
+     */
+    doc(slug: string): Promise<DocContent>;
   };
   config: {
     save(input: SaveInput): Promise<SaveResult>;

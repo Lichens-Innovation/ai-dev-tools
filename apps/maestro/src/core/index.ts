@@ -72,6 +72,7 @@ export {
   discoverAgents,
   discoverSkills,
   discoverProjectRules,
+  discoverRuleLibrary,
   discoverProjectTree,
   discoverVibeRules,
   hasVibeRules,
@@ -80,8 +81,17 @@ export {
   BUNDLED_AGENTS_REL,
   type DiscoveredDefinition,
   type ProjectRule,
+  type RuleLibraryEntry,
   type TreeNode,
 } from "./discovery.js";
+
+// help-server's read-only surface, folded in by docs/plans/m6-help-server-merge.md. All four
+// read the OPEN PROJECT plus `~/.claude` — there is no container mount and no precompute file to
+// recover a path from, which is what the merge retired along with port 3008.
+export { listInstalledPlugins, readProjectMarketplace, projectMarketplacePath } from "./plugins.js";
+export { listCuratedPlugins, CURATED_MARKETPLACES } from "./curated.js";
+export { readClaudeCommands, claudeCommandsDocPath } from "./commands.js";
+export { listDocs, readDoc, docSections, docsDir, isValidDocSlug, slugifyHeading } from "./docs.js";
 
 export { applyRules, targetDirFor, type ApplyRulesSummary } from "./rules.js";
 
