@@ -323,6 +323,7 @@ describe("the claude bridge across the process boundary", () => {
       "src/core/ccusage.ts", //     usage stats — token-gated, previewed, version-pinned
       "src/core/claude-run.ts", //  the bridge — token-gated
       "src/core/discovery.ts", //   `vibe-rules list`
+      "src/core/git.ts", //         `git init` + first commit for a new marketplace
       "src/core/install.ts", //     `git` during an install
       "src/core/rules.ts", //       `vibe-rules load`
     ]);
@@ -369,6 +370,29 @@ describe("the create-* routes", () => {
     const preload = read("src/preload/index.ts");
     expect(preload).toMatch(/invoke\(IPC\.createScaffold,\s*request\s*\)/);
     expect(preload).not.toMatch(/createScaffold,\s*(path|dir|target|cwd)/);
+  });
+
+  it("hand the scaffold a git port, or a new marketplace quietly stops being a repository", () => {
+    // The scaffold takes `git` as an OPTION, because importing the implementation would put
+    // `child_process` in `claude-preview.ts`'s import graph and cost the "preview cannot spawn"
+    // guarantee (test/core/claude.test.ts). The price of that is a capability which can go missing
+    // without anything failing: no port means no repository, silently, and every test in
+    // test/core/scaffold.test.ts that injects its own would still pass. So the wiring is pinned
+    // where it lives — this line IS "creating a marketplace produces a git repository".
+    expect(read("src/main/ipc.ts")).toMatch(/scaffoldCreate\([\s\S]{0,80}?\{\s*git:\s*nodeGit\(\)\s*\}\s*\)/);
+  });
+
+  it("ask git for nothing that has to work without it", () => {
+    // Two decisions must hold on a machine with no `git` installed: whether the target already sits
+    // inside a repository (the check that stops a marketplace nesting one), and what the
+    // confirmation prompt says about it. Both go through `repo.ts`, which is `fs` only — a
+    // `git rev-parse` here would answer about the process's cwd for a directory that does not exist
+    // yet, and would answer nothing at all on the machine this criterion is about.
+    // Comments stripped first — that module's own prose explains why it is not a `git rev-parse`.
+    expect(stripComments(read("src/core/repo.ts"))).not.toMatch(/child_process|execFile|spawn/);
+    for (const consumer of ["src/core/scaffold.ts", "src/core/claude-preview.ts"]) {
+      expect(read(consumer), `${consumer} should read the repo state from repo.ts`).toContain("./repo.js");
+    }
   });
 
   it("preview the same description the scaffold writes, from one implementation", () => {

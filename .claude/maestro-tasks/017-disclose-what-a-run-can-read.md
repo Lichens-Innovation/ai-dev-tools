@@ -27,6 +27,12 @@ user can see that a run may read one tree and write into another.
 Worth doing before the run path changes underneath it: the dialog should be honest about the current
 behaviour first, so the next slice's change is visible as a narrowing rather than arriving with it.
 
+One thing the target may already be: `016` moved repository setup into the deterministic scaffold, so
+a create-marketplace prompt now carries a line stating the repository state — created here, already
+inside one, or no `git` on this machine — derived from disk rather than from the payload. The
+directory this dialog is describing may therefore already be a git repository with the scaffold
+committed, before anything runs.
+
 ## Acceptance criteria
 
 - [ ] The confirmation dialog lists the directories a run can read, alongside what it may write
@@ -34,7 +40,7 @@ behaviour first, so the next slice's change is visible as a narrowing rather tha
 - [ ] The disclosure reflects the *effective* configuration, including anything contributed by settings files, not just what the app passed
 - [ ] Where a value came from is available to the user rather than being flattened into one list
 - [ ] The disclosure is derived in the main process; no directory is nominated by the renderer
-- [ ] Cancelling still leaves the scaffolded artifact untouched on disk
+- [ ] Cancelling still leaves the scaffolded artifact untouched on disk, including the git repository the scaffold made for it
 
 ## Blocked by
 

@@ -125,14 +125,18 @@ export function claudeSearchDirs(opts: ResolveOptions = {}): string[] {
 }
 
 /**
- * Where `claude` is, or the list of places it isn't.
+ * The first of `names` that exists and is executable in the search list above, or where it isn't.
+ *
+ * Generic because `claude` is not the only binary this app has to find on a machine whose PATH it
+ * cannot trust: `git.ts` resolves `git` the same way, for the same reason. Keeping one search list
+ * means a directory added for one of them is searched for both, and only one place knows how a GUI
+ * launch differs from a terminal.
  *
  * Never throws and never spawns: an unreadable directory is simply a directory without a match.
  */
-export function resolveClaudeCli(opts: ResolveOptions = {}): ClaudeCli {
+export function resolveOnPath(names: string[], opts: ResolveOptions = {}): ClaudeCli {
   const platform = opts.platform ?? process.platform;
   const searched = claudeSearchDirs(opts);
-  const names = binaryNames(platform);
 
   for (const dir of searched) {
     for (const name of names) {
@@ -141,6 +145,15 @@ export function resolveClaudeCli(opts: ResolveOptions = {}): ClaudeCli {
     }
   }
   return { available: false, bin: null, searched };
+}
+
+/**
+ * Where `claude` is, or the list of places it isn't.
+ *
+ * Never throws and never spawns: an unreadable directory is simply a directory without a match.
+ */
+export function resolveClaudeCli(opts: ResolveOptions = {}): ClaudeCli {
+  return resolveOnPath(binaryNames(opts.platform ?? process.platform), opts);
 }
 
 /**

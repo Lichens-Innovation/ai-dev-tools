@@ -1,4 +1,4 @@
-import { Check, FolderOpen, Terminal } from "lucide-react";
+import { Check, FolderOpen, GitBranch, Terminal } from "lucide-react";
 import type { CreateOutcome } from "../utils/create-flow";
 
 /**
@@ -37,6 +37,19 @@ export default function CreateResult({
           </li>
         ))}
       </ul>
+
+      {/*
+        The repository is reported whether or not one was made. "It is a repo and everything is
+        committed", "it was already inside one", and "git is not on this machine" are three states
+        the user cannot tell apart by looking at the folder, and the last two are not failures —
+        the marketplace is complete in all three.
+      */}
+      {result.repo && (
+        <div className="flex items-start gap-1.5 text-[12px] text-(--ink-2)">
+          <GitBranch size={13} className={`mt-0.5 shrink-0 ${result.repo.initialized ? "text-(--green)" : ""}`} />
+          <span>{result.repo.note}</span>
+        </div>
+      )}
 
       {result.remaining && <p className="text-[12px] text-(--ink-2) m-0">{result.remaining}</p>}
 

@@ -21,10 +21,12 @@ header, so the scope is readable at a glance rather than inferred. Submit a seco
 by one more. Nothing else can add to it.
 
 **Seed the conversation without spending a model call.** The handoff appends context — what was
-scaffolded, where it landed, what its frontmatter says, what is left to write — as a transcript
-entry that does not trigger a turn. The user's first typed message is the first thing that costs
-anything. This also means the model starts knowing what has already been decided, so it does not
-re-ask for a name the form captured.
+scaffolded, where it landed, what its frontmatter says, whether it is already a git repository
+(`ScaffoldResult.repo`, since `016`), what is left to write — as a transcript entry that does not
+trigger a turn. The user's first typed message is the first thing that costs anything. This also
+means the model starts knowing what has already been decided, so it does not re-ask for a name the
+form captured. Leave the repository state out and a pane session will helpfully offer to `git init` a
+directory that already is one.
 
 Because writes are now confined to the artifact's own directory, the per-write prompt on this path
 is close to ceremonial: the model cannot propose a write the user has not already approved by

@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { cliNotFoundMessage, resolveClaudeCli, type ResolveOptions } from "./claude-cli.js";
 import { issueInvocation } from "./claude-tokens.js";
+import { enclosingRepo } from "./repo.js";
 import { resolveCreateTarget } from "./scaffold.js";
 import { tasksDirFor } from "./tasks.js";
 import { joinOxford } from "./text.js";
@@ -169,6 +170,15 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
           `\`claude plugin marketplace add\` / \`claude plugin install\` instructions), and write a CLAUDE.md`,
           `explaining that this repo is a marketplace catalog, pointing at .claude-plugin/marketplace.json and`,
           `describing the plugins/<name>/ source layout. Do not edit marketplace.json.`,
+          // Repository setup left this prompt when it became a scaffold step, and the run is told
+          // the OUTCOME instead — read off the disk the scaffold just wrote, so the sentence is true
+          // in both cases rather than a claim about what should have happened. Left unsaid, a model
+          // finishing a marketplace reasonably reaches for `git init` and either nests a repository
+          // or re-commits the scaffold under its own authorship. Remotes and private-repo access
+          // are still the user's to arrange; they are not this run's either.
+          enclosingRepo(target.path)
+            ? `The directory is already a git repository with the scaffold committed: do not run git.`
+            : `The directory is not a git repository and the app could not make it one: do not run git — the user will.`,
           request.privateRepo
             ? `\nThis marketplace will live in a PRIVATE repository: document the token env vars (GITHUB_TOKEN / GH_TOKEN, GITLAB_TOKEN / GL_TOKEN, BITBUCKET_TOKEN) that background auto-update needs, since credential helpers are skipped there.`
             : "",

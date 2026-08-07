@@ -154,8 +154,15 @@ export {
   validateCreateRequest,
   type CreateRequest,
   type CreateTarget,
+  type ScaffoldOptions,
   type ScaffoldResult,
 } from "./scaffold.js";
+
+// The git half of the create-marketplace scaffold. Deliberately NOT imported by `scaffold.ts`:
+// it is handed in as a port, so the scaffold's import graph — which `claude-preview.ts` shares —
+// stays free of `child_process`. See `GitPort` in `contracts.ts`.
+export { nodeGit } from "./git.js";
+export { enclosingRepo } from "./repo.js";
 
 export { buildDesc, clip, deriveName, firstSentence, joinOxford, stripNamespace, titleFromName } from "./text.js";
 

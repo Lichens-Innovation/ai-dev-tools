@@ -14,13 +14,15 @@
 // whatever the developer happens to have registered with Claude Code.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { scaffoldCreate, resolveCreateTarget, validateCreateRequest } from "../../src/core/scaffold.js";
 import { listMarketplaces, marketplacePath } from "../../src/core/marketplaces.js";
-import type { CreateRequest } from "../../src/core/contracts.js";
+import { nodeGit } from "../../src/core/git.js";
+import type { CreateRequest, GitPort } from "../../src/core/contracts.js";
 
 let tmp: string;
 let home: string;
@@ -296,6 +298,170 @@ describe("scaffolding a marketplace", () => {
       expect(scaffoldCreate(project, marketplace(outside), opts()).scaffolded).toBe(true);
     } finally {
       fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  // ── the repository ─────────────────────────────────────────────────────────────────────────
+  //
+  // This used to be a sentence in a prompt — "set up git" — so whether a marketplace was a
+  // repository depended on whether a run happened and did as it was told. It is a scaffold step
+  // now, which means it is subject to the same two rules as every other one: it is deterministic,
+  // and it does not survive a failure of anything else in the list.
+
+  /** The real thing, resolved off this machine — the tests below assert on actual git output. */
+  const withGit = () => ({ home, git: nodeGit() });
+
+  /** A `git` that is genuinely not there: a platform/home pair with no binary to find. */
+  const withoutGit = () => ({
+    home,
+    git: nodeGit({
+      platform: "win32" as NodeJS.Platform,
+      env: { PATH: "" },
+      home: fs.mkdtempSync(path.join(tmp, "nogit-")),
+    }),
+  });
+
+  const git = (args: string[], cwd: string) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+
+  it("initialises a repository and commits what it wrote", () => {
+    const target = path.join(tmp, "with-repo");
+    const res = scaffoldCreate(project, marketplace(target), withGit());
+
+    expect(res.scaffolded).toBe(true);
+    expect(res.repo).toEqual({ initialized: true, root: target, note: expect.stringMatching(/Initialised a git/) });
+    // Not "a .git directory exists" — that is true of a `git init` that committed nothing. The
+    // claim is that the scaffold is IN the first commit, so it is read back out of the commit.
+    expect(git(["rev-parse", "--show-toplevel"], target)).toBe(fs.realpathSync(target));
+    expect(git(["log", "--format=%s"], target)).toBe("chore: scaffold the my-tools marketplace");
+    expect(git(["ls-tree", "-r", "--name-only", "HEAD"], target).split("\n").sort()).toEqual([
+      ".claude-plugin/marketplace.json",
+      "README.md",
+    ]);
+    // Nothing left uncommitted: a repository whose first commit is missing half the scaffold is
+    // the same half-initialised state as no repository at all.
+    expect(git(["status", "--porcelain"], target)).toBe("");
+  });
+
+  it("commits as the marketplace owner when the machine has no git identity", () => {
+    // A fresh machine has no user.name, and `git commit` there fails with "please tell me who you
+    // are" — which would roll the repository back for want of a name the form already collected.
+    const target = path.join(tmp, "no-identity");
+    const bareHome = fs.mkdtempSync(path.join(tmp, "gitless-home-"));
+    const res = scaffoldCreate(project, marketplace(target), {
+      home,
+      // A git with no config to read anywhere: no global file, no system one, and a HOME with
+      // nothing in it. Without this the developer's own ~/.gitconfig answers and the fallback that
+      // this test is about never runs.
+      git: nodeGit({
+        env: { ...process.env, HOME: bareHome, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+      }),
+    });
+
+    expect(res.repo?.initialized).toBe(true);
+    expect(git(["log", "--format=%an <%ae>"], target)).toBe("Ada <ada@example.com>");
+  });
+
+  it("does not nest a repository inside one that already exists", () => {
+    const outer = path.join(tmp, "outer-repo");
+    fs.mkdirSync(outer, { recursive: true });
+    execFileSync("git", ["init", "-q"], { cwd: outer });
+
+    const target = path.join(outer, "nested-marketplace");
+    const res = scaffoldCreate(project, marketplace(target), withGit());
+
+    expect(res.scaffolded).toBe(true);
+    expect(res.repo).toEqual({ initialized: false, root: outer, note: expect.stringMatching(/Already inside/) });
+    expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
+    // The marketplace itself is untouched by the decision — it is a full one either way.
+    expect(fs.existsSync(path.join(target, ".claude-plugin", "marketplace.json"))).toBe(true);
+    // And the outer repository was not committed to on the user's behalf.
+    expect(git(["status", "--porcelain"], outer)).not.toBe("");
+  });
+
+  it("says so and still writes a complete marketplace when git is not installed", () => {
+    const target = path.join(tmp, "gitless");
+    const res = scaffoldCreate(project, marketplace(target), withoutGit());
+
+    expect(res.scaffolded).toBe(true);
+    expect(res.repo?.initialized).toBe(false);
+    // Not "an error occurred": it names what was looked for and what the user can do about it.
+    expect(res.repo?.note).toMatch(/`git` was not found.*Looked for it in \d+ directories/s);
+    expect(res.repo?.note).toMatch(/run `git init`/);
+    expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
+    expect(fs.readFileSync(path.join(target, "README.md"), "utf8")).toBe("# my-tools\n\nMy personal tools\n");
+    expect(JSON.parse(fs.readFileSync(path.join(target, ".claude-plugin", "marketplace.json"), "utf8")).name).toBe(
+      "my-tools"
+    );
+  });
+
+  it("leaves no repository behind when a later step fails", () => {
+    // The whole reason `git init` is the FIRST step and the commit is the last: everything between
+    // them can fail, and a repository that outlived the files it was made for is exactly the
+    // half-initialised directory the all-or-nothing rule exists to prevent. A file where
+    // `.claude-plugin/` has to go makes the manifest write throw ENOTDIR, after the init.
+    const target = path.join(tmp, "doomed");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, ".claude-plugin"), "not a directory\n");
+
+    const res = scaffoldCreate(project, marketplace(target), withGit());
+
+    expect(res.scaffolded).toBe(false);
+    expect(res.written).toEqual([]);
+    expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
+    expect(fs.existsSync(path.join(target, "README.md"))).toBe(false);
+  });
+
+  it("removes the repository it half-made when the commit fails, and keeps the marketplace", () => {
+    // The other direction, and it is deliberately NOT symmetric. A git that errors is the same
+    // situation as a machine without git — the files are complete and usable — so the failure
+    // rolls back only itself and is reported, rather than destroying a marketplace over it.
+    const target = path.join(tmp, "commit-fails");
+    const brokenCommit: GitPort = {
+      availability: () => ({ available: true, reason: "" }),
+      init: (dir) => {
+        fs.mkdirSync(path.join(dir, ".git"), { recursive: true });
+        return path.join(dir, ".git");
+      },
+      commit: () => {
+        throw new Error("`git commit` failed: gpg failed to sign the data");
+      },
+    };
+
+    const res = scaffoldCreate(project, marketplace(target), { home, git: brokenCommit });
+
+    expect(res.scaffolded).toBe(true);
+    expect(res.repo?.initialized).toBe(false);
+    expect(res.repo?.note).toMatch(/gpg failed to sign/);
+    expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
+    expect(fs.existsSync(path.join(target, "README.md"))).toBe(true);
+  });
+
+  it("makes no repository at all for a caller that supplied no git port", () => {
+    // The port is what does this. A caller that drops it gets the old behaviour silently, which is
+    // why `test/isolation.test.ts` pins the one place in the app that supplies it.
+    const target = path.join(tmp, "no-port");
+    const res = scaffoldCreate(project, marketplace(target), opts());
+
+    expect(res.scaffolded).toBe(true);
+    expect(res.repo).toBeUndefined();
+    expect(fs.existsSync(path.join(target, ".git"))).toBe(false);
+  });
+
+  it("keeps the repository out of the flows that write into someone else's", () => {
+    // A skill, a subagent and a plugin land INSIDE a marketplace that is already a repository. Only
+    // the flow that creates a directory from nothing has a repository to make.
+    for (const request of [
+      skill(),
+      subagent(),
+      {
+        kind: "create-plugin",
+        name: "linting",
+        description: "d",
+        keywords: [],
+        marketplace: "my-tools",
+      } as CreateRequest,
+    ]) {
+      expect(scaffoldCreate(project, request, withGit()).repo, JSON.stringify(request)).toBeUndefined();
     }
   });
 });

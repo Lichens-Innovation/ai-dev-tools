@@ -23,14 +23,34 @@
 // a summary that said it was fine. Every flow here builds its complete list of steps first and
 // rolls back what it did if any of them fails, because "a failed write surfaces the reason rather
 // than leaving a partial artifact" is only true if something undoes the partial artifact.
+//
+// Added later: a new marketplace is a git repository, and that is a step in the same list. It used
+// to be an instruction in a prompt, which made "is it a repo?" depend on whether a run happened.
+// `git` is reached through the `GitPort` the caller supplies — see the interface in `contracts.ts`
+// for why this module must not import the implementation — and it obeys the same discipline as
+// every other step: a failure after it removes the repository it made.
 
 import fs from "node:fs";
 import path from "node:path";
 import { listMarketplaces, marketplaceOwner, marketplacePath, type MarketplaceOptions } from "./marketplaces.js";
+import { enclosingRepo } from "./repo.js";
 import { buildDesc, clip, deriveName, titleFromName } from "./text.js";
-import type { CreateRequest, ScaffoldResult } from "./contracts.js";
+import type { CreateRequest, GitPort, RepoResult, ScaffoldResult } from "./contracts.js";
 
 export type { CreateRequest, ScaffoldResult };
+
+/**
+ * What the scaffold needs beyond the request: which home to read marketplaces from, and how to
+ * make a repository.
+ *
+ * `git` is optional and its absence means "this caller does not do repositories" — not "there is no
+ * git". A caller that wants one passes `nodeGit()`; `src/main/ipc.ts` is the one that does, and
+ * `test/isolation.test.ts` pins it there, because a scaffold silently losing its port would show up
+ * as marketplaces that are quietly no longer repositories.
+ */
+export interface ScaffoldOptions extends MarketplaceOptions {
+  git?: GitPort;
+}
 
 // ── where an artifact goes ───────────────────────────────────────────────────────────────────
 
@@ -185,7 +205,11 @@ type Step =
   | { kind: "file"; file: string; contents: string }
   | { kind: "dir"; dir: string }
   /** Rewrite an existing JSON file. Its previous bytes are restored if a later step fails. */
-  | { kind: "patch"; file: string; patch: (json: Record<string, unknown>) => Record<string, unknown> };
+  | { kind: "patch"; file: string; patch: (json: Record<string, unknown>) => Record<string, unknown> }
+  /** `git init` in `dir`. Comes FIRST, so a failure in any later step still un-makes it. */
+  | { kind: "repo"; dir: string }
+  /** Stage and commit everything the steps above wrote. Comes LAST, for the same reason. */
+  | { kind: "commit"; dir: string; message: string; author: { name: string; email: string } };
 
 interface Applied {
   written: string[];
@@ -223,7 +247,10 @@ function mkdirTracked(dir: string, applied: Applied): void {
  * says so. Everything after it is undoable, so a permission error on the fourth write does not
  * leave the first three behind claiming success.
  */
-function apply(steps: Step[]): { ok: true; written: string[] } | { ok: false; reason: string } {
+function apply(
+  steps: Step[],
+  git?: GitPort
+): { ok: true; written: string[]; repoError: string } | { ok: false; reason: string } {
   for (const step of steps) {
     if (step.kind === "file" && fs.existsSync(step.file)) {
       return { ok: false, reason: `${step.file} already exists — nothing was written.` };
@@ -234,6 +261,11 @@ function apply(steps: Step[]): { ok: true; written: string[] } | { ok: false; re
   }
 
   const applied: Applied = { written: [], undo: [] };
+  // A git failure is reported, not thrown. The other steps are the artifact; the repository is a
+  // convenience on top of it, and a marketplace without one is exactly what a machine with no git
+  // installed gets — complete and usable. So these two steps roll back only THEMSELVES.
+  let repoError = "";
+  let undoRepo: (() => void) | null = null;
   try {
     for (const step of steps) {
       if (step.kind === "dir") {
@@ -243,14 +275,33 @@ function apply(steps: Step[]): { ok: true; written: string[] } | { ok: false; re
         fs.writeFileSync(step.file, step.contents);
         applied.written.push(step.file);
         applied.undo.push(() => fs.rmSync(step.file, { force: true }));
-      } else {
+      } else if (step.kind === "patch") {
         const before = fs.readFileSync(step.file, "utf8");
         applied.undo.push(() => fs.writeFileSync(step.file, before));
         const json = JSON.parse(before) as Record<string, unknown>;
         fs.writeFileSync(step.file, JSON.stringify(step.patch(json), null, 2) + "\n");
+      } else if (!repoError) {
+        try {
+          if (step.kind === "repo") {
+            const gitDir = git!.init(step.dir);
+            // Removing only the `.git` this call created — a pre-existing repository never gets
+            // here, because the enclosing-repo check drops both steps before `apply` runs. It goes
+            // on the shared stack too, so a LATER step failing takes the repository with it.
+            undoRepo = () => fs.rmSync(gitDir, { recursive: true, force: true });
+            applied.undo.push(undoRepo);
+          } else {
+            git!.commit(step.dir, step.message, step.author);
+          }
+        } catch (err) {
+          repoError = err instanceof Error ? err.message : String(err);
+          // An init that succeeded and a commit that did not is the half-repository this discipline
+          // exists to prevent. Undoing it now is safe to repeat: `rmSync` with `force` is idempotent,
+          // so the copy still on the stack is a no-op if a full rollback runs later.
+          undoRepo?.();
+        }
       }
     }
-    return { ok: true, written: applied.written };
+    return { ok: true, written: applied.written, repoError };
   } catch (err) {
     for (const undo of [...applied.undo].reverse()) {
       try {
@@ -261,6 +312,56 @@ function apply(steps: Step[]): { ok: true; written: string[] } | { ok: false; re
     }
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Decide, before anything runs, whether this scaffold makes a repository — and say so either way.
+ *
+ * Three of the four answers drop the git steps and none of them is a failure: no port (a caller
+ * that does not do repositories), no `git` on the machine, or a directory that already sits inside
+ * one. The last is the criterion that matters most in a monorepo: a marketplace created under a
+ * checkout must not become a nested repository nobody asked for.
+ */
+function planRepo(steps: Step[], git?: GitPort): { steps: Step[]; repo?: RepoResult } {
+  const init = steps.find((s): s is Extract<Step, { kind: "repo" }> => s.kind === "repo");
+  if (!init) return { steps };
+
+  const without = steps.filter((s) => s.kind !== "repo" && s.kind !== "commit");
+  if (!git) return { steps: without };
+
+  const availability = git.availability();
+  if (!availability.available) {
+    return {
+      steps: without,
+      repo: {
+        initialized: false,
+        root: null,
+        note: `${availability.reason} The marketplace is complete — run \`git init\` there once git is installed.`,
+      },
+    };
+  }
+
+  // Asked with `fs`, not with `git`, so the answer is the same on a machine that hasn't got it.
+  const enclosing = enclosingRepo(init.dir);
+  if (enclosing) {
+    return {
+      steps: without,
+      repo: {
+        initialized: false,
+        root: enclosing,
+        note: `Already inside the git repository at ${enclosing}, so no repository was created here.`,
+      },
+    };
+  }
+
+  return {
+    steps,
+    repo: {
+      initialized: true,
+      root: init.dir,
+      note: `Initialised a git repository and committed the scaffolded files.`,
+    },
+  };
 }
 
 // ── the artifacts themselves ─────────────────────────────────────────────────────────────────
@@ -414,6 +515,11 @@ function stepsFor(
       };
       return {
         steps: [
+          // The directory first and the repository second, so `git init` runs against something
+          // that exists and `mkdirTracked` still owns the undo for the directory itself. Then the
+          // files, then the commit — which has to be last to have anything to commit.
+          { kind: "dir", dir: target.path },
+          { kind: "repo", dir: target.path },
           {
             kind: "file",
             file: path.join(target.path, ".claude-plugin", "marketplace.json"),
@@ -425,9 +531,19 @@ function stepsFor(
             contents: `# ${target.name}\n\n${request.description.trim()}\n`,
           },
           { kind: "dir", dir: path.join(target.path, "plugins") },
+          {
+            kind: "commit",
+            dir: target.path,
+            message: `chore: scaffold the ${target.name} marketplace`,
+            author: { name: request.ownerName.trim(), email: request.ownerEmail.trim() },
+          },
         ],
+        // What is left is what the app cannot decide for the user: prose, and the two setup steps
+        // that need a host, an account and credentials. Those stay conversational deliberately —
+        // see the /create-marketplace skill.
         remaining:
-          "Enrich README.md and add a CLAUDE.md context file; set up git / private-repo and auto-update per /create-marketplace.",
+          "Enrich README.md and add a CLAUDE.md context file. Then add a git remote and push, and " +
+          "configure private-repo access and auto-update if it will not be public — see /create-marketplace.",
         needsModel: true,
       };
     }
@@ -445,7 +561,7 @@ function stepsFor(
 export function scaffoldCreate(
   projectRoot: string,
   request: CreateRequest,
-  opts: MarketplaceOptions = {}
+  opts: ScaffoldOptions = {}
 ): ScaffoldResult {
   const errors = validateCreateRequest(projectRoot, request, opts);
   if (errors.length) {
@@ -462,7 +578,8 @@ export function scaffoldCreate(
 
   const target = resolveCreateTarget(projectRoot, request, opts);
   const { steps, remaining, needsModel } = stepsFor(target, request);
-  const res = apply(steps);
+  const planned = planRepo(steps, opts.git);
+  const res = apply(planned.steps, opts.git);
 
   if (!res.ok) {
     return {
@@ -475,5 +592,25 @@ export function scaffoldCreate(
       reason: res.reason,
     };
   }
-  return { scaffolded: true, name: target.name, path: target.path, written: res.written, remaining, needsModel };
+
+  // `planRepo` said what SHOULD happen; only `apply` knows what did. A git that was present and
+  // then failed reports the failure rather than the plan, because a note claiming a repository
+  // exists when it does not is worse than no note at all.
+  const repo: RepoResult | undefined = res.repoError
+    ? {
+        initialized: false,
+        root: null,
+        note: `No repository was created — ${res.repoError} The marketplace itself is complete.`,
+      }
+    : planned.repo;
+
+  return {
+    scaffolded: true,
+    name: target.name,
+    path: target.path,
+    written: res.written,
+    remaining,
+    needsModel,
+    ...(repo ? { repo } : {}),
+  };
 }
