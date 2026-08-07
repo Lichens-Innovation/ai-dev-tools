@@ -227,10 +227,41 @@ describe("the claude bridge across the process boundary", () => {
   });
 
   it("builds the prompt in the main process, from the open project", () => {
-    // `previewClaudeRun(root, request)` — the cwd comes from main's project state, so a renderer
-    // cannot aim a run at a directory the window is not showing.
-    expect(main).toMatch(/previewClaudeRun\(root,\s*request\)/);
+    // `previewClaudeRun(root, request, …)` — the cwd comes from main's project state, so a renderer
+    // cannot aim a run at a directory the window is not showing. The third argument is capabilities
+    // main supplies, never anything off the request; the next test pins what has to be in it.
+    expect(main).toMatch(/previewClaudeRun\(root,\s*request(,|\))/);
     expect(main).toMatch(/const root = currentRoot\(\);/);
+  });
+
+  it("hands the preview a settings port, or the read disclosure quietly stops being effective", () => {
+    // The second capability this composition root supplies, next to `nodeGit()`, and it fails more
+    // quietly than that one. Resolving the settings cascade lives in the Agent SDK, which can start
+    // processes, so `claude-preview.ts` takes it as a PORT to keep its "cannot spawn" import graph
+    // (test/core/claude.test.ts). Drop this argument and nothing throws and no test in test/core/
+    // notices: the dialog simply starts saying the settings were not consulted, and a user reading
+    // "these are the directories this run can see" would be reading the app's intent rather than
+    // the configuration a run actually gets. So the wiring is asserted where it lives.
+    expect(main).toMatch(/previewClaudeRun\(root,\s*request,\s*\{\s*settings:\s*nodeSettings\(\)\s*\}\s*\)/);
+  });
+
+  it("derives the read disclosure in main — the renderer nominates no directory", () => {
+    // The same rule as the scaffold's destination path, applied to the other half of the
+    // confirmation. Every path, attribution and sentence in the read scope is built by
+    // `read-scope.ts` from a resolution main performed; the components render `preview.read` and
+    // compute nothing. A renderer that assembled its own list would be describing a run that is
+    // not the run about to happen — which is what a confirmation exists to prevent.
+    for (const file of ["src/renderer/src/components/read-scope.tsx", "src/renderer/src/components/chat-panel.tsx"]) {
+      const src = stripComments(read(file));
+      expect(src, `${file} builds paths of its own`).not.toMatch(/\bpath\.(join|resolve|relative)\(/);
+      // Rendering `read.sources[].permissions.additionalDirectories.length` is fine — that value
+      // was resolved in main. Naming a settings FILE here would not be: it would mean the renderer
+      // had decided where the configuration lives.
+      expect(src, `${file} names a settings file of its own`).not.toMatch(/settings\.(local\.)?json|\.claude\//);
+    }
+    // And the scope reaches the components as one prop, rather than being reassembled from parts.
+    expect(read("src/renderer/src/components/claude-run-dialog.tsx")).toMatch(/<ReadScope read=\{preview\.read\}/);
+    expect(read("src/renderer/src/components/chat-panel.tsx")).toMatch(/<ReadScope read=\{preview\.read\}/);
   });
 
   it("drops outstanding preview tokens when the project changes", () => {
@@ -240,7 +271,7 @@ describe("the claude bridge across the process boundary", () => {
     expect(announce).toContain("clearInvocations()");
   });
 
-  it("offers a Copy prompt identical to the prompt that would execute", () => {
+  it("offers a Copy prompt identical to the prompt that would execute", async () => {
     // The sentence exists twice on purpose. /maestro-tasks' Copy prompt is the paste-into-your-own-
     // session path and lives in the renderer; the executable one is built in the main process,
     // because the renderer must never be the source of a prompt the app will run. The cost of that
@@ -261,7 +292,7 @@ describe("the claude bridge across the process boundary", () => {
       const relativePath = path.posix.join(".claude", "maestro-tasks", filename);
       const fromRenderer = literal![1].replace("${task.relativePath}", relativePath);
       // No CLI is needed: preview returns the prompt whether or not one was found.
-      const { prompt } = previewClaudeRun(project, { kind: "maestro-task", filename });
+      const { prompt } = await previewClaudeRun(project, { kind: "maestro-task", filename });
 
       expect(fromRenderer).toBe(prompt);
     } finally {

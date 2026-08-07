@@ -173,9 +173,15 @@ export {
   previewClaudeRun,
   CLAUDE_BASE_FLAGS,
   type ClaudePreview,
+  type ClaudeReadScope,
   type ClaudeRequest,
   type ClaudeWriteTarget,
+  type PreviewOptions,
 } from "./claude-preview.js";
+
+// What a run can READ, derived from the effective settings rather than from the app's intent.
+// Pure — the resolution itself arrives as a `SettingsPort`, from `agent-sdk.js` below.
+export { buildReadScope, withinDirectory, RULE_DISPLAY_CAP, type ReadScopeInput } from "./read-scope.js";
 
 export { resolveClaudeCli, claudeSearchDirs, cliNotFoundMessage, type ClaudeCli } from "./claude-cli.js";
 
@@ -192,12 +198,16 @@ export {
 export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation, type InvocationPurpose } from "./claude-tokens.js";
 
 // The Claude Agent SDK — the steerable path to the same CLI, and the ground the session pane is
-// built on. Nothing user-facing consumes it yet; `runAgentSdkSmoke` proves a query runs in a
-// PACKAGED build, which is the only place this slice's failure modes appear. See ./agent-sdk.ts.
+// built on. `runAgentSdkSmoke` proves a query runs in a PACKAGED build, which is the only place
+// this slice's failure modes appear. `nodeSettings` is the first user-facing consumer: it resolves
+// the settings cascade for the confirmation dialog's read disclosure, and is injected as a port
+// rather than imported, so `claude-preview.ts` still cannot reach a process. See ./agent-sdk.ts.
 export {
   runAgentSdkSmoke,
   writeSmokeReceipt,
   agentChildEnv,
+  nodeSettings,
+  resolveEffectiveSettings,
   billingFrom,
   AGENT_SDK_PACKAGE,
   BILLING_ENV_VARS,

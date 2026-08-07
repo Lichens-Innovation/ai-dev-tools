@@ -30,6 +30,13 @@ has not made the boundary optional, it has removed it.
 The user should be able to grant just the one file or the whole directory, and the difference should
 be obvious in the prompt.
 
+**Add to the scope that already exists; do not build a second one.** `017` modelled readable
+directories as `ClaudeReadDirectory` in `src/core/contracts.ts`, each carrying an origin, a settings
+tier and the file it came from, and `additionalDirectories` provenance is already part of that. A
+session grant is one more origin on that list, which is also what makes it listable and revocable in
+the header without a second rendering path. Keep the provenance: "the user granted this, in this
+session" is exactly the distinction a flat list of directories destroys.
+
 Watch the other doors while you are here. The scope can also be widened by a directory-add command
 typed into the composer, by a control request from outside, and by the working directory moving.
 Hooks exist that report all three; treat them as boundary events rather than log lines.

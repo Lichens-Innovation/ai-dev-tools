@@ -446,6 +446,137 @@ export interface ClaudeWriteTarget {
   note?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// What a run can READ — the larger half of the disclosure, and the quieter one.
+//
+// Writes announce themselves: a create-* prompt names its file, and `--permission-mode acceptEdits`
+// is on screen in the argv. Reads announce nothing. File reads and searches are auto-approved by
+// the permission system and never raise a prompt, so the directory list a session is started with
+// IS the bound on what the model can see — and it is fully known before anything spawns.
+//
+// The types below exist so the confirmation can state that bound *truthfully*. The effective
+// configuration of a session is not what the app passes: it is the app's arguments merged with the
+// settings files on disk, which can add readable directories and permission rules the app never
+// chose. So the disclosure is built from a real resolution of those files (`SettingsPort`), and
+// every value carries where it came from rather than being flattened into one confident list.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A tier of Claude Code's settings cascade, in the CLI's own vocabulary.
+ *
+ * `user` (~/.claude/settings.json), `project` (.claude/settings.json, committed), `local`
+ * (.claude/settings.local.json, ignored), `managed` (the admin policy tier) and `flag` (a
+ * `--settings` file). Listed low→high precedence wherever a list of these appears.
+ */
+export type SettingsTier = "user" | "project" | "local" | "managed" | "flag";
+
+/** The permission-bearing slice of a settings file — the only part this disclosure is about. */
+export interface SettingsPermissions {
+  /** `permissions.additionalDirectories` — trees a session may read beyond its working directory. */
+  additionalDirectories: string[];
+  allow: string[];
+  deny: string[];
+  ask: string[];
+  /** `permissions.defaultMode`, or null when the tier does not set one. */
+  defaultMode: string | null;
+}
+
+/** One tier of the cascade: where its file is, and what it holds. */
+export interface SettingsSourceInfo {
+  tier: SettingsTier;
+  /** Absolute path of the file, when the tier has one on disk. Null for computed tiers. */
+  path: string | null;
+  /** Raw, as written in that file — NOT merged. Attribution is done against these. */
+  permissions: SettingsPermissions;
+}
+
+/**
+ * The effective settings a run would see, plus every tier that contributed to them.
+ *
+ * `effective` is the merge engine's own answer and is what the run actually gets; `sources` is what
+ * each file said, and is how a value in `effective` is attributed to a file. Reported separately
+ * on purpose: recomputing the merge here to work out provenance would make this a second, drifting
+ * implementation of a cascade the CLI already owns.
+ */
+export interface EffectiveSettingsSnapshot {
+  /** Low→high precedence. */
+  sources: SettingsSourceInfo[];
+  effective: SettingsPermissions;
+}
+
+/**
+ * Resolving the settings cascade — the one thing the preview cannot do for itself.
+ *
+ * A PORT for the same reason `GitPort` is one: the resolution lives in the Agent SDK, and
+ * `claude-preview.ts` must import nothing that can start a process (`test/core/claude.test.ts`
+ * walks its import graph). So `src/core/agent-sdk.ts` implements this and `src/main/ipc.ts` — the
+ * composition root — hands it over. Omitting it is not an error: the disclosure then says the
+ * settings files were not consulted, which is honest, rather than listing the app's intent as
+ * though it were the effective configuration.
+ */
+export interface SettingsPort {
+  /** Resolve the cascade as it applies to a run in `cwd`. Never spawns the `claude` CLI. */
+  resolve(cwd: string): Promise<EffectiveSettingsSnapshot>;
+}
+
+/** Where a readable directory came from: the run's own working directory, or a settings file. */
+export type ReadScopeOrigin = "cwd" | "settings";
+
+/** A tree the run can read. Everything under it, with no prompt at any point. */
+export interface ClaudeReadDirectory {
+  /** Absolute path. */
+  path: string;
+  origin: ReadScopeOrigin;
+  /** Which tier put it in scope. Null for the working directory, which the app chose. */
+  tier: SettingsTier | null;
+  /** The settings file it came from, when there is one. */
+  file: string | null;
+  /** Why it is readable, in a sentence the dialog renders verbatim. */
+  note: string;
+}
+
+/** One permission rule the effective settings carry, and which file it came from. */
+export interface ClaudePermissionRule {
+  list: "allow" | "deny" | "ask";
+  /** The rule as written, e.g. `Bash(git push:*)`. */
+  rule: string;
+  /** Null when the rule is in the merged result but in none of the files that were read. */
+  tier: SettingsTier | null;
+  file: string | null;
+}
+
+/**
+ * Everything the confirmation says about what a run may SEE, as opposed to change.
+ *
+ * `summary` is derived here rather than in the renderer for the same reason every path is: the
+ * renderer must not be the thing that decides what the user is told about a run.
+ */
+export interface ClaudeReadScope {
+  /** Every tree in scope, working directory first. */
+  directories: ClaudeReadDirectory[];
+  /** The project the window has open. "" when there is none. */
+  projectRoot: string;
+  /** The open project is inside one of `directories` — the run can see what the user is looking at. */
+  projectReadable: boolean;
+  /** Write targets that sit outside every readable tree: the run writes where it cannot look. */
+  writesOutsideReadScope: string[];
+  /** Plain-English account of the read/write relationship. Rendered verbatim. */
+  summary: string;
+  /** Permission rules in the EFFECTIVE settings. The app itself passes none. */
+  rules: ClaudePermissionRule[];
+  /** Rules beyond the cap, counted rather than listed — a wall of text is not a disclosure. */
+  rulesOmitted: number;
+  /** Every tier consulted, low→high, with its file and its raw contribution. */
+  sources: SettingsSourceInfo[];
+  /** The merged `permissions.defaultMode` and where it came from, after the CLI's trust filter. */
+  defaultMode: { mode: string; tier: SettingsTier | null } | null;
+  /**
+   * Set when the cascade could not be resolved: the list is then the app's own intent and nothing
+   * more. Never left null to mean "there was nothing" — the two are different answers.
+   */
+  unresolved: string | null;
+}
+
 /**
  * Everything the confirmation modal needs, and the token that makes the run possible.
  *
@@ -467,6 +598,13 @@ export interface ClaudePreview {
   argv: string[];
   cwd: string;
   targets: ClaudeWriteTarget[];
+  /**
+   * What the run can read — the other half of `targets`, and the bigger one.
+   *
+   * Never optional. A preview without it would be a confirmation that silently says nothing about
+   * the largest thing it is granting, which is precisely the state this field exists to end.
+   */
+  read: ClaudeReadScope;
   available: boolean;
   /** Absolute path of the resolved CLI, or null. */
   bin: string | null;

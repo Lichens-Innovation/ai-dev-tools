@@ -36,8 +36,11 @@ utils/create-flow.tsx  — the submit path all four routes share
         └─2─▶ only when needsModel:
               window.maestro.claude.preview(request)      IPC `claude:preview`
                 → builds the prompt (prose, never a slash command), resolves the argv,
-                  the cwd, and the files it may write; returns a TOKEN. Spawns nothing.
-              ClaudeRunDialog shows the full prompt, exact argv, cwd, targets
+                  the cwd, and the files it may write; resolves the EFFECTIVE settings
+                  for that cwd through an injected SettingsPort and derives what the
+                  run can READ; returns a TOKEN. Async. Spawns nothing.
+              ClaudeRunDialog shows what it can read, then the full prompt,
+                exact argv, cwd, targets
                 → Copy prompt / Cancel / Run
               window.maestro.claude.run(token)            IPC `claude:run`
                 → streams stdout/stderr; `claude:cancel` kills the child's process group
@@ -68,6 +71,7 @@ Renderer paths are relative to `apps/maestro/`.
 | The scaffold → preview → dialog path, shared by all four      | `src/renderer/src/utils/create-flow.tsx`                                                                         |
 | What landed on disk, plus **Finish with Claude**              | `src/renderer/src/components/create-result.tsx`                                                                  |
 | The confirmation: prompt, argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx`                                                              |
+| "What it can read" — ONE component, both confirmations        | `src/renderer/src/components/read-scope.tsx`                                                                     |
 | Live file preview components                                  | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
 | The typed channel contract                                    | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`)       |
 | Main-process handlers                                         | `src/main/ipc.ts`                                                                                                |
@@ -76,6 +80,8 @@ Renderer paths are relative to `apps/maestro/`.
 | "Is this inside a repository?", answered with `fs`            | `repo.ts` in `apps/maestro/src/core/`, with no `child_process`                                                   |
 | Where the `GitPort` is supplied - the composition root        | `src/main/ipc.ts`, `scaffoldCreate(root, request, { git: nodeGit() })`                                           |
 | Prompt + argv + cwd construction, and the token               | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/`                                              |
+| Deriving the read scope from a settings snapshot (pure)       | `read-scope.ts` in `apps/maestro/src/core/`                                                                      |
+| Resolving the settings cascade — the `SettingsPort`           | `agent-sdk.ts` in `apps/maestro/src/core/` (`nodeSettings()`), injected at `src/main/ipc.ts`                     |
 | Spawn, stream, cancel, dispose                                | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/`                                                     |
 | Marketplace discovery for the selectors                       | `marketplaces.ts` in `apps/maestro/src/core/`                                                                    |
 | `buildDesc` and friends — ONE implementation                  | `text.ts` in `apps/maestro/src/core/`                                                                            |
@@ -210,6 +216,19 @@ Three rules hold it together:
   are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
   nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path,
   and the dialog shows it.
+- **The settings are resolved against the RUN's cwd, not the open project** — the same asymmetry, one
+  layer down. A marketplace-targeted create run picks up the _marketplace's_ `.claude/settings.json`,
+  so its readable directories and permission rules can be nothing like the open project's. Resolving
+  against `projectRoot` "because that is the project" produces a disclosure that is confidently
+  describing the wrong tree. Verified in the window, not inferred.
+- **The settings resolution is a port, not an import — same reason as `GitPort`.** `SettingsPort` is
+  an interface in `contracts.ts`, `nodeSettings()` implements it in `src/core/agent-sdk.ts`, and
+  `src/main/ipc.ts` injects it. `claude-preview.ts` may import nothing that can start a process, and
+  the SDK shells out to `plutil`/`reg.exe` for MDM policy — one `child_process` in that graph costs
+  the guarantee `test/core/claude.test.ts` exists to prove. This makes `previewClaudeRun` **async**:
+  every caller must `await`. And dropping the injection is not an error — the preview falls back to
+  "the settings were not consulted", which is a true sentence nobody reads, so `test/isolation.test.ts`
+  pins the wiring. Never reimplement the cascade: the SDK's `resolveSettings` is the merge engine.
 - **Preview tokens are dropped on a project switch.** A token names the outgoing project's cwd, so a
   modal left open across a switch would otherwise still have a live token and **Run** would spawn
   Claude against the repo the window has moved off.

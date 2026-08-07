@@ -78,6 +78,8 @@ second.
 | `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                                 |
 | `claude-tokens.ts`                      | The single-use, expiring, purpose-tagged authorisation between preview and run         |
 | `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued                |
+| `read-scope.ts`                         | What a run can **read**, derived from a settings snapshot. Pure — no `fs`, no spawn    |
+| `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, smoke query, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
 | `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
@@ -337,14 +339,17 @@ Three rules hold it together, and each exists for a reason that is not obvious f
 The app can run Claude on the user's behalf, and asks first. Three channels:
 
 ```
-claude:preview  → { prompt, argv, cwd, targets, available, searched, token }   // spawns nothing
-claude:run      → streams stdout/stderr, resolves with the outcome             // token only
+claude:preview  → { prompt, argv, cwd, targets, read, available, searched, token }  // spawns nothing
+claude:run      → streams stdout/stderr, resolves with the outcome                  // token only
 claude:cancel   → kills the child's process group
 ```
 
-`ClaudeRunDialog` is the user-facing half: full prompt (scrollable, selectable — never a summary),
-exact argv, working directory, what may be written, then Copy prompt / Cancel / Run, then streamed
-output with a Stop. See `src/core/claude-preview.ts` and `src/core/claude-run.ts` for why preview
+`ClaudeRunDialog` is the user-facing half: what may be **read**, then full prompt (scrollable,
+selectable — never a summary), exact argv, working directory, what may be written, then Copy prompt
+/ Cancel / Run, then streamed output with a Stop. The whole body is **one** scroll region: with four
+sections, per-section shrink-to-fit squeezed the prompt `<pre>` to a sliver and let the read section
+render over the top of it — invisible to every test that is not a screenshot, so a rect-overlap
+assertion in the window probe pins it. See `src/core/claude-preview.ts` and `src/core/claude-run.ts` for why preview
 and run are two operations and what breaks if they become one. Everything a route needs is `window.maestro.claude.preview(request)`
 plus rendering `<ClaudeRunDialog>` with the result — a route that shells out on its own has opted
 out of the confirmation, which is the whole point.
@@ -353,6 +358,33 @@ Tokens carry a **purpose** (`claude-tokens.ts`). The usage-stats reader below sh
 one expiry rule, one single-use rule, one place to clear on a project switch — but not its tokens:
 without the tag, a stats preview would hand the renderer something `claude:run` would claim, and
 the app would spawn `npx` while every message on screen said Claude.
+
+### What a run can read — the `SettingsPort`
+
+Reads are the larger surface: file reads and searches are auto-approved and never raise a prompt, so
+the directory list handed over at spawn is the whole bound on what the model can see. The preview
+carries a `ClaudeReadScope`, built by `src/core/read-scope.ts` and rendered by **one** component,
+`renderer/src/components/read-scope.tsx` — used by `ClaudeRunDialog` and by the chat's inline
+`ConfirmCard` (`compact` changes the type scale, never the content).
+
+- **The resolution is a port, not an import** — exactly like `GitPort`. `SettingsPort` is an
+  interface in `contracts.ts`, `nodeSettings()` implements it in `agent-sdk.ts`, and `src/main/ipc.ts`
+  is the composition root that passes `{ settings: nodeSettings() }`. `claude-preview.ts` must import
+  nothing that can start a process (the SDK shells out to `plutil`/`reg.exe` for MDM policy) and
+  `test/core/claude.test.ts` walks its import graph. Dropping the wiring fails **silently** — the
+  dialog just starts saying the settings were not consulted — so `test/isolation.test.ts` pins it.
+- **`previewClaudeRun` is `async`** because of this. Every caller must `await`.
+- **The cascade is never reimplemented.** The SDK's `resolveSettings` is the merge engine;
+  re-deriving it here would be a second reader of someone else's format — the same argument as the
+  ccusage decision below.
+- **Provenance is never flattened.** Every directory and rule carries its tier and its file. "These
+  are the directories" is not the disclosure; "the app chose this one, a file on disk added those"
+  is. `RULE_DISPLAY_CAP` lists the first 40 rules and counts the rest.
+- **Unresolved ≠ empty.** If the cascade cannot be read the preview does not fail: it lists the cwd
+  and sets `unresolved`, because a scope that quietly reported only the cwd reads as a complete
+  answer.
+- **Resolved against the RUN's cwd, not the open project.** Verified in the window: a
+  marketplace-targeted create run picks up the *marketplace's* `.claude/settings.json`.
 
 ### The help chat is a bridge consumer, not a second spawn path
 
@@ -490,6 +522,18 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   (`CLAUDE_CODE_USE_BEDROCK` and friends) left alone but reported. `settingSources: []` closes the
   second door, a key in `~/.claude/settings.json`, which would override the environment anyway.
   `test/core/agent-sdk.test.ts` pins both halves.
+- **`settingSources` means two different things in `agent-sdk.ts`, and both are deliberate.** The
+  smoke query passes `[]` so nothing on disk can redirect billing. `resolveEffectiveSettings(cwd)`
+  leaves it **unset**, which loads every tier — because it is describing what a `claude -p` run
+  actually gets, and a disclosure that read a narrower cascade than the run would be wrong in exactly
+  the cases that matter. `defaultMode` there goes through the SDK's `filterEscalatingDefaultMode`,
+  since the raw cascade reports an escalating mode from a repo-committed file as though it applied.
+  If a future slice changes how a run is configured, this resolution has to change with it or the
+  confirmation quietly starts describing a session that no longer exists.
+- **The Agent SDK is now user-facing.** `nodeSettings()` backs the read disclosure in both
+  confirmations, so `agent-sdk.ts` is no longer a module whose only consumer is a smoke test — but it
+  is still the **only** module in the app that imports the SDK, and everything else reaches it
+  through the `SettingsPort` interface in `contracts.ts`.
 - **Project switches invalidate the router.** Every route loader reads the _current_ project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.

@@ -6,7 +6,17 @@
 // by launching the packaged app (see `runAgentSdkSmoke` and apps/maestro/CLAUDE.md).
 
 import { describe, it, expect } from "vitest";
-import { agentChildEnv, billingFrom, BILLING_ENV_VARS, AGENT_SDK_PACKAGE } from "../../src/core/agent-sdk.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  agentChildEnv,
+  billingFrom,
+  nodeSettings,
+  resolveEffectiveSettings,
+  BILLING_ENV_VARS,
+  AGENT_SDK_PACKAGE,
+} from "../../src/core/agent-sdk.js";
 
 const HOME = "/home/tester";
 
@@ -88,5 +98,43 @@ describe("the package name", () => {
     // The one that takes an API key and bills pay-as-you-go is `@anthropic-ai/sdk`. One path
     // segment apart, both install cleanly, and the wrong one defeats the entire point.
     expect(AGENT_SDK_PACKAGE).toBe("@anthropic-ai/claude-agent-sdk");
+  });
+});
+
+describe("the settings cascade", () => {
+  // The one test here that touches the real SDK, and it is worth the exception: every failure mode
+  // of this call — a renamed export, a changed `sources` shape, an `alpha` API withdrawn — degrades
+  // to `unresolved` in the UI rather than throwing anywhere a suite would notice. The dialog would
+  // go on rendering, and go on quietly saying the settings were not consulted.
+  //
+  // It resolves the DEVELOPER's own settings, because `resolveSettings` has no home override. So
+  // nothing is asserted about the values: only that the resolution runs, and that this module's
+  // mapping of it produces the shape `read-scope.ts` consumes.
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "settings-scope-"));
+
+  it("resolves without spawning the CLI, and maps to the disclosure's shape", async () => {
+    const snapshot = await resolveEffectiveSettings(cwd);
+
+    expect(Array.isArray(snapshot.sources)).toBe(true);
+    for (const source of snapshot.sources) {
+      expect(["user", "project", "local", "managed", "flag"]).toContain(source.tier);
+      expect(source.path === null || typeof source.path === "string").toBe(true);
+      // Absent lists are normalised to empty ones. `read-scope.ts` iterates these unguarded, and a
+      // settings file with no `permissions` block is the ordinary case, not the exotic one.
+      for (const list of ["additionalDirectories", "allow", "deny", "ask"] as const) {
+        expect(Array.isArray(source.permissions[list]), `${source.tier}.${list}`).toBe(true);
+      }
+    }
+
+    for (const list of ["additionalDirectories", "allow", "deny", "ask"] as const) {
+      expect(Array.isArray(snapshot.effective[list]), list).toBe(true);
+    }
+    expect(snapshot.effective.defaultMode === null || typeof snapshot.effective.defaultMode === "string").toBe(true);
+  });
+
+  it("is what the port hands over, so the composition root supplies no second implementation", async () => {
+    const port = nodeSettings();
+    const direct = await resolveEffectiveSettings(cwd);
+    expect(await port.resolve(cwd)).toEqual(direct);
   });
 });

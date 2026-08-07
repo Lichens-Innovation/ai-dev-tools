@@ -21,13 +21,35 @@ import fs from "node:fs";
 import path from "node:path";
 import { cliNotFoundMessage, resolveClaudeCli, type ResolveOptions } from "./claude-cli.js";
 import { issueInvocation } from "./claude-tokens.js";
+import { buildReadScope } from "./read-scope.js";
 import { enclosingRepo } from "./repo.js";
 import { resolveCreateTarget } from "./scaffold.js";
 import { tasksDirFor } from "./tasks.js";
 import { joinOxford } from "./text.js";
-import type { ChatTurn, ClaudePreview, ClaudeRequest, ClaudeWriteTarget, CreateRequest } from "./contracts.js";
+import type {
+  ChatTurn,
+  ClaudePreview,
+  ClaudeReadScope,
+  ClaudeRequest,
+  ClaudeWriteTarget,
+  CreateRequest,
+  SettingsPort,
+} from "./contracts.js";
 
-export type { ClaudePreview, ClaudeRequest, ClaudeWriteTarget };
+export type { ClaudePreview, ClaudeReadScope, ClaudeRequest, ClaudeWriteTarget };
+
+/**
+ * What the preview needs beyond the CLI resolution options.
+ *
+ * `settings` is a PORT, not an import, and the reason is the box at the top of this file: resolving
+ * the cascade lives in the Agent SDK, which can start processes. Handed in, it cannot appear in
+ * this module's import graph. Left out — which is what every test in `test/core/` does unless it is
+ * testing this specifically — the disclosure says the settings were not consulted rather than
+ * quietly presenting the app's own intent as the effective configuration.
+ */
+export interface PreviewOptions extends ResolveOptions {
+  settings?: SettingsPort;
+}
 
 /**
  * Flags an authoring invocation carries, before the prompt.
@@ -291,16 +313,57 @@ function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions
 }
 
 /**
+ * What the run will be able to READ, resolved rather than assumed.
+ *
+ * Never throws. A cascade that cannot be resolved — no port supplied, an SDK that failed to load,
+ * an unreadable settings file — still produces a scope naming the working directory, with
+ * `unresolved` saying why the rest is unknown. The alternative, failing the whole preview, would
+ * cost the user the prompt and the Copy-prompt fallback over a disclosure detail; the alternative
+ * of silently reporting only the cwd would be worse still, since it reads as a complete answer.
+ */
+async function readScopeFor(
+  projectRoot: string,
+  cwd: string,
+  targets: ClaudeWriteTarget[],
+  settings: SettingsPort | undefined
+): Promise<ClaudeReadScope> {
+  if (!settings) {
+    return buildReadScope({
+      projectRoot,
+      cwd,
+      targets,
+      settings: null,
+      unresolved: "The settings files on disk were not consulted for this preview.",
+    });
+  }
+  try {
+    return buildReadScope({ projectRoot, cwd, targets, settings: await settings.resolve(cwd) });
+  } catch (err) {
+    return buildReadScope({
+      projectRoot,
+      cwd,
+      targets,
+      settings: null,
+      unresolved: `The settings files on disk could not be read: ${err instanceof Error ? err.message : String(err)}.`,
+    });
+  }
+}
+
+/**
  * Build the invocation the confirmation modal shows, and authorise it.
  *
- * Pure with respect to the machine: it reads the project to build the prompt and reads directories
- * to find the CLI, and writes nothing anywhere.
+ * Pure with respect to the machine: it reads the project to build the prompt, reads directories to
+ * find the CLI, and reads the settings cascade through the injected port. It writes nothing
+ * anywhere and — the property the box at the top of this file is about — it cannot spawn.
+ *
+ * Async because of that last read. The cascade is genuinely on disk and genuinely worth waiting
+ * for: the confirmation's claim about what a run can see is only true if something actually looked.
  */
-export function previewClaudeRun(
+export async function previewClaudeRun(
   projectRoot: string,
   request: ClaudeRequest,
-  opts: ResolveOptions = {}
-): ClaudePreview {
+  opts: PreviewOptions = {}
+): Promise<ClaudePreview> {
   if (!projectRoot) throw new Error("No project is open.");
   const built = build(projectRoot, request, opts);
   const { prompt, targets } = built;
@@ -308,6 +371,9 @@ export function previewClaudeRun(
   // marketplace repo runs there, so its edits are inside the CLI's working directory.
   const cwd = built.cwd ?? projectRoot;
   const cli = resolveClaudeCli(opts);
+  // Resolved against the run's OWN cwd, not the open project: project-tier settings are read
+  // relative to where the session starts, and for a create-* flow that is the marketplace.
+  const read = await readScopeFor(projectRoot, cwd, targets, opts.settings);
 
   // argv[0] is the resolved path rather than the bare name, so what the modal shows is the exact
   // executable that will run — "claude" would be a claim about PATH resolution the user cannot check.
@@ -316,13 +382,15 @@ export function previewClaudeRun(
 
   if (!cli.available) {
     // No token: there is nothing runnable to authorise. The prompt and argv are still returned in
-    // full — Copy prompt is the whole fallback, and it must work in exactly this state.
+    // full — Copy prompt is the whole fallback, and it must work in exactly this state. The read
+    // scope comes too: a user about to paste this into their own session is about to grant it.
     return {
       token: null,
       prompt,
       argv,
       cwd,
       targets,
+      read,
       available: false,
       bin: null,
       searched: cli.searched,
@@ -338,6 +406,7 @@ export function previewClaudeRun(
     argv,
     cwd,
     targets,
+    read,
     available: true,
     bin: cli.bin,
     searched: cli.searched,

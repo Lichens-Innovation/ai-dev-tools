@@ -20,6 +20,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, MessageCircle, Play, Send, Square, Terminal, Trash2, X } from "lucide-react";
 import SlidePanel from "@repo/ui/slide-panel";
 import CopyableText from "@repo/ui/copyable-text";
+import ReadScope from "./read-scope";
 import { useChat, type ChatMessage, type PendingChatRun } from "../utils/chat-context";
 import { useProject } from "../utils/project-context";
 
@@ -258,10 +259,17 @@ function ConfirmCard({ pending, onRun, onCancel }: { pending: PendingChatRun; on
         `targets` is empty for a chat, and that is a fact about the invocation rather than a hope:
         the run carries `-p` without `--permission-mode acceptEdits`, so an edit in print mode has
         nobody to ask and does not happen. Said in words, because an empty list says nothing.
+
+        Reading is the other half of that sentence, and used to be the missing half: "not given
+        permission to edit files" was true and, on its own, misleading — the question is answered by
+        a session that can read the whole project without ever prompting. The scope below says which
+        tree that is, in the same terms the create-* confirmation uses.
       */}
       <p className="m-0 text-[10px] text-(--ink-3)">
-        This run answers a question. It is not given permission to edit files.
+        This run answers a question. It is not given permission to edit files — but it can read everything listed below.
       </p>
+
+      <ReadScope read={preview.read} compact />
 
       {!preview.available && (
         <div

@@ -8,9 +8,16 @@
 // Same trap in the repos: `anthropics/claude-agent-sdk-typescript` is this SDK,
 // `anthropics/anthropic-sdk-typescript` is not.
 //
-// Nothing here is user-facing yet. `runAgentSdkSmoke` exists to prove, on the machine the app is
-// actually installed on, that a query runs at all — see SESSION-PANE-PLAN.md, of which this is the
-// first slice.
+// Two things live here, and only one of them can start anything. `runAgentSdkSmoke` exists to
+// prove, on the machine the app is actually installed on, that a query runs at all — see
+// SESSION-PANE-PLAN.md, of which this is the first slice. `nodeSettings()` is the other, and is
+// user-facing: it resolves the effective settings cascade so the confirmation dialog can state what
+// a run will actually be able to read. It spawns no CLI (see its own comment) and is handed to the
+// preview as a PORT, because the preview may not import this module.
+//
+// This is also the only module in the app that imports the SDK, and `test/isolation.test.ts` pins
+// that: the SDK is a second path to the `claude` binary, and the options it is given decide the
+// permission model of everything built on it.
 //
 // ┌─ THREE THINGS THAT ONLY FAIL IN A PACKAGED BUILD ──────────────────────────────────────────┐
 // │                                                                                             │
@@ -49,6 +56,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
+import type {
+  EffectiveSettingsSnapshot,
+  SettingsPermissions,
+  SettingsPort,
+  SettingsSourceInfo,
+  SettingsTier,
+} from "./contracts.js";
 
 /** The one correct package name, in one place, so a typo is a diff rather than a silent downgrade. */
 export const AGENT_SDK_PACKAGE = "@anthropic-ai/claude-agent-sdk";
@@ -345,4 +359,83 @@ export async function runAgentSdkSmoke(opts: SmokeOptions = {}): Promise<AgentSd
 export function writeSmokeReceipt(file: string, result: AgentSdkSmokeResult): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The settings cascade — what a run will ACTUALLY be configured with.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The shape of a `permissions` block, normalised. Absent lists become empty ones, never undefined. */
+function permissionsOf(settings: { permissions?: Record<string, unknown> } | undefined): SettingsPermissions {
+  const p = settings?.permissions ?? {};
+  const list = (key: string): string[] => (Array.isArray(p[key]) ? (p[key] as unknown[]).map(String) : []);
+  const mode = p.defaultMode;
+  return {
+    additionalDirectories: list("additionalDirectories"),
+    allow: list("allow"),
+    deny: list("deny"),
+    ask: list("ask"),
+    defaultMode: typeof mode === "string" ? mode : null,
+  };
+}
+
+/** The SDK's `ResolvedSettingSource` is our `SettingsTier` — asserted rather than assumed. */
+function tierOf(source: string): SettingsTier | null {
+  return source === "user" || source === "project" || source === "local" || source === "managed" || source === "flag"
+    ? source
+    : null;
+}
+
+/**
+ * Resolve the settings a run in `cwd` would actually see, through the CLI's own merge engine.
+ *
+ * `resolveSettings` is the reason this disclosure can claim to be true rather than plausible. The
+ * alternative was to read `~/.claude/settings.json` and the project's two files here and merge them
+ * ourselves — a second implementation of a cascade the CLI owns, drifting silently the first time
+ * a tier or a precedence rule changes. Same argument as `ccusage`: do not become a second reader of
+ * someone else's format.
+ *
+ * Three things about the call are deliberate:
+ *
+ *   • **`settingSources` is left unset**, which loads all of them. That is what a `claude -p` run
+ *     gets, so it is what the disclosure has to describe. (The smoke query above passes `[]` for
+ *     the opposite reason — it must be configured by nothing on disk.) Reporting a narrower
+ *     resolution than the run will use would be a comfortable lie.
+ *   • **`defaultMode` goes through `filterEscalatingDefaultMode`.** The raw cascade reports an
+ *     escalating mode from a repo-committed file as though it applied; the CLI does not honour it
+ *     without a trust check. Reporting the unfiltered value would overstate what a run can do.
+ *   • **It spawns no `claude`.** It may shell out to `plutil`/`reg.exe` on a machine with MDM
+ *     policy — which is why this lives in `agent-sdk.ts` behind a port, and not somewhere
+ *     `claude-preview.ts` can import.
+ */
+export async function resolveEffectiveSettings(cwd: string): Promise<EffectiveSettingsSnapshot> {
+  // Literal specifier, not AGENT_SDK_PACKAGE — see the note at the query above.
+  const { resolveSettings, filterEscalatingDefaultMode } = await import("@anthropic-ai/claude-agent-sdk");
+  const resolved = await resolveSettings({ cwd });
+
+  const sources: SettingsSourceInfo[] = [];
+  for (const entry of resolved.sources) {
+    const tier = tierOf(entry.source);
+    if (!tier) continue;
+    sources.push({ tier, path: entry.path ?? null, permissions: permissionsOf(entry.settings) });
+  }
+
+  return {
+    sources,
+    effective: {
+      ...permissionsOf(resolved.effective),
+      defaultMode: permissionsOf(filterEscalatingDefaultMode(resolved)).defaultMode,
+    },
+  };
+}
+
+/**
+ * The `SettingsPort` the composition root hands to the preview.
+ *
+ * A one-line factory rather than the function itself, so that what `src/main/ipc.ts` passes reads
+ * the same as `nodeGit()` beside it: a capability being supplied, at the one place in the app that
+ * is allowed to supply capabilities.
+ */
+export function nodeSettings(): SettingsPort {
+  return { resolve: (cwd) => resolveEffectiveSettings(cwd) };
 }
