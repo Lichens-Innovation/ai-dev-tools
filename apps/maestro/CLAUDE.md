@@ -418,6 +418,41 @@ never opens this tab should not carry it.
   `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`. The node-side Maestro
   logic used to be a second such package; it is `src/core/` now, ordinary app source that gets
   bundled without anyone having to ask.
+- **`externalizeDepsPlugin` does not externalize anything here, and the app's runtime
+  `dependencies` are externalized by hand.** The plugin computes its list from package.json
+  `dependencies` and then assigns `config.build` from inside the `config` hook — the same vite 8 /
+  electron-vite 4 breakage already documented in that file for its `include` option, and it costs
+  the whole plugin. This was invisible for as long as the app had **no `dependencies` block at
+  all** (every entry was a devDependency), because an empty external list and an ignored one look
+  identical. Measured when the first real dependency arrived: `@anthropic-ai/claude-agent-sdk` in
+  `dependencies` and only the plugin to externalize it put **1.34 MB of SDK into
+  `out/main/chunks/`**. `EXTERNAL` in `electron.vite.config.ts` now derives from the manifest and
+  goes into `rollupOptions.external`, where it actually takes effect — including a regex for
+  subpath imports, which a bare package name does not cover. The plugin call stays because it is
+  harmless and correct in intent; it is simply not what is doing the work.
+- **The Agent SDK resolves a CLI on disk, so bundling it breaks it — and asar is the second half.**
+  `@anthropic-ai/claude-agent-sdk` (see `src/core/agent-sdk.ts`) is a real runtime dependency: it
+  spawns the `claude` binary the user is logged into. Inlined into the bundle, its own
+  `require.resolve` runs against `out/main/` and throws `Native CLI binary for <platform> not
+found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not sufficient. A
+  packaged app also needs `asar: { unpack: "**/node_modules/@anthropic-ai/**" }` plus rewriting
+  `app.asar` → `app.asar.unpacked` on the resolved path — the single most reported
+  Agent-SDK-in-Electron failure. It is **not actionable yet**: there is no electron-builder config
+  in this repo, so there is nowhere to write it. The smoke receipt's `sdkVersion` is the tell —
+  `null` means the package could not be resolved at runtime, which is what that failure looks like.
+- **The SDK is handed the resolved CLI path; left alone it spawns `node`.** Its default resolution
+  runs a bundled `cli.js` through a JS runtime, and a GUI-launched Electron app has a PATH with no
+  `node` on it — `spawn node ENOENT`, and it never reproduces from a terminal. So
+  `pathToClaudeCodeExecutable` gets `resolveClaudeCli().bin`, which `claude-cli.ts` decides with
+  `fs`. Same bug the app already fixed once for `claude -p`; the SDK is a second place to
+  re-acquire it.
+- **The SDK's `env` option REPLACES the child environment rather than merging it.** So the naive
+  way to withhold an `ANTHROPIC_API_KEY` — which would silently bill the API instead of the user's
+  subscription — also drops `PATH`, and the CLI shells out to git and to hooks. `agentChildEnv()`
+  builds it in full: credentials deleted, expanded PATH set, provider variables
+  (`CLAUDE_CODE_USE_BEDROCK` and friends) left alone but reported. `settingSources: []` closes the
+  second door, a key in `~/.claude/settings.json`, which would override the environment anyway.
+  `test/core/agent-sdk.test.ts` pins both halves.
 - **Project switches invalidate the router.** Every route loader reads the _current_ project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.
@@ -625,3 +660,30 @@ exposed to the renderer, so a probe can switch projects without the native folde
 
 Use `electron .` rather than `pnpm start`, and never `dev`: `dev` serves the renderer over
 `http://localhost:5173` and skips the `file://` path that ships.
+
+### Checking the Agent SDK from a real launch
+
+The SDK's failure modes are packaging failures — a bundled SDK, an unresolvable CLI, a PATH a
+terminal would never hand you — so no vitest run and no CDP probe of the renderer can see them.
+`MAESTRO_AGENT_SDK_SMOKE` runs one query from main at startup and leaves a JSON receipt:
+
+```bash
+# dev
+MAESTRO_AGENT_SDK_SMOKE=/tmp/dev-smoke.json pnpm --filter maestro dev
+
+# the packaged bundle, with the PATH a GUI launch actually gets (no ~/.local/bin, no shell rc)
+env -i HOME="$HOME" DISPLAY=:0 WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/$(id -u) \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus" PATH=/usr/local/bin:/usr/bin:/bin \
+  MAESTRO_AGENT_SDK_SMOKE=/tmp/packaged-smoke.json \
+  node_modules/.pnpm/electron@*/node_modules/electron/dist/electron apps/maestro \
+  --user-data-dir=/tmp/maestro-smoke
+
+# and from a real desktop entry, which is the launch the PATH bug only reproduces from
+gio launch /path/to/maestro-smoke.desktop     # Exec=env MAESTRO_AGENT_SDK_SMOKE=… <electron> <appdir>
+```
+
+Read the receipt rather than the exit code. `ok`, `billing: "subscription"` (an `api-key` here
+means a credential got through), `bin` (should be the resolved `~/.local/bin/claude`, not a guess),
+`env.dropped`/`env.hasPath`, and `sdkVersion` — `null` there means the package could not be
+resolved at runtime, which is the asar failure above. Unset, the variable runs nothing; the app
+spawns nothing on a normal launch.

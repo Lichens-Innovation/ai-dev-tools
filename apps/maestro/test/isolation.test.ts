@@ -269,21 +269,31 @@ describe("the claude bridge across the process boundary", () => {
     }
   });
 
-  it("has exactly one path from the app to the `claude` binary, and it cannot spawn", () => {
+  it("keeps the paths from the app to the `claude` binary to a reviewed list", () => {
     // THE ACCEPTANCE CRITERION FOR THE WHOLE MERGE, asserted where it regresses silently.
     //
     // help-server shipped a second spawn path — `execFile("claude", ["-p", prompt, …])` in a
     // server function, per chat message, with no preview and no confirmation. Nothing failed when
     // it existed; the app simply ran prompts the user had not seen. The defence is structural:
-    // `resolveClaudeCli` is the only thing in the app that produces a path to the CLI, so as long
-    // as exactly one module calls it, and that module provably cannot start a process
-    // (test/core/claude.test.ts walks its import graph), there is no second way to reach `claude`.
+    // `resolveClaudeCli` is the only thing in the app that produces a path to the CLI, so the list
+    // of modules that call it IS the list of ways to reach `claude`, and it is short enough to read.
     // `(?<!function\s)` so the module that DECLARES it isn't counted as a caller of itself.
+    //
+    // It was one module until the Agent SDK arrived, and the second entry is a real widening rather
+    // than a formality: `agent-sdk.ts` hands that path to a library that spawns it, where
+    // `claude-preview.ts` provably cannot spawn at all (test/core/claude.test.ts walks its import
+    // graph). What holds the guarantee up for now is that nothing user-facing calls into the SDK —
+    // its one entry point is an env-gated startup diagnostic. Task 018 moves `claude-run.ts` onto
+    // the SDK behind the same preview token, at which point this list should NARROW again, not grow.
     const callers = sourcesUnder("src/core")
       .concat(sourcesUnder("src/main"))
       .filter((f) => /(?<!function\s)\bresolveClaudeCli\s*\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
-      .map((f) => path.relative(appRoot, f));
-    expect(callers, "something other than preview resolves the claude CLI").toEqual(["src/core/claude-preview.ts"]);
+      .map((f) => path.relative(appRoot, f))
+      .sort();
+    expect(callers, "something unreviewed resolves the claude CLI").toEqual([
+      "src/core/agent-sdk.ts", //       the Agent SDK — hands the path over, never a PATH lookup
+      "src/core/claude-preview.ts", //  the `claude -p` bridge — cannot spawn
+    ]);
   });
 
   it("spawns only from modules that claim a preview token, one purpose each", () => {
@@ -547,6 +557,80 @@ describe("saving refreshes loader data", () => {
       expect(invalidate).toBeGreaterThan(bail);
     });
   }
+});
+
+describe("the Claude Agent SDK is a dependency, not a bundle", () => {
+  // Everything here fails ONLY in a packaged build. A `dev` run resolves the SDK out of
+  // node_modules whatever the bundler did with it, so the entire failure class is invisible until
+  // the app is installed somewhere — which is the reason for asserting it at this level.
+  const manifest = JSON.parse(read("package.json"));
+  const config = read("electron.vite.config.ts");
+  const SDK = "@anthropic-ai/claude-agent-sdk";
+
+  it("is in `dependencies`, which is where externalizeDepsPlugin looks", () => {
+    // The plugin derives its externals from `dependencies`. Before this arrived the app had NO
+    // dependencies block — every entry was a devDependency — so an SDK added in the obvious place
+    // would have been bundled, and its runtime `require.resolve` of a CLI on disk would have
+    // resolved against out/main/ and thrown `Native CLI binary for <platform> not found`.
+    expect(manifest.dependencies?.[SDK], `${SDK} is not in dependencies`).toBeTruthy();
+    expect(manifest.devDependencies?.[SDK], `${SDK} is ALSO a devDependency`).toBeUndefined();
+  });
+
+  it("is the CLI-spawning SDK, not the API-key REST client", () => {
+    // `@anthropic-ai/sdk` is the Messages API client: it takes an API key, bills pay-as-you-go,
+    // spawns no CLI and has no canUseTool. One path segment apart from the right one, and it
+    // installs and type-checks perfectly happily.
+    const deps = { ...manifest.dependencies, ...manifest.devDependencies };
+    expect(Object.keys(deps)).not.toContain("@anthropic-ai/sdk");
+  });
+
+  it("is not on the bundler's workspace-source exclusion list", () => {
+    // `exclude:` is for workspace SOURCE packages with no build artifact for `require` to find —
+    // the opposite case. Adding the SDK to it looks like the same kind of fix and undoes the above.
+    const exclude = config.match(/exclude:\s*\[([^\]]*)\]/);
+    expect(exclude, "externalizeDepsPlugin no longer has an exclude list").not.toBeNull();
+    expect(exclude![1]).not.toContain("@anthropic-ai");
+  });
+
+  it("has exactly one module importing it", () => {
+    // Not a rule against the SDK — a rule that its call sites arrive as a diff to this line. It is
+    // a second way to reach the `claude` binary (see the reviewed list above), and the options it
+    // is given decide the permission model for every future session.
+    const importers = sourcesUnder("src/core")
+      .concat(sourcesUnder("src/main"))
+      .filter((f) => new RegExp(`["'\`]${SDK}["'\`]`).test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(importers).toEqual(["src/core/agent-sdk.ts"]);
+  });
+
+  it("gives the query an explicitly resolved binary and a constructed environment", () => {
+    // Three properties of the spawn options, each of which is a silent failure on its own:
+    //   • no `pathToClaudeCodeExecutable` → the SDK spawns NODE to run a bundled cli.js, and a
+    //     GUI-launched app has no `node` on PATH. Reads as `spawn node ENOENT`; never reproduces
+    //     from a terminal.
+    //   • `env: process.env` → an ANTHROPIC_API_KEY anywhere in the inherited environment bills
+    //     the API instead of the user's subscription, with nothing on screen saying so.
+    //   • `settingSources` unset → a key in ~/.claude/settings.json is the second door to the same
+    //     place, and it overrides the environment we just built.
+    const src = stripComments(read("src/core/agent-sdk.ts"));
+    expect(src).toMatch(/pathToClaudeCodeExecutable:\s*cli\.bin/);
+    expect(src).toMatch(/settingSources:\s*\[\]/);
+    // The env is built by a tested function, never spread inline from the parent at the call site.
+    expect(src).toMatch(/agentChildEnv\(/);
+    expect(src, "the SDK query spreads process.env directly").not.toMatch(/env:\s*\{\s*\.\.\.process\.env/);
+  });
+
+  const builtMain = path.join(appRoot, "out/main/index.js");
+
+  it.runIf(fs.existsSync(builtMain))("is required at runtime rather than inlined into main", () => {
+    const src = fs.readFileSync(builtMain, "utf8");
+    // The specifier survives the build — that is what "external" means at this level.
+    expect(src, "the built main bundle does not reference the SDK").toContain(SDK);
+    // And the source did not come with it. `Native CLI binary for` is the SDK's own resolution
+    // error, present only in its implementation; if it is in our bundle, the SDK is in our bundle.
+    expect(src, "the SDK's source was inlined into out/main/index.js").not.toContain("Native CLI binary for");
+    expect(src).not.toContain("CLAUDE_AGENT_SDK_CLIENT_APP");
+  });
 });
 
 describe("built main and preload bundles", () => {
