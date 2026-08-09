@@ -10,6 +10,8 @@ Rules that apply when reducing complexity of a **custom React hook**. Apply sing
 
 3. **Split into specialized hooks** — If no store fits or the logic is purely local/UI, and the hook still handles several concerns (e.g. fetching + filtering + pagination) or states, extract **one hook per concern**: e.g. `useFetchItems`, `useItemsFilter`, `usePagination`. Compose them in the component or in a thin “orchestrator” hook that only wires the others. Each hook should have **one clear responsibility** and a name that reflects it.
 
+4. **Wrap a third-party/SDK hook that needs repeated post-processing** — If several components call the same external or SDK hook and each repeats the same filter/find/default logic on its result (e.g. filtering a raw list down to "enabled" items, guarding against `undefined`, looking one up by id), wrap that hook in one project-owned hook instead. The wrapper returns ready-to-use, non-nullish data plus any small getters consumers need (e.g. `useEnabledAnnotationTypes()` wrapping `useConfigAnnotationTypes()` — returns the already-filtered list, a `defaultX`, and a `getX(id)` getter). Consumers then depend on the project's own hook, not the raw third-party shape, and the post-processing logic lives in exactly one place.
+
 ## Hook design
 
 - **Narrow return shape** — Prefer returning a small, stable object (e.g. `{ data, isLoading, error }` or `{ value, onChange }`). Avoid returning large bags of unrelated state and setters; split into separate hooks instead.

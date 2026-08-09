@@ -52,26 +52,30 @@
     - [❌ Avoid creating unnecessary custom hooks](#-avoid-creating-unnecessary-custom-hooks)
     - [✅ Prefer using plain functions instead](#-prefer-using-plain-functions-instead)
     - [ℹ️ Explanation](#ℹ️-explanation-9)
+  - [*HIGH* Prefer Wrapping a Repeated Third-Party Hook Over Duplicating Post-Processing](#high-prefer-wrapping-a-repeated-third-party-hook-over-duplicating-post-processing)
+    - [❌ Avoid Repeating Filter/Find/Default Logic After Every Call to a Third-Party Hook](#-avoid-repeating-filterfinddefault-logic-after-every-call-to-a-third-party-hook)
+    - [✅ Prefer One Project-Owned Hook That Returns Ready-to-Use Data](#-prefer-one-project-owned-hook-that-returns-ready-to-use-data)
+    - [ℹ️ Explanation](#ℹ️-explanation-10)
   - [*MEDIUM* Event handlers — where to put them](#medium-event-handlers--where-to-put-them)
     - [❌ avoid](#-avoid)
     - [✅ prefer](#-prefer)
-    - [ℹ️ Explanation](#ℹ️-explanation-10)
+    - [ℹ️ Explanation](#ℹ️-explanation-11)
   - [*MEDIUM* Conditionally executable handlers — use a dedicated handler with early returns](#medium-conditionally-executable-handlers--use-a-dedicated-handler-with-early-returns)
     - [❌ avoid inline conditional execution in event props](#-avoid-inline-conditional-execution-in-event-props)
     - [✅ prefer a dedicated handler with early returns](#-prefer-a-dedicated-handler-with-early-returns)
-    - [ℹ️ Explanation](#ℹ️-explanation-11)
+    - [ℹ️ Explanation](#ℹ️-explanation-12)
   - [*MEDIUM* Avoid Misusing the `use` Prefix](#medium-avoid-misusing-the-use-prefix)
     - [❌ Avoid Misusing the `use` Prefix for Non-Hook Functions](#-avoid-misusing-the-use-prefix-for-non-hook-functions)
     - [✅ Prefer a More Descriptive Name for Pure Functions](#-prefer-a-more-descriptive-name-for-pure-functions)
-    - [ℹ️ Explanation](#ℹ️-explanation-12)
+    - [ℹ️ Explanation](#ℹ️-explanation-13)
   - [*MEDIUM* Store the Selected Item by ID](#medium-store-the-selected-item-by-id)
     - [❌ Avoid storing the entire item](#-avoid-storing-the-entire-item)
     - [✅ Prefer storing the item ID](#-prefer-storing-the-item-id)
-    - [ℹ️ Explanation](#ℹ️-explanation-13)
+    - [ℹ️ Explanation](#ℹ️-explanation-14)
   - [*MEDIUM* Clarify the Distinction Between Initial State and Current State](#medium-clarify-the-distinction-between-initial-state-and-current-state)
     - [❌ Avoid unclear naming for state variables](#-avoid-unclear-naming-for-state-variables)
     - [✅ Prefer clear naming to differentiate initial state and current state](#-prefer-clear-naming-to-differentiate-initial-state-and-current-state)
-    - [ℹ️ Explanation](#ℹ️-explanation-14)
+    - [ℹ️ Explanation](#ℹ️-explanation-15)
   - [*MEDIUM* Prefer Props Destructuring Over Direct Props Access](#medium-prefer-props-destructuring-over-direct-props-access)
     - [❌ Avoid Using Direct Props Access](#-avoid-using-direct-props-access)
     - [✅ Prefer Props Destructuring](#-prefer-props-destructuring)
@@ -83,23 +87,31 @@
   - [*MEDIUM* Always Clean Up in Your `useEffect` Hooks](#medium-always-clean-up-in-your-useeffect-hooks)
     - [❌ Avoid forgetting to clean up side effects](#-avoid-forgetting-to-clean-up-side-effects)
     - [✅ Prefer cleaning up side effects with a cleanup function](#-prefer-cleaning-up-side-effects-with-a-cleanup-function)
-    - [ℹ️ Explanation](#ℹ️-explanation-15)
+    - [ℹ️ Explanation](#ℹ️-explanation-16)
   - [*MEDIUM* Avoid Simple Assignment in State Update Functions](#medium-avoid-simple-assignment-in-state-update-functions)
     - [❌ Avoid Simple Assignment for State Updates Dependent on Current State](#-avoid-simple-assignment-for-state-updates-dependent-on-current-state)
     - [✅ Prefer Using Setter Function for State Updates Dependent on Current State](#-prefer-using-setter-function-for-state-updates-dependent-on-current-state)
-    - [ℹ️ Explanation](#ℹ️-explanation-16)
+    - [ℹ️ Explanation](#ℹ️-explanation-17)
   - [*MEDIUM* Specify Types Explicitly in useState, useRef, etc.](#medium-specify-types-explicitly-in-usestate-useref-etc)
     - [❌ Avoid omitting types when they can't be inferred](#-avoid-omitting-types-when-they-cant-be-inferred)
     - [✅ Prefer specifying types explicitly when they can't be inferred](#-prefer-specifying-types-explicitly-when-they-cant-be-inferred)
-    - [ℹ️ Explanation](#ℹ️-explanation-17)
+    - [ℹ️ Explanation](#ℹ️-explanation-18)
+  - [*MEDIUM* Avoid Passthrough Handlers That Add No Logic](#medium-avoid-passthrough-handlers-that-add-no-logic)
+    - [❌ Avoid a Handler That Only Forwards Its Argument](#-avoid-a-handler-that-only-forwards-its-argument)
+    - [✅ Prefer Passing the Function Reference Directly](#-prefer-passing-the-function-reference-directly)
+    - [ℹ️ Explanation](#ℹ️-explanation-19)
+  - [*MEDIUM* Prefer Naming Callback Parameters for Their Domain Meaning](#medium-prefer-naming-callback-parameters-for-their-domain-meaning)
+    - [❌ Avoid Generic Parameter Names That Get Renamed at Every Call Site](#-avoid-generic-parameter-names-that-get-renamed-at-every-call-site)
+    - [✅ Prefer a Name That Already Matches Its Downstream Usage](#-prefer-a-name-that-already-matches-its-downstream-usage)
+    - [ℹ️ Explanation](#ℹ️-explanation-20)
   - [*LOW* Prefer useToggle from @uidotdev/usehooks for Boolean Toggle State](#low-prefer-usetoggle-from-uidotdevusehooks-for-boolean-toggle-state)
     - [❌ Avoid useState for Simple Open/Close or Show/Hide Toggles](#-avoid-usestate-for-simple-openclose-or-showhide-toggles)
     - [✅ Prefer useToggle When @uidotdev/usehooks Is Present](#-prefer-usetoggle-when-uidotdevusehooks-is-present)
-    - [ℹ️ Explanation](#ℹ️-explanation-18)
+    - [ℹ️ Explanation](#ℹ️-explanation-21)
   - [*LOW* Prefer Using `gap`, `rowGap`, and `columnGap` Over `margin` or `padding` in React Native](#low-prefer-using-gap-rowgap-and-columngap-over-margin-or-padding-in-react-native)
     - [❌ Avoid Using `margin` or `padding` for Spacing Between Elements](#-avoid-using-margin-or-padding-for-spacing-between-elements)
     - [✅ Prefer Using `gap`, `rowGap`, and `columnGap` for Spacing Between Elements](#-prefer-using-gap-rowgap-and-columngap-for-spacing-between-elements)
-    - [ℹ️ Explanation](#ℹ️-explanation-19)
+    - [ℹ️ Explanation](#ℹ️-explanation-22)
   - [*LOW* Prefer react-native `Pressable` Over `TouchableOpacity`](#low-prefer-react-native-pressable-over-touchableopacity)
     - [❌ Avoid TouchableOpacity usage](#-avoid-touchableopacity-usage)
     - [✅ Prefer Pressable](#-prefer-pressable)
@@ -119,15 +131,15 @@
   - [*LOW* Use `ReactNode` instead of `JSX.Element | null | undefined`](#low-use-reactnode-instead-of-jsxelement--null--undefined)
     - [❌ Avoid typing props with JSX.Element | null | undefined](#-avoid-typing-props-with-jsxelement--null--undefined)
     - [✅ Prefer using `ReactNode` for more compact code](#-prefer-using-reactnode-for-more-compact-code)
-    - [ℹ️ Explanation](#ℹ️-explanation-20)
+    - [ℹ️ Explanation](#ℹ️-explanation-23)
   - [*LOW* Simplify Typing of Components Expecting Children Props](#low-simplify-typing-of-components-expecting-children-props)
     - [❌ Avoid manually typing the children prop](#-avoid-manually-typing-the-children-prop)
     - [✅ Prefer using PropsWithChildren for typing children props](#-prefer-using-propswithchildren-for-typing-children-props)
-    - [ℹ️ Explanation](#ℹ️-explanation-21)
+    - [ℹ️ Explanation](#ℹ️-explanation-24)
   - [*LOW* Use ElementRef Type Helper for Typing Refs](#low-use-elementref-type-helper-for-typing-refs)
     - [❌ Avoid typing refs directly with element type names](#-avoid-typing-refs-directly-with-element-type-names)
     - [✅ Prefer using the ElementRef type helper for typing refs](#-prefer-using-the-elementref-type-helper-for-typing-refs)
-    - [ℹ️ Explanation](#ℹ️-explanation-22)
+    - [ℹ️ Explanation](#ℹ️-explanation-25)
   - [*LOW* Use explicit boolean conditions for conditional rendering](#low-use-explicit-boolean-conditions-for-conditional-rendering)
     - [❌ Avoid implicit boolean conversion with non-boolean values](#-avoid-implicit-boolean-conversion-with-non-boolean-values)
     - [✅ Prefer explicit boolean conditions](#-prefer-explicit-boolean-conditions)
@@ -978,6 +990,46 @@ const getLocale = () => window.navigator.languages?.[0] ?? window.navigator.lang
 
 By preferring functions over unnecessary hooks, your code remains lean, maintainable, and easy to reason about.
 
+## *HIGH* Prefer Wrapping a Repeated Third-Party Hook Over Duplicating Post-Processing
+
+### ❌ Avoid Repeating Filter/Find/Default Logic After Every Call to a Third-Party Hook
+
+```tsx
+import { useConfigAnnotationTypes } from "@lichens-innovation/lichens-racine-ts-sdk";
+
+const MarkerItem = ({ marker }: MarkerItemProps) => {
+  const { annotationTypes } = useConfigAnnotationTypes();
+  const enabledTypes = (annotationTypes ?? []).filter((type) => type.enabled);
+  const annotationType = enabledTypes.find((type) => type.annotation_type_slug === marker.type);
+  // ...the same filter + find is repeated in every component that needs a type
+};
+```
+
+### ✅ Prefer One Project-Owned Hook That Returns Ready-to-Use Data
+
+```tsx
+// hooks/use-enabled-annotation-types.ts
+export const useEnabledAnnotationTypes = () => {
+  const { annotationTypes, isLoadingAnnotationTypes } = useConfigAnnotationTypes();
+
+  const enabledTypes = (annotationTypes ?? []).filter((type) => type.enabled);
+
+  const getAnnotationType = (slug: string) => enabledTypes.find((type) => type.annotation_type_slug === slug);
+
+  return { enabledTypes, isLoadingAnnotationTypes, defaultAnnotationType: enabledTypes[0], getAnnotationType };
+};
+
+// marker-item.tsx
+const { getAnnotationType } = useEnabledAnnotationTypes();
+const annotationType = getAnnotationType(marker.type);
+```
+
+### ℹ️ Explanation
+
+- **DRY across consumers**: the filter/find/default logic lives in exactly one place instead of being copy-pasted into every component that needs it.
+- **Non-nullish by construction**: the wrapper hook resolves `undefined`/`null` from the raw response once, so consumers work with plain arrays and objects, not optional chains.
+- **Small, purposeful getters**: exposing a `getAnnotationType(slug)` (or `defaultAnnotationType`) keeps lookups consistent and gives future consumers a documented entry point instead of reinventing the `.find()`.
+
 ## *MEDIUM* Event handlers — where to put them
 
 - **Pure TypeScript only** → move to `component-name.utils.ts` next to the component.
@@ -1539,6 +1591,56 @@ const [selectedItemId, setSelectedItemId] = useState<string>();
 ### ℹ️ Explanation
 
 When using hooks like `useState` or `useRef`, always specify the type explicitly if it can't be inferred from the initial value. This ensures that TypeScript correctly understands the type of the state or ref, preventing potential type-related bugs. For example, if you have a state variable `selectedItemId` that should be an optional `string`, explicitly typing it as `useState<string>()` ensures that TypeScript will enforce this type.
+
+## *MEDIUM* Avoid Passthrough Handlers That Add No Logic
+
+### ❌ Avoid a Handler That Only Forwards Its Argument
+
+```tsx
+const handleMarkerAdd = async (marker: Marker): Promise<void> => {
+  await createMarker(marker);
+};
+
+<ChartDrawOverlay onMarkerAdd={handleMarkerAdd} />;
+```
+
+### ✅ Prefer Passing the Function Reference Directly
+
+```tsx
+<ChartDrawOverlay onMarkerAdd={createMarker} />;
+```
+
+### ℹ️ Explanation
+
+- **No added value**: `handleMarkerAdd` does nothing `createMarker` doesn't already do — it's pure indirection.
+- **One less name to track**: removing the wrapper means one fewer function to read through when tracing what happens on the event.
+- **Keep the wrapper when it earns its keep**: a handler that branches, maps arguments, or does extra work (e.g. closing a modal after `await`) is not a passthrough and should stay.
+
+## *MEDIUM* Prefer Naming Callback Parameters for Their Domain Meaning
+
+### ❌ Avoid Generic Parameter Names That Get Renamed at Every Call Site
+
+```tsx
+const handleTypeChange = (value: string) => {
+  const nextLabel = resolveTypeLabel({ typeSlug: value, enabledTypes, language });
+  setType(value);
+};
+```
+
+### ✅ Prefer a Name That Already Matches Its Downstream Usage
+
+```tsx
+const handleTypeChange = (typeSlug: string) => {
+  const nextLabel = resolveTypeLabel({ typeSlug, enabledTypes, language });
+  setType(typeSlug);
+};
+```
+
+### ℹ️ Explanation
+
+- **Self-documenting**: `typeSlug` tells the reader what the value represents; `value` says nothing beyond "some argument."
+- **Flows naturally**: once named to match the shape consumed downstream, it can be passed as an object-shorthand property (`{ typeSlug }`) instead of being renamed at every call (`{ typeSlug: value }`).
+- **Applies to any callback**: the same reasoning applies to `onChange`, `onSelect`, or `map`/`filter` callbacks — name the parameter for what it *is*, not the framework's generic placeholder.
 
 ## *LOW* Prefer useToggle from @uidotdev/usehooks for Boolean Toggle State
 

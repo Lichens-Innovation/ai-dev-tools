@@ -159,42 +159,54 @@
     - [❌ Avoid Importing and Re-exporting the Same Symbol in a Single File](#-avoid-importing-and-re-exporting-the-same-symbol-in-a-single-file)
     - [✅ Prefer a Direct Re-export or Importing Directly from the Source](#-prefer-a-direct-re-export-or-importing-directly-from-the-source)
     - [ℹ️ Explanation](#ℹ️-explanation-36)
+  - [*MEDIUM* Apply Optional Defaults Once at Destructuring](#medium-apply-optional-defaults-once-at-destructuring)
+    - [❌ Avoid Repeating `?? fallback` at Every Call Site](#-avoid-repeating--fallback-at-every-call-site)
+    - [✅ Prefer Defaulting Once, at the Source](#-prefer-defaulting-once-at-the-source)
+    - [ℹ️ Explanation](#ℹ️-explanation-37)
+  - [*MEDIUM* Destructure a Repeated Nested Property Access Once](#medium-destructure-a-repeated-nested-property-access-once)
+    - [❌ Avoid Repeating the Same Property Path](#-avoid-repeating-the-same-property-path)
+    - [✅ Prefer Destructuring the Nested Value Once](#-prefer-destructuring-the-nested-value-once)
+    - [ℹ️ Explanation](#ℹ️-explanation-38)
+  - [*MEDIUM* Avoid Extracting a Single Comparison Into Its Own Function](#medium-avoid-extracting-a-single-comparison-into-its-own-function)
+    - [❌ Avoid a Named Function for a One-Line Equality Check](#-avoid-a-named-function-for-a-one-line-equality-check)
+    - [✅ Prefer Inlining the Comparison at the Call Site](#-prefer-inlining-the-comparison-at-the-call-site)
+    - [ℹ️ Explanation](#ℹ️-explanation-39)
   - [*LOW* Prefer `Array.some()` Over Checking `Array.find()` for Undefined](#low-prefer-arraysome-over-checking-arrayfind-for-undefined)
     - [❌ Avoid Checking `Array.find()` for Undefined](#-avoid-checking-arrayfind-for-undefined)
     - [✅ Prefer Using `Array.some()` for Better Readability](#-prefer-using-arraysome-for-better-readability)
-    - [ℹ️ Explanation](#ℹ️-explanation-37)
+    - [ℹ️ Explanation](#ℹ️-explanation-40)
   - [*LOW* Prefer Explicit Time Periods (PeriodsInMS) from @lichens-innovation/ts-common](#low-prefer-explicit-time-periods-periodsinms-from-lichens-innovationts-common)
     - [❌ Avoid Magic Numbers for Durations in Milliseconds](#-avoid-magic-numbers-for-durations-in-milliseconds)
     - [✅ Prefer PeriodsInMS for Readable Time Periods](#-prefer-periodsinms-for-readable-time-periods)
-    - [ℹ️ Explanation](#ℹ️-explanation-38)
+    - [ℹ️ Explanation](#ℹ️-explanation-41)
   - [*LOW* Prefer Using Optional Parameters Over `Type | undefined`](#low-prefer-using-optional-parameters-over-type--undefined)
     - [❌ Avoid Using `param: Type | undefined` for Optional Parameters](#-avoid-using-param-type--undefined-for-optional-parameters)
     - [✅ Prefer Using Optional Parameters with `param?: Type`](#-prefer-using-optional-parameters-with-param-type)
-    - [ℹ️ Explanation](#ℹ️-explanation-39)
+    - [ℹ️ Explanation](#ℹ️-explanation-42)
   - [*LOW* Prefer Using Object Destructuring for readability and clarity](#low-prefer-using-object-destructuring-for-readability-and-clarity)
     - [❌ Avoid Complex Interpolation Without Destructuring](#-avoid-complex-interpolation-without-destructuring)
     - [✅ Prefer Using Object Destructuring for Clarity](#-prefer-using-object-destructuring-for-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-40)
+    - [ℹ️ Explanation](#ℹ️-explanation-43)
   - [*LOW* Prefer Using TypeScript `Record` Utility Type over Custom Index Signatures](#low-prefer-using-typescript-record-utility-type-over-custom-index-signatures)
     - [❌ Avoid Custom Index Signatures for Object Types](#-avoid-custom-index-signatures-for-object-types)
     - [✅ Prefer Using TypeScript `Record` Utility Type for Simplicity and Clarity](#-prefer-using-typescript-record-utility-type-for-simplicity-and-clarity)
-    - [ℹ️ Explanation](#ℹ️-explanation-41)
+    - [ℹ️ Explanation](#ℹ️-explanation-44)
   - [*LOW* Prefer Interfaces Over Types for Object Shapes](#low-prefer-interfaces-over-types-for-object-shapes)
     - [❌ Avoid Using `type` for Object Shapes When `interface` Fits](#-avoid-using-type-for-object-shapes-when-interface-fits)
     - [✅ Prefer `interface`; Use `type` Only When It Simplifies Syntax](#-prefer-interface-use-type-only-when-it-simplifies-syntax)
-    - [ℹ️ Explanation](#ℹ️-explanation-42)
+    - [ℹ️ Explanation](#ℹ️-explanation-45)
   - [*LOW* Prefer Adding a Task Ticket ID to `TODO` Comments for Better Tracking](#low-prefer-adding-a-task-ticket-id-to-todo-comments-for-better-tracking)
     - [❌ Avoid Using `TODO` Comments Without a Ticket Reference](#-avoid-using-todo-comments-without-a-ticket-reference)
     - [✅ Prefer Adding a Task Management Ticket ID to `TODO` Comments for Better Traceability](#-prefer-adding-a-task-management-ticket-id-to-todo-comments-for-better-traceability)
-    - [ℹ️ Explanation](#ℹ️-explanation-43)
+    - [ℹ️ Explanation](#ℹ️-explanation-46)
   - [*LOW* Prefer Using `??` Over `||` for Handling `null` and `undefined`](#low-prefer-using--over--for-handling-null-and-undefined)
     - [❌ Avoid Using `||` to Handle `null` and `undefined` Exclusively](#-avoid-using--to-handle-null-and-undefined-exclusively)
     - [✅ Prefer Using `??` to Handle `null` and `undefined`](#-prefer-using--to-handle-null-and-undefined)
-    - [ℹ️ Explanation](#ℹ️-explanation-44)
+    - [ℹ️ Explanation](#ℹ️-explanation-47)
   - [*LOW* Prefer Using `useWindowDimensions` Hook Over `Dimensions.get` in React Native](#low-prefer-using-usewindowdimensions-hook-over-dimensionsget-in-react-native)
     - [❌ Avoid Using `Dimensions.get` for Getting Window Dimensions](#-avoid-using-dimensionsget-for-getting-window-dimensions)
     - [✅ Prefer Using `useWindowDimensions` Hook for Getting Window Dimensions](#-prefer-using-usewindowdimensions-hook-for-getting-window-dimensions)
-    - [ℹ️ Explanation](#ℹ️-explanation-45)
+    - [ℹ️ Explanation](#ℹ️-explanation-48)
 
 # Typescript coding guidelines
 
@@ -1866,6 +1878,100 @@ export { formatDate } from "./formatDate";
 - **Redundant Indirection:** Importing a symbol only to export it again under the same name adds an extra hop with no behavioral difference from re-exporting directly, forcing callers to trace through an unnecessary file.
 - **Prefer Direct Re-export Syntax:** `export { X } from "./module"` achieves the same result in one line, without binding `X` into the local module scope.
 - **Barrel Files Are the Exception:** This pattern is expected in a dedicated barrel/index file that intentionally re-exports many symbols; avoid it in ordinary modules where the import would otherwise be unused.
+
+---
+
+## *MEDIUM* Apply Optional Defaults Once at Destructuring
+
+### ❌ Avoid Repeating `?? fallback` at Every Call Site
+
+```ts
+const { siteSlug, equipmentSlug } = useParams({ strict: false });
+
+const createMarker = (marker: Marker) =>
+  createAnnotationAsync({ siteSlug: siteSlug ?? "", equipmentSlug: equipmentSlug ?? "", annotation: marker });
+
+const deleteMarker = (id: string) =>
+  deleteAnnotationAsync({ siteSlug: siteSlug ?? "", equipmentSlug: equipmentSlug ?? "", annotationUuid: id });
+```
+
+### ✅ Prefer Defaulting Once, at the Source
+
+```ts
+const { siteSlug = "", equipmentSlug = "" } = useParams({ strict: false });
+
+const createMarker = (marker: Marker) => createAnnotationAsync({ siteSlug, equipmentSlug, annotation: marker });
+
+const deleteMarker = (id: string) => deleteAnnotationAsync({ siteSlug, equipmentSlug, annotationUuid: id });
+```
+
+### ℹ️ Explanation
+
+- **Single point of truth**: the fallback is defined once, at the value's origin, instead of duplicated at every place it's read.
+- **Type reflects reality**: after the destructure default, TypeScript narrows `siteSlug`/`equipmentSlug` to plain `string` — every downstream usage is simpler because the type no longer carries `| undefined`.
+- **Less to review**: a reviewer only has to check the fallback once instead of verifying it was applied consistently everywhere the value is used.
+
+---
+
+## *MEDIUM* Destructure a Repeated Nested Property Access Once
+
+### ❌ Avoid Repeating the Same Property Path
+
+```tsx
+const { t, i18n } = useTranslation();
+
+const label = resolveTypeLabel({ typeSlug, enabledTypes, language: i18n.language });
+const options = annotationsAsDropDownOptions({ enabledTypes, language: i18n.language });
+const preview = resolveTypeLabel({ typeSlug: nextValue, enabledTypes, language: i18n.language });
+```
+
+### ✅ Prefer Destructuring the Nested Value Once
+
+```tsx
+const {
+  t,
+  i18n: { language },
+} = useTranslation();
+
+const label = resolveTypeLabel({ typeSlug, enabledTypes, language });
+const options = annotationsAsDropDownOptions({ enabledTypes, language });
+const preview = resolveTypeLabel({ typeSlug: nextValue, enabledTypes, language });
+```
+
+### ℹ️ Explanation
+
+- **Removes repetition**: `i18n.language` written five times becomes one destructured `language` binding reused everywhere.
+- **No unused intermediate binding**: destructuring `i18n: { language }` directly avoids keeping an unused `i18n` variable around once nothing else needs the full object.
+- **Scales to any nested source**: the same technique applies to any object accessed by the same nested path repeatedly in one scope, not just `i18n`.
+
+---
+
+## *MEDIUM* Avoid Extracting a Single Comparison Into Its Own Function
+
+### ❌ Avoid a Named Function for a One-Line Equality Check
+
+```ts
+interface IsDefaultMarkerLabelArgs {
+  label: string;
+  defaultLabel: string;
+}
+
+const isDefaultMarkerLabel = ({ label, defaultLabel }: IsDefaultMarkerLabelArgs): boolean => label === defaultLabel;
+
+const shouldShowLabel = !isDefaultMarkerLabel({ label: marker.label, defaultLabel: typeLabel });
+```
+
+### ✅ Prefer Inlining the Comparison at the Call Site
+
+```ts
+const shouldShowLabel = marker.label !== typeLabel;
+```
+
+### ℹ️ Explanation
+
+- **No real abstraction**: wrapping `===`/`!==` in a function adds an indirection (interface, import, extra file to open) without hiding any complexity — the reader still has to know it's a plain equality check.
+- **Reserve extraction for actual logic**: extract a named function when it encapsulates multiple steps, a non-obvious rule, or logic likely to change, not a single comparison.
+- **Readability**: `marker.label !== typeLabel` is at least as clear inline as `!isDefaultMarkerLabel({ label: marker.label, defaultLabel: typeLabel })`, with one less name to learn.
 
 ---
 

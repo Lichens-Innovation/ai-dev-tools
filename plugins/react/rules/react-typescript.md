@@ -51,6 +51,9 @@ paths:
 | `console.log(...)` calls in production code paths | Structured `logger.info(...)` with explicit safe fields |
 | `user?.address?.location?.city` dangling deep optional chain | `user?.address?.location?.city ?? "Unknown"` ending with a `?? fallback` |
 | `import { X } from "./x"; export { X };` importing then re-exporting the same symbol under one name in a file | `export { X } from "./x";` direct re-export (or drop the passthrough, import `X` straight from `./x` at call sites) |
+| Repeating `value ?? fallback` at every call site for the same optional value | Apply the default once at destructuring (`const { x = fallback } = source`) so the rest of the function uses the narrowed value directly |
+| Repeating the same nested property access (`obj.prop.nested`) several times in one scope | Destructure it once near the top (e.g. `const { prop: { nested } } = obj`) and reuse the local binding |
+| Extracting a single `===` / `!==` comparison into its own named function | Inline the comparison at the call site — reserve extracted functions for genuine multi-step logic |
 
 ## LOW
 

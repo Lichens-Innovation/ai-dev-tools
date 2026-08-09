@@ -43,6 +43,8 @@ Plain TypeScript functions are always in `*.ts`, never in `*.tsx`. Load the matc
 
 - Use **object destructuring** when reading or passing object attributes so that attribute names are explicit and the code stays readable. Applies to: **component props** (e.g. `const { isLoading, error, data } = props` or in the signature), **function parameters** (e.g. `const fn = ({ a, b }: FnArgs) => ...`), and **local objects** when you use several properties (e.g. `const { name, status } = item`). Prefer destructuring when it clarifies usage and improves readability; avoid when a single property is used once.
 - **Parameter object (2+ args)** — As soon as a function has more than one parameter, use a single options object with destructuring and extract the parameter interface immediately above the signature. Applies to every function: component, hook, or method.
+- **Default at destructure time** — When a value can be `undefined`, apply its fallback once at destructuring (`const { x = fallback } = source`) instead of repeating `x ?? fallback` at every call site that reads it.
+- **Destructure repeated access once** — When the same nested property (e.g. `i18n.language`) is read several times in one scope, destructure it once near the top (`const { language } = i18n`, or `const { i18n: { language } } = useTranslation()`) and reuse the local binding.
 
 ### Coupling (shotgun surgery)
 

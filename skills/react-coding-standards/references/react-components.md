@@ -19,6 +19,7 @@ paths:
 | Nested ternaries inside `return` for `loading` / `error` / `data` branches | Early `if (...) return ...` for each branch before the main render |
 | `const OPTIONS = [...]` declared inside the component body | Module-level `const` outside the component for static data and helpers |
 | `useXxx` hook that calls no React hook internally (e.g. `useLocale`) | Plain function (`getLocale()`) imported where needed |
+| Calling the same third-party/SDK hook in several components and repeating the same filter/find/default logic after each call | Wrap it in one project-owned hook that returns ready-to-use, non-nullish data plus small getters (e.g. `useEnabledAnnotationTypes` wrapping `useConfigAnnotationTypes`) |
 
 ## MEDIUM
 
@@ -34,6 +35,8 @@ paths:
 | `useEffect` registering intervals / listeners with no cleanup | `useEffect` returning `() => clearInterval(id)` (or equivalent teardown) |
 | `setNumbers([...numbers, n])` when the next state only depends on the current state | `setNumbers((current) => [...current, n])` updater form |
 | `useState()` / `useRef()` with no generic when the initial value can't infer it | `useState<string>()` / `useRef<HTMLDivElement>(null)` explicit generic |
+| A handler that only forwards its argument with no added logic (`(x) => fn(x)`) | Pass the function reference directly (`onEvent={fn}`) — drop the wrapper |
+| Generic callback param names (`value`, `e`, `item`) when a more specific domain name exists | Name params for their domain meaning so they flow naturally into the functions they call (e.g. `typeSlug` instead of `value` when passed straight into `resolveTypeLabel({ typeSlug })`) |
 
 ## LOW
 
