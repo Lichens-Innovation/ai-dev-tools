@@ -44,7 +44,8 @@ import type {
   SettingsSourceInfo,
   ClaudeOutputChunk,
   ClaudeRunResult,
-  ChatTurn,
+  SessionEvent,
+  SessionInfo,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -98,7 +99,8 @@ export type {
   SettingsSourceInfo,
   ClaudeOutputChunk,
   ClaudeRunResult,
-  ChatTurn,
+  SessionEvent,
+  SessionInfo,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -232,6 +234,16 @@ export const IPC = {
   claudeRun: "claude:run",
   claudeCancel: "claude:cancel",
 
+  // The session pane. NOT a third half of the bridge above: a previewed run needs a token because
+  // main authored the prompt and the user approved it, and a session turn needs none because the
+  // user typed it. `session:say` therefore carries a user input value and nothing else — that is
+  // the invariant, restated, and `test/isolation.test.ts` pins the call site.
+  sessionStart: "session:start",
+  sessionSay: "session:say",
+  sessionStop: "session:stop",
+  sessionEnd: "session:end",
+  sessionInfo: "session:info",
+
   // Usage stats, in the same two halves and for the same reason: with no local `ccusage`, running
   // one means fetching a package from npm and executing it, so what would run is returned before
   // anything does. See src/core/ccusage.ts.
@@ -247,6 +259,7 @@ export const IPC = {
 /** Push channels: main → renderer. */
 export const IPC_EVENTS = {
   claudeOutput: "claude:output",
+  sessionEvent: "session:event",
   logInit: "log:init",
   logEntry: "log:entry",
   logReset: "log:reset",
@@ -356,6 +369,43 @@ export interface MaestroApi {
     run(token: string, onOutput: (chunk: ClaudeOutputChunk) => void): Promise<ClaudeRunResult>;
     /** Stop a run. Signals the child's whole process group, so the CLI's own children go too. */
     cancel(token: string): Promise<void>;
+  };
+  /**
+   * The session pane — one live, multi-turn conversation per open project.
+   *
+   * The bridge above and this are the app's two ways to reach a model, and they differ in who
+   * authored the prompt. A run executes a string MAIN built and the user approved, so it needs a
+   * token to prove the two are the same string. A session turn is a string the USER TYPED, so
+   * there is nothing to prove and nothing to preview — the guarantee restates as: `say` carries a
+   * user input value and nothing else, and main stamps it as human-authored at the SDK boundary.
+   *
+   * What a session may do is fixed before it starts and reported by `start`: it reads the open
+   * project and the marketplaces the app resolved, and it writes NOTHING. There is no call here by
+   * which a renderer could widen either.
+   */
+  session: {
+    /**
+     * Start a session against the open project, replacing any this window already had. Rejects
+     * when no project is open. Resolves with `id: null` when the CLI could not be found — the pane
+     * says so rather than failing on the first send.
+     */
+    start(): Promise<SessionInfo>;
+    /** What a session in this window can see and do right now. Reads only; starts nothing. */
+    info(): Promise<SessionInfo>;
+    /** One turn, as the user typed it. False when the session is gone. */
+    say(id: string, text: string): Promise<boolean>;
+    /** Interrupt the turn in flight. The session stays usable. */
+    stop(id: string): Promise<boolean>;
+    /** End the session and reap the CLI's process group. */
+    end(): Promise<void>;
+    /**
+     * Everything that happens in this window's session, in order.
+     *
+     * SINGLE-OWNER, like `log.subscribe` and for the same reason: main keys one session per
+     * `webContents.id`, so a second subscriber would receive another owner's transcript. The owner
+     * is `SessionProvider`, mounted once in `__root.tsx`.
+     */
+    subscribe(onEvent: (event: SessionEvent) => void): () => void;
   };
   /**
    * Usage stats, behind the same preview-then-run split as the bridge.

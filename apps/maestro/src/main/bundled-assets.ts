@@ -40,3 +40,34 @@ export function bundledAgentsDir(): string | null {
 
   return findUpBundledAgents(app.getAppPath());
 }
+
+/**
+ * The bundled Maestro PLUGIN's root — the directory `plugins/ai-tools-manager` itself.
+ *
+ * Why the pane needs it, and why declaring skill names was not enough. A pane session runs with
+ * `settingSources: []`, which loads no user, project or local settings — and therefore no
+ * installed plugins. `skills: ['super-help', 'create-skill', …]` names skills the CLI then cannot
+ * resolve, and the `Skill` tool answers "Unknown skill" for every one of them. Measured in the
+ * window; nothing failed and nothing was logged, which is what makes it worth this comment.
+ *
+ * So the plugin is loaded PROGRAMMATICALLY instead, which is the same trade `settingSources: []`
+ * makes everywhere else in this app: everything the session gets is passed in by name from here,
+ * rather than merged in from files nobody looked at. The one this app ships is the one it loads —
+ * a plugin the user installed globally still does not reach a pane session.
+ *
+ * MEASURED, BECAUSE THE OBVIOUS OBJECTION IS RIGHT ABOUT `settingSources` AND WRONG HERE. This
+ * plugin also ships `hooks/hooks.json`, whose `PreToolUse` entry appends every tool call to
+ * `<project>/.claude/maestro_session.log.jsonl` — which is exactly the pollution SESSION-PANE-PLAN
+ * names as a reason not to load project settings, since `/session-log` is a view built for
+ * orchestrator runs. Checked in the window against a fixture that HAS a `maestro.json` (the hook
+ * no-ops without one, so a fixture without one would have proved nothing): after a turn that read
+ * a file, no log file exists. A plugin loaded through this option contributes its skills, agents
+ * and commands; its hooks do not run.
+ *
+ * Derived from `bundledAgentsDir()` rather than searched for separately, so the two cannot end up
+ * pointing at different checkouts: the agents directory is `<plugin>/agents`.
+ */
+export function bundledPluginDir(): string | null {
+  const agents = bundledAgentsDir();
+  return agents ? path.dirname(agents) : null;
+}

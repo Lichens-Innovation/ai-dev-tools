@@ -37,15 +37,30 @@ session grant is one more origin on that list, which is also what makes it lista
 the header without a second rendering path. Keep the provenance: "the user granted this, in this
 session" is exactly the distinction a flat list of directories destroys.
 
-**Nothing has widened a read scope yet, so the ground is emptier than the shape suggests.** `018`
-deliberately did **not** widen reads: it passes **no `additionalDirectories`**, and a run's read
-scope is its cwd. It also loads no filesystem settings (`settingSources: []`), so the user-, project-
-and local-tier directories `017` was built to disclose are no longer contributed by anything —
-what remains is the cwd plus the managed (administrator) policy tier, which `[]` does not drop. The
-`ClaudeReadDirectory` provenance machinery is therefore in place and barely exercised; `019` adds the
-first real `additionalDirectories` (the project and the marketplace), and this slice adds the first
-that came from a user decision. Expect to be the first caller to prove the origin field earns its
-keep, and do not read "the settings say so" as a live origin in a run.
+**The form path has still never widened a read scope, so the ground is emptier than the shape
+suggests.** `018` deliberately did **not** widen reads: it passes **no `additionalDirectories`**, and
+a run's read scope is its cwd. It also loads no filesystem settings (`settingSources: []`), so the
+user-, project- and local-tier directories `017` was built to disclose are no longer contributed by
+anything — what remains is the cwd plus the managed (administrator) policy tier, which `[]` does not
+drop. Do not read "the settings say so" as a live origin in a run.
+
+### What `019` already built, and what it deliberately did not
+
+- **`additionalDirectories` already exists and is already populated — this slice grows a list rather
+  than introducing one.** The pane's read scope is the open project **plus every local marketplace**,
+  not "the resolved marketplace": with no create-form handoff in `019` there was no single one to
+  name, so main resolves them itself with `listMarketplaces()` over the `source: "directory"` entries
+  of `~/.claude/plugins/known_marketplaces.json`. They render with the new `ReadScopeOrigin` value
+  `"app"`. A session grant is one more origin beside it, which is what makes it listable and
+  revocable in the header without a second rendering path.
+- **The boundary layer exists and currently denies.** `src/core/session-scope.ts` (`decideBoundary`,
+  `boundaryTargetOf`, `BOUNDED_TOOLS`, `UNBOUNDED_TOOLS`) is the pure decision, returning
+  `{ decision: "out-of-scope", path, reason }`; `agent-sdk.ts` maps that to
+  `permissionDecision: "deny"` today, and `020` is what turns it into `"ask"` and gives it a prompt to
+  route into. By the time this slice runs, that routing is the thing a grant answers.
+- **The hook is wired only to the read-only tools, and that separation is load-bearing here.**
+  `session-scope.ts` knows how to check write tools as well, precisely so widening writes cannot
+  widen reads by accident — which is the mistake this slice is best placed to make.
 
 Watch the other doors while you are here. The scope can also be widened by a directory-add command
 typed into the composer, by a control request from outside, and by the working directory moving.

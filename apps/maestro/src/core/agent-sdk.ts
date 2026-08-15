@@ -56,11 +56,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
-import { decideWrite, READ_ONLY_TOOLS } from "./write-scope.js";
+import { cliNotFoundMessage, resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
+import { decideWrite, targetPathOf, READ_ONLY_TOOLS } from "./write-scope.js";
+import { decideBoundary } from "./session-scope.js";
 import type {
   ClaudeOutputChunk,
   EffectiveSettingsSnapshot,
+  SessionEvent,
+  SessionEventBody,
   SettingsPermissions,
   SettingsPort,
   SettingsSourceInfo,
@@ -614,6 +617,370 @@ export function startAgentSession(request: AgentSessionRequest): AgentSession {
       query?.close();
     },
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The pane session — the same SDK, driven as a conversation rather than as a job.
+//
+// `startAgentSession` above takes a `prompt` STRING, which gives a one-shot query: there is no way
+// to add a turn to it and no working Stop, because `interrupt()` exists only in streaming-input
+// mode. So the pane's session is a sibling of that function over the same options rather than a
+// second SDK importer — this module is still the only one in the app that imports the SDK, and
+// `test/isolation.test.ts` pins that.
+//
+// Three things are genuinely new here, and each is load-bearing:
+//
+//   • **Input is a stream the app yields into.** A queue plus an async generator, closed when the
+//     session is disposed. Deciding this later would mean rewriting the message pump.
+//   • **A turn is stamped `origin: { kind: "human" }`.** Claude Code treats an unattributed user
+//     message differently, and checks that require a human-typed prompt reject it. That is what
+//     makes "the user writes the prompts, not the renderer" enforceable at the SDK boundary rather
+//     than only in a test.
+//   • **A `PreToolUse` hook bounds READS.** `canUseTool` cannot: it fires only for calls that would
+//     otherwise prompt, and `Read`/`Glob`/`Grep` never do. The hook fires for every tool call,
+//     before the permission flow, so it is the only place a read can be stopped at all.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The tools a PANE session is offered — `SESSION_TOOLS` extended, never a second list.
+ *
+ * `Skill` arrives here and not in the headless set for the reason `SESSION_TOOLS` states: a session
+ * can be asked a follow-up question and a print-mode run cannot. It is also what the deleted help
+ * chat is replaced by — that chat asked for `super-help` by pasting its name into a prompt string;
+ * the pane declares it as a session skill and lets the model reach it as a tool.
+ *
+ * `AskUserQuestion` is in SESSION-PANE-PLAN.md's set and is deliberately still absent: nothing in
+ * this slice can render a structured question, and a tool that is offered and then refused costs
+ * turns to argue with, where one that was never offered costs nothing. It arrives with the
+ * question UI in `021`.
+ */
+export const PANE_TOOLS = [...SESSION_TOOLS, "Skill"] as const;
+
+/**
+ * The skills a pane session may reach by name.
+ *
+ * The four create-\* skills so a conversation can finish the work a form started (`022`/`026` build
+ * on that), and `super-help` because it is the one thing the pane inherits from the help chat —
+ * now a declared session skill rather than a sentence in a generated prompt.
+ */
+export const PANE_SKILLS = [
+  "create-skill",
+  "create-subagent",
+  "create-plugin",
+  "create-marketplace",
+  "super-help",
+] as const;
+
+/** What the pane can say about the CLI before a session exists. Resolved here, never in main. */
+export interface PaneSessionTarget {
+  bin: string | null;
+  available: boolean;
+  searched: string[];
+  /** Set only when `available` is false: what was looked for, and where. */
+  unavailable: string | null;
+}
+
+/**
+ * Where the pane's `claude` would come from.
+ *
+ * Exists so `src/main/claude-session.ts` does not have to call `resolveClaudeCli` itself: the list
+ * of modules that produce a path to the CLI is the list of ways to reach it, `test/isolation.test.ts`
+ * asserts it is two modules long, and a session pane is not a reason to make it three.
+ */
+export function paneSessionTarget(opts: ResolveOptions = {}): PaneSessionTarget {
+  const cli = resolveClaudeCli(opts);
+  return {
+    bin: cli.bin,
+    available: cli.available,
+    searched: cli.searched,
+    unavailable: cli.available ? null : cliNotFoundMessage(cli),
+  };
+}
+
+export interface PaneSessionRequest {
+  /** Where the session runs, and the root of what it can read. */
+  cwd: string;
+  /** The resolved `claude` binary. Never a PATH lookup — see `paneSessionTarget`. */
+  bin: string;
+  /**
+   * Trees beyond `cwd` this session may read, passed to the SDK as `additionalDirectories` AND used
+   * as the boundary the hook enforces. One list, so the disclosure and the check cannot disagree.
+   */
+  additionalDirectories: readonly string[];
+  /**
+   * The Maestro plugin's root directory, or null when this build does not ship it.
+   *
+   * `settingSources: []` loads no installed plugins, so naming a skill in `skills` is not enough
+   * to make it resolvable — measured in the window, the `Skill` tool answered "Unknown skill" for
+   * every name in `PANE_SKILLS` until the plugin was loaded here. Passing the path is the same
+   * trade this app makes everywhere else: what the session gets is what this process handed it,
+   * not what a file on disk happened to say.
+   */
+  pluginDir: string | null;
+  /** How to start the CLI — a detached process-group leader, supplied by the caller. */
+  spawn: (options: SpawnOptions) => SpawnedProcess;
+  /** Everything that happens, in order, as it happens. */
+  emit(event: SessionEvent): void;
+  envOptions?: ResolveOptions;
+}
+
+export interface PaneSession {
+  /**
+   * Add a turn. The text is the USER'S, verbatim: nothing here wraps it, and nothing may.
+   *
+   * Returns false when the session has already ended, so the caller can say so rather than dropping
+   * the turn into a closed stream.
+   */
+  say(text: string): boolean;
+  /** Interrupt the turn in flight, leaving the session usable. */
+  stop(): Promise<void>;
+  /** End the session and release the CLI. Idempotent, and safe before the import resolves. */
+  close(): void;
+  /** Resolves when the session is over. Never rejects. */
+  ended: Promise<{ error: string | null }>;
+}
+
+/** The user turn, in the SDK's own shape. The `origin` is the point — see the block comment above. */
+function humanTurn(text: string): {
+  type: "user";
+  message: { role: "user"; content: string };
+  parent_tool_use_id: null;
+  origin: { kind: "human" };
+} {
+  return {
+    type: "user",
+    message: { role: "user", content: text },
+    parent_tool_use_id: null,
+    origin: { kind: "human" },
+  };
+}
+
+/**
+ * Start a live session and drive it from a stream of user turns.
+ *
+ * Returns synchronously for the same reason `startAgentSession` does: the SDK import is dynamic, so
+ * the query does not exist yet, and `say`/`close` are written to cope with being called in that
+ * window — a turn typed before the import resolves is queued, not lost.
+ *
+ * Never rejects. Every failure is an `ended` event with a reason on it.
+ */
+export function startPaneSession(request: PaneSessionRequest): PaneSession {
+  const { env } = agentChildEnv(request.envOptions);
+  const readable = [request.cwd, ...request.additionalDirectories];
+
+  let seq = 0;
+  const emit = (event: SessionEventBody): void => request.emit({ ...event, seq: ++seq } as SessionEvent);
+
+  // ── the input pump ────────────────────────────────────────────────────────
+  // A queue and one waiting resolver. `say` pushes; the generator below yields. Closing resolves
+  // the waiter with `null`, which ends the generator, which ends the query — that is the only
+  // orderly way out of a stream the SDK is iterating.
+  const queue: Array<ReturnType<typeof humanTurn>> = [];
+  let wake: ((value: null) => void) | null = null;
+  let closed = false;
+
+  async function* turns() {
+    for (;;) {
+      while (queue.length > 0) {
+        const next = queue.shift()!;
+        if (closed) return;
+        yield next;
+      }
+      if (closed) return;
+      await new Promise<null>((resolve) => {
+        wake = resolve;
+      });
+    }
+  }
+
+  let query: { close(): void; interrupt(): Promise<unknown> } | null = null;
+  let resolveEnded: (value: { error: string | null }) => void = () => {};
+  const ended = new Promise<{ error: string | null }>((resolve) => {
+    resolveEnded = resolve;
+  });
+
+  const finish = (error: string | null): void => {
+    if (!closed) closed = true;
+    wake?.(null);
+    wake = null;
+    emit({ kind: "ended", error });
+    resolveEnded({ error });
+  };
+
+  void (async () => {
+    try {
+      // Literal specifier, not AGENT_SDK_PACKAGE — see the note at `runAgentSdkSmoke`.
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      if (closed) return finish(null);
+
+      const q = sdk.query({
+        prompt: turns(),
+        options: {
+          cwd: request.cwd,
+          pathToClaudeCodeExecutable: request.bin,
+          env,
+          spawnClaudeCodeProcess: request.spawn,
+          // The first time this app passes any: `018` widened nothing, so a run reads its cwd. The
+          // same list the boundary hook below checks against.
+          additionalDirectories: [...request.additionalDirectories],
+          tools: [...PANE_TOOLS],
+          disallowedTools: [...SESSION_DISALLOWED_TOOLS],
+          // The skills the pane may reach, and the plugin they live in. Both, or neither works —
+          // see `PaneSessionRequest.pluginDir`.
+          skills: [...PANE_SKILLS],
+          plugins: request.pluginDir ? [{ type: "local" as const, path: request.pluginDir }] : [],
+          permissionMode: "default",
+          // Nothing on disk configures this session — not its permissions, not its skills, and not
+          // where the bill goes. Note the consequence: CLAUDE.md files are NOT auto-loaded, since
+          // the SDK needs `settingSources` to include 'project' for that. The model can still Read
+          // them, and the pane should expect to be told to.
+          settingSources: [],
+          systemPrompt: { type: "preset", preset: "claude_code" },
+          hooks: {
+            // THE READ BOUNDARY. `canUseTool` cannot do this: it fires only for calls that would
+            // otherwise prompt, and reads never do. This fires for every tool call.
+            PreToolUse: [
+              {
+                hooks: [
+                  async (input: unknown) => {
+                    const hook = input as { tool_name?: string; tool_input?: Record<string, unknown> };
+                    const tool = String(hook.tool_name ?? "");
+                    const toolInput = hook.tool_input ?? {};
+                    // Only where `decideWrite` does not answer. Every write is already refused by
+                    // the empty write scope with a reason the model can act on, and letting the
+                    // boundary answer first would replace that reason with a different one.
+                    if (!(READ_ONLY_TOOLS as readonly string[]).includes(tool)) return {};
+
+                    const verdict = decideBoundary({
+                      tool,
+                      input: toolInput,
+                      directories: readable,
+                      cwd: request.cwd,
+                    });
+                    if (verdict.decision === "allow") return {};
+
+                    // Hook denials are NOT reported through `SDKPermissionDeniedMessage`, so this
+                    // layer owns its own transcript entry. Losing that would make an out-of-scope
+                    // read look like a tool that simply found nothing.
+                    emit({
+                      kind: "refusal",
+                      tool,
+                      target: verdict.path || null,
+                      reason: verdict.reason,
+                    });
+                    return {
+                      hookSpecificOutput: {
+                        hookEventName: "PreToolUse" as const,
+                        // `020` changes this one word to "ask", which ROUTES the call into the
+                        // permission prompt instead of refusing it. The verdict above is already
+                        // spelled "out-of-scope" rather than "deny" so that stays a one-line change.
+                        permissionDecision: "deny" as const,
+                        permissionDecisionReason: verdict.reason,
+                      },
+                    };
+                  },
+                ],
+              },
+            ],
+          },
+          canUseTool: async (tool: string, input: Record<string, unknown>) => {
+            // The SAME engine the form path uses, with an empty write scope — not a second one.
+            // `writable: []` is already a working state: it refuses every write with a reason
+            // saying the run was started to answer rather than to author.
+            const decision = decideWrite({ tool, input, writable: [], cwd: request.cwd });
+            if (decision.behavior === "allow") return { behavior: "allow" as const };
+            emit({
+              kind: "refusal",
+              tool,
+              target: targetPathOf(input),
+              reason: decision.message,
+            });
+            return decision;
+          },
+          stderr: (chunk: string) => {
+            const text = chunk.trim();
+            if (text) emit({ kind: "notice", text });
+          },
+        },
+      });
+      query = q;
+      if (closed) {
+        q.close();
+        return finish(null);
+      }
+
+      for await (const message of q) {
+        if (message.type === "assistant") {
+          for (const event of assistantEvents(message.message?.content)) emit(event);
+          continue;
+        }
+        if (message.type === "result") {
+          // A turn ended — NOT the session. A streaming-input query emits one result per turn and
+          // keeps running, which is exactly why the pump above stays open.
+          emit({
+            kind: "turn",
+            ok: message.subtype === "success" && !message.is_error,
+            error: message.subtype === "success" && !message.is_error ? null : `The turn ended as ${message.subtype}.`,
+            costUsd: message.total_cost_usd ?? null,
+          });
+        }
+      }
+      finish(null);
+    } catch (err) {
+      finish(err instanceof Error ? err.message : String(err));
+    }
+  })();
+
+  return {
+    ended,
+    say(text: string): boolean {
+      if (closed) return false;
+      queue.push(humanTurn(text));
+      wake?.(null);
+      wake = null;
+      return true;
+    },
+    async stop(): Promise<void> {
+      try {
+        await query?.interrupt();
+      } catch {
+        /* nothing in flight, or a CLI that does not answer — Stop still tears down above */
+      }
+    },
+    close(): void {
+      closed = true;
+      wake?.(null);
+      wake = null;
+      query?.close();
+    },
+  };
+}
+
+/** Assistant text and tool calls, as separate transcript entries rather than one rendered string. */
+function assistantEvents(content: unknown): SessionEventBody[] {
+  if (!Array.isArray(content)) return [];
+  const events: SessionEventBody[] = [];
+  for (const block of content as Array<Record<string, unknown>>) {
+    if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
+      events.push({ kind: "assistant", text: block.text });
+    }
+    if (block?.type === "tool_use") {
+      const input = (block.input ?? {}) as Record<string, unknown>;
+      // The humanizer in the renderer renders `Tool(target)`; what counts as the target differs per
+      // tool, and picking it here keeps the renderer from learning tool-input shapes.
+      const target =
+        targetPathOf(input) ??
+        (typeof input.pattern === "string"
+          ? input.pattern
+          : typeof input.command === "string"
+            ? input.command
+            : typeof input.skill === "string"
+              ? input.skill
+              : null);
+      events.push({ kind: "tool", tool: String(block.name), target });
+    }
+  }
+  return events;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

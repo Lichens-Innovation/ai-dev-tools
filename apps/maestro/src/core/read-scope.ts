@@ -81,6 +81,16 @@ export interface ReadScopeInput {
   cwd: string;
   /** What the same preview says the run may write, so the two can be compared. */
   targets: ClaudeWriteTarget[];
+  /**
+   * Trees THIS APP adds beyond the working directory — what it passes as `additionalDirectories`.
+   *
+   * Empty for a previewed run: `018` passes none, so a run reads its cwd and nothing else. The
+   * session pane is the first caller to use it, for the marketplaces resolved out of
+   * `known_marketplaces.json`. They are listed with `origin: "app"` rather than folded in with the
+   * settings-contributed ones, because "the app chose this" and "a file you have not read chose
+   * this" are the two answers this disclosure exists to keep apart.
+   */
+  additional?: Array<{ path: string; note: string }>;
   /** The resolved cascade, or null when it could not be resolved. */
   settings: EffectiveSettingsSnapshot | null;
   /** Why `settings` is null. Required when it is — "nothing applied" is not the same answer. */
@@ -110,6 +120,16 @@ export function buildReadScope(input: ReadScopeInput): ClaudeReadScope {
   ];
 
   const seen = new Set([path.resolve(cwd)]);
+
+  // The app's own additions first, so the list reads outward from what the app chose before it
+  // reaches what a settings file added.
+  for (const extra of input.additional ?? []) {
+    const resolved = path.resolve(cwd, extra.path);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    directories.push({ path: resolved, origin: "app", tier: null, file: null, note: extra.note });
+  }
+
   for (const dir of settings?.effective.additionalDirectories ?? []) {
     const resolved = path.resolve(cwd, dir);
     if (seen.has(resolved)) continue;
@@ -182,7 +202,8 @@ function summarise(args: {
   unresolved: string | null;
 }): string {
   const { projectRoot, cwd, directories, projectReadable, writesOutsideReadScope, unresolved } = args;
-  const extra = directories.length - 1;
+  const fromApp = directories.filter((d) => d.origin === "app").length;
+  const extra = directories.filter((d) => d.origin === "settings").length;
   const parts: string[] = [];
 
   if (projectRoot && !withinDirectory(projectRoot, cwd)) {
@@ -197,6 +218,11 @@ function summarise(args: {
     parts.push(`This run reads ${cwd}.`);
   }
 
+  if (fromApp > 0) {
+    parts.push(
+      `The app also opened ${fromApp} ${fromApp === 1 ? "directory" : "directories"} for reading, listed below.`
+    );
+  }
   if (extra > 0) {
     parts.push(`${extra} further ${extra === 1 ? "directory was" : "directories were"} added by settings files.`);
   }

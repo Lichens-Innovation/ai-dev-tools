@@ -17,11 +17,33 @@ question and get a real answer. So the skills can be loaded as skills, invoked w
 inlined copies deleted. One source of guidance for the app and the terminal both, instead of two that
 drift apart with nothing to catch it.
 
-Two mechanical preconditions, both from `018`. The `Skill` tool is **not** in `SESSION_TOOLS`
-(`src/core/agent-sdk.ts`) — `019` adds it for the pane, and "loaded through the `skills` option"
-means nothing without it. And a session loads no filesystem settings (`settingSources: []`), so
-**`CLAUDE.md` files are not auto-loaded into a run**; a skill that assumed the model had already
-absorbed a project's conventions has to say so and let the model `Read` them.
+### What `019` already built, and what it deliberately did not
+
+- **The `Skill` tool is in the pane's set, and the five skills genuinely load.** `PANE_TOOLS` is
+  `[...SESSION_TOOLS, "Skill"]` in `src/core/agent-sdk.ts`, and a live session reports exactly
+  `ai-tools-manager:create-marketplace`, `:create-plugin`, `:create-skill`, `:create-subagent`,
+  `:super-help` and nothing else.
+- **`skills` alone was not enough, and that is worth knowing before you debug anything.** With
+  `settingSources: []`, naming skills in the `skills` option makes the `Skill` tool answer _"Unknown
+  skill"_ for every one of them, because no installed plugin reaches the session. What fixed it is
+  `plugins: [{ type: "local", path: bundledPluginDir() }]`.
+- **The pane loads the plugin BUNDLED WITH THE APP — `plugins/ai-tools-manager/` in this repo — not
+  the user's installed marketplace copy.** So an edit to a `SKILL.md` here reaches a pane session
+  immediately: no `plugin.json` version bump, no marketplace update, no cache to clear. That is the
+  opposite of every delivery path the `updating-maestro` skill describes, and it makes iterating on
+  these files in the app fast and slightly deceptive — **terminal users still read the version-keyed
+  marketplace cache**, so the version bump is still required before the rewrite reaches them, and the
+  terminal entry is half of what this task must prove.
+- **The plugin's `hooks.json` does not fire in a pane session.** Measured: a turn that read a file in
+  a project _with_ a `maestro.json` wrote no `maestro_session.log.jsonl`. A rewritten skill cannot
+  lean on Maestro's runtime hooks when it runs in the pane, and its tool calls will not appear in
+  `/session-log`.
+- **A session loads no filesystem settings (`settingSources: []`), so `CLAUDE.md` files are not
+  auto-loaded** — into a headless run or into the pane. A skill that assumed the model had already
+  absorbed a project's conventions has to say so and let the model `Read` them.
+- **"Ask rather than guess" depends on `021`, not on `019`.** `019` added only `Skill`;
+  `AskUserQuestion` is in no tool set in the app, so the facility these skills are meant to be the
+  first real consumer of arrives one slice later. Do not write a skill that assumes it before then.
 
 **Each skill must handle both entries.** These files are invoked from the terminal too, where no
 scaffold exists:

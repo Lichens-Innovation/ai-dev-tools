@@ -1,6 +1,6 @@
 # Session pane — a Claude session inside the desktop app
 
-**Status: designed, queued as tasks `015`–`026`.** Written 2026-08-04 after M5. Revised 2026-08-05
+**Status: queued as tasks `015`–`026`; `015`–`019` are done.** Written 2026-08-04 after M5. Revised 2026-08-05
 twice: first against the vendored SDK reference, then against a design interview that changed
 roughly half of it. The earlier draft's conclusions about transport and permissions survive; its
 scope, sequencing and tool story did not.
@@ -397,6 +397,57 @@ built; the pane slices build UI on top of it rather than a second engine.
   stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`); `spawnClaudeChild`
   is tested directly for the process-group property.
 
+## What `019` actually shipped, and where it differs from this page
+
+The pane exists, read-only, and the help chat is deleted. `src/main/claude-session.ts` owns one
+session per `webContents.id`; `startPaneSession()` in `agent-sdk.ts` is a **sibling** of
+`startAgentSession()` over the same options with a streaming-input pump, not a second SDK importer.
+`session-pane.tsx` + `utils/session-context.tsx` are the renderer half, mounted above the `Outlet`.
+Verified in the window: 12/12 on layout, 17/17 on a live session against a real `claude`, with 377
+unit tests, typecheck and build clean.
+
+Eight places where the shipped slice is not this page, each of which a later slice inherits:
+
+- **`AskUserQuestion` was NOT added to the tool set; only `Skill` was.** `PANE_TOOLS` is
+  `[...SESSION_TOOLS, "Skill"]`. Nothing in `019` can render a structured question, and by finding 5
+  an offered-then-refused tool costs turns to argue with while an unoffered one costs nothing. **`021`
+  owns adding it**, together with `toolConfig: { askUserQuestion: { previewFormat: 'markdown' } }` —
+  which is not passed anywhere yet.
+- **The read scope is the open project + EVERY local marketplace, not "the resolved marketplace"
+  (singular).** With no create-form handoff in `019` there is no single marketplace to name. Main
+  resolves them itself with `listMarketplaces()` — the `source: "directory"` entries of
+  `~/.claude/plugins/known_marketplaces.json` — so no name and no path crosses the process boundary.
+  The "two sets, not one" table above should be read with that substitution. **`022` and `023`
+  inherit a populated `additionalDirectories`**, so `023` grows a list rather than introducing one.
+- **Loading the plugin was required, and is absent from the spawn-options block above.** Measured:
+  with `settingSources: []`, `skills: ['super-help', …]` alone makes the `Skill` tool answer
+  _"Unknown skill"_ for every name, because no installed plugin reaches the session. The block needs
+  `plugins: [{ type: "local", path: bundledPluginDir() }]`, after which the session reports exactly
+  the five `ai-tools-manager:` skills and nothing else. Also measured: **the plugin's `hooks.json`
+  does not fire in the session** — a turn reading a file in a fixture _with_ a `maestro.json` wrote no
+  `maestro_session.log.jsonl` — so the `/session-log` pollution this page warns about for
+  `settingSources` does **not** arrive with `plugins`. Note which copy is loaded: the plugin
+  **bundled with the app**, not the user's installed marketplace cache, so `026`'s `SKILL.md` edits
+  reach the pane straight from the repo.
+- **An out-of-scope read is refused by the hook (`permissionDecision: "deny"`), not routed to a
+  prompt.** `019`'s criterion was "denied with a visible reason"; the `"ask"` routing described under
+  "Widening" belongs to `020`. `src/core/session-scope.ts` deliberately returns
+  `{ decision: "out-of-scope", path, reason }` rather than `"deny"`, so `020` changes one word in
+  `agent-sdk.ts` plus the UI.
+- **The boundary hook runs only on the read-only tools** (`BOUNDED_TOOLS` / `UNBOUNDED_TOOLS`).
+  `019` also required that a refused write carry `decideWrite`'s reason rather than a new one, and
+  letting the boundary answer first would have replaced it. `session-scope.ts` still knows how to
+  check write tools, so `023` cannot widen reads by accident when it widens writes.
+- **Nothing budget-related was passed** — no `maxBudgetUsd`, `taskBudget`, `effort`,
+  `enableFileCheckpointing` or `persistSession`. **`024` owns all of them**, and starts from a
+  `startPaneSession` that simply ends the session when the SDK stream ends.
+- **`interrupt()`'s receipt is not surfaced.** `stop()` awaits `query.interrupt()` and discards the
+  result, so verification item 12's `still_queued` is dropped. Outstanding against `024`.
+- **`settingSources: []` is now FOUR occurrences** — smoke, run session, pane session,
+  `resolveEffectiveSettings` — and `test/isolation.test.ts` counts four, having counted three after
+  `018`. The pane inherits the consequence: **a pane session auto-loads no `CLAUDE.md`**, and the
+  model should be expected to be told to `Read` one.
+
 ## Budget is a ceiling with a door
 
 `maxBudgetUsd` is compared against a **client-side estimate** with documented accuracy caveats — a
@@ -520,17 +571,21 @@ ENOENT` in a GUI-launched app. On this machine `~/.local/bin/claude` is a bun-co
 
 ## Acceptance criteria
 
-- [ ] A live, multi-turn Claude session runs inside the app, per project, on the Agent SDK
-- [ ] The help chat is gone and the pane is the only conversational surface
-- [ ] Permission requests render per-tool (path + diff, full URL) and are answerable
-- [ ] `AskUserQuestion` renders as a structured choice, answered by validated selection
+- [x] A live, multi-turn Claude session runs inside the app, per project, on the Agent SDK (`019`)
+- [x] The help chat is gone and the pane is the only conversational surface (`019`)
+- [ ] Permission requests render per-tool (path + diff, full URL) and are answerable — `020`
+- [ ] `AskUserQuestion` renders as a structured choice, answered by validated selection — `021`;
+      the tool is not yet in `PANE_TOOLS`
 - [ ] Read scope is disclosed before a session starts; write scope starts empty and grows only per submit
+      — disclosed and empty since `019`; the per-submit growth is `022`
 - [ ] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
-- [ ] Session-scoped directory grants work and never touch disk
+      — the hook exists and **denies** since `019`; `020` routes it to `"ask"`
+- [ ] Session-scoped directory grants work and never touch disk — `023`
 - [ ] Auto-denied and hook-denied tool calls are both visible in the transcript
 - [x] `Bash` is absent from the session and `git init` is deterministic (`016` + `018`)
 - [x] `acceptEdits` exists nowhere in the app (`018`)
-- [ ] No orphaned child process survives window close, project switch, or app quit
-- [ ] A per-session budget ceiling is enforced, surfaced, and continuable
-- [ ] A terminal-started session can be resumed, with its prior reads disclosed first
-- [ ] `test/isolation.test.ts` pins the invariant properties above
+- [x] No orphaned child process survives window close, project switch, or app quit (`018` + `019`)
+- [ ] A per-session budget ceiling is enforced, surfaced, and continuable — `024`
+- [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`
+- [ ] `test/isolation.test.ts` pins the invariant properties above — partially; `019` added the
+      **"the session pane"** describe

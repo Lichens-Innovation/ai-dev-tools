@@ -20,6 +20,40 @@ Two of the requirements below are therefore already met on the form path and mus
 `WriteDecision` is a two-shape union whose fall-through is a **deny**, so returning `undefined`/`null`
 is already unrepresentable; and every deny already carries a reason the model reads and adapts to.
 
+### What `019` already built, and what it deliberately did not
+
+The pane, the transcript and the boundary hook all exist. This slice is smaller than it reads.
+
+- **The `PreToolUse` boundary hook is built, and it denies rather than asks.** `src/core/session-scope.ts`
+  is the decision — `decideBoundary` / `boundaryTargetOf` / `BOUNDED_TOOLS` / `UNBOUNDED_TOOLS`, pure,
+  with exhaustive tests in `test/core/session-scope.test.ts`. It returns `{ decision: "allow" }` or
+  `{ decision: "out-of-scope", path, reason }` — **deliberately not the word `"deny"`**, because
+  `agent-sdk.ts` is the only place that translates it, and it currently maps it to
+  `permissionDecision: "deny"`. Routing an out-of-scope read into the prompt UI is **one word there**
+  plus the UI on this side of the wire. Do not rewrite the module.
+- **The hook runs only over the read-only tools, and must keep doing so.** `019` also required that a
+  refused write carry `decideWrite`'s reason rather than a new one, and letting the boundary answer
+  first would have replaced it. `session-scope.ts` knows how to check write tools too, so widening
+  what it is wired to is a live hazard rather than a theoretical one.
+- **The stream, the channel and the single owner exist.** `SessionEvent` / `SessionEventBody` are in
+  `src/core/contracts.ts`, `session:event` is the push channel, and
+  `renderer/src/utils/session-context.tsx` is the **only** module in the renderer allowed to touch
+  `window.maestro.session`. A pending prompt is another `SessionEventBody` variant and another
+  handler beside `session:start/info/say/stop/end` — not a second subscriber, which would steal the
+  session the way a second log subscriber steals the tail.
+- **The teardown paths that must resolve outstanding asks already exist and are already called.**
+  `announce()` calls `endAllSessions()` on a project switch; `disposeIpc()` calls `disposeSessions()`;
+  the escalation is `terminateChildGroup()`, shared with `cancelClaudeRun`. Each is a place an
+  unresolved parked promise would wedge a session — they are the hooks to hang the default denial on,
+  not new work.
+- **Stop already exists as its own control.** `session:stop` interrupts the turn and leaves the
+  session usable, verified live. That is one of the two controls this slice needs; the `interrupt: true`
+  deny is the other. Note that `stop()` currently **awaits `query.interrupt()` and discards the
+  result**, so a `still_queued` receipt reaches nothing — surface it here or leave it explicitly to
+  `024`, but do not leave it unnoticed.
+- **No question can arrive through the callback yet.** `AskUserQuestion` is not in `PANE_TOOLS`
+  (`019` added only `Skill`), so the branch for it is `021`'s, not this slice's.
+
 A permission request parks a promise in the main process and resolves it when the user answers.
 That registry is the fiddly part:
 

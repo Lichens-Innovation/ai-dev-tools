@@ -46,6 +46,7 @@ import {
 } from "../core/index.js";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
+  SessionInfo,
   ClaudePreview,
   ClaudeRequest,
   CreateOptions,
@@ -69,6 +70,15 @@ import type {
   WorkflowsData,
 } from "../shared/ipc.js";
 import { bundledAgentsDir } from "./bundled-assets.js";
+import {
+  disposeSessions,
+  endAllSessions,
+  endSession,
+  saySession,
+  sessionInfo,
+  startSession,
+  stopSession,
+} from "./claude-session.js";
 import { currentRoot, forgetProject, getState, openProject } from "./project-store.js";
 
 /**
@@ -132,6 +142,13 @@ function announce(state: ProjectState): ProjectState {
   // Claude against the repo the window is no longer showing — the same class of bug the workflow
   // store's projectRoot key exists for. Runs already in flight keep their own cwd and are left alone.
   clearInvocations();
+  // A live session ENDS on a switch, and nothing is started against the new project. Not a
+  // retarget, unlike the tails above: a tail has no state to lose and a conversation does, so
+  // silently re-pointing a transcript about repository A at repository B would be worse than
+  // losing it — and starting one implicitly would spend the user's subscription on a project they
+  // have only just opened. Same failure class as `seedWorkflowStore`'s keying; both prior
+  // instances of it were silent.
+  endAllSessions();
   return state;
 }
 
@@ -367,6 +384,31 @@ export function registerIpc(): void {
     cancelClaudeRun(token);
   });
 
+  // ── the session pane ─────────────────────────────────────────────────
+  // The app's second way to reach a model, and the difference from the bridge above is who wrote
+  // the prompt. There is no preview channel here and no token, because there is nothing for main
+  // to have authored: `session:say` forwards TEXT THE USER TYPED and the SDK is told so
+  // (`origin: { kind: "human" }`). What the session may do is decided entirely in main — the cwd
+  // comes from the open project, the readable directories from `known_marketplaces.json`, and the
+  // write scope is empty with no channel by which it could become anything else.
+  //
+  // One session per window, ended on a project switch (see `announce`) and reaped on quit.
+  ipcMain.handle(IPC.sessionStart, async (e): Promise<SessionInfo> => {
+    // The window going away is the case that leaves a detached `claude` running against the user's
+    // repo with nothing left to stop it from — a reload counts, and there is no prompt timeout to
+    // rescue it.
+    e.sender.once("destroyed", () => endSession(e.sender.id));
+    return startSession(e.sender.id, currentRoot() ?? "");
+  });
+
+  ipcMain.handle(IPC.sessionInfo, async (e): Promise<SessionInfo> => sessionInfo(e.sender.id, currentRoot() ?? ""));
+
+  ipcMain.handle(IPC.sessionSay, (e, id: string, text: string): boolean => saySession(e.sender.id, id, text));
+
+  ipcMain.handle(IPC.sessionStop, async (e, id: string): Promise<boolean> => stopSession(e.sender.id, id));
+
+  ipcMain.handle(IPC.sessionEnd, (e): void => endSession(e.sender.id));
+
   // ── usage stats ──────────────────────────────────────────────────────
   // The same two-handler shape, and for a reason of its own: with no `ccusage` installed locally,
   // answering this question DOWNLOADS A PACKAGE FROM NPM AND EXECUTES IT. help-server did that on
@@ -409,4 +451,6 @@ export function disposeIpc(): void {
   // Without this, quitting the app leaves Claude running against the user's repo with no window
   // left to stop it from.
   disposeClaudeRuns();
+  // And the pane's sessions, which are detached for the same reason and outlive us the same way.
+  disposeSessions();
 }

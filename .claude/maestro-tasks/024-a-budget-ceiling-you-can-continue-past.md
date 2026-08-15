@@ -33,6 +33,25 @@ already carries `costUsd`, `numTurns` and `sessionId` off the SDK's own result m
 off its init message. That is the end-of-session figure; what this slice adds is the running one and
 the ceiling. `sessionId` is also what **Continue** resumes against, and what `025` lists.
 
+### What `019` already built, and what it deliberately did not
+
+- **`019` passed nothing budget-related at all**, and this slice owns every one of them: no
+  `maxBudgetUsd`, no `taskBudget`, no `effort`, no `enableFileCheckpointing`, no `persistSession`.
+  `startPaneSession()` in `src/core/agent-sdk.ts` is the single place they go in — extend that
+  options object rather than adding a second session builder; it is a sibling of `startAgentSession`
+  over the same options and `agent-sdk.ts` is still the only module in the app that imports the SDK.
+- **`startPaneSession` simply ends the session when the SDK stream ends.** So the end path exists but
+  carries no reason a UI could branch on. "The budget fires, the session ends cleanly, and the pane
+  offers Continue" needs the ending to say _why_ — that distinction is new work, and it is the
+  difference between a door and a crash.
+- **The surfaces to render on already exist.** `SessionInfo` and `session:info` are there to carry
+  spend-to-date, `session:event` is the stream to push it on, and the pane header is where `019` put
+  the read-scope disclosure — that is where an effort level and a model selector belong.
+- **`interrupt()`'s receipt is discarded.** `stop()` awaits `query.interrupt()` and drops the result,
+  so `SESSION-PANE-PLAN.md`'s verification item 12 — a `still_queued` reflected in the UI rather than
+  dropped — is outstanding. It belongs to this slice unless `020` picked it up first; check before
+  assuming either.
+
 Surface spend as it accrues rather than only at the end, and put an effort level and a model
 selector in the header — both can change on a live session without losing the conversation, and
 effort is a larger lever than model choice for a session that mostly reads.

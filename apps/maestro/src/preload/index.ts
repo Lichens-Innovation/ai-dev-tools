@@ -5,7 +5,14 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
-import type { ClaudeOutputChunk, MaestroApi, ProjectState, SaveInput, SessionLogEntry } from "../shared/ipc.js";
+import type {
+  ClaudeOutputChunk,
+  MaestroApi,
+  ProjectState,
+  SaveInput,
+  SessionEvent,
+  SessionLogEntry,
+} from "../shared/ipc.js";
 
 const api: MaestroApi = {
   project: {
@@ -65,6 +72,24 @@ const api: MaestroApi = {
         .finally(() => ipcRenderer.removeListener(IPC_EVENTS.claudeOutput, listener));
     },
     cancel: (token) => ipcRenderer.invoke(IPC.claudeCancel, token),
+  },
+  session: {
+    // No argument: the project comes from main's own state, exactly as `claude:preview` takes its
+    // cwd from there. A renderer cannot start a session against a directory of its choosing.
+    start: () => ipcRenderer.invoke(IPC.sessionStart),
+    info: () => ipcRenderer.invoke(IPC.sessionInfo),
+    // The session id and the USER'S TEXT. Nothing else crosses — no system prompt, no history, no
+    // tool list, no directory. Main stamps the turn as human-authored; a preload that let the
+    // renderer send anything more would be the renderer authoring a prompt, which is the one thing
+    // this app's whole Claude surface is built to prevent.
+    say: (id, text) => ipcRenderer.invoke(IPC.sessionSay, id, text),
+    stop: (id) => ipcRenderer.invoke(IPC.sessionStop, id),
+    end: () => ipcRenderer.invoke(IPC.sessionEnd),
+    subscribe: (onEvent) => {
+      const listener = (_e: unknown, event: SessionEvent) => onEvent(event);
+      ipcRenderer.on(IPC_EVENTS.sessionEvent, listener);
+      return () => ipcRenderer.removeListener(IPC_EVENTS.sessionEvent, listener);
+    },
   },
   stats: {
     // A view name, never an argv: main resolves `ccusage` and builds the command, exactly as it
