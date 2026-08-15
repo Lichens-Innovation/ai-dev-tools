@@ -22,12 +22,12 @@
   color: var(--ink-2);
 }
 
-.tabs button[aria-selected='true'] {
+.tabs button[aria-selected="true"] {
   color: var(--ink);
 }
 
-.tabs button[aria-selected='true']::after {
-  content: '';
+.tabs button[aria-selected="true"]::after {
+  content: "";
   position: absolute;
   left: 0.75rem;
   right: 0.75rem;

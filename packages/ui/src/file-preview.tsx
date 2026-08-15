@@ -1,17 +1,17 @@
-import type { ReactNode } from 'react'
-import SyntaxLine from './syntax-line'
+import type { ReactNode } from "react";
+import SyntaxLine from "./syntax-line";
 
 interface FilePreviewProps {
-  label?: string
-  filename: string
-  fileIcon?: ReactNode
-  path?: string
-  lines?: string[]
-  children?: ReactNode
+  label?: string;
+  filename: string;
+  fileIcon?: ReactNode;
+  path?: string;
+  lines?: string[];
+  children?: ReactNode;
 }
 
 export default function FilePreview({
-  label = 'Template preview',
+  label = "Template preview",
   filename,
   fileIcon,
   path,
@@ -42,12 +42,12 @@ export default function FilePreview({
             ? lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-[40px_1fr] pr-3">
                   <span className="text-(--ink-4) opacity-55 text-right pr-3 text-[11px] select-none">{i + 1}</span>
-                  <span className="whitespace-pre-wrap wrap-break-word">{l ? <SyntaxLine raw={l} /> : ' '}</span>
+                  <span className="whitespace-pre-wrap wrap-break-word">{l ? <SyntaxLine raw={l} /> : " "}</span>
                 </div>
               ))
             : children}
         </div>
       </div>
     </div>
-  )
+  );
 }

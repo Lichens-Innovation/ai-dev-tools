@@ -4,11 +4,11 @@
  * in fallbacks. Do not put the remote URL back: see README.md, and regenerate with
  * `node scripts/vendor-fonts.mjs` rather than editing ./fonts.css by hand.
  */
-@import './fonts.css';
-@import 'tailwindcss';
+@import "./fonts.css";
+@import "tailwindcss";
 @source '../ui/src/**/*.{tsx,ts}';
 @plugin '@tailwindcss/typography';
-@import 'tw-animate-css';
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -16,16 +16,14 @@
    TAILWIND THEME WIRING
    ─────────────────────────────────────────────────────────────── */
 @theme inline {
-  --font-sans:
-    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", "Courier New", monospace;
   /*
    * 'Bodoni Moda', not 'Domine': the CDN import only ever fetched Bodoni Moda italic 600/700 —
    * exactly what .display-title and .display-num ask for — while Domine was never loaded by
    * anything, so display text has been falling back to Georgia since the var was written.
    */
-  --font-serif: 'Bodoni Moda', Georgia, serif;
+  --font-serif: "Bodoni Moda", Georgia, serif;
   --color-background: var(--bg);
   --color-foreground: var(--ink);
   --color-card: var(--bg-2);
@@ -59,16 +57,16 @@
 /* ───────────────────────────────────────────────────────────────
    DESIGN SYSTEM — Sass partials
    ─────────────────────────────────────────────────────────────── */
-@import './scss/abstracts/_tokens.scss';
-@import './scss/base/_reset.scss';
-@import './scss/base/_typography.scss';
-@import './scss/components/_panels.scss';
-@import './scss/components/_buttons.scss';
-@import './scss/components/_chips.scss';
-@import './scss/components/_inputs.scss';
-@import './scss/components/_tables.scss';
-@import './scss/layout/_labels.scss';
-@import './scss/layout/_tabs.scss';
-@import './scss/layout/_cmd-row.scss';
-@import './scss/utilities/_animations.scss';
-@import './scss/utilities/_misc.scss';
+@import "./scss/abstracts/_tokens.scss";
+@import "./scss/base/_reset.scss";
+@import "./scss/base/_typography.scss";
+@import "./scss/components/_panels.scss";
+@import "./scss/components/_buttons.scss";
+@import "./scss/components/_chips.scss";
+@import "./scss/components/_inputs.scss";
+@import "./scss/components/_tables.scss";
+@import "./scss/layout/_labels.scss";
+@import "./scss/layout/_tabs.scss";
+@import "./scss/layout/_cmd-row.scss";
+@import "./scss/utilities/_animations.scss";
+@import "./scss/utilities/_misc.scss";

@@ -25,14 +25,10 @@
 }
 
 .stat-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    120% 80% at 0% 0%,
-    var(--primary-dim),
-    transparent 55%
-  );
+  background: radial-gradient(120% 80% at 0% 0%, var(--primary-dim), transparent 55%);
   opacity: 0.6;
   pointer-events: none;
 }

@@ -11,7 +11,7 @@
 }
 
 .section-label::before {
-  content: '//';
+  content: "//";
   color: var(--primary);
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -36,7 +36,7 @@
 }
 
 .eyebrow::before {
-  content: '// ';
+  content: "// ";
   opacity: 0.65;
 }
 
@@ -54,7 +54,7 @@
 }
 
 .stamp::before {
-  content: '';
+  content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;

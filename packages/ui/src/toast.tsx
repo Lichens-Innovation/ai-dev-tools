@@ -1,64 +1,64 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import type { ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useState, useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export interface ToastOptions {
-  variant?: 'success' | 'error'
+  variant?: "success" | "error";
   /** Auto-dismiss delay in ms. 0 keeps it until manually closed. Default 4000. */
-  duration?: number
+  duration?: number;
 }
 
 interface ToastItem {
-  id: number
-  message: ReactNode
-  variant: 'success' | 'error'
+  id: number;
+  message: ReactNode;
+  variant: "success" | "error";
 }
 
 // ── Module-level store ─────────────────────────────────────────────
 // Imperative: routes call `toast(...)` directly, a single <Toaster /> renders.
-let items: ToastItem[] = []
-const listeners = new Set<() => void>()
-let nextId = 1
+let items: ToastItem[] = [];
+const listeners = new Set<() => void>();
+let nextId = 1;
 
 function emit() {
-  for (const l of listeners) l()
+  for (const l of listeners) l();
 }
 
 function dismiss(id: number) {
-  items = items.filter((t) => t.id !== id)
-  emit()
+  items = items.filter((t) => t.id !== id);
+  emit();
 }
 
 export function toast(message: ReactNode, opts: ToastOptions = {}) {
-  const id = nextId++
-  items = [...items, { id, message, variant: opts.variant ?? 'success' }]
-  emit()
-  const duration = opts.duration ?? 4000
-  if (typeof window !== 'undefined' && duration > 0) {
-    window.setTimeout(() => dismiss(id), duration)
+  const id = nextId++;
+  items = [...items, { id, message, variant: opts.variant ?? "success" }];
+  emit();
+  const duration = opts.duration ?? 4000;
+  if (typeof window !== "undefined" && duration > 0) {
+    window.setTimeout(() => dismiss(id), duration);
   }
-  return id
+  return id;
 }
 
 function subscribe(cb: () => void) {
-  listeners.add(cb)
+  listeners.add(cb);
   return () => {
-    listeners.delete(cb)
-  }
+    listeners.delete(cb);
+  };
 }
 
 function getSnapshot() {
-  return items
+  return items;
 }
 
-const EMPTY: ToastItem[] = []
+const EMPTY: ToastItem[] = [];
 function getServerSnapshot() {
-  return EMPTY
+  return EMPTY;
 }
 
 // ── Components ─────────────────────────────────────────────────────
 function ToastCard({ item }: { item: ToastItem }) {
-  const isError = item.variant === 'error'
+  const isError = item.variant === "error";
   return (
     <div
       role="status"
@@ -66,10 +66,20 @@ function ToastCard({ item }: { item: ToastItem }) {
     >
       <div
         className={`mt-px shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-          isError ? 'bg-red-500/15 text-red-500' : 'bg-(--primary-dim) text-(--primary)'
+          isError ? "bg-red-500/15 text-red-500" : "bg-(--primary-dim) text-(--primary)"
         }`}
       >
-        <svg viewBox="0 0 24 24" width={13} height={13} aria-hidden fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          width={13}
+          height={13}
+          aria-hidden
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           {isError ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M5 12l5 5L20 7" />}
         </svg>
       </div>
@@ -80,25 +90,35 @@ function ToastCard({ item }: { item: ToastItem }) {
         onClick={() => dismiss(item.id)}
         className="shrink-0 p-0.5 -mr-1 rounded text-(--ink-3) cursor-pointer hover:text-(--ink) focus:outline-none"
       >
-        <svg viewBox="0 0 24 24" width={13} height={13} aria-hidden fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          viewBox="0 0 24 24"
+          width={13}
+          height={13}
+          aria-hidden
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M6 6l12 12M18 6L6 18" />
         </svg>
       </button>
     </div>
-  )
+  );
 }
 
 export function Toaster() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  if (!mounted) return null
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   return createPortal(
     <div className="fixed bottom-5 right-5 z-[80] flex flex-col gap-2.5 items-end pointer-events-none">
       {snapshot.map((t) => (
         <ToastCard key={t.id} item={t} />
       ))}
     </div>,
-    document.body,
-  )
+    document.body
+  );
 }
