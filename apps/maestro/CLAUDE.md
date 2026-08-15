@@ -423,6 +423,12 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   argument by which a caller could widen it; `ccusage.ts` issues its token with `writable: []`.
 - **A directory means "anything under it"; a file means itself.** One `withinDirectory` check covers
   both, which is what `ClaudeWriteTarget.path` already documented.
+- **It bounds writes and does NOT bound reads.** `decideWrite` returns `allow` for
+  `Read`/`Glob`/`Grep` without looking at the path, deliberately: reads are auto-approved and never
+  raise a prompt, which is why the disclosure above exists at all. Bounding what a session may read
+  is a `PreToolUse` hook returning `permissionDecision: "ask"` — it _routes_ an out-of-scope read
+  into a prompt instead of silently allowing or silently failing it. Adding a path check to the
+  read-tool branch looks like the fix and is not one.
 - **The fall-through is a deny, never `undefined`/`null`.** The SDK reads `null` as "the host
   answered out of band" and the tool call then blocks forever with no timeout. `WriteDecision` is a
   two-shape union and the `default` branch is a refusal.
