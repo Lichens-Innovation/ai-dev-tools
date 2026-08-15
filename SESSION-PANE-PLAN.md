@@ -29,8 +29,10 @@ than overlaying it**. On the create-\* routes it takes the `FilePreview` column 
 begins: that column exists to show the file that _will be_ generated, and once Claude is writing
 it, the conversation is the more useful thing to have there — the artifact is already on disk.
 
-It **replaces the help chat**. `chat-panel.tsx`, `utils/chat-context.tsx`, the `{ kind: "help-chat" }`
-request and `CLAUDE_ASK_FLAGS` are all deleted. Two conversational surfaces would mean two
+It **replaces the help chat**. `chat-panel.tsx`, `utils/chat-context.tsx` and the
+`{ kind: "help-chat" }` request are all deleted. (`CLAUDE_ASK_FLAGS` went in `018`, along with
+`BuiltRequest.flags`: with `acceptEdits` gone there is no flag-level difference between an authoring
+invocation and an asking one — the difference is the write scope.) Two conversational surfaces would mean two
 transcripts and two consent models, and the help chat is strictly weaker — its whole design rests
 on a guarantee ("the user saw exactly what ran", `CLAUDE.md:341`) that a live session abandons
 anyway. What the pane inherits from it: the `super-help` skill dependency, now expressed as the
@@ -153,6 +155,10 @@ trap: it auto-approves without restricting, and unlisted tools fall through to `
 tools: ["Read", "Glob", "Grep", "Edit", "Write", "AskUserQuestion", "Skill", "TodoWrite", "WebSearch", "WebFetch"];
 disallowedTools: ["Bash", "Agent", "NotebookEdit"];
 ```
+
+`018` shipped this as `SESSION_TOOLS` / `SESSION_DISALLOWED_TOOLS` in `src/core/agent-sdk.ts`, minus
+**`AskUserQuestion` and `Skill`** — the form path is headless, so a question has nobody to answer it.
+The pane slices extend that constant rather than declaring a second list.
 
 **No `Bash`.** Its only genuine consumer in this system was a _prompt string_ — the
 create-marketplace prompt asked Claude to set up git — and a `git init` is exactly as deterministic
@@ -350,14 +356,46 @@ Both stay, because they differ in _who is driving_ — a form you filled in and 
 a conversation you steer turn by turn. What would make that indefensible is the two paths having
 different **authority**, so they share one permission engine:
 
-- **Form path.** `claude-run.ts` becomes an SDK query. It still takes a token and nothing else and
-  is still the only module that can start anything. `canUseTool` silently auto-allows `Edit`/`Write`
-  to exactly the path `resolveCreateTarget` returned and the dialog displayed, and denies everything
-  else. No prompt UI, no interruption — and **strictly narrower than the `acceptEdits` it replaces**,
-  which permits writing anything anywhere under the marketplace repo.
+- **Form path. Done in `018`.** `claude-run.ts` is an SDK query. It still takes a token and nothing
+  else and is still the only module that can start anything. `canUseTool` silently auto-allows
+  `Edit`/`Write` to exactly the paths `resolveCreateTarget` returned and the dialog displayed, and
+  denies everything else with a reason. No prompt UI, no interruption — and **strictly narrower than
+  the `acceptEdits` it replaced**, which permitted writing anything anywhere under the marketplace
+  repo.
 - **Pane path.** Per-action prompts, as above.
 
-`acceptEdits` then exists nowhere in the app.
+`acceptEdits` exists nowhere in the app. `test/isolation.test.ts` fails if it comes back.
+
+**What `018` actually shipped, and where it differs from this page.** The permission _engine_ is
+built; the pane slices build UI on top of it rather than a second engine.
+
+- `src/core/write-scope.ts` is the decision, pure and exhaustively unit-tested: `decideWrite`,
+  `targetPathOf`, `WRITE_TOOLS`, `READ_ONLY_TOOLS`, `WriteDecision`. The fall-through is a **deny**,
+  never `undefined`/`null`. `startAgentSession()` in `agent-sdk.ts` hands it to the SDK as
+  `canUseTool`; `SESSION_TOOLS` and `SESSION_DISALLOWED_TOOLS` are exported from the same module.
+- **The write scope rides on the preview token** — `ClaudeInvocation.writable`, the paths the
+  confirmation displayed. `runPreviewedClaude` has no argument by which a caller could widen it.
+  This is the shape `022` grows: a submitted form adds one directory, and nothing else can.
+- **The headless tool set is narrower than the pane's.**
+  `SESSION_TOOLS` = `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch, Edit, Write`.
+  **`AskUserQuestion` and `Skill` are NOT in it** —
+  the form path is still headless, so a question has nobody to answer it. `019`/`021`/`026` add
+  them; `SESSION_TOOLS` is the list to extend, not a new one to invent.
+- **`settingSources: []` now appears three times** in `agent-sdk.ts` — smoke query, session, and
+  `resolveEffectiveSettings()`, which backs the disclosure. They must move together or the
+  confirmation describes a session that no longer exists, and nothing fails.
+  **Consequence not anticipated here: `CLAUDE.md` files are no longer auto-loaded into a run**; the
+  SDK needs `settingSources` to include `'project'` for that. The model can still `Read` them. `[]`
+  does not drop the managed (administrator) policy tier.
+- **Reads were deliberately not widened.** No `additionalDirectories` is passed; the read scope is
+  the run's cwd. `023` is where `additionalDirectories` first appears.
+- **`ClaudePreview.argv` is now the _equivalent_ `claude -p` command line, not what is spawned.**
+  The SDK adds its own stream-protocol flags; `ClaudeRunResult.argv` reports what actually went out
+  and deliberately does not match. The dialog's row is labelled "Equivalent". `ClaudeRunResult.code`
+  is `0` on success and `null` otherwise.
+- **A fake `claude` on `PATH` is no longer a usable test double** — it cannot speak the SDK's private
+  stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`); `spawnClaudeChild`
+  is tested directly for the process-group property.
 
 ## Budget is a ceiling with a door
 
@@ -490,8 +528,8 @@ ENOENT` in a GUI-launched app. On this machine `~/.local/bin/claude` is a bun-co
 - [ ] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
 - [ ] Session-scoped directory grants work and never touch disk
 - [ ] Auto-denied and hook-denied tool calls are both visible in the transcript
-- [ ] `Bash` is absent from the session and `git init` is deterministic (second half done in `016`)
-- [ ] `acceptEdits` exists nowhere in the app
+- [x] `Bash` is absent from the session and `git init` is deterministic (`016` + `018`)
+- [x] `acceptEdits` exists nowhere in the app (`018`)
 - [ ] No orphaned child process survives window close, project switch, or app quit
 - [ ] A per-session budget ceiling is enforced, surfaced, and continuable
 - [ ] A terminal-started session can be resumed, with its prior reads disclosed first

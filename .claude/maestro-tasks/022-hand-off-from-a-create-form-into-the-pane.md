@@ -16,6 +16,13 @@ create resolution returned and the confirmation displayed. Every writable direct
 to a form the user filled in and a scaffold that already wrote a file there. Not a dialog they
 clicked through: an artifact they made, minutes ago.
 
+That shape already exists on the form path and should be carried over rather than re-derived: since
+`018`, `ClaudeInvocation.writable` is exactly `targets.map(t => t.path)` — the paths the confirmation
+displayed — and `decideWrite` in `src/core/write-scope.ts` is the check, where a directory means
+"anything under it" and a file means only itself. `runPreviewedClaude` has no argument by which a
+caller could widen it, and the pane's accumulator must keep that property: the only input is a
+completed preview.
+
 Each addition is announced inline in the transcript at the moment it happens and listed in the pane
 header, so the scope is readable at a glance rather than inferred. Submit a second form and it grows
 by one more. Nothing else can add to it.
@@ -37,10 +44,18 @@ anything outside it.
 `ClaudeReadScope` — the directories the run can read, each with its origin and settings tier — and
 the pane it hands off into must carry that across rather than dropping it. A handoff that moves only
 the write target leaves the user having consented to a read scope the session then never shows them
-again.
+again. Note what that scope contains after `018`: a run loads **no filesystem settings**
+(`settingSources: []`), so it is the run's cwd plus whatever the managed (administrator) policy tier
+contributes, and no `additionalDirectories` — user-, project- and local-tier entries are simply not
+there any more. The pane's own scope is wider (`019` adds the project and the marketplace), so the
+handoff is a **widening** and should read as one on screen rather than silently replacing one list
+with another.
 
 The existing headless finish stays available. The two paths differ in who is driving, not in what
-they are allowed to do.
+they are allowed to do — and since `018` that is literally true rather than aspirational: the
+headless finish is itself an SDK session running the same `decideWrite` over the same `writable`
+list. Keep it that way; the moment the pane path grows its own notion of "what may be written", the
+sentence stops being checkable.
 
 ## Acceptance criteria
 

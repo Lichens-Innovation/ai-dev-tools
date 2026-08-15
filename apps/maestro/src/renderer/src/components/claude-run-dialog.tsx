@@ -26,8 +26,9 @@ import type { ClaudePreview, ClaudeRunResult } from "../../../shared/ipc";
  *     not a nicety — it is what keeps the app useful on a machine without the CLI, so it is the one
  *     control that is never hidden or disabled.
  *   • **Reads are disclosed as prominently as writes**, and above them. Writes announce themselves
- *     anyway — the prompt names its file and `acceptEdits` is in the argv on screen — while reads
- *     announce nothing at all: they are auto-approved and never prompt. The read section therefore
+ *     anyway — the prompt names its file, the writable paths are listed, and the session denies
+ *     everything else — while reads announce nothing at all: they are auto-approved and never
+ *     prompt. The read section therefore
  *     comes first, and everything in it was derived in the main process (see `ClaudeReadScope`);
  *     this component computes no path and consults no setting of its own.
  */
@@ -159,7 +160,13 @@ export default function ClaudeRunDialog({
               </span>
             </div>
             <div className="flex gap-2">
-              <span className="shrink-0 w-[86px] text-(--ink-3)">Command</span>
+              {/*
+                "Equivalent", not "Command": the app runs this through the Agent SDK, which spawns
+                the same binary with its own stream-protocol flags. This line is what you would type
+                to do the same thing yourself, and it is the honest label for it — claiming it is
+                the literal argv would be a claim the user cannot check and that is no longer true.
+              */}
+              <span className="shrink-0 w-[86px] text-(--ink-3)">Equivalent</span>
               <span data-testid="claude-argv" className="font-mono text-(--ink-2) break-all select-text">
                 {/* Quoted so the prompt argument reads as one argument, which is what it is. */}
                 {preview.argv.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ")}
@@ -194,6 +201,10 @@ export default function ClaudeRunDialog({
                   {t.note && <span> — {t.note}</span>}
                 </li>
               ))}
+              {/* Not a hope about the model: a write anywhere else is refused by the app, per call. */}
+              <li className="text-[11px] text-(--ink-3) mt-0.5">
+                Anything else is refused. The session is also offered no shell and no subagents.
+              </li>
             </ul>
           </div>
 
@@ -287,9 +298,10 @@ export default function ClaudeRunDialog({
 /**
  * How the run ended.
  *
- * The four outcomes read differently on purpose. A non-zero exit means the CLI ran and disagreed —
- * its stderr is the explanation. A crash means it never ran, or was killed — that is a fact about
- * the machine, not about the prompt, and sending the user to re-read their prompt would be wrong.
+ * The four outcomes read differently on purpose. A failure means the session ran and ended badly —
+ * `error` says how, and the output is the explanation. A crash means it never ran, or was killed —
+ * that is a fact about the machine, not about the prompt, and sending the user to re-read their
+ * prompt would be wrong.
  */
 function Outcome({ result }: { result: ClaudeRunResult }) {
   const tone =
@@ -305,7 +317,7 @@ function Outcome({ result }: { result: ClaudeRunResult }) {
       : result.outcome === "cancelled"
         ? "Stopped. The Claude process and everything it started were terminated."
         : result.outcome === "failed"
-          ? `The CLI exited with code ${result.code}. Its error output is above.`
+          ? (result.error ?? "The session ended without finishing. Its output is above.")
           : (result.error ?? "The CLI could not be run.");
 
   return (

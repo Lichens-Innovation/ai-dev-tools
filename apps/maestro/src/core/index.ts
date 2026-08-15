@@ -189,7 +189,9 @@ export {
   runPreviewedClaude,
   cancelClaudeRun,
   disposeClaudeRuns,
+  spawnClaudeChild,
   TokenRefused,
+  type ClaudeRunDeps,
   type ClaudeRunEvents,
   type ClaudeOutputChunk,
   type ClaudeRunResult,
@@ -209,14 +211,32 @@ export {
   nodeSettings,
   resolveEffectiveSettings,
   billingFrom,
+  startAgentSession,
   AGENT_SDK_PACKAGE,
   BILLING_ENV_VARS,
   SMOKE_PROMPT,
+  SESSION_TOOLS,
+  SESSION_DISALLOWED_TOOLS,
   type AgentBilling,
   type AgentChildEnv,
+  type AgentDenial,
   type AgentSdkSmokeResult,
+  type AgentSession,
+  type AgentSessionRequest,
+  type AgentSessionResult,
   type SmokeOptions,
 } from "./agent-sdk.js";
+
+// What a run may WRITE, decided per tool call. Pure — the counterpart to `read-scope.ts`, and the
+// module that replaced `--permission-mode acceptEdits`.
+export {
+  decideWrite,
+  targetPathOf,
+  READ_ONLY_TOOLS,
+  WRITE_TOOLS,
+  type WriteDecision,
+  type WriteScopeInput,
+} from "./write-scope.js";
 
 // Usage stats. The same preview-then-run shape and the same token store as the bridge above,
 // because the thing being confirmed is the same kind of thing: a command about to run on the

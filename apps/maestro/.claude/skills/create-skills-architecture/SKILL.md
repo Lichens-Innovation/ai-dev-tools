@@ -1,13 +1,14 @@
 ---
 name: create-skills-architecture
-description: "Explains how the four create-* flows (create-skill, create-subagent, create-plugin, create-marketplace) work end-to-end: the desktop app's form routes, the deterministic scaffold in src/core, the claude -p confirmation dialog, and the consuming SKILL.md prompts. Use when the user is working inside apps/maestro or plugins/ai-tools-manager and asks how a create flow works, where to add a new field, why a form change isn't reaching the prompt, why the confirmation dialog did or didn't open, or how target=project differs from target=marketplace."
+description: "Explains how the four create-* flows (create-skill, create-subagent, create-plugin, create-marketplace) work end-to-end: the desktop app's form routes, the deterministic scaffold in src/core, the confirmation dialog and the Agent SDK session it runs, and the consuming SKILL.md prompts. Use when the user is working inside apps/maestro or plugins/ai-tools-manager and asks how a create flow works, where to add a new field, why a form change isn't reaching the prompt, why the confirmation dialog did or didn't open, why a run was refused a write, or how target=project differs from target=marketplace."
 ---
 
 # Create-Skills Architecture
 
 Four creation flows share one pipeline: `create-skill`, `create-subagent`, `create-plugin`,
 `create-marketplace`. Each is a route in the Maestro desktop app, a scaffold function in
-`src/core`, and a `SKILL.md` prompt the app hands to `claude -p`.
+`src/core`, and a `SKILL.md` prompt the app hands to a Claude run — which since `018` is an **Agent
+SDK session**, not a `claude -p` spawn.
 
 ## End-to-end pipeline
 
@@ -40,10 +41,13 @@ utils/create-flow.tsx  — the submit path all four routes share
                   for that cwd through an injected SettingsPort and derives what the
                   run can READ; returns a TOKEN. Async. Spawns nothing.
               ClaudeRunDialog shows what it can read, then the full prompt,
-                exact argv, cwd, targets
+                the EQUIVALENT command line, cwd, targets
                 → Copy prompt / Cancel / Run
               window.maestro.claude.run(token)            IPC `claude:run`
-                → streams stdout/stderr; `claude:cancel` kills the child's process group
+                → starts an Agent SDK session over that invocation and streams it;
+                  `canUseTool` allows writes to `targets` and denies everything
+                  else with a reason; no shell, no subagents
+                → `claude:cancel` closes the query, then kills the process group
         │
         ▼
 The headless run reads plugins/ai-tools-manager/skills/create-<name>/SKILL.md
@@ -64,30 +68,32 @@ which the SKILL.md handles by gathering the fields conversationally.
 
 Renderer paths are relative to `apps/maestro/`.
 
-| Concern                                                       | File                                                                                                             |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Form (route): schema, fields, preview, shortcut map           | `src/renderer/src/routes/create-<name>.tsx`                                                                      |
-| Shared chrome: layout, header, shortcuts, submit row          | `src/renderer/src/components/create-shell.tsx`                                                                   |
-| The scaffold → preview → dialog path, shared by all four      | `src/renderer/src/utils/create-flow.tsx`                                                                         |
-| What landed on disk, plus **Finish with Claude**              | `src/renderer/src/components/create-result.tsx`                                                                  |
-| The confirmation: prompt, argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx`                                                              |
-| "What it can read" — ONE component, both confirmations        | `src/renderer/src/components/read-scope.tsx`                                                                     |
-| Live file preview components                                  | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
-| The typed channel contract                                    | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`)       |
-| Main-process handlers                                         | `src/main/ipc.ts`                                                                                                |
-| **Deterministic scaffold** + `resolveCreateTarget`            | `scaffold.ts` in `apps/maestro/src/core/`                                                                        |
-| Making a new marketplace a repository, via `execFile`         | `git.ts` in `apps/maestro/src/core/` (a `GitPort`, injected)                                                     |
-| "Is this inside a repository?", answered with `fs`            | `repo.ts` in `apps/maestro/src/core/`, with no `child_process`                                                   |
-| Where the `GitPort` is supplied - the composition root        | `src/main/ipc.ts`, `scaffoldCreate(root, request, { git: nodeGit() })`                                           |
-| Prompt + argv + cwd construction, and the token               | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/`                                              |
-| Deriving the read scope from a settings snapshot (pure)       | `read-scope.ts` in `apps/maestro/src/core/`                                                                      |
-| Resolving the settings cascade — the `SettingsPort`           | `agent-sdk.ts` in `apps/maestro/src/core/` (`nodeSettings()`), injected at `src/main/ipc.ts`                     |
-| Spawn, stream, cancel, dispose                                | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/`                                                     |
-| Marketplace discovery for the selectors                       | `marketplaces.ts` in `apps/maestro/src/core/`                                                                    |
-| `buildDesc` and friends — ONE implementation                  | `text.ts` in `apps/maestro/src/core/`                                                                            |
-| Shared UI primitives                                          | `packages/ui/src/`                                                                                               |
-| Consuming prompt                                              | `plugins/ai-tools-manager/skills/create-<name>/SKILL.md`                                                         |
-| Shared prompt contract the four SKILL.md link to              | `docs/ai-tools-create-shared.md`                                                                                 |
+| Concern                                                                              | File                                                                                                             |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Form (route): schema, fields, preview, shortcut map                                  | `src/renderer/src/routes/create-<name>.tsx`                                                                      |
+| Shared chrome: layout, header, shortcuts, submit row                                 | `src/renderer/src/components/create-shell.tsx`                                                                   |
+| The scaffold → preview → dialog path, shared by all four                             | `src/renderer/src/utils/create-flow.tsx`                                                                         |
+| What landed on disk, plus **Finish with Claude**                                     | `src/renderer/src/components/create-result.tsx`                                                                  |
+| The confirmation: read scope, prompt, equivalent argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx`                                                              |
+| "What it can read" — ONE component, both confirmations                               | `src/renderer/src/components/read-scope.tsx`                                                                     |
+| Live file preview components                                                         | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
+| The typed channel contract                                                           | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`)       |
+| Main-process handlers                                                                | `src/main/ipc.ts`                                                                                                |
+| **Deterministic scaffold** + `resolveCreateTarget`                                   | `scaffold.ts` in `apps/maestro/src/core/`                                                                        |
+| Making a new marketplace a repository, via `execFile`                                | `git.ts` in `apps/maestro/src/core/` (a `GitPort`, injected)                                                     |
+| "Is this inside a repository?", answered with `fs`                                   | `repo.ts` in `apps/maestro/src/core/`, with no `child_process`                                                   |
+| Where the `GitPort` is supplied - the composition root                               | `src/main/ipc.ts`, `scaffoldCreate(root, request, { git: nodeGit() })`                                           |
+| Prompt + argv + cwd construction, and the token                                      | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/`                                              |
+| Deriving the read scope from a settings snapshot (pure)                              | `read-scope.ts` in `apps/maestro/src/core/`                                                                      |
+| Deciding each write — `canUseTool`'s answer (pure)                                   | `write-scope.ts` in `apps/maestro/src/core/` (`decideWrite`)                                                     |
+| Resolving the settings cascade — the `SettingsPort`                                  | `agent-sdk.ts` in `apps/maestro/src/core/` (`nodeSettings()`), injected at `src/main/ipc.ts`                     |
+| The session itself, and the ONLY SDK import                                          | `agent-sdk.ts` in `apps/maestro/src/core/` (`startAgentSession`, `SESSION_TOOLS`)                                |
+| Start, stream, cancel, dispose                                                       | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/`                                                     |
+| Marketplace discovery for the selectors                                              | `marketplaces.ts` in `apps/maestro/src/core/`                                                                    |
+| `buildDesc` and friends — ONE implementation                                         | `text.ts` in `apps/maestro/src/core/`                                                                            |
+| Shared UI primitives                                                                 | `packages/ui/src/`                                                                                               |
+| Consuming prompt                                                                     | `plugins/ai-tools-manager/skills/create-<name>/SKILL.md`                                                         |
+| Shared prompt contract the four SKILL.md link to                                     | `docs/ai-tools-create-shared.md`                                                                                 |
 
 ## The four flows compared
 
@@ -212,10 +218,37 @@ Three rules hold it together:
   still passes, because none of them can see that side of the wire. `test/isolation.test.ts` pins
   the call to `invoke(IPC.claudeRun, token)`.
 - **A create-\* run's working directory is not always the open project.** A skill written into a
-  marketplace repo, or a brand-new marketplace, lives outside it — and a headless run whose edits
-  are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
-  nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path,
-  and the dialog shows it.
+  marketplace repo, or a brand-new marketplace, lives outside it. `claude-preview.ts` derives the cwd
+  from the same resolution that chose the path, and the dialog shows it. What the cwd no longer does
+  is decide what may be written — see the next entry.
+- **The cwd bounds nothing; `writable` does.** A run may write **only the paths the confirmation
+  listed** (`ClaudeInvocation.writable` = `targets.map(t => t.path)`), and a write anywhere else —
+  including elsewhere under the run's own working directory — is refused with a reason the model can
+  act on. `src/core/write-scope.ts` is the whole decision (`decideWrite`, pure, no `fs`); the session
+  hands it to the SDK as `canUseTool`. This replaced `--permission-mode acceptEdits`, which granted
+  writes to anything anywhere under the cwd — an entire repository, for a marketplace target. **Edit
+  pre-acceptance exists nowhere in the app**, and `test/isolation.test.ts` fails if it comes back.
+  A `writable` of `[]` (the help chat, `ccusage`) refuses every write, saying the run was started to
+  answer rather than to author.
+- **The run is offered no shell and no subagents.** `SESSION_TOOLS` is `Read, Glob, Grep, TodoWrite,
+WebSearch, WebFetch, Edit, Write`; `SESSION_DISALLOWED_TOOLS` is `Bash, Agent, NotebookEdit`. Both
+  are in `agent-sdk.ts`. Withholding `Bash` is what makes the path check meaningful — it is the one
+  tool whose reach cannot be bounded by inspecting `tool_input` — and it is only affordable because
+  `016` moved `git init` into the scaffold. `allowedTools` is deliberately unused: it auto-approves
+  without restricting. `AskUserQuestion` and `Skill` are **not** offered either: this path is still
+  headless, so a question has nobody to answer it.
+- **`ClaudePreview.argv` is the _equivalent_ command line, not what is spawned.** It is what you
+  would type to reproduce the run yourself — which is what **Copy prompt** is for — and the dialog
+  labels the row "Equivalent" for that reason. The SDK spawns the same binary with its own
+  stream-protocol flags, and `ClaudeRunResult.argv` reports what actually went out; the two do not
+  match on purpose. `ClaudeRunResult.code` is `0` on success and `null` otherwise, so the UI renders
+  `error`.
+- **A run loads no filesystem settings** (`settingSources: []`), so nothing on disk can widen it and
+  no key in a settings file can redirect billing. Two consequences: the read disclosure lists only
+  the cwd and the managed (administrator) policy tier, and **`CLAUDE.md` files are not auto-loaded
+  into a run** — the SDK requires `settingSources` to include `'project'`. The model can still
+  `Read` them. `resolveEffectiveSettings()` passes `[]` too, and must keep matching the session or
+  the disclosure describes a session that no longer exists with nothing failing.
 - **The settings are resolved against the RUN's cwd, not the open project** — the same asymmetry, one
   layer down. A marketplace-targeted create run picks up the _marketplace's_ `.claude/settings.json`,
   so its readable directories and permission rules can be nothing like the open project's. Resolving
@@ -234,7 +267,12 @@ Three rules hold it together:
   Claude against the repo the window has moved off.
 - **A cancelled run's child is detached, so quitting must kill it.** The child is spawned into its
   own process group — that is how Stop reaches the CLI's own children — which also means it outlives
-  the app. `disposeIpc` calls `disposeClaudeRuns()`.
+  the app. `disposeIpc` calls `disposeClaudeRuns()`. The SDK is handed the app's own
+  `spawnClaudeCodeProcess` rather than left to spawn for itself, precisely to keep that property.
+  Teardown is three distinct actions and only one of them releases the child the SDK holds:
+  `query.close()`, then SIGTERM to the process **group**, then SIGKILL after a grace. `stdio` is
+  three pipes now — the SDK speaks a control protocol over stdin/stdout, and closing stdin closes
+  the conversation.
 - **Scaffold can still fail.** A bad path or a refused overwrite yields `scaffolded: false` with a
   `reason`, and the consuming skill must create the artifact itself. Always branch on the `scaffold`
   object; never assume the file exists.

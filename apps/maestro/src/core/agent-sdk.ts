@@ -8,12 +8,13 @@
 // Same trap in the repos: `anthropics/claude-agent-sdk-typescript` is this SDK,
 // `anthropics/anthropic-sdk-typescript` is not.
 //
-// Two things live here, and only one of them can start anything. `runAgentSdkSmoke` exists to
-// prove, on the machine the app is actually installed on, that a query runs at all — see
-// SESSION-PANE-PLAN.md, of which this is the first slice. `nodeSettings()` is the other, and is
-// user-facing: it resolves the effective settings cascade so the confirmation dialog can state what
-// a run will actually be able to read. It spawns no CLI (see its own comment) and is handed to the
-// preview as a PORT, because the preview may not import this module.
+// Three things live here. `runAgentSdkSmoke` exists to prove, on the machine the app is actually
+// installed on, that a query runs at all — see SESSION-PANE-PLAN.md, of which this is the first
+// slice. `nodeSettings()` resolves the effective settings cascade so the confirmation dialog can
+// state what a run will actually be able to read; it spawns no CLI (see its own comment) and is
+// handed to the preview as a PORT, because the preview may not import this module.
+// `startAgentSession()` is the third and the one that does the work: it is what `claude-run.ts`
+// executes a previewed invocation with, in place of the `claude -p` spawn it used to be.
 //
 // This is also the only module in the app that imports the SDK, and `test/isolation.test.ts` pins
 // that: the SDK is a second path to the `claude` binary, and the options it is given decide the
@@ -56,13 +57,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
+import { decideWrite, READ_ONLY_TOOLS } from "./write-scope.js";
 import type {
+  ClaudeOutputChunk,
   EffectiveSettingsSnapshot,
   SettingsPermissions,
   SettingsPort,
   SettingsSourceInfo,
   SettingsTier,
 } from "./contracts.js";
+
+// Type-only, and therefore erased: `claude-run.ts` supplies the spawn function and must be able to
+// type it without importing the SDK, which this module is the app's only importer of.
+import type { SpawnOptions, SpawnedProcess } from "@anthropic-ai/claude-agent-sdk";
+export type { SpawnOptions, SpawnedProcess };
 
 /** The one correct package name, in one place, so a typo is a diff rather than a silent downgrade. */
 export const AGENT_SDK_PACKAGE = "@anthropic-ai/claude-agent-sdk";
@@ -362,6 +370,253 @@ export function writeSmokeReceipt(file: string, result: AgentSdkSmokeResult): vo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The session — what a previewed invocation actually runs as.
+//
+// This replaced `spawn("claude", ["-p", "--permission-mode", "acceptEdits", prompt])`. The prompt,
+// the working directory and the binary are unchanged and still come from the token `claude-preview.ts`
+// issued; what changed is that the host process is now SOMEBODY TO ASK. `acceptEdits` existed only
+// because a headless run had nobody — and it granted writes to anything anywhere under the working
+// directory, which for a marketplace target is a whole repository. `canUseTool` grants exactly the
+// paths the confirmation displayed instead, silently, with no prompt and nothing for the user to
+// notice beyond a run that can no longer wander.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The built-in tools a session is offered. Everything absent from this list is absent from the
+ * model's context, which costs nothing; a tool that is present and denied costs turns to argue with.
+ *
+ * `Bash` is gone and can be, because `016` moved `git init` and the first commit into the
+ * deterministic scaffold and the create-marketplace prompt now forbids git rather than asking for
+ * it. It is also the one tool whose filesystem reach cannot be bounded by inspecting `tool_input` —
+ * a path check cannot see what `cd .. && cat` does at runtime — so withholding it is what makes the
+ * check below meaningful rather than decorative.
+ *
+ * `AskUserQuestion` and `Skill` are in SESSION-PANE-PLAN.md's set and deliberately not here: this
+ * path is still headless, so a question has nobody to answer it. They arrive with the pane.
+ */
+export const SESSION_TOOLS = [...READ_ONLY_TOOLS, "Edit", "Write"] as const;
+
+/**
+ * Named as forbidden as well as omitted from `SESSION_TOOLS`, and the redundancy is the point:
+ * `tools` sets the base list, `disallowedTools` removes a tool from the model's context even if
+ * something else would have put it back. `Agent` goes because a subagent's prompts arrive with an
+ * `agentID` nothing here disambiguates; `NotebookEdit` because it writes and this app never wants it.
+ */
+export const SESSION_DISALLOWED_TOOLS = ["Bash", "Agent", "NotebookEdit"] as const;
+
+/** One tool call this session refused, kept so the run can report what it would not do. */
+export interface AgentDenial {
+  tool: string;
+  /** The path it was aimed at, when it named one. */
+  path: string | null;
+  /** The reason handed back to the model — the same string, so the transcript matches. */
+  message: string;
+}
+
+export interface AgentSessionRequest {
+  /** The prompt the preview built and the confirmation displayed. Never assembled here. */
+  prompt: string;
+  cwd: string;
+  /** The resolved `claude` binary, from the invocation. Never a PATH lookup. */
+  bin: string;
+  /** Absolute paths this session may write. A directory means anything under it; empty means none. */
+  writable: readonly string[];
+  /**
+   * How to start the CLI.
+   *
+   * Supplied by the caller rather than left to the SDK because the child must be its own process
+   * group: the CLI spawns its own children, and a Stop that signals only the process we started
+   * leaves the grandchildren running. `claude-run.ts` owns that, and owns the teardown that goes
+   * with it, so the SDK is handed a spawner rather than trusted with a lifecycle.
+   */
+  spawn: (options: SpawnOptions) => SpawnedProcess;
+  /** Output as it arrives — assistant text, tool activity, and the CLI's stderr. */
+  output(chunk: ClaudeOutputChunk): void;
+  /** Resolution options for the child environment. Tests pass a fake machine; the app passes none. */
+  envOptions?: ResolveOptions;
+}
+
+/** How a session ended. Never a throw: every failure is one of these. */
+export interface AgentSessionResult {
+  ok: boolean;
+  /** The SDK result message's subtype (`success`, `error_max_turns`, …), or null if none arrived. */
+  subtype: string | null;
+  /** The final assistant text, as the result message reported it. */
+  text: string | null;
+  /** Why it is not `ok`. Null on success. */
+  error: string | null;
+  costUsd: number | null;
+  numTurns: number | null;
+  sessionId: string | null;
+  /** Where the money went, as the CLI reported it on init. */
+  billing: AgentBilling;
+  /** Everything `canUseTool` refused, in order. */
+  denied: AgentDenial[];
+}
+
+export interface AgentSession {
+  /** Resolves when the session ends. Never rejects. */
+  result: Promise<AgentSessionResult>;
+  /**
+   * End the session and terminate the CLI.
+   *
+   * Interrupting a turn, aborting the read loop and closing the query are three different things,
+   * and only this one releases the child. Idempotent, and safe to call before the dynamic import
+   * has even resolved — a close that lands first prevents the query rather than racing it.
+   */
+  close(): void;
+}
+
+/** Text and tool activity out of one assistant message, rendered the way a terminal would show it. */
+function renderAssistant(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content as Array<Record<string, unknown>>) {
+    if (block?.type === "text" && typeof block.text === "string") parts.push(block.text);
+    if (block?.type === "tool_use") {
+      const input = (block.input ?? {}) as Record<string, unknown>;
+      const target = typeof input.file_path === "string" ? input.file_path : "";
+      parts.push(`⏺ ${String(block.name)}${target ? `(${target})` : ""}`);
+    }
+  }
+  return parts.filter(Boolean).join("\n");
+}
+
+/**
+ * Start a session for a previewed invocation and stream what it does.
+ *
+ * Returns synchronously — the SDK import is dynamic (1.3 MB that a launch which never runs anything
+ * should not parse), so the query does not exist yet when this returns, and `close()` is written to
+ * cope with being called in that window.
+ *
+ * Never rejects. A failed import (the asar case at the top of this file), a CLI that cannot be
+ * spawned, an aborted read loop and a session that errored are all outcomes to report: each one is
+ * a different thing for the user to do next, and collapsing them into a rejection loses that.
+ */
+export function startAgentSession(request: AgentSessionRequest): AgentSession {
+  const { env } = agentChildEnv(request.envOptions);
+  const stderr: string[] = [];
+  const denied: AgentDenial[] = [];
+  let closed = false;
+  let query: { close(): void } | null = null;
+
+  const result = (async (): Promise<AgentSessionResult> => {
+    const base: AgentSessionResult = {
+      ok: false,
+      subtype: null,
+      text: null,
+      error: null,
+      costUsd: null,
+      numTurns: null,
+      sessionId: null,
+      billing: "unknown",
+      denied,
+    };
+
+    try {
+      // Literal specifier, not AGENT_SDK_PACKAGE — see the note at `runAgentSdkSmoke`.
+      const sdk = await import("@anthropic-ai/claude-agent-sdk");
+      if (closed) return { ...base, error: "The session was closed before it started." };
+
+      let apiKeySource: string | null = null;
+      let sessionId: string | null = null;
+
+      const q = sdk.query({
+        prompt: request.prompt,
+        options: {
+          cwd: request.cwd,
+          // The resolved binary, never the SDK's own lookup — see (3) in the box at the top.
+          pathToClaudeCodeExecutable: request.bin,
+          env,
+          spawnClaudeCodeProcess: request.spawn,
+          // The base tool set, and the same names forbidden outright. See both constants above.
+          tools: [...SESSION_TOOLS],
+          disallowedTools: [...SESSION_DISALLOWED_TOOLS],
+          // `default`, never `acceptEdits` and never `bypassPermissions`: the callback below is the
+          // whole permission model, and a mode that pre-decides would make it unreachable.
+          permissionMode: "default",
+          // Nothing on disk configures this session — not its permissions, and not where the bill
+          // goes. `agentChildEnv` closed the environment door; this is the other one.
+          settingSources: [],
+          // `claude -p` runs with Claude Code's own system prompt. The SDK does not use it unless
+          // asked, and a create-* run that lost it would author against a different set of defaults
+          // than the one every prompt in this app was written for.
+          systemPrompt: { type: "preset", preset: "claude_code" },
+          canUseTool: async (tool, input) => {
+            const decision = decideWrite({ tool, input, writable: request.writable, cwd: request.cwd });
+            if (decision.behavior === "allow") return { behavior: "allow" };
+            const target = typeof input?.file_path === "string" ? input.file_path : null;
+            denied.push({ tool, path: target, message: decision.message });
+            // Surfaced as stderr rather than swallowed: a run that quietly declined half of what it
+            // was asked to do, and then said it was finished, is the failure worth seeing.
+            request.output({
+              stream: "stderr",
+              chunk: `Denied ${tool}${target ? ` ${target}` : ""}: ${decision.message}\n`,
+            });
+            return decision;
+          },
+          stderr: (chunk: string) => {
+            stderr.push(chunk);
+            if (stderr.length > 50) stderr.shift();
+            request.output({ stream: "stderr", chunk });
+          },
+        },
+      });
+      query = q;
+      if (closed) q.close();
+
+      for await (const message of q) {
+        if (message.type === "system" && message.subtype === "init") {
+          apiKeySource = message.apiKeySource ?? null;
+          sessionId = message.session_id ?? null;
+          continue;
+        }
+        if (message.type === "assistant") {
+          const text = renderAssistant(message.message?.content);
+          if (text) request.output({ stream: "stdout", chunk: `${text}\n` });
+          continue;
+        }
+        if (message.type === "result") {
+          return {
+            ...base,
+            ok: message.subtype === "success" && !message.is_error,
+            subtype: message.subtype,
+            text: message.subtype === "success" ? message.result : null,
+            costUsd: message.total_cost_usd ?? null,
+            numTurns: message.num_turns ?? null,
+            sessionId: message.session_id ?? sessionId,
+            billing: billingFrom(apiKeySource),
+            error:
+              message.subtype === "success" && !message.is_error
+                ? null
+                : `The session ended as ${message.subtype}.${stderr.length ? ` ${stderr.join("").trim()}` : ""}`,
+          };
+        }
+      }
+
+      // The loop ends on the RESULT message. Falling out of it means the stream stopped without
+      // one, which is a closed query or a child that went away — not a session that finished.
+      return {
+        ...base,
+        sessionId,
+        billing: billingFrom(apiKeySource),
+        error: closed ? null : "The session ended without a result.",
+      };
+    } catch (err) {
+      return { ...base, error: err instanceof Error ? err.message : String(err) };
+    }
+  })();
+
+  return {
+    result,
+    close() {
+      closed = true;
+      query?.close();
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The settings cascade — what a run will ACTUALLY be configured with.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -397,10 +652,13 @@ function tierOf(source: string): SettingsTier | null {
  *
  * Three things about the call are deliberate:
  *
- *   • **`settingSources` is left unset**, which loads all of them. That is what a `claude -p` run
- *     gets, so it is what the disclosure has to describe. (The smoke query above passes `[]` for
- *     the opposite reason — it must be configured by nothing on disk.) Reporting a narrower
- *     resolution than the run will use would be a comfortable lie.
+ *   • **`settingSources` matches the session's**, and that is the whole reason this function has to
+ *     be edited whenever `startAgentSession` is. It was left UNSET while a run was `claude -p`,
+ *     because an unset value loads every tier and that is what such a run got. A run is now an SDK
+ *     session configured entirely by this app, so `[]` is passed here for the same reason it is
+ *     passed there: the disclosure describes the session that exists. Note what `[]` does NOT drop —
+ *     the managed (administrator) policy tier is still read from disk, so an admin deny rule still
+ *     appears, and still applies.
  *   • **`defaultMode` goes through `filterEscalatingDefaultMode`.** The raw cascade reports an
  *     escalating mode from a repo-committed file as though it applied; the CLI does not honour it
  *     without a trust check. Reporting the unfiltered value would overstate what a run can do.
@@ -411,7 +669,7 @@ function tierOf(source: string): SettingsTier | null {
 export async function resolveEffectiveSettings(cwd: string): Promise<EffectiveSettingsSnapshot> {
   // Literal specifier, not AGENT_SDK_PACKAGE — see the note at the query above.
   const { resolveSettings, filterEscalatingDefaultMode } = await import("@anthropic-ai/claude-agent-sdk");
-  const resolved = await resolveSettings({ cwd });
+  const resolved = await resolveSettings({ cwd, settingSources: [] });
 
   const sources: SettingsSourceInfo[] = [];
   for (const entry of resolved.sources) {

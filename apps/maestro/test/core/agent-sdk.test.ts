@@ -1,9 +1,11 @@
-// The Agent SDK's child environment, and the two properties that are one edit apart from silently
-// costing money or breaking a GUI launch.
+// The Agent SDK's child environment and tool set — the properties that are one edit apart from
+// silently costing money, breaking a GUI launch, or handing an authoring run a shell.
 //
 // The query itself is not tested here: it spawns the user's own `claude`, costs tokens, and its
 // interesting failures are packaging failures that no vitest run can reach. That half is verified
-// by launching the packaged app (see `runAgentSdkSmoke` and apps/maestro/CLAUDE.md).
+// by launching the packaged app (see `runAgentSdkSmoke` and apps/maestro/CLAUDE.md). The permission
+// callback the session installs is `decideWrite`, tested exhaustively in `write-scope.test.ts`
+// because it is pure; what a session DOES with it is verified in a real window.
 
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
@@ -16,6 +18,8 @@ import {
   resolveEffectiveSettings,
   BILLING_ENV_VARS,
   AGENT_SDK_PACKAGE,
+  SESSION_TOOLS,
+  SESSION_DISALLOWED_TOOLS,
 } from "../../src/core/agent-sdk.js";
 
 const HOME = "/home/tester";
@@ -90,6 +94,27 @@ describe("billing, as the CLI reports it", () => {
 
   it("does not guess when the init message said nothing", () => {
     expect(billingFrom(null)).toBe("unknown");
+  });
+});
+
+describe("the tool set a session is offered", () => {
+  // The first permission layer, and the biggest. `allowedTools` is the trap: it auto-approves
+  // without restricting, and an unlisted tool still falls through to the permission callback. These
+  // two lists are the ones that decide what exists in the model's context at all.
+  it("offers no shell and no subagents", () => {
+    expect(SESSION_TOOLS).not.toContain("Bash");
+    expect(SESSION_TOOLS).not.toContain("Agent");
+    for (const tool of ["Bash", "Agent", "NotebookEdit"]) expect(SESSION_DISALLOWED_TOOLS).toContain(tool);
+  });
+
+  it("still offers everything a create-* run needs to finish a file", () => {
+    // Reading the project to learn its conventions, and writing the one artifact it was opened for.
+    for (const tool of ["Read", "Glob", "Grep", "Edit", "Write"]) expect(SESSION_TOOLS).toContain(tool);
+  });
+
+  it("names nothing it also forbids", () => {
+    // Both lists reach the same query. A name in both is a contradiction the SDK resolves silently.
+    for (const tool of SESSION_DISALLOWED_TOOLS) expect(SESSION_TOOLS, tool).not.toContain(tool);
   });
 });
 

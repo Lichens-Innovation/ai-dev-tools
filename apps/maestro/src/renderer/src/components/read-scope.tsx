@@ -5,9 +5,10 @@ import type { ClaudeReadScope, SettingsTier } from "../../../shared/ipc";
  * What a previewed run can SEE, next to what it may change.
  *
  * The section every confirmation in this app was missing. Writes announce themselves — a create-\*
- * prompt names its file, `--permission-mode acceptEdits` sits in the argv on screen — while reads
- * announce nothing at all: file reads and searches are auto-approved by the permission system and
- * never raise a prompt. The directory list a session starts with is therefore the entire bound on
+ * prompt names its file, the writable paths are listed beside it, and the session refuses every
+ * other one — while reads announce nothing at all: file reads and searches are auto-approved by the
+ * permission system and never raise a prompt. The directory list a session starts with is therefore
+ * the entire bound on
  * what the model can look at, and it is fully known before anything spawns, so saying nothing about
  * it was the app silently granting whatever it happened to pass.
  *

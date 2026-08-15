@@ -77,9 +77,10 @@ second.
 | `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                   |
 | `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                                 |
 | `claude-tokens.ts`                      | The single-use, expiring, purpose-tagged authorisation between preview and run         |
-| `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued                |
+| `claude-run.ts`                         | The only module that starts Claude, and only for a token preview issued                |
 | `read-scope.ts`                         | What a run can **read**, derived from a settings snapshot. Pure — no `fs`, no spawn    |
-| `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, smoke query, and the `SettingsPort`     |
+| `write-scope.ts`                        | What a run may **write**, decided per tool call. Pure — no `fs`, no spawn, no SDK      |
+| `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
 | `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
@@ -222,17 +223,17 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 
 ## Routes
 
-| Route                                                                        | Purpose                                                                                                                                                           |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                                                          | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose.                            |
-| `/workflows`                                                                 | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it.  |
-| `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                           |
-| `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                         |
-| `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
-| `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                            |
-| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                    |
-| `/tools`                                                                     | help-server's tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).   |
-| `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                 |
+| Route                                                                        | Purpose                                                                                                                                                          |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                                          | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose.                           |
+| `/workflows`                                                                 | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it. |
+| `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                          |
+| `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                        |
+| `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the Claude bridge: **Run with Claude** previews the invocation, confirms it, and streams it.     |
+| `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                           |
+| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                   |
+| `/tools`                                                                     | help-server's tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).  |
+| `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                |
 
 ### The top bar is grouped, not a list
 
@@ -334,25 +335,38 @@ Three rules hold it together, and each exists for a reason that is not obvious f
   after `git init` does take the repository with it. That is why `init` is first and `commit` is
   last.
 
-## The `claude -p` bridge
+## The Claude bridge
 
 The app can run Claude on the user's behalf, and asks first. Three channels:
 
 ```
 claude:preview  → { prompt, argv, cwd, targets, read, available, searched, token }  // spawns nothing
-claude:run      → streams stdout/stderr, resolves with the outcome                  // token only
-claude:cancel   → kills the child's process group
+claude:run      → an Agent SDK session; streams output, resolves with the outcome   // token only
+claude:cancel   → closes the query, then kills the child's process group
 ```
 
+It was the `claude -p` bridge, and a run **is no longer a `claude -p` spawn**: every run on
+`claude:run` — create-\*, `/maestro-tasks`, the help chat — is an Agent SDK session
+(`startAgentSession` in `agent-sdk.ts`). Nothing else about the bridge moved: preview still builds
+the prompt and issues the token, and run still accepts a token and nothing else.
+
 `ClaudeRunDialog` is the user-facing half: what may be **read**, then full prompt (scrollable,
-selectable — never a summary), exact argv, working directory, what may be written, then Copy prompt
-/ Cancel / Run, then streamed output with a Stop. The whole body is **one** scroll region: with four
-sections, per-section shrink-to-fit squeezed the prompt `<pre>` to a sliver and let the read section
-render over the top of it — invisible to every test that is not a screenshot, so a rect-overlap
-assertion in the window probe pins it. See `src/core/claude-preview.ts` and `src/core/claude-run.ts` for why preview
+selectable — never a summary), the **equivalent** command line, working directory, what may be
+written, then Copy prompt / Cancel / Run, then streamed output with a Stop. The whole body is **one**
+scroll region: with four sections, per-section shrink-to-fit squeezed the prompt `<pre>` to a sliver
+and let the read section render over the top of it — invisible to every test that is not a
+screenshot, so a rect-overlap assertion in the window probe pins it. See
+`src/core/claude-preview.ts` and `src/core/claude-run.ts` for why preview
 and run are two operations and what breaks if they become one. Everything a route needs is `window.maestro.claude.preview(request)`
 plus rendering `<ClaudeRunDialog>` with the result — a route that shells out on its own has opted
 out of the confirmation, which is the whole point.
+
+**`ClaudePreview.argv` is the _equivalent_ invocation, not what is spawned.** It is `claude -p
+<prompt>` — what you would type to reproduce the run yourself, which is what **Copy prompt** is for,
+and why the dialog's row says "Equivalent" rather than "Command". The SDK spawns the same binary
+with its own stream-protocol flags, and `ClaudeRunResult.argv` reports what actually went out. The
+two deliberately do not match. `ClaudeRunResult.code` is `0` on success and `null` otherwise — a
+session is not a process exit — so the UI renders `error`, never an exit code.
 
 Tokens carry a **purpose** (`claude-tokens.ts`). The usage-stats reader below shares this store —
 one expiry rule, one single-use rule, one place to clear on a project switch — but not its tokens:
@@ -367,6 +381,14 @@ carries a `ClaudeReadScope`, built by `src/core/read-scope.ts` and rendered by *
 `renderer/src/components/read-scope.tsx` — used by `ClaudeRunDialog` and by the chat's inline
 `ConfirmCard` (`compact` changes the type scale, never the content).
 
+- **The disclosure narrowed when the run became a session, visibly.** A run loads **no filesystem
+  settings** (`settingSources: []`), so the confirmation no longer lists user-, project- or
+  local-tier directories and rules — there are none to list. `017` made the disclosure honest about
+  the old `claude -p` behaviour first, on purpose, so this landed as a visible narrowing rather than
+  arriving with it. The managed (administrator) policy tier is **not** dropped by `[]`: it is still
+  read from disk, still disclosed, and still applies. **Consequence worth knowing: `CLAUDE.md` files
+  are no longer auto-loaded into a run** — the SDK requires `settingSources` to include `'project'`
+  for that. The model can still `Read` them.
 - **The resolution is a port, not an import** — exactly like `GitPort`. `SettingsPort` is an
   interface in `contracts.ts`, `nodeSettings()` implements it in `agent-sdk.ts`, and `src/main/ipc.ts`
   is the composition root that passes `{ settings: nodeSettings() }`. `claude-preview.ts` must import
@@ -384,7 +406,54 @@ carries a `ClaudeReadScope`, built by `src/core/read-scope.ts` and rendered by *
   and sets `unresolved`, because a scope that quietly reported only the cwd reads as a complete
   answer.
 - **Resolved against the RUN's cwd, not the open project.** Verified in the window: a
-  marketplace-targeted create run picks up the *marketplace's* `.claude/settings.json`.
+  marketplace-targeted create run picks up the _marketplace's_ `.claude/settings.json`.
+
+### What a run can write — `canUseTool`, and no pre-acceptance anywhere
+
+Writes are the smaller surface and the sharper one, and since the run became a session the app
+answers for each of them itself. `src/core/write-scope.ts` is the whole decision — `decideWrite` is
+pure path arithmetic, no `fs`, no spawn, no SDK — and `startAgentSession` hands it to the SDK as
+`canUseTool`. **Edit pre-acceptance now exists nowhere in the app**; `test/isolation.test.ts` fails
+if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears under `src/`.
+
+- **The write scope rides on the token.** `ClaudeInvocation.writable` is the exact list of paths the
+  preview resolved and the confirmation displayed (`targets.map(t => t.path)`). The callback reads it
+  off the invocation, so it is structurally incapable of being wider than what the user was shown —
+  the argument the token already made about prompts, applied to paths. `runPreviewedClaude` has no
+  argument by which a caller could widen it; `ccusage.ts` issues its token with `writable: []`.
+- **A directory means "anything under it"; a file means itself.** One `withinDirectory` check covers
+  both, which is what `ClaudeWriteTarget.path` already documented.
+- **The fall-through is a deny, never `undefined`/`null`.** The SDK reads `null` as "the host
+  answered out of band" and the tool call then blocks forever with no timeout. `WriteDecision` is a
+  two-shape union and the `default` branch is a refusal.
+- **Every deny carries a reason the model can act on.** It reads denial messages and adapts; a bare
+  "denied" wastes the one channel there is for steering it back to the file it was started for.
+  Denials are also pushed onto the output stream as stderr — a run that quietly declined half of
+  what it was asked and then reported success is the failure worth seeing.
+- **The tool set is the first permission layer.**
+  `SESSION_TOOLS` = `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch, Edit, Write`.
+  `SESSION_DISALLOWED_TOOLS` = `Bash, Agent, NotebookEdit`. A
+  tool that was never offered costs nothing; a tool that is offered and denied costs turns to argue
+  with. `allowedTools` is the trap — it auto-approves without restricting, so it is not used.
+  Withholding `Bash` is what makes the path check meaningful at all: it is the one tool whose
+  filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `016`
+  moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` and
+  `Skill` are deliberately **not** in the set: this path is still headless, so a question has nobody
+  to answer it. They arrive with the session pane.
+- **`systemPrompt: { type: "preset", preset: "claude_code" }` is passed explicitly.** The SDK's
+  default is a minimal prompt, not Claude Code's, and a create-\* run that lost it would author
+  against different defaults than every prompt in this app was written for.
+- **The spawn function stays the app's.** `claude-run.ts` supplies `spawnClaudeCodeProcess` so the
+  child is still a detached process-group leader. `stdio` is three pipes now, not
+  `["ignore","pipe","pipe"]`: the SDK speaks a control protocol to the child over stdin/stdout, and
+  closing stdin closes the conversation.
+- **Teardown is three distinct actions.** Interrupting a turn, aborting the read loop and closing the
+  query are not the same thing. `cancelClaudeRun` does `query.close()` — which releases the child the
+  SDK is holding — then SIGTERM to the process **group**, which is what reaches the CLI's own
+  children, then SIGKILL after a grace.
+- **A fake `claude` on `PATH` can no longer serve as a test double**, because it cannot speak the
+  SDK's private stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`), and
+  `spawnClaudeChild` is tested directly for the process-group property.
 
 ### The help chat is a bridge consumer, not a second spawn path
 
@@ -400,12 +469,16 @@ Four things about it are decisions rather than styling:
 - **The confirmation is inline in the transcript**, not `ClaudeRunDialog`. In a chat the answer
   belongs in the conversation, so the consent does too — a modal would put the prompt in one place
   and the streamed reply behind a dialog the user has to dismiss. It shows the same list: full
-  prompt verbatim, exact argv, working directory.
-- **The chat runs without `--permission-mode acceptEdits`** (`CLAUDE_ASK_FLAGS`). That flag exists
-  so a create-\* run can finish the file it was started for; a question is not an authoring job,
-  and pre-accepting edits for one would give a chat message the same write authority as a form the
-  user filled in deliberately. `targets` is empty because nothing is writable, not because nobody
-  worked it out.
+  prompt verbatim, the equivalent command line, working directory.
+- **The chat carries no write authority, and that is now a property of the token rather than a
+  flag.** There used to be a `CLAUDE_ASK_FLAGS` / `CLAUDE_BASE_FLAGS` split, because a create-\* run
+  needed `--permission-mode acceptEdits` to finish the file it was started for and a question is not
+  an authoring job. Both are gone: `CLAUDE_ASK_FLAGS` was deleted along with `BuiltRequest.flags`,
+  and `CLAUDE_BASE_FLAGS` is just `["-p"]`. The difference between an authoring invocation and an
+  asking one is the **write scope** — a list of paths on screen — not a flag whose meaning the
+  reader has to already know. `targets` is empty for a chat because nothing is writable, so
+  `writable` is empty on the token and `decideWrite` refuses every write with a reason saying the
+  run was started to answer, not to author.
 - **History travels on the request**, not in main's memory. It is then part of the string the
   preview displays, so "the user saw exactly what ran" stays literally true on the tenth message.
   It is capped (ten turns, clipped) for the same reason: a prompt too long to read is one nobody
@@ -522,18 +595,25 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   (`CLAUDE_CODE_USE_BEDROCK` and friends) left alone but reported. `settingSources: []` closes the
   second door, a key in `~/.claude/settings.json`, which would override the environment anyway.
   `test/core/agent-sdk.test.ts` pins both halves.
-- **`settingSources` means two different things in `agent-sdk.ts`, and both are deliberate.** The
-  smoke query passes `[]` so nothing on disk can redirect billing. `resolveEffectiveSettings(cwd)`
-  leaves it **unset**, which loads every tier — because it is describing what a `claude -p` run
-  actually gets, and a disclosure that read a narrower cascade than the run would be wrong in exactly
-  the cases that matter. `defaultMode` there goes through the SDK's `filterEscalatingDefaultMode`,
-  since the raw cascade reports an escalating mode from a repo-committed file as though it applied.
-  If a future slice changes how a run is configured, this resolution has to change with it or the
-  confirmation quietly starts describing a session that no longer exists.
-- **The Agent SDK is now user-facing.** `nodeSettings()` backs the read disclosure in both
-  confirmations, so `agent-sdk.ts` is no longer a module whose only consumer is a smoke test — but it
-  is still the **only** module in the app that imports the SDK, and everything else reaches it
-  through the `SettingsPort` interface in `contracts.ts`.
+- **`settingSources: []` appears THREE times in `agent-sdk.ts`, and they must stay in lockstep.** The
+  smoke query, the run's own session, and `resolveEffectiveSettings(cwd)` — the last of which backs
+  the read disclosure. The first two are so nothing on disk can redirect billing or widen
+  permissions; the third is so the confirmation describes **the session that actually exists**.
+  `resolveEffectiveSettings` used to leave it unset (loading every tier), because that is what a
+  `claude -p` run got; when the run became a session it had to move with it. Configure the run one
+  way and resolve the other and the disclosure silently becomes a lie — it keeps describing a
+  session that is gone, and **nothing fails**. `test/isolation.test.ts` counts the three occurrences
+  for exactly that reason. Note `[]` does not drop the managed (administrator) policy tier: it is
+  still read from disk and still applies. `defaultMode` goes through the SDK's
+  `filterEscalatingDefaultMode`, since the raw cascade reports an escalating mode from a
+  repo-committed file as though it applied.
+- **The Agent SDK is now user-facing, and it is what a run IS.** `nodeSettings()` backs the read
+  disclosure in both confirmations and `startAgentSession()` is every run on `claude:run`, so
+  `agent-sdk.ts` is no longer a module whose only consumer is a smoke test — but it is still the
+  **only** module in the app that imports the SDK. Everything else reaches it through interfaces in
+  `contracts.ts` (`SettingsPort`) or through `agent-sdk.ts`'s own exports — including the SDK's
+  `SpawnOptions`/`SpawnedProcess` **types**, which it re-exports so `claude-run.ts` can type its
+  spawn function without importing the SDK itself.
 - **Project switches invalidate the router.** Every route loader reads the _current_ project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.
@@ -620,10 +700,14 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   `src/core/text.ts` is the one home; note that module rather than the barrel, which re-exports
   `fs`. `test/isolation.test.ts` fails on a re-implementation anywhere under `src/renderer`.
 - **A create-\* run's working directory is not always the open project.** A skill written into a
-  marketplace repo, or a brand-new marketplace, lives outside it — and a headless run whose edits
-  are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
-  nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path;
-  the dialog shows it. Verified in the window: a marketplace-target skill runs in the marketplace.
+  marketplace repo, or a brand-new marketplace, lives outside it. `claude-preview.ts` derives the cwd
+  from the same resolution that chose the path; the dialog shows it. Verified in the window: a
+  marketplace-target skill runs in the marketplace. This used to matter because
+  `--permission-mode acceptEdits` only auto-accepted edits under the cwd; it now matters the other
+  way round — the cwd bounds nothing, `writable` does, and a write to the run's **own** working
+  directory is refused unless the preview listed it. Verified live: a `README.md` the model tried to
+  write beside its target — exactly what `acceptEdits` used to permit — was denied, and the file does
+  not exist.
 - **The prompt is prose, never `/create-skill`.** Historically a slash command in a headless run
   fired the plugin's `UserPromptExpansion` hook, which launched the Docker app and blocked on a form
   submission that could never arrive. That hook is gone, but the rule stands: a slash command
@@ -645,7 +729,10 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
 - **A cancelled run's child is detached, so quitting must kill it.** The child is spawned into its
   own process group (that is how Stop reaches the CLI's _own_ children), which also means it
   outlives the app. `disposeIpc` calls `disposeClaudeRuns()`; without it, closing the window leaves
-  Claude running against the user's repo with nothing left to stop it from.
+  Claude running against the user's repo with nothing left to stop it from. Closing the SDK query is
+  **not** a substitute — it releases the child the SDK knows about and reaches none of its
+  grandchildren — which is why teardown does both, in that order. Verified by inspecting processes:
+  the CLI's pgid is not the app's, Stop kills the group, and quitting mid-run leaves nothing behind.
 - **`claude` is resolved explicitly, never off `process.env.PATH` alone.** A GUI-launched Electron
   app gets a PATH that does not include `~/.local/bin`, which is where the CLI installs — so the
   app reported "not installed" on machines where `which claude` answers instantly. This does not
@@ -679,7 +766,13 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   `contextIsolation: true`, one exposed namespace, no generic `invoke(channel, …)` escape hatch,
   no node builtins in the built renderer bundle, and — outside `src/main/` — no import of the
   `src/core/index.ts` barrel, `@repo/claude-fs`, or any `node:` builtin. These are configuration
-  and convention properties: they'd all regress silently without assertions.
+  and convention properties: they'd all regress silently without assertions. It also pins the
+  permission model, for the same reason: **"pre-accepts edits nowhere in the app"** fails if
+  `acceptEdits`/`bypassPermissions`/`dangerouslySkipPermissions` reappears under `src/`; **"bounds a
+  session's writes by what the preview displayed, and offers it no shell"** pins `canUseTool`,
+  `decideWrite`, `permissionMode: "default"`, `spawnClaudeCodeProcess`, the two tool lists and
+  `writable: inv.writable`; and **"loads no filesystem settings for a run, and discloses the same
+  resolution"** counts the three `settingSources: []` so the run and the disclosure cannot drift.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

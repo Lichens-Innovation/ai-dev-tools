@@ -257,8 +257,9 @@ function ConfirmCard({ pending, onRun, onCancel }: { pending: PendingChatRun; on
 
       {/*
         `targets` is empty for a chat, and that is a fact about the invocation rather than a hope:
-        the run carries `-p` without `--permission-mode acceptEdits`, so an edit in print mode has
-        nobody to ask and does not happen. Said in words, because an empty list says nothing.
+        the empty write scope rides on the preview token, and the session's permission callback
+        refuses every write against it, with a reason. Said in words, because an empty list says
+        nothing.
 
         Reading is the other half of that sentence, and used to be the missing half: "not given
         permission to edit files" was true and, on its own, misleading — the question is answered by

@@ -11,10 +11,17 @@ command re-entered the skill from the top and re-derived fields the payload alre
 instructions were pasted in instead.
 
 That rule exists **because a headless run has nobody to ask**. It is the same root cause as edit
-pre-acceptance, and the pane removed it: the session can ask a real question and get a real answer.
-So the skills can be loaded as skills, invoked when relevant, and the inlined copies deleted. One
-source of guidance for the app and the terminal both, instead of two that drift apart with nothing
-to catch it.
+pre-acceptance — which `018` removed on its own terms, by answering for the paths the confirmation
+displayed rather than by asking — and the pane removes the rest of it: the session can ask a real
+question and get a real answer. So the skills can be loaded as skills, invoked when relevant, and the
+inlined copies deleted. One source of guidance for the app and the terminal both, instead of two that
+drift apart with nothing to catch it.
+
+Two mechanical preconditions, both from `018`. The `Skill` tool is **not** in `SESSION_TOOLS`
+(`src/core/agent-sdk.ts`) — `019` adds it for the pane, and "loaded through the `skills` option"
+means nothing without it. And a session loads no filesystem settings (`settingSources: []`), so
+**`CLAUDE.md` files are not auto-loaded into a run**; a skill that assumed the model had already
+absorbed a project's conventions has to say so and let the model `Read` them.
 
 **Each skill must handle both entries.** These files are invoked from the terminal too, where no
 scaffold exists:
@@ -35,9 +42,19 @@ Rewrite them to ask rather than guess. A skill that needs a decision should put 
 of the user, with enough description to choose between them — that facility exists now and these
 skills are its first real consumer.
 
-Note that the create-\* confirmation surface changed shape in `017`: it now opens with **what the run
-can read** and only then says what it may write. Any of these skills that describes the confirmation
-to the user, or assumes the write targets are the first thing on it, is describing the old dialog.
+Note that the create-\* confirmation surface changed shape twice. `017`: it now opens with **what the
+run can read** and only then says what it may write. `018`: the "Command" row is labelled
+**"Equivalent"**, because `ClaudePreview.argv` is the equivalent `claude -p` line rather than what is
+spawned — the run is an Agent SDK session — and the write section now ends with "Anything else is
+refused. The session is also offered no shell and no subagents." Any of these skills that describes
+the confirmation to the user, or assumes the write targets are the first thing on it, or tells the
+model it can shell out, is describing a dialog and a run that no longer exist.
+
+The headless entry's own contract tightened with it, and the skills should say so plainly rather than
+letting a run discover it by being refused: **a headless create-\* run may write only the paths the
+confirmation listed**, including nothing else under its own working directory, and it has no `Bash`.
+The four `README.md` files beside these skills were corrected for this; the `SKILL.md` bodies are
+this task's job.
 
 Since these files also serve terminal users, the rewrite changes behaviour outside the app. That is
 intended, and it is why this comes last: only once the handoff is working is it clear what the model

@@ -201,6 +201,8 @@ export function previewUsageStats(
     args: argv.slice(1),
     cwd,
     prompt: "",
+    // A reader, not an author. The field is on every invocation so no run path can forget to say.
+    writable: [],
   });
 
   return {

@@ -6,18 +6,37 @@
 // caller therefore cannot express "run this other thing", which is a stronger guarantee than
 // validating that they didn't (see `claude-tokens.ts` for why the argument list is the design).
 //
+// It used to spawn `claude -p --permission-mode acceptEdits <prompt>` and read its stdout. It now
+// drives an **Agent SDK session** (`startAgentSession` in `agent-sdk.ts`) over the same invocation.
+// What that bought, and what it deliberately did not change:
+//
+//   • **The permission model.** `acceptEdits` was not decoration — a headless run has nobody to ask,
+//     so without it the default mode turns every useful run into a refusal. But it granted writes to
+//     anything anywhere under the working directory, which for a marketplace target is a whole
+//     repository. The host process IS somebody to ask, so the session's `canUseTool` silently allows
+//     writes to exactly the paths the confirmation displayed and denies everything else with a
+//     reason the model can act on. Strictly narrower, and nothing the user notices.
+//   • **The token is unchanged.** Preview builds the prompt and issues it; this module claims it and
+//     nothing else. The guarantee was always about which prompt executes, never about which process
+//     ran it.
+//   • **The detached process group stays.** The SDK accepts a custom spawn function, and this module
+//     supplies one, because Stop has to reach the CLI's own children. Trading a working teardown for
+//     an unverified one is not a simplification.
+//
 // Two operational properties the UI depends on:
 //
 //   • **Output streams.** A create-a-skill run is tens of seconds and a task run is minutes. The
 //     result is delivered as it arrives, not accumulated and handed over at the end, because a
 //     window with nothing in it is indistinguishable from a window that has hung.
-//   • **Cancel actually kills.** The child is spawned into its own process group and the group is
-//     signalled, because the CLI spawns its own children — signalling only the parent leaves the
-//     grandchildren running and the "stopped" run still burning tokens.
+//   • **Cancel actually kills.** Closing the query, aborting a read loop and interrupting a turn are
+//     three different things. Stop does the first — which releases the child the SDK knows about —
+//     and then signals the whole process group, which is the part that reaches the grandchildren.
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, type ChildProcessByStdio } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import { claimInvocation, TokenRefused } from "./claude-tokens.js";
 import { claudeChildPath } from "./claude-cli.js";
+import { startAgentSession, type AgentSession, type AgentSessionRequest, type SpawnOptions } from "./agent-sdk.js";
 import type { ClaudeOutputChunk, ClaudeRunResult } from "./contracts.js";
 
 export { TokenRefused };
@@ -34,7 +53,10 @@ const RETAINED_OUTPUT_BYTES = 512 * 1024;
 const SIGKILL_AFTER_MS = 5000;
 
 interface ActiveRun {
-  child: ChildProcess;
+  /** Ends the session and releases the CLI the SDK is holding. */
+  session: AgentSession;
+  /** The child the spawn function below produced, so the whole GROUP can be signalled. */
+  child: ChildProcess | null;
   /** Set by `cancelClaudeRun`, so the exit is reported as a cancellation and not as a crash. */
   cancelled: boolean;
   killTimer: ReturnType<typeof setTimeout> | null;
@@ -46,6 +68,18 @@ const active = new Map<string, ActiveRun>();
 export interface ClaudeRunEvents {
   /** Called for every chunk, as it arrives. */
   output(chunk: ClaudeOutputChunk): void;
+}
+
+/**
+ * How a run is executed. Exists so the outcome mapping below can be tested without the real SDK,
+ * a real `claude`, real tokens or real money — none of which say anything about whether a
+ * `crashed` is distinguishable from a `failed`.
+ *
+ * The app never passes it. `test/core/claude.test.ts` does, and the spawn function it replaces is
+ * tested directly and separately, because "the group really dies" is not a thing a fake can show.
+ */
+export interface ClaudeRunDeps {
+  start(request: AgentSessionRequest): AgentSession;
 }
 
 /** Append with a cap, keeping the tail. */
@@ -76,14 +110,44 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 }
 
 /**
+ * Start the CLI the way this app needs it started, for the SDK to talk to.
+ *
+ * Exported because it carries the one property no fake session can demonstrate: the child is a
+ * process GROUP leader, so `signalGroup` reaches the children the CLI spawns for itself. Left to
+ * the SDK's own spawn, Stop would kill the process we started and leave its grandchildren running
+ * against the user's repo — the exact failure `detached` has always existed to prevent here.
+ *
+ * `stdio` is three pipes rather than the old `["ignore", "pipe", "pipe"]`: the SDK speaks a control
+ * protocol to the child over stdin/stdout, so closing stdin would close the conversation. The
+ * return type says so too — `SpawnedProcess` requires a non-null `stdin`, which the plain
+ * `ChildProcess` type cannot promise and this overload can.
+ */
+export function spawnClaudeChild(options: SpawnOptions): ChildProcessByStdio<Writable, Readable, Readable> {
+  return spawn(options.command, options.args, {
+    cwd: options.cwd,
+    // The environment the SDK built (see `agentChildEnv`), plus the PATH this app resolved for
+    // itself if that env somehow arrived without one — a GUI launch hands us a PATH that may not
+    // contain `node`, and the CLI shells out.
+    env: { ...options.env, PATH: options.env.PATH ?? claudeChildPath() },
+    // Its own process group, so cancelling can reach the CLI's children too.
+    detached: true,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+
+/**
  * Run the invocation a token authorises, streaming its output, and resolve with how it ended.
  *
- * Throws `TokenRefused` — synchronously, before anything is spawned — for a forged, replayed or
- * expired token. Every other failure is a resolved `ClaudeRunResult`: a CLI that exits non-zero and
- * a CLI that could not be executed are both outcomes the user needs reported with their output,
- * not exceptions that reach the UI as a bare string.
+ * Throws `TokenRefused` — before anything is spawned — for a forged, replayed or expired token.
+ * Every other failure is a resolved `ClaudeRunResult`: a session that errored and a CLI that could
+ * not be executed are both outcomes the user needs reported with their output, not exceptions that
+ * reach the UI as a bare string.
  */
-export async function runPreviewedClaude(token: unknown, events: ClaudeRunEvents): Promise<ClaudeRunResult> {
+export async function runPreviewedClaude(
+  token: unknown,
+  events: ClaudeRunEvents,
+  deps: ClaudeRunDeps = { start: startAgentSession }
+): Promise<ClaudeRunResult> {
   // `async`, but the claim is still the first thing that happens and still happens before any
   // spawn — a refused token rejects the returned promise rather than throwing at the call site,
   // which is what an `await` in an IPC handler can actually catch.
@@ -91,113 +155,120 @@ export async function runPreviewedClaude(token: unknown, events: ClaudeRunEvents
   // claiming it here would spawn that while every message on screen said Claude.
   const inv = claimInvocation(token, "claude");
   const startedAt = Date.now();
-  const argv = [inv.bin, ...inv.args];
 
-  return new Promise<ClaudeRunResult>((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let truncated = false;
-    let settled = false;
+  let stdout = "";
+  let stderr = "";
+  let truncated = false;
+  /** What the SDK actually asked to be spawned — reported instead of the argv the modal showed. */
+  let argv: string[] = [inv.bin, ...inv.args];
+  /** A spawn-level failure, kept so it can be reported as a crash naming the file. */
+  let spawnError: string | null = null;
 
-    const child = spawn(inv.bin, inv.args, {
-      cwd: inv.cwd,
-      // The child inherits our environment plus the PATH this app resolved for itself. A GUI
-      // launch hands us a PATH that may not even contain `node`, and the CLI shells out.
-      env: { ...process.env, PATH: claudeChildPath() },
-      // Its own process group, so cancelling can reach the CLI's children too.
-      detached: true,
-      // stdin closed: headless `-p` reads its prompt from argv, and an inherited stdin would leave
-      // a run waiting on input nobody can supply.
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    const entry: ActiveRun = { child, cancelled: false, killTimer: null };
-    active.set(inv.token, entry);
-
-    const finish = (
-      result: Omit<ClaudeRunResult, "stdout" | "stderr" | "truncated" | "durationMs" | "argv" | "cwd">
-    ) => {
-      if (settled) return;
-      settled = true;
-      if (entry.killTimer) clearTimeout(entry.killTimer);
-      active.delete(inv.token);
-      resolve({
-        ...result,
-        stdout,
-        stderr,
-        truncated,
-        durationMs: Date.now() - startedAt,
-        argv,
-        cwd: inv.cwd,
-      });
-    };
-
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-
-    child.stdout?.on("data", (chunk: string) => {
-      const next = appendCapped(stdout, chunk);
+  const record = (chunk: ClaudeOutputChunk) => {
+    if (chunk.stream === "stdout") {
+      const next = appendCapped(stdout, chunk.chunk);
       stdout = next.text;
       truncated = truncated || next.truncated;
-      events.output({ stream: "stdout", chunk });
-    });
-
-    child.stderr?.on("data", (chunk: string) => {
-      const next = appendCapped(stderr, chunk);
+    } else {
+      const next = appendCapped(stderr, chunk.chunk);
       stderr = next.text;
       truncated = truncated || next.truncated;
-      events.output({ stream: "stderr", chunk });
-    });
+    }
+    events.output(chunk);
+  };
 
-    // Spawn-level failure: the binary vanished between preview and Run, or is not executable.
-    // Reported as a crash naming the path, never as a raw ENOENT — "spawn ENOENT" tells a user
-    // nothing about which file was missing.
-    child.on("error", (err: NodeJS.ErrnoException) => {
-      const reason =
-        err.code === "ENOENT"
-          ? `Could not run ${inv.bin} — the file is no longer there. It was found when the prompt was previewed.`
-          : err.code === "EACCES"
-            ? `Could not run ${inv.bin} — it is not executable.`
-            : `Could not run ${inv.bin}: ${err.message}`;
-      finish({ outcome: "crashed", code: null, signal: null, error: reason });
-    });
+  // Declared before `session` so the spawn function can register the child on the entry the moment
+  // it exists — the SDK spawns during `startAgentSession`, which is before it returns a handle.
+  const entry: ActiveRun = { session: null as unknown as AgentSession, child: null, cancelled: false, killTimer: null };
 
-    child.on("close", (code, signal) => {
-      if (entry.cancelled) {
-        finish({ outcome: "cancelled", code, signal, error: null });
-        return;
-      }
-      if (signal) {
-        // Killed by something that wasn't us — OOM, a shutdown, a stray kill. That is a different
-        // event from "the CLI decided this request failed", and is labelled as one.
-        finish({
-          outcome: "crashed",
-          code,
-          signal,
-          error: `The Claude CLI was terminated by ${signal}.`,
-        });
-        return;
-      }
-      finish({ outcome: code === 0 ? "ok" : "failed", code, signal: null, error: null });
-    });
+  const session = deps.start({
+    prompt: inv.prompt,
+    cwd: inv.cwd,
+    bin: inv.bin,
+    // Off the invocation, so what the confirmation listed is what the callback allows. There is no
+    // argument on this function by which a caller could widen it.
+    writable: inv.writable,
+    output: record,
+    spawn: (options) => {
+      argv = [options.command, ...options.args];
+      const child = spawnClaudeChild(options);
+      entry.child = child;
+      // Spawn-level failure: the binary vanished between preview and Run, or is not executable.
+      // Captured here and reported as a crash naming the path, never as a raw ENOENT — "spawn
+      // ENOENT" tells a user nothing about which file was missing.
+      child.on("error", (err: NodeJS.ErrnoException) => {
+        spawnError =
+          err.code === "ENOENT"
+            ? `Could not run ${options.command} — the file is no longer there. It was found when the prompt was previewed.`
+            : err.code === "EACCES"
+              ? `Could not run ${options.command} — it is not executable.`
+              : `Could not run ${options.command}: ${err.message}`;
+      });
+      return child;
+    },
   });
+
+  entry.session = session;
+  active.set(inv.token, entry);
+
+  try {
+    const outcome = await session.result;
+    // Everything the callback refused is already in `stderr` as it happened; the count is what the
+    // outcome line can use without re-reading it.
+    const denials = outcome.denied.length;
+
+    if (entry.cancelled) {
+      return finish("cancelled", { code: null, signal: "SIGTERM", error: null });
+    }
+    if (spawnError) {
+      return finish("crashed", { code: null, signal: null, error: spawnError });
+    }
+    if (outcome.ok) {
+      return finish("ok", { code: 0, signal: null, error: null });
+    }
+    return finish("failed", {
+      code: null,
+      signal: null,
+      error:
+        (outcome.error ?? "The session ended without saying why.") +
+        (denials ? ` ${denials} tool call${denials === 1 ? " was" : "s were"} denied — see the output above.` : ""),
+    });
+  } finally {
+    if (entry.killTimer) clearTimeout(entry.killTimer);
+    active.delete(inv.token);
+    // Belt and braces: a session that resolved on its own has already released the child, and a
+    // second close is a no-op. A session that resolved because the read loop ended early has not.
+    session.close();
+  }
+
+  function finish(
+    outcome: ClaudeRunResult["outcome"],
+    rest: { code: number | null; signal: string | null; error: string | null }
+  ): ClaudeRunResult {
+    return { outcome, ...rest, stdout, stderr, truncated, durationMs: Date.now() - startedAt, argv, cwd: inv.cwd };
+  }
 }
 
 /**
  * Stop a run. Returns false when there is nothing running under that token.
  *
- * SIGTERM first so the CLI can finish its current write, then SIGKILL if it is still there — a
- * Stop button that leaves the process alive is the failure this exists to prevent, so the escalation
- * is not optional.
+ * Three steps, and they are not interchangeable. `close()` ends the query and releases the child
+ * the SDK is holding; SIGTERM to the process GROUP is what reaches the CLI's own children; SIGKILL
+ * follows if anything is still there. A Stop button that leaves a process alive is the failure this
+ * exists to prevent, so the escalation is not optional.
  */
 export function cancelClaudeRun(token: string): boolean {
   const entry = active.get(token);
   if (!entry) return false;
   entry.cancelled = true;
-  signalGroup(entry.child, "SIGTERM");
-  if (!entry.killTimer) {
-    entry.killTimer = setTimeout(() => signalGroup(entry.child, "SIGKILL"), SIGKILL_AFTER_MS);
-    entry.killTimer.unref?.();
+  entry.session.close();
+  if (entry.child) {
+    signalGroup(entry.child, "SIGTERM");
+    if (!entry.killTimer) {
+      const child = entry.child;
+      entry.killTimer = setTimeout(() => signalGroup(child, "SIGKILL"), SIGKILL_AFTER_MS);
+      entry.killTimer.unref?.();
+    }
   }
   return true;
 }
