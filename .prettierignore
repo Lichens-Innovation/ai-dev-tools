@@ -19,3 +19,30 @@ coverage/
 # Generated code — owned by its generator, which rewrites it wholesale
 routeTree.gen.ts
 plugins/*/scripts/lib/
+
+# Prose that prettier does not own.
+#
+# The only `check` script in the workspace is apps/maestro's, so these directories were never
+# actually checked — but nothing said so, and running prettier from the root reported ~110
+# failures that read as rot rather than as scope. They are documentation, task files and SKILL.md
+# bodies: hand-formatted, read as much in a GitHub blob and a Claude context window as in an
+# editor, and reflowing them would rewrite line breaks that were chosen. Stated here so the answer
+# is a decision on the record instead of a surprise for whoever next runs prettier from the root.
+#
+# EVERY PATTERN IS ROOT-ANCHORED, and that is load-bearing rather than tidy. A bare `skills/`
+# matches at any depth (the note at the top of this file), so it would also swallow
+# apps/maestro/.claude/skills/ — six architecture docs that ARE in the enforced set today. The
+# leading slash is what keeps this widening out of the one app prettier is actually policing.
+/docs/
+/skills/
+/rules/
+/agents/
+/incubator/
+/plugins/
+/.claude/
+
+# NOT ignored, and deliberately: `packages/` and the root's own README/CHANGELOG/TODO. Those are
+# maintained files, not prose prettier has no business in. Twenty-three of them fail today — 20
+# TypeScript/TSX under packages/ui and packages/claude-fs, plus three CLAUDE.md/README.md — and
+# that is a real gap rather than a scoping question: those packages simply have no `check` script
+# to fail. Closing it is a diff to those files, not a line here.
