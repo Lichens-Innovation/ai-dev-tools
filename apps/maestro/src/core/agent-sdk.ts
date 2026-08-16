@@ -59,9 +59,12 @@ import { createRequire } from "node:module";
 import { cliNotFoundMessage, resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
 import { decideWrite, targetPathOf, READ_ONLY_TOOLS } from "./write-scope.js";
 import { decideBoundary } from "./session-scope.js";
+import { autoRefusal, decidePaneCall, permissionReason, PANE_ASK_TOOLS } from "./session-permission.js";
+import { createPermissionRegistry } from "./permission-registry.js";
 import type {
   ClaudeOutputChunk,
   EffectiveSettingsSnapshot,
+  PermissionAnswer,
   SessionEvent,
   SessionEventBody,
   SettingsPermissions,
@@ -663,6 +666,16 @@ export const PANE_TOOLS = [...SESSION_TOOLS, "Skill"] as const;
  * on that), and `super-help` because it is the one thing the pane inherits from the help chat —
  * now a declared session skill rather than a sentence in a generated prompt.
  */
+/**
+ * What an outstanding permission request is told when the session goes away underneath it.
+ *
+ * It reaches the model, not the user — the window is already closing — but it still has to be a
+ * real sentence: a deny with an empty message is the one shape the SDK does not define behaviour
+ * for, and a run reading its transcript later should be able to tell this apart from a refusal
+ * somebody actually meant.
+ */
+export const TEARDOWN_DENIAL = "The session ended before this could be answered, so it was refused. Nothing was done.";
+
 export const PANE_SKILLS = [
   "create-skill",
   "create-subagent",
@@ -732,12 +745,46 @@ export interface PaneSession {
    * the turn into a closed stream.
    */
   say(text: string): boolean;
-  /** Interrupt the turn in flight, leaving the session usable. */
-  stop(): Promise<void>;
+  /**
+   * Answer a parked permission request.
+   *
+   * False when the id names nothing pending — a click that arrived after the session ended, or a
+   * second click on a prompt already answered. Both are ordinary, and neither may park anything.
+   */
+  answer(requestId: string, answer: PermissionAnswer): boolean;
+  /** Request ids still waiting on a person, so a reconnecting UI can re-render them. */
+  pendingPermissions(): string[];
+  /**
+   * Interrupt the turn in flight, leaving the session usable.
+   *
+   * Resolves with the uuids of queued user messages that SURVIVED the interrupt, when the CLI
+   * advertises `interrupt_receipt_v1`. Each of those runs as its own turn afterwards, so a Stop
+   * that reported nothing while a message was still queued would be a lie on screen.
+   */
+  stop(): Promise<{ stillQueued: string[] }>;
   /** End the session and release the CLI. Idempotent, and safe before the import resolves. */
   close(): void;
   /** Resolves when the session is over. Never rejects. */
   ended: Promise<{ error: string | null }>;
+}
+
+/**
+ * The third argument `canUseTool` is called with, as much of it as this app reads.
+ *
+ * Declared here rather than imported: the SDK's own `CanUseTool` type would have to be imported as
+ * a VALUE-adjacent type from the package this module is the app's only importer of, which is fine —
+ * but every field below is optional on older CLIs (`requestId` and `title` are recent additions),
+ * and writing them out is what makes the fallbacks at the call site legible.
+ */
+interface CanUseToolOptions {
+  signal?: AbortSignal;
+  blockedPath?: string;
+  decisionReason?: string;
+  /** The CLI's own prompt sentence, when it rendered one. Preferred over reconstructing it. */
+  title?: string;
+  toolUseID?: string;
+  agentID?: string;
+  requestId?: string;
 }
 
 /** The user turn, in the SDK's own shape. The `origin` is the point — see the block comment above. */
@@ -793,14 +840,45 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     }
   }
 
-  let query: { close(): void; interrupt(): Promise<unknown> } | null = null;
+  let query: { close(): void; interrupt(): Promise<{ still_queued?: string[] } | undefined> } | null = null;
   let resolveEnded: (value: { error: string | null }) => void = () => {};
   const ended = new Promise<{ error: string | null }>((resolve) => {
     resolveEnded = resolve;
   });
 
+  /** Last-resort key for a CLI too old to send `requestId`. Ascending, so it cannot collide. */
+  let askSeq = 0;
+
+  /** The hook output that routes a call into the prompt instead of answering it. */
+  const askHook = (reason: string) => ({
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse" as const,
+      permissionDecision: "ask" as const,
+      permissionDecisionReason: reason,
+    },
+  });
+
+  // ── the permission registry ───────────────────────────────────────────────
+  // Parked promises, one per outstanding ask. See ./permission-registry.ts for the four things that
+  // make it fiddly; the one that matters HERE is that every exit below resolves what it holds.
+  const permissions = createPermissionRegistry();
+
+  /**
+   * Deny everything outstanding, and tell the UI so it can stop showing questions nobody can answer.
+   *
+   * Called from `finish` and from `close`, because they are not the same moment: `close()` runs the
+   * instant the window goes away, while `finish` waits for the SDK's stream to actually end — which
+   * it cannot do while a `canUseTool` promise is still parked. Denying first is what unblocks it.
+   */
+  const releasePermissions = (message: string): void => {
+    for (const requestId of permissions.denyAll(message)) {
+      emit({ kind: "permission-resolved", requestId, outcome: "cancelled" });
+    }
+  };
+
   const finish = (error: string | null): void => {
     if (!closed) closed = true;
+    releasePermissions(TEARDOWN_DENIAL);
     wake?.(null);
     wake = null;
     emit({ kind: "ended", error });
@@ -846,9 +924,18 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                     const hook = input as { tool_name?: string; tool_input?: Record<string, unknown> };
                     const tool = String(hook.tool_name ?? "");
                     const toolInput = hook.tool_input ?? {};
-                    // Only where `decideWrite` does not answer. Every write is already refused by
-                    // the empty write scope with a reason the model can act on, and letting the
-                    // boundary answer first would replace that reason with a different one.
+
+                    // The network tools reach `canUseTool` only because this says so. They pass
+                    // every path check there is — they touch no path — so without a route into the
+                    // prompt they are auto-approved, and a `WebFetch` is how the contents of the
+                    // project the session can read leave the machine.
+                    if ((PANE_ASK_TOOLS as readonly string[]).includes(tool)) {
+                      return askHook(`${tool} reaches the network. The app does not decide that for you.`);
+                    }
+
+                    // Only where `decideWrite` does not answer. Every write is already answered by
+                    // the write scope with a reason the model can act on, and letting the boundary
+                    // answer first would replace that reason with a different one.
                     if (!(READ_ONLY_TOOLS as readonly string[]).includes(tool)) return {};
 
                     const verdict = decideBoundary({
@@ -859,42 +946,118 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                     });
                     if (verdict.decision === "allow") return {};
 
-                    // Hook denials are NOT reported through `SDKPermissionDeniedMessage`, so this
-                    // layer owns its own transcript entry. Losing that would make an out-of-scope
-                    // read look like a tool that simply found nothing.
-                    emit({
-                      kind: "refusal",
-                      tool,
-                      target: verdict.path || null,
-                      reason: verdict.reason,
-                    });
-                    return {
-                      hookSpecificOutput: {
-                        hookEventName: "PreToolUse" as const,
-                        // `020` changes this one word to "ask", which ROUTES the call into the
-                        // permission prompt instead of refusing it. The verdict above is already
-                        // spelled "out-of-scope" rather than "deny" so that stays a one-line change.
-                        permissionDecision: "deny" as const,
-                        permissionDecisionReason: verdict.reason,
-                      },
-                    };
+                    // A call with NO PATH IN IT STAYS A DENY, and it is the only one that does.
+                    // There is nothing here for a person to authorise — the call named no file, so
+                    // "allow it" would mean allowing an unknown read — and a prompt whose subject
+                    // is blank is a prompt answered by reflex.
+                    //
+                    // This is also why the transcript entry below still exists. Hook denials are
+                    // NOT reported through `SDKPermissionDeniedMessage`, so this layer owns its own
+                    // entry or the call vanishes: no prompt, no auto-deny event, and a tool that
+                    // simply appears to have found nothing.
+                    if (!verdict.path) {
+                      emit({
+                        kind: "refusal",
+                        tool,
+                        target: null,
+                        reason: verdict.reason,
+                        source: "read-boundary",
+                        decidedBy: null,
+                      });
+                      return {
+                        hookSpecificOutput: {
+                          hookEventName: "PreToolUse" as const,
+                          permissionDecision: "deny" as const,
+                          permissionDecisionReason: verdict.reason,
+                        },
+                      };
+                    }
+
+                    // ROUTED, NOT REFUSED. `"ask"` is what makes a read the boundary stopped reach
+                    // `canUseTool` at all: reads are auto-approved and never prompt on their own,
+                    // so without this the call is silently allowed or silently denied and the user
+                    // is asked nothing. The verdict is spelled "out-of-scope" rather than "deny"
+                    // precisely so this stayed the one-word change it was written to be. The
+                    // transcript entry then comes from the ANSWER, so a routed read is written down
+                    // once rather than twice.
+                    return askHook(verdict.reason);
                   },
                 ],
               },
             ],
           },
-          canUseTool: async (tool: string, input: Record<string, unknown>) => {
-            // The SAME engine the form path uses, with an empty write scope — not a second one.
-            // `writable: []` is already a working state: it refuses every write with a reason
-            // saying the run was started to answer rather than to author.
-            const decision = decideWrite({ tool, input, writable: [], cwd: request.cwd });
-            if (decision.behavior === "allow") return { behavior: "allow" as const };
-            emit({
-              kind: "refusal",
+          canUseTool: async (tool: string, input: Record<string, unknown>, options: CanUseToolOptions) => {
+            // The SAME engines the form path and the hook use, composed — not a second one.
+            // `writable: []` is still the pane's write scope and `decideWrite` still produces the
+            // refusal; what `decidePaneCall` adds is the branch where that refusal becomes a
+            // question for the user rather than the end of the matter.
+            const verdict = decidePaneCall({
               tool,
-              target: targetPathOf(input),
-              reason: decision.message,
+              input,
+              writable: [],
+              directories: readable,
+              cwd: request.cwd,
             });
+
+            if (verdict.outcome === "settled") {
+              if (verdict.decision.behavior === "deny") {
+                emit({
+                  kind: "refusal",
+                  tool,
+                  target: targetPathOf(input),
+                  reason: verdict.decision.message,
+                  source: "write-scope",
+                  decidedBy: null,
+                });
+              }
+              return verdict.decision;
+            }
+
+            // ── the ask ──────────────────────────────────────────────────────
+            // `requestId` is the SDK's own envelope id and therefore the idempotency key: the same
+            // request redelivered after a transport gap carries the same one, and the registry
+            // resolves the entry that already exists instead of parking a second.
+            const requestId = options?.requestId || options?.toolUseID || `${tool}-${++askSeq}`;
+            const { fresh, answer } = permissions.request(requestId);
+            if (fresh) {
+              emit({
+                kind: "permission",
+                request: {
+                  requestId,
+                  toolUseId: options?.toolUseID ?? null,
+                  tool,
+                  agentId: options?.agentID ?? null,
+                  // The path the SDK says triggered it, when it named one — it knows about reasons
+                  // this app does not, such as a rule matching a path our own check waved through.
+                  target: options?.blockedPath ?? verdict.target,
+                  reason: permissionReason(verdict.reason, `${tool} needs your permission.`),
+                  denyReason: permissionReason(
+                    verdict.denyReason,
+                    `The user did not allow this ${tool} call. Say what you needed it for instead.`
+                  ),
+                  decisionReason: options?.decisionReason ?? null,
+                  title: options?.title ?? null,
+                  detail: verdict.detail,
+                },
+              });
+            }
+
+            const decision = await answer;
+            emit({
+              kind: "permission-resolved",
+              requestId,
+              outcome: decision.behavior === "allow" ? "allow" : decision.interrupt === true ? "stop" : "deny",
+            });
+            if (decision.behavior === "deny") {
+              emit({
+                kind: "refusal",
+                tool,
+                target: verdict.target,
+                reason: decision.message,
+                source: "user",
+                decidedBy: null,
+              });
+            }
             return decision;
           },
           stderr: (chunk: string) => {
@@ -912,6 +1075,17 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
       for await (const message of q) {
         if (message.type === "assistant") {
           for (const event of assistantEvents(message.message?.content)) emit(event);
+          continue;
+        }
+        if (message.type === "system" && message.subtype === "permission_denied") {
+          // THE OTHER DENIAL ROUTE, and it shares no code with the two above. The permission system
+          // auto-denies some calls without ever reaching `canUseTool` — a deny RULE, or the mode —
+          // and says so only here. Without this branch those calls are invisible: no prompt, no
+          // refusal, and a tool that looks like it did nothing. `decision_reason_type` is the
+          // discriminator naming which component decided, and the transcript shows it, because
+          // "a rule refused this" and "the model's own classifier refused this" are different
+          // things for the user to do something about.
+          emit(autoRefusal(message));
           continue;
         }
         if (message.type === "result") {
@@ -940,15 +1114,32 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
       wake = null;
       return true;
     },
-    async stop(): Promise<void> {
+    answer(requestId: string, decision: PermissionAnswer): boolean {
+      return permissions.answer(requestId, decision);
+    },
+    pendingPermissions(): string[] {
+      return permissions.pending();
+    },
+    async stop(): Promise<{ stillQueued: string[] }> {
       try {
-        await query?.interrupt();
+        // THE RECEIPT IS READ, not discarded. On a CLI advertising `interrupt_receipt_v1` this
+        // resolves with the uuids of queued user messages the interrupt did NOT reach — each of
+        // which runs as its own turn immediately afterwards. Dropping it made Stop claim to have
+        // stopped a session that was about to start talking again.
+        const receipt = await query?.interrupt();
+        return { stillQueued: receipt?.still_queued ?? [] };
       } catch {
         /* nothing in flight, or a CLI that does not answer — Stop still tears down above */
+        return { stillQueued: [] };
       }
     },
     close(): void {
       closed = true;
+      // BEFORE the query is closed, not after: a `canUseTool` promise parked on a prompt nobody is
+      // left to answer holds the SDK's read loop open, and with it the detached child. This is the
+      // window-close / project-switch / quit path, and it is the one with no user action to hang a
+      // resolution off.
+      releasePermissions(TEARDOWN_DENIAL);
       wake?.(null);
       wake = null;
       query?.close();

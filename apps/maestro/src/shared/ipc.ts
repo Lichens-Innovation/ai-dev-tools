@@ -44,6 +44,13 @@ import type {
   SettingsSourceInfo,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  PermissionAnswer,
+  PermissionChoice,
+  PermissionDetail,
+  PermissionDiff,
+  PermissionOutcome,
+  PermissionPrompt,
+  RefusalSource,
   SessionEvent,
   SessionInfo,
   CreateOptions,
@@ -99,6 +106,13 @@ export type {
   SettingsSourceInfo,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  PermissionAnswer,
+  PermissionChoice,
+  PermissionDetail,
+  PermissionDiff,
+  PermissionOutcome,
+  PermissionPrompt,
+  RefusalSource,
   SessionEvent,
   SessionInfo,
   CreateOptions,
@@ -241,6 +255,9 @@ export const IPC = {
   sessionStart: "session:start",
   sessionSay: "session:say",
   sessionStop: "session:stop",
+  // The answer to one parked permission request. A CHOICE, not a permission result — see
+  // `PermissionChoice`, and `MaestroApi.session.answer` below.
+  sessionPermission: "session:permission",
   sessionEnd: "session:end",
   sessionInfo: "session:info",
 
@@ -396,6 +413,19 @@ export interface MaestroApi {
     say(id: string, text: string): Promise<boolean>;
     /** Interrupt the turn in flight. The session stays usable. */
     stop(id: string): Promise<boolean>;
+    /**
+     * Answer a parked permission request.
+     *
+     * A CHOICE crosses, never a permission result. The SDK's own allow shape carries
+     * `updatedPermissions` — blanket allow rules, `bypassPermissions`, a permanently widened read
+     * scope, any of it saved into the user's repository or home directory — so the renderer sends
+     * one of three words plus its reason and main constructs the answer. Same discipline as
+     * `claude:run` taking a token: the boundary carries a decision, never a payload.
+     *
+     * False when the request is no longer pending — answered already, or the session ended under
+     * it, both of which are ordinary rather than errors.
+     */
+    answer(id: string, requestId: string, choice: PermissionChoice): Promise<boolean>;
     /** End the session and reap the CLI's process group. */
     end(): Promise<void>;
     /**

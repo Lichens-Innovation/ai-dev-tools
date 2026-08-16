@@ -686,13 +686,157 @@ export type SessionEvent =
    * A tool call this app refused, with the reason the model was given — the same string, so the
    * transcript and the model's context agree about what happened.
    */
-  | { kind: "refusal"; seq: number; tool: string; target: string | null; reason: string }
+  | {
+      kind: "refusal";
+      seq: number;
+      tool: string;
+      target: string | null;
+      reason: string;
+      /** Who decided. Two of these arrive by routes that share no code — see `RefusalSource`. */
+      source: RefusalSource;
+      /** The SDK's own discriminator on an auto-denial: `rule`, `mode`, `classifier`, `asyncAgent`. */
+      decidedBy: string | null;
+    }
+  /** A tool call waiting on a person. Answer it with `session:permission`, or it waits forever. */
+  | { kind: "permission"; seq: number; request: PermissionPrompt }
+  /**
+   * A pending request is no longer pending — because the user answered it, or because the session
+   * went away and every outstanding ask was denied on its behalf.
+   */
+  | { kind: "permission-resolved"; seq: number; requestId: string; outcome: PermissionOutcome }
   /** Something about the session itself: stderr worth surfacing, a boundary event. */
   | { kind: "notice"; seq: number; text: string }
   /** A turn finished. `ok: false` means the session reported an error rather than an answer. */
   | { kind: "turn"; seq: number; ok: boolean; error: string | null; costUsd: number | null }
   /** The session is over — no further turn can be sent. `error` is null on a clean close. */
   | { kind: "ended"; seq: number; error: string | null };
+
+/**
+ * Who refused a tool call — and the reason this is a field rather than a comment.
+ *
+ * The four values arrive through routes that share no code, and two of them are easy to build only
+ * one of. `write-scope` and `read-boundary` are this app's own decisions; `user` is an answered
+ * prompt; and `auto` is the SDK's `permission_denied` stream event, which reports deny RULES and
+ * MODE denials — and which explicitly does **not** report hook denials, so a `read-boundary` entry
+ * has to be written by the hook layer itself or it never appears at all.
+ */
+export type RefusalSource = "write-scope" | "read-boundary" | "user" | "auto";
+
+/** How a pending permission request ended. `cancelled` is the session going away underneath it. */
+export type PermissionOutcome = "allow" | "deny" | "stop" | "cancelled";
+
+/**
+ * The answer to a permission request — the SDK's `PermissionResult`, narrowed to what this app
+ * sends.
+ *
+ * TWO SHAPES, AND THE FALL-THROUGH IS A DENY. The SDK reads `null` as "the host answered out of
+ * band" and then never writes a `control_response` at all; prompts do not time out, so the tool
+ * call blocks forever with nothing on screen. Every producer of this type — `decideWrite`, which
+ * aliases it as `WriteDecision`, and the renderer's Allow/Deny/Stop buttons — is therefore
+ * incapable of producing `undefined` by falling through a branch.
+ *
+ * `interrupt` is what makes Deny and Stop two controls rather than one: a plain denial refuses the
+ * call and lets the model adapt (it reads the message and tries something else), while `interrupt`
+ * ends the turn. `decideWrite` never sets it — only a person does.
+ */
+export type PermissionAnswer = { behavior: "allow" } | { behavior: "deny"; message: string; interrupt?: boolean };
+
+/**
+ * What the RENDERER is allowed to send — a decision, never a result.
+ *
+ * The three buttons, and nothing that could become a fourth. `PermissionAnswer` above is the SDK's
+ * own shape, and its allow arm carries `updatedPermissions`: a field that can add blanket allow
+ * rules, flip the session to `bypassPermissions`, or widen the readable set permanently and
+ * machine-wide, with destinations that write to the user's repository or to their home directory.
+ * A renderer that could put a value there would be authoring policy rather than answering a
+ * question, so the wire carries this instead and the main process constructs the answer.
+ *
+ * `reason` is what the model is told. It travels on `deny` and on `stop` because a denial with an
+ * empty message wastes the one channel there is for steering — the model READS the refusal and
+ * adapts — and main substitutes a real sentence rather than forwarding an empty string.
+ */
+export type PermissionChoice =
+  | { choice: "allow" }
+  | { choice: "deny"; reason: string }
+  /** Deny AND end the turn. A different intent from a plain refusal, so it is a different button. */
+  | { choice: "stop"; reason: string };
+
+/**
+ * One hunk of what a write would change. `before: null` means the file is being created.
+ *
+ * A prompt is not a file viewer: the bodies are clipped and the surplus hunks counted, because the
+ * question being asked is "should this happen", not "review this patch".
+ */
+export interface PermissionDiffHunk {
+  before: string | null;
+  after: string;
+}
+
+export interface PermissionDiff {
+  hunks: PermissionDiffHunk[];
+  /** Hunks not included above, because the call carried more than a prompt should render. */
+  more: number;
+  /** True when at least one body was clipped for length. */
+  clipped: boolean;
+}
+
+/**
+ * What a permission prompt actually shows, per tool.
+ *
+ * PER TOOL, NEVER A PAYLOAD DUMP. A generic `{tool, input}` blob is technically correct and
+ * practically useless: users click Allow blindly, which is worse than pre-accepting because it
+ * looks like consent. So a fetch shows the COMPLETE url — query string included, never elided to a
+ * hostname, because the session can read the user's project and an outbound request is how its
+ * contents leave — and a write shows the path and what would change.
+ */
+export type PermissionDetail =
+  /** `WebFetch`. `url` is verbatim from the call: nothing here shortens or normalises it. */
+  | { kind: "fetch"; url: string; prompt: string | null }
+  /** `WebSearch`. The query leaves the machine, so it is what the prompt shows. */
+  | { kind: "search"; query: string }
+  /** `Write`/`Edit`/`MultiEdit`/`NotebookEdit`. */
+  | { kind: "write"; path: string; diff: PermissionDiff | null }
+  /** A `Read` the boundary stopped. */
+  | { kind: "read"; path: string }
+  /** `Glob`/`Grep` — the root it would search and the pattern, since either can leave the scope. */
+  | { kind: "scan"; path: string | null; pattern: string | null }
+  /** Anything else: NAMED, with whatever the request carried, rather than dumped. */
+  | { kind: "other"; summary: string };
+
+/**
+ * A tool call parked in the main process, waiting for a person.
+ *
+ * `requestId` is the idempotency key and the only handle the answer travels back on. A request
+ * whose response was lost across a transport gap **is dispatched again** — by `reinitialize()`, and
+ * by any `initialize` to a running session, whose response carries `pending_permission_requests`
+ * that the SDK re-dispatches for you. Resolving the entry that already exists is correct; parking a
+ * second one beside it leaks a promise the UI has nothing left to answer.
+ */
+export interface PermissionPrompt {
+  requestId: string;
+  /** The tool call this answers, when the SDK named one. */
+  toolUseId: string | null;
+  tool: string;
+  /** The subagent that asked, or null for the session itself. */
+  agentId: string | null;
+  /** The path that triggered it — the SDK's `blockedPath` when it gave one, else our own. */
+  target: string | null;
+  /** Why a person is being asked, written for them. Never empty: an unexplained prompt is a blind Allow. */
+  reason: string;
+  /**
+   * What the MODEL is told if this is denied and the user typed no reason of their own.
+   *
+   * A second sentence rather than a reuse of `reason`, because the two have different readers. It
+   * is also how `decideWrite`'s refusal survives a write becoming a prompt: the engine's message
+   * still reaches the model, verbatim, on the path where the call is actually refused.
+   */
+  denyReason: string;
+  /** The SDK's own explanation of what forced the prompt, when it gave one. */
+  decisionReason: string | null;
+  /** The CLI's own prompt sentence, when it rendered one — preferred over reconstructing it. */
+  title: string | null;
+  detail: PermissionDetail;
+}
 
 /**
  * One session event before the sequence number is stamped on it.

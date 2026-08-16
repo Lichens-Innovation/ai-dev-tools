@@ -40,6 +40,16 @@ is close to ceremonial: the model cannot propose a write the user has not alread
 submitting the form. That is intended. The prompts worth the user's attention are the ones for
 anything outside it.
 
+**Note what that sentence means after `020`, because the direction reversed.** The per-write prompt
+already exists: `020` made a write the empty scope refuses into a question the user can answer
+per-call, rather than a flat refusal. So a granted directory does **not** turn a refusal into a
+prompt — it turns a **prompt into a silent allow**. `decideWrite` returns `{ behavior: "allow" }` for
+a path inside the scope, `decidePaneCall` reports that as `{ outcome: "settled" }`, and nothing
+reaches the user at all. The user-visible win of this slice is therefore the prompts that **stop
+appearing** inside the artifact's own directory, and the acceptance criterion below reads that way:
+a write inside the granted directory succeeds without asking, while a write outside it still raises
+the same prompt `020` built and can still be allowed once without growing the scope.
+
 **The read scope has to survive the handoff too.** Since `017` the create confirmation carries a
 `ClaudeReadScope` — the directories the run can read, each with its origin and settings tier — and
 the pane it hands off into must carry that across rather than dropping it. A handoff that moves only
@@ -69,7 +79,11 @@ one on screen rather than silently replacing one list with another.
   in this slice.
 - **There is no write-scope accumulator to extend.** The pane reaches `decideWrite` with
   `writable: []`, so every write is refused with "started to answer, not to author". This slice
-  builds the accumulator; the engine and the refusal message it must keep are already there.
+  builds the accumulator; the engine and the refusal message it must keep are already there. `020`
+  did **not** build one either — it lets a user wave a single call through, and the scope is `[]`
+  again on the next one. That premise is intact: this slice is still the only thing that can grow it.
+  The literal `writable: []` to replace is in `startPaneSession`'s `canUseTool` in
+  `src/core/agent-sdk.ts`, where it is passed to `decidePaneCall`.
 
 The existing headless finish stays available. The two paths differ in who is driving, not in what
 they are allowed to do — and since `018` that is literally true rather than aspirational: the
@@ -84,7 +98,7 @@ sentence stops being checkable.
 - [ ] A second submit grows the scope by one more; nothing else in the app can add to it
 - [ ] The seeded context does not trigger a model turn and costs nothing until the user types
 - [ ] The model does not re-ask for fields the form already captured
-- [ ] A write inside the granted directory prompts and succeeds; a write outside every granted directory is refused
+- [ ] A write inside the granted directory succeeds **without** raising a prompt; a write outside every granted directory still raises `020`'s prompt, and allowing it once does not grow the scope
 - [ ] The existing headless finish still works and produces the same artifacts
 - [ ] Switching projects clears the accumulated write scope along with the session
 

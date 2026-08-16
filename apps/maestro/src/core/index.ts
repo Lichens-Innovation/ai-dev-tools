@@ -259,6 +259,26 @@ export {
   type BoundaryTarget,
 } from "./session-scope.js";
 
+// When a session has to ask a PERSON, and what the question shows. Composes the two modules above
+// rather than deciding anything itself — the third answer neither of them can give. Pure.
+export {
+  autoRefusal,
+  decidePaneCall,
+  describeCall,
+  permissionReason,
+  PANE_ASK_TOOLS,
+  type PaneCallInput,
+  type PaneVerdict,
+} from "./session-permission.js";
+
+// The parked promises behind that ask: idempotent per request id, and resolved — denied — by every
+// teardown path, because permission prompts do not time out and nothing else will. Pure.
+export {
+  createPermissionRegistry,
+  type PermissionRegistry,
+  type PermissionRequestHandle,
+} from "./permission-registry.js";
+
 // Usage stats. The same preview-then-run shape and the same token store as the bridge above,
 // because the thing being confirmed is the same kind of thing: a command about to run on the
 // user's machine — and, when no local copy exists, one FETCHED FROM THE NETWORK first. The

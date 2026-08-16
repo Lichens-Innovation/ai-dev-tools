@@ -16,6 +16,28 @@ branches on the tool and hands questions to their own component. Note that quest
 even when a rule would otherwise auto-approve them — by definition they need a human, so they cannot
 be configured away.
 
+That channel is now built and named, so this slice sits beside it rather than inventing a second
+one. **`session:permission`** is the answer channel (`MaestroApi.session.answer(id, requestId,
+choice)`), `session:event` pushes the `{ kind: "permission", request: PermissionPrompt }` and
+`{ kind: "permission-resolved", requestId, outcome }` events, and the pair that crosses the wire is
+`PermissionPrompt` out / **`PermissionChoice`** back — a decision, never a payload, which is exactly
+the shape this slice's own carve-out has to take. Reuse three things rather than re-deriving them:
+
+- **`createPermissionRegistry()` in `src/core/permission-registry.ts` for the parked promises.** It
+  is idempotent per `requestId`, replays a settled answer to a redelivery, and `denyAll()` is already
+  called from both `finish()` and `close()` in `startPaneSession`. That is the "dismissing the pane or
+  switching projects with a question outstanding resolves it" criterion below, already solved — for
+  permissions. A second registry beside it means a second thing to remember to drain on teardown, and
+  the one that gets forgotten wedges the session exactly as hard.
+- **The branch point in `canUseTool`.** `020` routes every call through `decidePaneCall` in
+  `src/core/session-permission.ts` and `agent-sdk.ts` never authors a decision itself. An
+  `AskUserQuestion` call arrives at the same callback: branch on the tool name **before**
+  `decidePaneCall`, the way `PANE_ASK_TOOLS` is checked first, and keep the decision out of
+  `agent-sdk.ts`.
+- **The renderer plumbing.** `session-context.tsx` already tracks `pending`/`outcomes` and auto-opens
+  the pane; `top-nav.tsx` already carries the amber pending badge. A question is another pending item
+  on those, not a parallel set of state.
+
 Previews are opt-in: without declaring the preview format at session start, no previews are emitted
 at all and the option list arrives bare.
 
@@ -39,8 +61,8 @@ preconditions, and neither exists anywhere in the app today:
 If a question never arrives, check those two before anything else. Note also that `018` uses
 `tools`/`disallowedTools` and never `allowedTools`, which auto-approves without restricting — a
 question routed through `allowedTools` would be answered by the SDK instead of by the user. And
-`020` owns the callback branch this slice hangs a component off; the permission prompt is where the
-tool-name branch lives.
+`020` built the callback branch this slice hangs a component off: `canUseTool` in `startPaneSession`,
+where `PANE_ASK_TOOLS` is already checked by tool name before anything else runs.
 
 **The answer travels back through the field this app otherwise refuses to expose**, and that
 collision needs an explicit, checkable carve-out rather than an exception. The renderer sends a

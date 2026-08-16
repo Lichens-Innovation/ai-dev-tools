@@ -5,6 +5,61 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — the pane asks before it acts
+
+- **A tool call the app will not answer for now raises a prompt**, pinned above the composer, with
+  three controls: **Allow once**, **Deny** and **Stop turn**. Deny refuses the call and lets the model
+  adapt; Stop ends the turn. They are two buttons because they are two intents, and every denial
+  carries a reason — the UI never sends an empty one.
+- **Two new pure core modules.** `src/core/session-permission.ts` is the fourth scope module and
+  deliberately **not** a fourth engine: it composes `decideWrite` (`write-scope.ts`) and
+  `decideBoundary` (`session-scope.ts`) unchanged and adds the one answer neither can give — ask a
+  person. `decidePaneCall` → `PaneVerdict` (`settled` | `ask`); also `describeCall`,
+  `permissionReason`, `autoRefusal` and `PANE_ASK_TOOLS = ["WebFetch", "WebSearch"]`.
+  `src/core/permission-registry.ts` is the parked promises: `createPermissionRegistry()` →
+  `{ request, answer, pending, denyAll }`, idempotent per `requestId` (a redelivered request
+  re-attaches, or replays the answer it already got — bounded at 64), and **every exit denies
+  everything outstanding**, because prompts do not time out and an unresolved ask is a wedged session
+  holding a child process.
+- **The pane is no longer read-only, and the write scope is still `[]`.** `decideWrite` still produces
+  the refusal and still produces its own reason; what changed is that the user may override it for
+  **that one call**. Nothing accumulates — the next write asks again, and `022` is still the only
+  thing that can grow the scope.
+- **A refused write now carries two sentences.** `PermissionPrompt.reason` is written for the person
+  reading the dialog; `denyReason` is `decideWrite`'s model-facing message verbatim, sent only if the
+  user denies without typing anything. That is how `018`/`019`'s "a refused write still carries
+  `decideWrite`'s reason" survived the write becoming a prompt.
+- **The boundary hook returns `"ask"`** — the one-word change `019` wrote it for — **except for a call
+  that carries no path**, which still denies: there is nothing there for a person to authorise. That
+  branch writes its own transcript entry, because the SDK's `permission_denied` event does not report
+  hook denials.
+- **Prompts render per tool, never as a payload dump.** A fetch shows the **complete** URL, query
+  string included; a write shows the path and clipped hunks; a scan shows the root and the pattern;
+  an unrecognised tool is still named with whatever it carried. The network tools always ask — they
+  touch no path, so no scope module has an opinion about them, and a `WebFetch` is how the contents of
+  a readable project leave the machine.
+- **Four refusal routes, distinguished in the transcript.** `SessionEvent`'s `refusal` gained
+  `source` (`write-scope` | `read-boundary` | `user` | `auto`) and `decidedBy` (the SDK's
+  `decision_reason_type`). `autoRefusal` maps the `permission_denied` stream event and is a **pure**
+  function rather than inline in the read loop, because the rule/mode branch cannot be provoked from a
+  window: with `settingSources: []` only the machine-wide managed-settings tier survives, and writing
+  one needs root. It is covered by unit tests and an isolation pin, not by a live probe.
+- New contracts: `RefusalSource`, `PermissionOutcome`, `PermissionAnswer`, `PermissionChoice`,
+  `PermissionDiff`, `PermissionDetail`, `PermissionPrompt`; `SessionEvent` gained `permission` and
+  `permission-resolved`. `WriteDecision` is now an **alias of `PermissionAnswer`** — one union, two
+  producers, and the fall-through is still a deny.
+- New IPC `session:permission` / `MaestroApi.session.answer(id, requestId, choice)`. **The renderer
+  sends a `PermissionChoice`, never a `PermissionAnswer`**: the SDK's allow arm carries
+  `updatedPermissions`, which can add blanket allow rules or flip the session to `bypassPermissions`,
+  so main constructs the answer. `023` extends that choice rather than replacing it.
+- `stop()` now returns `{ stillQueued }` off the `interrupt()` receipt and `stopSession` emits a
+  notice when the interrupt left messages queued — previously discarded, and previously `024`'s.
+- A pending prompt is answerable from any route: `session-context.tsx` tracks `pending`/`outcomes` and
+  auto-opens the pane, and `top-nav.tsx` shows an amber pending badge that outranks the busy dot.
+- Tests: `test/core/session-permission.test.ts` (14) and `test/core/permission-registry.test.ts` (8),
+  plus three new blocks in the isolation suite's "the session pane" describe — **404 tests, 23 files**.
+  Verified in a real Electron window over CDP against the packaged build.
+
 ### maestro — a live Claude session in a right-hand pane, and the help chat is gone
 
 - One live, multi-turn Agent SDK session per open project, in a **resizable right-hand pane that

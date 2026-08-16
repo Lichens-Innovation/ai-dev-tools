@@ -83,6 +83,8 @@ second.
 | `read-scope.ts`                         | What a run can **read**, derived from a settings snapshot. Pure — no `fs`, no spawn    |
 | `write-scope.ts`                        | What a run may **write**, decided per tool call. Pure — no `fs`, no spawn, no SDK      |
 | `session-scope.ts`                      | What a pane session may **read**, decided per tool call by a hook. Pure, no `fs`       |
+| `session-permission.ts`                 | Settled, or a question for a PERSON. Composes the two scope modules. Pure              |
+| `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
@@ -437,10 +439,14 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   raise a prompt, which is why the disclosure above exists at all. Bounding what a session may read
   is a `PreToolUse` hook, and `019` built it as a **third** scope module — `src/core/session-scope.ts`
   (`decideBoundary`), described below. Adding a path check to the read-tool branch looks like the fix
-  and is not one; the two layers are wired to different sessions on purpose.
+  and is not one; the two layers are wired to different sessions on purpose. `020` added a **fourth**
+  module, `src/core/session-permission.ts`, which decides nothing on its own: it composes these two
+  and adds the branch where the answer comes from a person.
 - **The fall-through is a deny, never `undefined`/`null`.** The SDK reads `null` as "the host
   answered out of band" and the tool call then blocks forever with no timeout. `WriteDecision` is a
-  two-shape union and the `default` branch is a refusal.
+  two-shape union and the `default` branch is a refusal. Since `020` it is an **alias of
+  `PermissionAnswer`** — one union, two producers (`decideWrite` and the pane's Allow/Deny/Stop
+  buttons), so neither can widen the hole back open on its own.
 - **Every deny carries a reason the model can act on.** It reads denial messages and adapts; a bare
   "denied" wastes the one channel there is for steering it back to the file it was started for.
   Denials are also pushed onto the output stream as stderr — a run that quietly declined half of
@@ -485,23 +491,27 @@ every prompt precisely because it had no session. What the pane inherited is the
 dependency, now a **session skill** rather than a name in a prompt string.
 
 **One live, multi-turn session per open project**, in a resizable right-hand pane that _shifts_ the
-layout rather than overlaying it. It is **read-only**, which is what made it shippable before any
-permission UI existed.
+layout rather than overlaying it. `019` shipped it **read-only**, which is what made it shippable
+before any permission UI existed; `020` replaced that with the UI — the pane now **asks** rather than
+refusing, and a write it was going to refuse is a question instead of a wall.
 
 ```
 src/core/session-scope.ts                       the read boundary (pure)
+src/core/session-permission.ts                  settled, or ask a person (pure) — composes the two
+src/core/permission-registry.ts                 the parked promises, one per outstanding ask (pure)
 src/main/claude-session.ts                      one session per webContents.id
-src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope disclosure
+src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope + PermissionCard
 src/renderer/src/utils/session-context.tsx      SessionProvider / useSession — single-owner
 ```
 
 ```
-session:start  → SessionInfo      no argument; the cwd comes from main's project state
-session:info   → SessionInfo      reads only
-session:say    → (id, text)       USER-TYPED TEXT ONLY
-session:stop   → (id)             interrupt the turn; the session stays usable
-session:end    → ()               end, and reap the process group
-session:event  ← SessionEvent     the streamed transcript
+session:start      → SessionInfo              no argument; the cwd comes from main's project state
+session:info       → SessionInfo              reads only
+session:say        → (id, text)               USER-TYPED TEXT ONLY
+session:stop       → (id)                     interrupt the turn; the session stays usable
+session:permission → (id, requestId, choice)  A PermissionChoice, never a PermissionAnswer
+session:end        → ()                       end, and reap the process group
+session:event      ← SessionEvent             the streamed transcript
 ```
 
 - **The session lives in main, one per `webContents.id` — the same ownership shape as the log tail.**
@@ -518,16 +528,60 @@ session:event  ← SessionEvent     the streamed transcript
 - **`session:say` carries user-typed text and nothing else.** The bridge's invariant restated for a
   surface with no per-turn confirmation: the renderer never authors a prompt, the user does. Turns
   are stamped human-authored, so it holds at the SDK boundary and not only in a test.
-- **The write scope is empty, and the refusal is `decideWrite`'s.** Nothing can add to it yet
-  (`022` is where a submitted form can), so every write is refused with the same "started to answer,
-  not to author" reason the token path already produced. One engine, two callers.
+- **The write scope is still empty, but a refused write is now a PROMPT rather than the end of the
+  matter.** Nothing can add to the scope yet (`022` is where a submitted form can), so `decideWrite`
+  still produces the refusal and still produces its own reason — and `020` gives the user a button
+  that lets that **one call** through anyway. Nothing accumulates: the scope is `[]` again on the
+  next call, and the next write asks again. One engine, two callers, still.
+- **A refused write therefore carries two sentences, not one.** `PermissionPrompt.reason` is written
+  for the person reading the dialog; `PermissionPrompt.denyReason` is `decideWrite`'s model-facing
+  message verbatim, sent only if the user denies without typing anything. That split is how "a
+  refused write still carries `decideWrite`'s reason" survived the write becoming a question.
 - **Reads are bounded by a `PreToolUse` hook, and that is a third scope module.** `read-scope.ts`
   _discloses_, `write-scope.ts` _bounds writes_, and `src/core/session-scope.ts` bounds **reads** —
   `decideBoundary` / `boundaryTargetOf` / `BOUNDED_TOOLS` / `UNBOUNDED_TOOLS`, pure, exhaustively
   tested in `test/core/session-scope.test.ts`. It returns `{ decision: "allow" }` or
-  `{ decision: "out-of-scope", path, reason }` — deliberately **not** the word `"deny"`, even though
-  `agent-sdk.ts` currently maps it to `permissionDecision: "deny"`. `020` routes it to `"ask"`
-  instead, and that is one word in `agent-sdk.ts` plus the UI.
+  `{ decision: "out-of-scope", path, reason }` — deliberately **not** the word `"deny"`, which is
+  what let `020` route it to `permissionDecision: "ask"` in `agent-sdk.ts` in one word.
+- **The hook is not purely `"ask"`, and the exception is load-bearing.** A call the boundary cannot
+  check because it carries **no path** still returns `"deny"` — there is nothing there for a person
+  to authorise, and a prompt with a blank subject is answered by reflex. That branch also writes its
+  own `{ kind: "refusal", source: "read-boundary" }` transcript entry, because the SDK's
+  `permission_denied` stream event does **not** report hook denials: without it the call vanishes
+  with no prompt, no auto-deny event, and a tool that merely appears to have found nothing.
+- **`session-permission.ts` is the fourth scope module and deliberately not a fourth engine.** It
+  **composes** `decideWrite` and `decideBoundary` and adds the one answer neither can give: ask a
+  person. `decidePaneCall` returns a `PaneVerdict` — `{ outcome: "settled", decision }` or
+  `{ outcome: "ask", reason, denyReason, target, detail }` — and `agent-sdk.ts` routes it without
+  ever authoring a decision of its own. Also here: `describeCall` (the per-tool prompt bodies —
+  fetch / search / write / read / scan / other, never a payload dump), `permissionReason` (a reason
+  that is never empty), `autoRefusal`, and `PANE_ASK_TOOLS = ["WebFetch", "WebSearch"]`.
+- **The network tools always ask.** Neither scope module has an opinion about them — they touch no
+  path — so without a route into the prompt they are auto-approved, and a `WebFetch` is how the
+  contents of the project the session can read leave the machine. The prompt shows the **complete**
+  URL, query string included.
+- **Four refusal routes exist, and the transcript says which one fired.** `SessionEvent`'s `refusal`
+  carries `source: "write-scope" | "read-boundary" | "user" | "auto"` plus `decidedBy` (the SDK's
+  own `decision_reason_type`: `rule`, `mode`, `classifier`, `asyncAgent`). They share no code, which
+  is why the discriminator is a field and not a comment. `autoRefusal` is pure and lives in
+  `session-permission.ts` rather than inline in the read loop precisely because the `rule`/`mode`
+  branch **cannot be provoked from a window**: with `settingSources: []` only the machine-wide
+  `/etc/claude-code/managed-settings.json` tier survives, and writing one needs root. It is covered
+  by unit tests over the pure function plus an isolation pin, and that is the honest extent of it.
+- **The parked promises are their own module.** `createPermissionRegistry()` in
+  `src/core/permission-registry.ts` → `{ request, answer, pending, denyAll }`, idempotent per
+  `requestId` (a redelivered request re-attaches to the parked promise, or replays the answer it
+  already got — bounded at 64), because `reinitialize()` and any `initialize` to a running session
+  re-dispatch `pending_permission_requests`. **Every exit denies everything outstanding**
+  (`TEARDOWN_DENIAL`, from both `finish()` and `close()`): prompts do not time out, there is no
+  backstop below this, and an unresolved ask is a permanently wedged session holding a child.
+- **The renderer sends a `PermissionChoice`, never a `PermissionAnswer`.** Three buttons —
+  `{choice:"allow"}`, `{choice:"deny", reason}`, `{choice:"stop", reason}` — and main constructs the
+  SDK-shaped answer. Deny and Stop are two controls because they are two intents: a plain denial
+  refuses the call and lets the model adapt, `interrupt` ends the turn. The wire shape exists
+  because `PermissionAnswer`'s allow arm carries `updatedPermissions`, which can add blanket allow
+  rules or flip the session to `bypassPermissions`; `023` extends `PermissionChoice` rather than
+  replacing it when it adds the grant.
 - **The boundary hook runs only on the read-only tools**, by design. Letting it answer for
   `Write`/`Edit` too would have replaced `decideWrite`'s reason with a new one, and the requirement
   is that a refused write still carries the original. `session-scope.ts` knows how to check write
@@ -554,8 +608,14 @@ session:event  ← SessionEvent     the streamed transcript
 - **Nothing budget-related is passed.** No `maxBudgetUsd`, `taskBudget`, `effort`,
   `enableFileCheckpointing` or `persistSession`; `startPaneSession` simply ends the session when the
   SDK stream ends. All of that is `024`.
-- **`interrupt()`'s receipt is discarded.** `stop()` awaits `query.interrupt()` and drops the result,
-  so a `still_queued` is not reflected anywhere in the UI. Outstanding.
+- **`interrupt()`'s receipt is surfaced.** `stop()` returns `{ stillQueued }` off the
+  `query.interrupt()` receipt and `stopSession` emits a `notice` when the interrupt left messages
+  queued. `020` picked this up; `024` no longer owns it.
+- **A pending prompt is visible from every route.** `session-context.tsx` tracks `pending` and
+  `outcomes` and auto-opens the pane on a `permission` event; `top-nav.tsx` carries an amber pending
+  badge (`data-testid="session-toggle-pending"`) that **outranks** the busy dot, because a parked
+  question and a running turn are different states and the one nobody can act on is not the one to
+  show. The card itself is pinned above the composer, not inline in the scrollback.
 - **The layout is a root-level flex row, and the pane is not rendered by `TopNav`.** `__root.tsx`
   puts the route column and the pane side by side; `top-nav.tsx` carries only the toggle
   (`data-session-toggle`), because the top bar remounts on every navigation and a transcript owned
@@ -855,7 +915,12 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   resolution"** counts the four `settingSources: []` so the run and the disclosure cannot drift.
   `019` replaced its three help-chat blocks with a **"the session pane"** describe, which pins the
   pane's own properties: `session:say` carries only user-typed text, `session-context.tsx` is the
-  single owner of `window.maestro.session`, and the pane is not rendered by `top-nav.tsx`.
+  single owner of `window.maestro.session`, and the pane is not rendered by `top-nav.tsx`. `020`
+  added three more to that describe — **"asks a person instead of deciding, and resolves every ask on
+  every exit"**, **"lets the renderer send a permission CHOICE and never a permission result"**, and
+  **"writes down a refusal whichever of the four routes it arrived by"**. The last one is the only
+  coverage the `rule`/`mode` auto-denial has outside a unit test, since provoking it live needs a
+  machine-wide managed-settings file.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

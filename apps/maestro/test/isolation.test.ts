@@ -636,13 +636,19 @@ describe("the session pane", () => {
   });
 
   it("gives the pane an empty write scope with no channel that could widen it", () => {
-    // The pane ships before permission prompts exist, and that is only safe because it CANNOT
-    // write. Two properties, both of which fail silently: the callback is the same engine the form
-    // path uses (a second one would drift), and it is handed a literal empty list rather than
-    // anything a caller supplied.
+    // The pane's write scope is empty and only `022` may add to it. Two properties, both of which
+    // fail silently: the decision is the same engine the form path uses (a second one would drift),
+    // and it is handed a literal empty list rather than anything a caller supplied.
+    //
+    // `020` moved the CALL rather than the property. `decidePaneCall` composes `decideWrite` and
+    // `decideBoundary` and adds the third answer neither can give — "ask a person" — so the pane
+    // passes the empty list to that, and the write decision itself still comes from `write-scope.ts`.
     const sdk = stripComments(read("src/core/agent-sdk.ts"));
     const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
-    expect(pane).toMatch(/decideWrite\(\{\s*tool,\s*input,\s*writable:\s*\[\],/);
+    expect(pane).toMatch(/decidePaneCall\(\{\s*tool,\s*input,\s*writable:\s*\[\],/);
+    expect(stripComments(read("src/core/session-permission.ts"))).toMatch(
+      /decideWrite\(\{ tool, input, writable, cwd \}\)/
+    );
     expect(pane, "the pane grew its own permission engine").not.toMatch(/behavior:\s*"deny"/);
 
     // Nothing on the wire names a writable path, so `022` has to add a channel rather than a field.
@@ -660,7 +666,18 @@ describe("the session pane", () => {
     const sdk = stripComments(read("src/core/agent-sdk.ts"));
     expect(sdk).toMatch(/PreToolUse:\s*\[/);
     expect(sdk).toMatch(/decideBoundary\(/);
-    expect(sdk).toMatch(/permissionDecision:\s*"deny"/);
+    // `020` turned the refusal into a ROUTE. `"ask"` is what makes an out-of-scope read reach
+    // `canUseTool` at all — reads are auto-approved and never prompt on their own — so a diff that
+    // put `"deny"` back would not fail a type check and would silently delete the prompt.
+    expect(sdk).toMatch(/permissionDecision:\s*"ask"/);
+    // The one surviving hook DENY, and it needs its own transcript entry: hook denials are not
+    // reported through `SDKPermissionDeniedMessage`, so a call refused here and not written down
+    // vanishes entirely. It is the uncheckable case — a bounded tool that named no path, where
+    // there is nothing for a person to authorise.
+    const paneOnly = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    const hook = paneOnly.slice(paneOnly.indexOf("PreToolUse:"), paneOnly.indexOf("canUseTool:"));
+    expect(hook).toMatch(/permissionDecision:\s*"deny"/);
+    expect(hook).toMatch(/source:\s*"read-boundary"/);
     // The boundary and the disclosure are ONE list. Two would let the header describe a session
     // that can see more (or less) than the hook allows, with nothing failing.
     expect(sdk).toMatch(/additionalDirectories:\s*\[\.\.\.request\.additionalDirectories\]/);
@@ -669,6 +686,82 @@ describe("the session pane", () => {
     const write = stripComments(read("src/core/write-scope.ts"));
     const readBranch = write.slice(write.indexOf("export function decideWrite"), write.indexOf("if (!(WRITE_TOOLS"));
     expect(readBranch).toMatch(/READ_ONLY_TOOLS[\s\S]*return \{ behavior: "allow" \}/);
+  });
+
+  it("asks a person instead of deciding, and resolves every ask on every exit", () => {
+    // THE WEDGE. `canUseTool` returns a promise; when the answer has to come from a user, that
+    // promise is PARKED. Permission prompts do not time out — there is no backstop anywhere below
+    // this — so an ask left outstanding is a session that never ends, holding a detached `claude`
+    // against the user's repository. Every exit therefore resolves what it holds, denying it.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    expect(pane).toMatch(/createPermissionRegistry\(\)/);
+
+    // Two exits, and they are NOT the same moment: `close()` runs the instant the window goes away,
+    // while `finish` waits for the SDK's stream to end — which it cannot do while a `canUseTool`
+    // promise is still parked. Denying in `close` is what unblocks the other one.
+    const closeFn = pane.slice(pane.indexOf("close(): void"));
+    expect(closeFn, "closing a window leaves a parked permission request wedging the session").toMatch(
+      /releasePermissions\(/
+    );
+    expect(pane.slice(pane.indexOf("const finish =")), "a session that ends on its own leaves asks parked").toMatch(
+      /releasePermissions\(/
+    );
+
+    // And the three teardown paths that reach `close()` are already pinned by the test below; what
+    // this adds is that each of them ANSWERS rather than merely killing the child.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    expect(session).toMatch(/entry\.session\.close\(\)/);
+  });
+
+  it("lets the renderer send a permission CHOICE and never a permission result", () => {
+    // The dangerous field is `updatedPermissions` on the SDK's allow shape: `addRules`, `setMode`
+    // and `addDirectories`, each with a destination that can be `localSettings`, `projectSettings`
+    // or `userSettings`. One accepted update can grant blanket allow rules, flip the session to
+    // `bypassPermissions`, or widen the read scope permanently and machine-wide — written into the
+    // user's own repository or home directory. So the wire carries three words plus a reason, and
+    // the main process constructs the answer. Same shape as the preview token: a decision crosses,
+    // never a payload.
+    const preload = stripComments(read("src/preload/index.ts"));
+    expect(preload).toMatch(/invoke\(IPC\.sessionPermission,\s*id,\s*requestId,\s*choice\)/);
+
+    const renderer = sourcesUnder("src/renderer")
+      .map((f) => stripComments(fs.readFileSync(f, "utf8")))
+      .join("\n");
+    expect(renderer, "the renderer can author a permission update").not.toMatch(
+      // `setMode` deliberately absent: it is also an ordinary React setter name here. The three
+      // below are the SDK's own, and none of them has an innocent meaning in a renderer.
+      /updatedPermissions|addDirectories|permissionMode/
+    );
+    expect(renderer, "the renderer builds an SDK permission result rather than a choice").not.toMatch(
+      /behavior:\s*"(allow|deny)"/
+    );
+
+    // A denial's message is the ONE channel for steering the model — it reads the refusal and
+    // adapts — so an empty one is a wasted turn. Both halves are asserted: the UI substitutes a
+    // real sentence, and main substitutes one again in case it ever does not.
+    const pane = stripComments(read("src/renderer/src/components/session-pane.tsx"));
+    expect(pane).toMatch(/DEFAULT_DENY_REASON/);
+    expect(stripComments(read("src/main/claude-session.ts"))).toMatch(/permissionReason\(/);
+  });
+
+  it("writes down a refusal whichever of the four routes it arrived by", () => {
+    // Four components can refuse a call, and they reach the transcript by routes that share no
+    // code. Two of them are easy to build only one of: the SDK's `permission_denied` event reports
+    // deny RULES and MODE denials and EXPLICITLY does not report hook denials, so the hook layer
+    // owns its own entry or an out-of-scope call vanishes silently — which is the worse half,
+    // because the gap stays invisible until someone wonders why a tool did nothing.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    // The auto-denial is READ in the message loop and MAPPED in the pure module, so the branch that
+    // needs an administrator policy file to provoke is reachable from a test (`autoRefusal`).
+    expect(sdk).toMatch(/subtype === "permission_denied"/);
+    expect(sdk).toMatch(/emit\(autoRefusal\(message\)\)/);
+
+    const permission = stripComments(read("src/core/session-permission.ts"));
+    const both = sdk + permission;
+    for (const source of ['"write-scope"', '"read-boundary"', '"user"', '"auto"']) {
+      expect(both, `no refusal is ever attributed to ${source}`).toContain(`source: ${source}`);
+    }
   });
 
   it("ends a session on a project switch and reaps it on quit", () => {
