@@ -95,15 +95,48 @@ header and the confirmation are showing.
 
 ## Acceptance criteria
 
-- [ ] A fetch raises a prompt showing the complete URL; Deny refuses it and the model continues; Stop ends the turn
-- [ ] Denials require a reason, and the UI never sends an empty one
-- [ ] The same request delivered twice resolves once — one prompt, no leaked entry
-- [ ] Closing the window, switching projects, or quitting with a prompt outstanding resolves it as denied and leaves no surviving process
-- [ ] A rule-denied or mode-denied call appears in the transcript with the reason its discriminator gives
-- [ ] A boundary-hook-denied call also appears in the transcript — asserted separately, since it arrives by a different route
-- [ ] A pending prompt is visible and answerable from any route
-- [ ] Prompts render per tool rather than as a payload dump
-- [ ] The form path still runs unprompted and unchanged — one engine, two callers, and `018`'s isolation pins still hold
+Closed retroactively during `023`, which had to re-verify most of this surface anyway. Each item
+below says how it was settled, because two of them are covered by tests rather than by a window and
+saying so is the difference between a closed box and a believed one.
+
+- [x] A fetch raises a prompt showing the complete URL; Deny refuses it and the model continues; Stop
+      ends the turn — **verified live, 7/7.** The rendered URL was byte-identical to the requested one,
+      query string included. Deny produced a `source: "user"` refusal, outcome `deny`, and the model
+      answered anyway rather than dying. Stop produced outcome `stop`, ended the turn, and left the
+      session usable and the composer enabled.
+- [x] Denials require a reason, and the UI never sends an empty one — both halves exist and are
+      pinned: `DEFAULT_DENY_REASON`/`DEFAULT_STOP_REASON` in `session-pane.tsx`, and
+      `permissionReason()` again in `claude-session.ts` in case the first ever fails to arrive.
+      `test/isolation.test.ts` asserts both call sites.
+- [x] The same request delivered twice resolves once — one prompt, no leaked entry —
+      `createPermissionRegistry()` is idempotent per `requestId` and replays a settled answer (capped
+      at 64); the `fresh` flag is what gates the emit, so a redelivery re-attaches rather than
+      prompting again. Covered by `test/core/permission-registry.test.ts`.
+- [x] Closing the window, switching projects, or quitting with a prompt outstanding resolves it as
+      denied and leaves no surviving process — `releasePermissions(TEARDOWN_DENIAL)` runs from **both**
+      `finish()` and `close()`, which are not the same moment: `close()` fires the instant the window
+      goes, while `finish` cannot run until the SDK's stream ends, which a parked `canUseTool` promise
+      prevents. `test/isolation.test.ts` pins both call sites plus the three teardown paths.
+- [x] A rule-denied or mode-denied call appears in the transcript with the reason its discriminator
+      gives — `autoRefusal()` maps the `permission_denied` stream event, carrying `decidedBy`
+      (`rule`/`mode`/`classifier`/`asyncAgent`), and the transcript renders it. **This one is NOT
+      window-verified and cannot be:** with `settingSources: []` only the machine-wide
+      `/etc/claude-code/managed-settings.json` tier survives, and writing one needs root. It is unit
+      tests over the pure function plus an isolation pin, and that is the honest extent of it.
+- [x] A boundary-hook-denied call also appears in the transcript — asserted separately, since it
+      arrives by a different route — the hook writes its own
+      `{ kind: "refusal", source: "read-boundary" }` entry, because the SDK's `permission_denied`
+      event explicitly does not report hook denials. Asserted as its own expectation in
+      `test/isolation.test.ts`, separately from the `auto` route.
+- [x] A pending prompt is visible and answerable from any route — **verified live.** The pane was
+      closed and the window navigated to `#/tools` before the prompt landed; the prompt opened the
+      pane itself, on that route, and was answered there.
+- [x] Prompts render per tool rather than as a payload dump — **verified live for two branches:** a
+      fetch rendered the URL box and no path box, a read rendered the path box (during `023`'s probe),
+      and neither card contained a JSON dump.
+- [x] The form path still runs unprompted and unchanged — one engine, two callers, and `018`'s
+      isolation pins still hold — `decidePaneCall` composes `decideWrite` rather than replacing it,
+      `startAgentSession` is untouched, and `018`'s pins still pass (425 tests green as of `023`).
 
 ## Blocked by
 

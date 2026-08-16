@@ -257,3 +257,66 @@ describe("permission rules the app never chose", () => {
     expect(scope.defaultMode).toBeNull();
   });
 });
+
+describe("a directory a person granted mid-session", () => {
+  // The fourth origin, and the only one that did not exist when the session started. It is on this
+  // list rather than in a second one precisely so it is listed, attributed and revocable through
+  // the component that already renders directories — a flat list of paths destroys the distinction
+  // that matters most here, which is "you granted this, in this session".
+  const scope = () =>
+    buildReadScope({
+      projectRoot: PROJECT,
+      cwd: PROJECT,
+      targets: [],
+      additional: [{ path: MARKET, note: "A marketplace the app opened." }],
+      granted: [{ path: "/home/tester/.claude/skills/mine", note: "You opened this folder during this session." }],
+      settings: snapshot([{ tier: "user", path: "/u.json" }]),
+    });
+
+  it("is disclosed with its own origin, not folded in with the app's own directories", () => {
+    const granted = scope().directories.find((d) => d.origin === "session");
+    expect(granted?.path).toBe("/home/tester/.claude/skills/mine");
+    expect(granted?.note).toContain("You opened this");
+    // And it did not quietly become one of the app's.
+    expect(
+      scope()
+        .directories.filter((d) => d.origin === "app")
+        .map((d) => d.path)
+    ).toEqual([MARKET]);
+  });
+
+  it("reads after the app's directories and before anything a settings file added", () => {
+    expect(scope().directories.map((d) => d.origin)).toEqual(["cwd", "app", "session"]);
+  });
+
+  it("is said out loud in the summary, in the second person", () => {
+    // A grant the user cannot recognise as their own is indistinguishable from the app having
+    // widened the scope by itself, which is the thing this whole disclosure exists to prevent.
+    expect(scope().summary).toContain("You granted 1 more path");
+    expect(scope().summary).toContain("until the session ends");
+  });
+
+  it("does not duplicate a path the app or the settings already opened", () => {
+    const built = buildReadScope({
+      projectRoot: PROJECT,
+      cwd: PROJECT,
+      targets: [],
+      additional: [{ path: MARKET, note: "A marketplace the app opened." }],
+      granted: [{ path: MARKET, note: "granted" }],
+      settings: snapshot([{ tier: "user", path: "/u.json" }]),
+    });
+    expect(built.directories.filter((d) => d.path === MARKET)).toHaveLength(1);
+    expect(built.directories.find((d) => d.path === MARKET)?.origin).toBe("app");
+  });
+
+  it("says nothing about grants when there are none", () => {
+    const built = buildReadScope({
+      projectRoot: PROJECT,
+      cwd: PROJECT,
+      targets: [],
+      settings: snapshot([{ tier: "user", path: "/u.json" }]),
+    });
+    expect(built.directories.some((d) => d.origin === "session")).toBe(false);
+    expect(built.summary).not.toContain("You granted");
+  });
+});

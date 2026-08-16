@@ -512,8 +512,14 @@ export interface SettingsPort {
  * this app passes as `additionalDirectories` — chosen by the app, like `cwd`, but not the place the
  * session is running. Three origins rather than a flag, because "the app widened this" and "a file
  * you have never read widened this" are different things to consent to.
+ *
+ * `session` is the fourth, and the only one a PERSON authored: a live session asked to look outside
+ * its scope, the user answered a prompt, and the answer holds until the session ends. It is an
+ * origin on this list rather than a second list precisely so it is listed, attributed and revocable
+ * through the one component that already renders directories — a flat list would destroy the
+ * distinction that matters most here, which is "you granted this, in this session".
  */
-export type ReadScopeOrigin = "cwd" | "app" | "settings";
+export type ReadScopeOrigin = "cwd" | "app" | "settings" | "session";
 
 /** A tree the run can read. Everything under it, with no prompt at any point. */
 export interface ClaudeReadDirectory {
@@ -704,6 +710,16 @@ export type SessionEvent =
    * went away and every outstanding ask was denied on its behalf.
    */
   | { kind: "permission-resolved"; seq: number; requestId: string; outcome: PermissionOutcome }
+  /**
+   * The read scope MOVED — the first thing in this app that can happen mid-session.
+   *
+   * `020` resolved the readable set once at session start and handed the same list to the hook and
+   * to the disclosure. A session grant makes it mutable, and it has to reach BOTH or the header and
+   * the boundary start disagreeing about what the model can see. This event is that second half:
+   * main re-derives the disclosure the moment it widens the boundary, and the pane's header re-reads
+   * it from here rather than from what a button click implied.
+   */
+  | { kind: "scope"; seq: number; read: ClaudeReadScope; grants: SessionGrant[] }
   /** Something about the session itself: stderr worth surfacing, a boundary event. */
   | { kind: "notice"; seq: number; text: string }
   /** A turn finished. `ok: false` means the session reported an error rather than an answer. */
@@ -739,12 +755,84 @@ export type PermissionOutcome = "allow" | "deny" | "stop" | "cancelled";
  * call and lets the model adapt (it reads the message and tries something else), while `interrupt`
  * ends the turn. `decideWrite` never sets it — only a person does.
  */
-export type PermissionAnswer = { behavior: "allow" } | { behavior: "deny"; message: string; interrupt?: boolean };
+export type PermissionAnswer =
+  | {
+      behavior: "allow";
+      /**
+       * The one permission update this app will ever author, and the reason it is typed this
+       * narrowly rather than as the SDK's `PermissionUpdate`.
+       *
+       * The SDK's union also carries `addRules` (blanket allow rules), `setMode` (including
+       * `bypassPermissions`) and four destinations, three of which WRITE TO DISK — the user's
+       * repository, their machine-local project settings, or their home directory. Nothing in this
+       * app has a reason to reach any of them, so the type cannot express them: what remains is a
+       * directory added for the length of this session and nothing else. See
+       * `SessionPermissionUpdate`.
+       */
+      updatedPermissions?: SessionPermissionUpdate[];
+    }
+  | { behavior: "deny"; message: string; interrupt?: boolean };
+
+/**
+ * A session-scoped directory grant, in the SDK's own `PermissionUpdate` shape — narrowed to the
+ * single member this app is allowed to author.
+ *
+ * `destination: "session"` is the whole guarantee about disk. The alternatives are all worse than
+ * they look: `localSettings` lands a rule in the user's repository, `projectSettings` lands one
+ * they would commit, and `userSettings` is global to the machine. A grant that outlives the
+ * conversation it was made in is not the thing the user was asked about, so the literal type is the
+ * enforcement — a diff cannot widen it without changing this line.
+ */
+export interface SessionPermissionUpdate {
+  type: "addDirectories";
+  directories: string[];
+  destination: "session";
+}
+
+/** Grant just the file that was asked about, or the directory containing it. */
+export type GrantScope = "file" | "directory";
+
+/**
+ * One thing the user can grant in answer to a prompt, resolved by the main process.
+ *
+ * The renderer renders these and sends back only a `scope` word — it never nominates a path, which
+ * is `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied to
+ * the permission wire. The paths are here so the BUTTONS can name them: "grant the file" and "grant
+ * the directory" are the same sentence until the user can see that one of them says `~/.claude`.
+ */
+export interface SessionGrantOption {
+  scope: GrantScope;
+  /** Absolute path this option would make readable for the rest of the session. */
+  path: string;
+  /** The button's own words, e.g. `Allow this folder`. */
+  label: string;
+  /** What it costs, in a sentence — rendered verbatim beside the button. */
+  note: string;
+  /**
+   * The grant reaches far more than the file that was asked about — a home directory, a filesystem
+   * root, a top-level tree. Still offered, because the user may genuinely mean it, but never
+   * offered quietly.
+   */
+  broad: boolean;
+}
+
+/** A grant that is in force. Dies with the session; nothing here is ever written to disk. */
+export interface SessionGrant {
+  /** Absolute path now readable. A directory means everything under it; a file means itself. */
+  path: string;
+  scope: GrantScope;
+  /** The path the prompt was about, which is not always `path` — a file grant's directory is not. */
+  target: string;
+  /** The tool call that asked for it, so the header can say what this was for. */
+  tool: string;
+  /** Epoch ms. The header sorts by it, and it is what makes "granted just now" sayable. */
+  grantedAt: number;
+}
 
 /**
  * What the RENDERER is allowed to send — a decision, never a result.
  *
- * The three buttons, and nothing that could become a fourth. `PermissionAnswer` above is the SDK's
+ * The four buttons, and nothing that could become a fifth. `PermissionAnswer` above is the SDK's
  * own shape, and its allow arm carries `updatedPermissions`: a field that can add blanket allow
  * rules, flip the session to `bypassPermissions`, or widen the readable set permanently and
  * machine-wide, with destinations that write to the user's repository or to their home directory.
@@ -759,7 +847,16 @@ export type PermissionChoice =
   | { choice: "allow" }
   | { choice: "deny"; reason: string }
   /** Deny AND end the turn. A different intent from a plain refusal, so it is a different button. */
-  | { choice: "stop"; reason: string };
+  | { choice: "stop"; reason: string }
+  /**
+   * Allow, AND stop asking about this path for the rest of the session.
+   *
+   * A SCOPE WORD AND NOTHING ELSE. The path is not on the wire: main holds the prompt this answers
+   * and resolves `scope` against the `SessionGrantOption` it already published, so a renderer
+   * cannot name a directory here any more than it can name one on `create:scaffold`. A `scope` that
+   * matches no option on that prompt grants nothing.
+   */
+  | { choice: "grant"; scope: GrantScope };
 
 /**
  * One hunk of what a write would change. `before: null` means the file is being created.
@@ -836,6 +933,15 @@ export interface PermissionPrompt {
   /** The CLI's own prompt sentence, when it rendered one — preferred over reconstructing it. */
   title: string | null;
   detail: PermissionDetail;
+  /**
+   * What the user may grant for the rest of the session, beyond letting this one call through.
+   *
+   * EMPTY IS THE COMMON CASE AND IS NOT A DEFECT. Only a read the boundary stopped is grantable: a
+   * refused WRITE is not (the write scope is `022`'s to grow, and widening reads from a write
+   * prompt is exactly the accident `session-scope.ts` keeps checkable), and a `WebFetch` has no
+   * path to grant. A prompt with no options renders Allow once / Deny / Stop, as it did before.
+   */
+  grants: SessionGrantOption[];
 }
 
 /**
@@ -865,6 +971,14 @@ export interface SessionInfo {
    * in words, because an empty list on screen says nothing.
    */
   writable: string[];
+  /**
+   * Directories a person opened for this session, in force right now.
+   *
+   * Also present, and already attributed, inside `read.directories` as `origin: "session"` — this
+   * list is the revocable handle on them, not a second notion of what is readable. A grant the user
+   * cannot find again has not made the boundary optional, it has removed it.
+   */
+  grants: SessionGrant[];
   /** The tools the session was offered, so the header can name them rather than imply them. */
   tools: string[];
   /** Skills declared for the session, including the help skill the deleted chat asked for by name. */

@@ -24,6 +24,7 @@ import {
   Ban,
   Check,
   Eye,
+  FolderOpen,
   Info,
   MessagesSquare,
   Play,
@@ -32,6 +33,7 @@ import {
   Square,
   Terminal,
   Trash2,
+  Undo2,
   Wrench,
   X,
 } from "lucide-react";
@@ -39,7 +41,13 @@ import ReadScope from "./read-scope";
 import { humanizeLog } from "../utils/session-log";
 import { useProject } from "../utils/project-context";
 import { useSession, MAX_PANE_WIDTH, MIN_PANE_WIDTH, type TranscriptEntry } from "../utils/session-context";
-import type { PermissionChoice, PermissionDetail, PermissionOutcome, PermissionPrompt } from "../../../shared/ipc";
+import type {
+  PermissionChoice,
+  PermissionDetail,
+  PermissionOutcome,
+  PermissionPrompt,
+  SessionGrant,
+} from "../../../shared/ipc";
 
 /** What to type in a Claude Code session to reach the same help the deleted chat asked for. */
 const HELP_SKILL = "/super-help";
@@ -150,6 +158,7 @@ export default function SessionPane() {
           className="border-b border-(--line) bg-(--bg-elev) px-4 py-3 flex flex-col gap-2"
         >
           <ReadScope read={session.info.read} compact />
+          <GrantList grants={session.info.grants} onRevoke={(path) => void session.revoke(path)} />
           <p data-testid="session-write-scope" className="m-0 text-[10px] text-(--ink-3)">
             This session's write scope is empty — nothing in the app can add a directory to it yet — so every Edit or
             Write is stopped and asked about instead. Allowing one lets that single call through; it grants nothing
@@ -254,6 +263,55 @@ export default function SessionPane() {
 }
 
 /**
+ * Grants in force, and the way back out of each one.
+ *
+ * A GRANT THE USER CANNOT FIND AGAIN HAS NOT MADE THE BOUNDARY OPTIONAL, IT HAS REMOVED IT. This is
+ * the third of the three properties inherited from the chat's confirmation opt-out — it defaults to
+ * asking, it dies with the session, and it is visible and revocable from the header — and it is the
+ * only one of the three that needs a control rather than an absence of code.
+ *
+ * The paths are also listed above, inside `ReadScope`, attributed as `origin: "session"`. That is
+ * not a duplicate: that list answers "what can this session see", and this one answers "what did I
+ * open, and how do I close it".
+ */
+function GrantList({ grants, onRevoke }: { grants: SessionGrant[]; onRevoke(path: string): void }) {
+  if (grants.length === 0) return null;
+  return (
+    <div data-testid="session-grants" className="flex flex-col gap-1">
+      <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+        Granted by you, for this session only
+      </p>
+      {grants.map((grant) => (
+        <div
+          key={grant.path}
+          data-testid="session-grant"
+          data-path={grant.path}
+          data-scope={grant.scope}
+          className="flex items-start gap-2 rounded-md border border-(--line) bg-(--bg) px-2 py-1.5"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[10px] text-(--ink-2) break-all">{grant.path}</div>
+            <div className="text-[10px] text-(--ink-3)">
+              {grant.scope === "file" ? "This file only" : "This folder and everything under it"} · granted answering a{" "}
+              {grant.tool} prompt · nothing written to disk
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="session-grant-revoke"
+            onClick={() => onRevoke(grant.path)}
+            title="Put this back out of scope"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-(--line) bg-(--bg) px-2 py-0.5 text-[10px] text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+          >
+            <Undo2 size={10} /> Revoke
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * The default a denial carries when the user typed nothing.
  *
  * NOT `"denied"`. The model reads the refusal and adapts — that is measured behaviour, not hope —
@@ -330,7 +388,7 @@ function PermissionCard({
         className="mt-2 w-full rounded-md border border-(--line) bg-(--bg) px-2 py-1.5 text-[11px] text-(--ink) placeholder-subtle outline-none focus:border-primary"
       />
 
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           data-testid="session-permission-allow"
@@ -340,6 +398,35 @@ function PermissionCard({
         >
           <Check size={11} /> Allow once
         </button>
+        {/*
+          THE OTHER HALF OF THE BOUNDARY. Allow once is correct and, on its own, is the state in
+          which users stop reading prompts: the same question, about the same file, every turn. So
+          the same path can be opened for the rest of the session — and the two options are two
+          BUTTONS, each naming its own path, because "grant the file" and "grant the folder" are the
+          same sentence right up until you can see that one of them says the whole of ~/.claude.
+
+          Empty on a write and on a fetch, by construction — see `PermissionPrompt.grants`.
+        */}
+        {request.grants.map((option) => (
+          <button
+            key={option.scope}
+            type="button"
+            data-testid="session-permission-grant"
+            data-scope={option.scope}
+            data-path={option.path}
+            data-broad={option.broad ? "yes" : "no"}
+            disabled={sent}
+            title={option.note}
+            onClick={() => answer({ choice: "grant", scope: option.scope })}
+            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] disabled:opacity-40 cursor-pointer focus:outline-none ${
+              option.broad
+                ? "border border-amber-500/60 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+                : "border border-ring bg-(--primary-dim) text-primary hover:brightness-110"
+            }`}
+          >
+            {option.broad ? <AlertTriangle size={11} /> : <FolderOpen size={11} />} {option.label}
+          </button>
+        ))}
         <button
           type="button"
           data-testid="session-permission-deny"
@@ -365,6 +452,25 @@ function PermissionCard({
           <Square size={9} /> Stop turn
         </button>
       </div>
+
+      {/*
+        The paths, spelled out. A button labelled "Allow this folder" is not a disclosure — it is a
+        promise that the folder is the obvious one — and the case this whole prompt exists for is the
+        one where it is not. So each option's path and what it costs are rendered beside the buttons,
+        not hidden in a tooltip.
+      */}
+      {request.grants.length > 0 && (
+        <ul data-testid="session-permission-grant-notes" className="m-0 mt-1.5 list-none p-0 flex flex-col gap-0.5">
+          {request.grants.map((option) => (
+            <li key={option.scope} className="text-[10px] text-(--ink-3)">
+              <span className={`font-mono break-all ${option.broad ? "text-amber-600" : "text-(--ink-2)"}`}>
+                {option.path}
+              </span>
+              <span> — {option.note}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -514,7 +620,7 @@ function EmptyState({ noProject, live }: { noProject: boolean; live: boolean }) 
         <p className="m-0 text-[12px] text-subtle max-w-[26rem]">
           {noProject
             ? "The session runs in the open project's directory, so it needs one."
-            : "One conversation, per project, that can read this repository and your marketplaces. Anything else — a write, a fetch, a file outside them — it has to ask you about first."}
+            : "One conversation, per project, that can read this repository and your marketplaces. Anything else — a write, a fetch, a file outside them — it has to ask you about first, and you can open that file or its folder for the rest of the session when it does."}
         </p>
       </div>
       <div className="w-full rounded-xl border border-(--line) bg-(--bg-elev) px-3.5 py-3 text-left">

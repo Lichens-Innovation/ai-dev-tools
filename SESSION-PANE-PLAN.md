@@ -1,9 +1,14 @@
 # Session pane — a Claude session inside the desktop app
 
-**Status: queued as tasks `015`–`026`; `015`–`019` are done.** Written 2026-08-04 after M5. Revised 2026-08-05
-twice: first against the vendored SDK reference, then against a design interview that changed
-roughly half of it. The earlier draft's conclusions about transport and permissions survive; its
-scope, sequencing and tool story did not.
+**Status: queued as tasks `015`–`026`; `015`–`020` and `023` are done.** Written 2026-08-04 after M5.
+Revised 2026-08-05 twice: first against the vendored SDK reference, then against a design interview
+that changed roughly half of it. The earlier draft's conclusions about transport and permissions
+survive; its scope, sequencing and tool story did not.
+
+**This page is the PLAN, not the build.** Where the two disagree the build wins, and every
+disagreement is recorded — `018` and `019` have their own sections below, and everything since is in
+**[Drift log](#drift-log--where-the-build-left-the-plan)** at the end. Read that before trusting a
+shape, a channel name or a file path on this page.
 
 **Get the package right.** This plan is about **`@anthropic-ai/claude-agent-sdk`**, documented at
 `code.claude.com/docs/en/agent-sdk/typescript` and vendored at `agent-sdk-typescript.md` in this
@@ -145,6 +150,12 @@ the session, and it is listed and revocable in the header. **Main authors the `P
 the renderer sends a bounded decision and nothing else.** These are the same three properties
 `CLAUDE.md:344` already established for the chat's opt-out, and inheriting them beats inventing a
 second policy.
+
+**Shipped in `023`, and this paragraph was half the mechanism.** `updatedPermissions` alone does not
+widen anything the user can see: the `PreToolUse` hook runs BEFORE the CLI's permission system, so a
+grant that only told the permission system would leave the hook routing the same path into a prompt
+forever. A grant widens **both** — the hook's own list and the session-scoped update — and that
+asymmetry is also what makes revocation possible at all. See the drift log.
 
 ## The tool set is the first permission layer
 
@@ -526,66 +537,219 @@ ENOENT` in a GUI-launched app. On this machine `~/.local/bin/claude` is a bun-co
   `close()` is explicit teardown, and they are not interchangeable.
 - **Sessions are keyed on `projectRoot` and dropped on switch.** Same failure class as
   `seedWorkflowStore`'s keying and `clearInvocations()`. Both prior instances were silent.
-- **The scope can be widened by things other than `updatedPermissions`.** `/add-dir` typed into the
-  composer, the `register_repo_root` control request, and a Bash `cd` persisting the working
-  directory. `DirectoryAdded` (with a `source` discriminator) and `CwdChanged` hooks exist to
-  observe all three; subscribe to them and treat them as boundary events, not log lines.
+- ~~**The scope can be widened by things other than `updatedPermissions`.**~~ **Two of the three
+  doors do not exist here — measured in `023`.** `/add-dir` typed into the composer answers
+  `/add-dir isn't available in this environment.` in an SDK session, for a directory inside the cwd
+  and outside it alike: it is an interactive-CLI-only command, and its refusal is already visible to
+  the user as an assistant turn. A Bash `cd` cannot happen because `Bash` is not in the tool set.
+  What remains is the `register_repo_root` control request, which only this app could issue and does
+  not. The `DirectoryAdded` (with its `source` discriminator) and `CwdChanged` hooks are subscribed
+  anyway and are currently unreachable from the pane — a handler for something that cannot happen yet
+  is how the first time it can is not silent — and `test/isolation.test.ts` pins both plus the fact
+  that the boundary stays anchored to the session's original `cwd`.
 - **Do not gate on `pause_turn`-style assumptions.** The read loop ends on the SDK's result message,
   not the first quiet moment.
 
 ## Probes to run before building
 
 - Does `resume` honour the pane's `cwd`/`additionalDirectories`, or restore the recorded ones?
+  **Still open, and `025` owns it — but `023` settled the half that matters most.** The `PreToolUse`
+  hook runs before the permission system and checks a list this app owns, so it remains the authority
+  over reads whatever a resume restores. What is left to probe is `settingSources` and the recorded
+  `cwd`.
 - Does the **`PermissionDenied` hook** fire for hook-issued denials? If so it collapses the
   hook-owns-its-own-transcript-entries awkwardness into one funnel, and its `retry` output is
-  interesting.
+  interesting. **Still open.** `020` shipped the awkwardness as designed — the hook writes its own
+  `{ kind: "refusal", source: "read-boundary" }` entry — so this is now an optional simplification
+  rather than a precondition.
 - **`PermissionRequest` hook vs `canUseTool`** — a second interactive decision point returning a
   full `{ behavior, updatedInput, updatedPermissions, interrupt }`. Establish precedence and pick
-  one deliberately.
+  one deliberately. **Answered by choosing:** `020` and `023` are built entirely on `canUseTool`, and
+  `PermissionRequest` is not registered. Precedence was never established because nothing needs it.
 - Can a runtime `setMode` reach `bypassPermissions` without `allowDangerouslySkipPermissions`?
+  **Moot, and deliberately kept that way.** `023` made the app's permission-update vocabulary a
+  hand-narrowed type (`SessionPermissionUpdate`) that cannot express `setMode` at all, and
+  `test/isolation.test.ts` fails if the literal appears anywhere under `src/`.
 
 ## Verification
 
+Slice attributions are on the items that have been closed. Anything unmarked is still owed.
+
 1. `canUseTool` round-trips through the UI: a `Write` outside the write scope pops a prompt, **Deny**
-   leaves no file, **Allow** writes it. Verified in the window, not a unit test.
+   leaves no file, **Allow** writes it. Verified in the window, not a unit test. — **`020`**
 2. Killing the window mid-ask resolves the parked promise and reaps the child. `ps` shows nothing.
-3. A project switch with a live session ends that session and starts nothing implicitly.
+   — **`020`** built it (`denyAll` on both exits) and `test/isolation.test.ts` pins both call sites.
+3. A project switch with a live session ends that session and starts nothing implicitly. — **`019`**
 4. The same `request_id` delivered twice resolves once — no duplicate prompt, no leaked entry.
+   — **`020`** (`permission-registry.ts`, idempotent per request id, settled answers replayed)
 5. An auto-denied tool renders via `SDKPermissionDeniedMessage`; a **hook**-denied tool renders too.
-   Two assertions, because hook denials do not emit that message.
+   Two assertions, because hook denials do not emit that message. — **`020`**, with one honest limit:
+   the auto-denial branch **cannot be provoked from a window** (with `settingSources: []` only the
+   machine-wide managed-settings tier survives, and writing one needs root), so it is covered by unit
+   tests over the pure `autoRefusal` plus an isolation pin, and that is the whole of it.
 6. A create-\* handoff still shows the confirmation dialog before its first turn, and the artifact is
-   on disk before the pane opens.
+   on disk before the pane opens. — **`022`**
 7. `test/isolation.test.ts` fails if the preload gains a raw `updatedInput` or `updatedPermissions`,
    a generic invoke, or a `session:say` call site whose payload is not a user input value.
+   — **`019`** + **`020`**, and **widened by `023`**: the same block now also fails if the grant arm
+   gains a path, if `SessionPermissionUpdate` names a rule or a disk destination, if any such literal
+   appears anywhere under `src/`, or if a grant reaches the SDK without reaching the hook.
 8. A session with no `ANTHROPIC_API_KEY` reports subscription usage; one with the var set is rejected
    or warned. Repeat with a key in `~/.claude/settings.json` — `settingSources: []` must close it.
-9. `/add-dir` typed into the composer does not widen the scope, and is visible.
+   — **`015`/`018`** (`agentChildEnv`, pinned by `test/core/agent-sdk.test.ts`)
+9. `/add-dir` typed into the composer does not widen the scope, and is visible. — **`023`, and the
+   answer is narrower than the item assumed**: the CLI refuses the command outright in an SDK
+   session, so the scope cannot widen and the refusal is what the user sees. See the drift log.
 10. A `Read` outside the read scope raises a prompt via the hook's `"ask"`; granting it adds the
-    directory for the session only, and nothing is written to disk.
+    directory for the session only, and nothing is written to disk. — **`020` + `023`**, verified in
+    the window 16/16: every settings file byte-identical before and after, and `~/.claude.json`
+    gained no permission-shaped key and never named the granted path.
 11. An outstanding ask that is never answered stays outstanding — kill the window, confirm no
-    `claude` survives. There is no prompt timeout to rescue a leaked resolver.
+    `claude` survives. There is no prompt timeout to rescue a leaked resolver. — **`020`**
 12. Stop mid-turn interrupts and leaves the session usable; the receipt's `still_queued` is reflected
-    in the UI rather than dropped.
-13. Budget fires, the session ends, **Continue** resumes it with the transcript intact.
-14. The packaged build resolves the CLI. Only fails in `build`, never in `dev`.
+    in the UI rather than dropped. — **`020`** (it left `024`)
+13. Budget fires, the session ends, **Continue** resumes it with the transcript intact. — **`024`**
+14. The packaged build resolves the CLI. Only fails in `build`, never in `dev`. — **`015`**
 
 ## Acceptance criteria
 
 - [x] A live, multi-turn Claude session runs inside the app, per project, on the Agent SDK (`019`)
 - [x] The help chat is gone and the pane is the only conversational surface (`019`)
-- [ ] Permission requests render per-tool (path + diff, full URL) and are answerable — `020`
+- [x] Permission requests render per-tool (path + diff, full URL) and are answerable (`020`)
 - [ ] `AskUserQuestion` renders as a structured choice, answered by validated selection — `021`;
-      the tool is not yet in `PANE_TOOLS`
+      the tool is still not in `PANE_TOOLS`
 - [ ] Read scope is disclosed before a session starts; write scope starts empty and grows only per submit
-      — disclosed and empty since `019`; the per-submit growth is `022`
-- [ ] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
-      — the hook exists and **denies** since `019`; `020` routes it to `"ask"`
-- [ ] Session-scoped directory grants work and never touch disk — `023`
-- [ ] Auto-denied and hook-denied tool calls are both visible in the transcript
+      — disclosed and empty since `019`, and `023` made the READ half mutable mid-session; the
+      per-submit write growth is still `022`
+- [x] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
+      (`019` built it as a deny, `020` routed it to `"ask"`) — with one surviving deny, for the call
+      that names no path and therefore has nothing for a person to authorise
+- [x] Session-scoped directory grants work and never touch disk (`023`)
+- [x] Auto-denied and hook-denied tool calls are both visible in the transcript (`020`) — see
+      verification item 5 for the limit on how the auto-denial half is covered
 - [x] `Bash` is absent from the session and `git init` is deterministic (`016` + `018`)
 - [x] `acceptEdits` exists nowhere in the app (`018`)
 - [x] No orphaned child process survives window close, project switch, or app quit (`018` + `019`)
 - [ ] A per-session budget ceiling is enforced, surfaced, and continuable — `024`
 - [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`
 - [ ] `test/isolation.test.ts` pins the invariant properties above — partially; `019` added the
-      **"the session pane"** describe
+      **"the session pane"** describe, `020` added three blocks to it and `023` widened one of those
+      and added two more
+
+## Drift log — where the build left the plan
+
+This page stopped being a description of the app somewhere around `019`, and drifted silently for two
+slices before anyone noticed. This section exists so that cannot happen again: **every slice from
+`020` on appends here**, whether or not it changed anything on the page above.
+
+Read it as the errata. The body of this plan is preserved as written — it is the record of what was
+believed on 2026-08-05, and rewriting it in place would destroy the only evidence of which
+assumptions were wrong. `018` and `019` already have their own sections above, for the same reason;
+this is where the rest goes.
+
+### The two shapes on this page that were never built
+
+Both predate `020` and are recorded once, here, rather than corrected inline.
+
+**The component split did not happen.** The Architecture block names
+`components/permission-prompt.tsx` and `components/agent-question.tsx`. Neither exists. The prompt UI
+is `PermissionCard` inside `session-pane.tsx`, beside the transcript it interrupts, because a parked
+tool call has to render pinned above the composer and a separate file for one card bought nothing.
+`021` should expect to add the question UI the same way unless it grows large enough to earn a file.
+
+**The channel names are wrong, and one channel does not exist.** The plan lists `session:permit`,
+`session:answer`, `session:message`, `session:ask` and `session:ended`. What shipped is
+`session:permission` for the answer, `session:event` for **everything** streamed back (a discriminated
+`SessionEvent` union — `assistant`, `tool`, `refusal`, `permission`, `permission-resolved`, `scope`,
+`notice`, `turn`, `ended`), and no `session:answer` at all yet. `021` owns that last one and should
+decide whether an `AskUserQuestion` answer is a sixth channel or a second arm of `session:permission`,
+now that `023` has demonstrated the arm-extension pattern. `023` added `session:revoke`, which the
+plan did not anticipate at all.
+
+### `020` — permission prompts in the pane
+
+Landed as designed; the page above simply had not caught up. Three things worth recording:
+
+- **`session-permission.ts` is a FOURTH scope module and deliberately not a fourth engine.** The plan
+  described the permission model without saying where it would live. It composes `decideWrite` and
+  `decideBoundary` and adds only the answer neither can give — ask a person — so a refused write still
+  carries `write-scope.ts`'s own reason.
+- **A refused write carries TWO sentences.** The plan treated the deny `message` as one string. It is
+  two audiences: `PermissionPrompt.reason` is written for the human reading the dialog,
+  `denyReason` is the engine's model-facing message sent verbatim if the user denies without typing
+  anything. Collapsing them costs one of them.
+- **One hook deny survived the move to `"ask"`,** and it is load-bearing: a bounded tool that named no
+  path is refused outright, because a prompt with a blank subject is answered by reflex. The plan's
+  "the hook routes out-of-scope calls to the prompt UI" is true of every call that names a path and
+  false of exactly that one.
+- **Bookkeeping:** `020`'s own acceptance criteria in
+  `.claude/maestro-tasks/020-permission-prompts-in-the-pane.md` were never ticked, though the slice
+  shipped and `status.json` recorded it as done. **Closed retroactively during `023`**, each item
+  annotated with how it was settled — and closing them turned up two things worth keeping:
+  - **Two of the nine are covered by tests rather than by a window, and now say so.** The
+    rule/mode auto-denial cannot be provoked from a window at all: with `settingSources: []` only the
+    machine-wide managed-settings tier survives and writing one needs root. A tick that did not
+    distinguish that from the live-verified items would be the more expensive kind of wrong.
+  - **The deny reason is read by the model as untrusted input, which is the two-audience split
+    earning its keep.** A probe typed `"Do not fetch anything; answer from memory."` as its denial
+    reason and the model flagged it as a possible prompt injection — reasonably, since a first-person
+    imperative arriving in a tool result is exactly that shape. The app's own defaults are phrased as
+    reports _about_ the user (`"The user declined this call…"`) rather than as commands, which is why
+    they do not trip it. Worth preserving if those strings are ever reworded.
+- **Verified live during `023`'s retroactive close, 7/7:** the complete URL byte-identical to the
+  request, a prompt landing on a route the user had navigated to and opening the pane itself, Deny
+  leaving the model able to continue, and Stop ending the turn while leaving the session usable.
+
+### `023` — a directory you can authorise for the session
+
+The slice this page described under "Widening: session-scoped, never persisted". Everything it
+promised is true; the mechanism is bigger than the paragraph.
+
+- **A grant has to reach TWO enforcement layers, not one.** The plan said a grant is
+  `{ type: "addDirectories", destination: "session" }`. That is half of it. The `PreToolUse` hook runs
+  _before_ the CLI's permission system and checks a list this app owns, so a grant that only sent
+  `updatedPermissions` would leave the hook routing the same path into a prompt on every subsequent
+  call — the grant would appear to do nothing. `session.grant([path])` widens the hook's list,
+  `updatedPermissions` rides on the allow, and main re-derives the disclosure and pushes it as a
+  `{ kind: "scope" }` event. Drop any one and the failure is silent.
+- **That asymmetry is also what makes revocation possible.** The SDK has no API for withdrawing a
+  `PermissionUpdate`. Revoking works because the hook is the authority: a path it stops recognising is
+  routed back into a prompt before the permission system is ever consulted. This was not foreseen and
+  is the reason `session:revoke` could be built at all.
+- **The read scope became MUTABLE mid-session — the first thing in the app that is.** `readable` went
+  from a captured array to a function, `readable()`, read fresh on every call. A captured copy is the
+  obvious implementation and it goes on answering the old question with nothing failing. `022` needs
+  the same property for the write accumulator.
+- **The dangerous field is closed by the TYPE, not by a code path.** The plan named
+  `updatedPermissions` as "the dangerous mutation channel" and stopped there.
+  `SessionPermissionUpdate` in `contracts.ts` is a hand-narrowed member of the SDK's union: it cannot
+  express `addRules`, `setMode`, or any of the three destinations that write to disk. The isolation
+  suite additionally fails on those literals anywhere under `src/`.
+- **`PermissionChoice` was EXTENDED, as the task required — with a scope word and no path.** The
+  fourth arm is `{ choice: "grant", scope: "file" | "directory" }`. Main holds the prompt being
+  answered and resolves the path from the `SessionGrantOption` it published with it. This is
+  `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied to the
+  permission wire, and it is the pattern `021` should copy.
+- **A file gets two offers, a directory gets one, and the difference is on screen.** The plan said
+  "grant the directory"; the requirement was finer. `grantOptionsFor` offers a file as itself _and_ as
+  its containing directory — as two buttons, each naming its own path — because "Allow this folder" is
+  a promise the folder is the obvious one, and the case this prompt exists for is where it is not. A
+  directory ≤2 segments deep, or one that contains something already in scope, is flagged `broad`,
+  rendered in amber, and its note names what it would swallow.
+- **Only a READ is grantable.** `PaneVerdict.grantable` is true in the read-boundary branch and
+  nowhere else. A refused write keeps Allow once / Deny / Stop — widening writes is `022`'s, and a
+  grant button on a write prompt is exactly how widening writes would widen reads by accident.
+- **`ReadScopeOrigin` gained a fourth value, `"session"`,** rather than a second list. That is what
+  makes a grant listable, attributable and revocable through the component that already renders
+  directories.
+- **`/add-dir` does not exist in an SDK session.** Measured: the CLI answers
+  `/add-dir isn't available in this environment.` for a directory inside the cwd and outside it alike.
+  With `Bash` absent too, two of the three doors this page warned about are closed by the CLI rather
+  than by us. `DirectoryAdded` and `CwdChanged` are subscribed anyway and are currently unreachable
+  from the pane. See "Things that bite".
+- **Verified live, 16/16 plus 5/5**, against real Claude sessions in the packaged build: the prompt,
+  both grant options with their own paths, the header listing and its Revoke, the disclosure moving
+  with the boundary, a second read in the granted directory going unasked, revocation putting it back
+  out of scope, and — the criterion this whole design exists for — **every settings file on disk
+  byte-identical before and after**, with `~/.claude.json` gaining no permission-shaped key and never
+  naming the granted path.

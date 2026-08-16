@@ -91,6 +91,15 @@ export interface ReadScopeInput {
    * this" are the two answers this disclosure exists to keep apart.
    */
   additional?: Array<{ path: string; note: string }>;
+  /**
+   * Trees a PERSON opened, mid-session, by answering a permission prompt.
+   *
+   * The only origin on this list that did not exist before the run started, and the only one that
+   * can be taken back. It is here rather than folded into `additional` because "the app opened this
+   * for you" and "you opened this, in this conversation, and can close it again" are different
+   * things — and the second one is the one a header has to be able to show and revoke.
+   */
+  granted?: Array<{ path: string; note: string }>;
   /** The resolved cascade, or null when it could not be resolved. */
   settings: EffectiveSettingsSnapshot | null;
   /** Why `settings` is null. Required when it is — "nothing applied" is not the same answer. */
@@ -128,6 +137,16 @@ export function buildReadScope(input: ReadScopeInput): ClaudeReadScope {
     if (seen.has(resolved)) continue;
     seen.add(resolved);
     directories.push({ path: resolved, origin: "app", tier: null, file: null, note: extra.note });
+  }
+
+  // Then what the user granted during the session, so the two things the APP is responsible for
+  // read first and the one thing the PERSON authorised reads next to them rather than buried under
+  // whatever a settings file contributed.
+  for (const grant of input.granted ?? []) {
+    const resolved = path.resolve(cwd, grant.path);
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    directories.push({ path: resolved, origin: "session", tier: null, file: null, note: grant.note });
   }
 
   for (const dir of settings?.effective.additionalDirectories ?? []) {
@@ -203,6 +222,7 @@ function summarise(args: {
 }): string {
   const { projectRoot, cwd, directories, projectReadable, writesOutsideReadScope, unresolved } = args;
   const fromApp = directories.filter((d) => d.origin === "app").length;
+  const granted = directories.filter((d) => d.origin === "session").length;
   const extra = directories.filter((d) => d.origin === "settings").length;
   const parts: string[] = [];
 
@@ -221,6 +241,15 @@ function summarise(args: {
   if (fromApp > 0) {
     parts.push(
       `The app also opened ${fromApp} ${fromApp === 1 ? "directory" : "directories"} for reading, listed below.`
+    );
+  }
+  // Said in its own sentence, and said with "you": a grant the user cannot recognise as their own
+  // is indistinguishable from the app having widened the scope on its own.
+  if (granted > 0) {
+    parts.push(
+      `You granted ${granted} more ${granted === 1 ? "path" : "paths"} during this session; ${
+        granted === 1 ? "it lasts" : "they last"
+      } until the session ends and ${granted === 1 ? "is" : "are"} revocable here.`
     );
   }
   if (extra > 0) {

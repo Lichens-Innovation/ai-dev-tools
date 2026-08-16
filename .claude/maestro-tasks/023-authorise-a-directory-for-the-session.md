@@ -91,16 +91,42 @@ Watch the other doors while you are here. The scope can also be widened by a dir
 typed into the composer, by a control request from outside, and by the working directory moving.
 Hooks exist that report all three; treat them as boundary events rather than log lines.
 
+### What this slice measured, and where the plan above was wrong
+
+**Two of the three other doors do not exist from the pane, and the composer one is closed by the CLI
+rather than by us.** Typed into the pane composer, `/add-dir <path>` answers _"`/add-dir` isn't
+available in this environment."_ — for a directory inside the session's cwd and outside it alike. It
+is an interactive-CLI-only command and an SDK session refuses it. The app's scope did not widen (zero
+`origin: "session"` directories after the attempt) and a read there still raised a prompt. The
+refusal is already an assistant turn in the transcript, so "and is surfaced" is satisfied by the CLI
+rather than by app code. Consequently:
+
+- The `DirectoryAdded` hook **is** registered — it also covers `source: "register_repo_root"`, the
+  SDK control request, which nothing in this app issues today — but is **currently unreachable from
+  the pane**.
+- The `CwdChanged` hook is registered and likewise unreachable: the pane offers no way to move the
+  working directory. What is enforced and pinned is that the boundary stays anchored to
+  `request.cwd` and does not follow a cwd that moves.
+- Both are pinned by a new isolation block, so the first time either becomes reachable it is not
+  silent.
+
+**Revocation needed a new IPC channel, which this page did not anticipate.** A grant is "listed in
+the header, revocable there" as planned, but revoking it is `session:revoke` — and it carries a
+**path**, where the grant itself crosses as a scope word. That is safe in one direction only: it can
+remove an entry main is already holding and has no shape by which it could add one. The SDK has no
+API for withdrawing a `PermissionUpdate`; revocation works because the **hook** is the authority and
+runs before the permission system ever sees the call.
+
 ## Acceptance criteria
 
-- [x] A read outside the read scope raises a prompt naming the path and why it was stopped, rather than silently failing — **delivered by `020`**; re-assert it rather than rebuilding it
-- [ ] The user can allow that path once, or grant its directory for the session, or deny with a reason — allow-once and deny are `020`'s; the **grant** is this slice's
-- [ ] A session grant is listed in the header, revocable there, and gone when the session ends
-- [ ] No grant writes anything to disk — asserted by checking settings files are untouched after granting
-- [ ] The main process authors the permission update; the renderer sends only a decision — **partly delivered**: `PermissionChoice` and `session:permission` exist, and this slice adds the `updatedPermissions` half by EXTENDING that union
-- [ ] A directory-add typed into the composer does not widen the scope, and is surfaced
-- [ ] A working-directory change is observed and does not silently move the boundary
-- [ ] The isolation tests fail if the renderer gains the ability to author a permission update or set a permission mode — **partly delivered**: widen the existing _"lets the renderer send a permission CHOICE and never a permission result"_ block
+- [x] A read outside the read scope raises a prompt naming the path and why it was stopped, rather than silently failing — **delivered by `020`**; re-asserted live rather than rebuilt
+- [x] The user can allow that path once, or grant its directory for the session, or deny with a reason — allow-once and deny are `020`'s; the **grant** is this slice's, offered as the file *and* as its containing directory, each naming its own path
+- [x] A session grant is listed in the header, revocable there, and gone when the session ends — revocation is the new `session:revoke` channel, which NARROWS ONLY
+- [x] No grant writes anything to disk — asserted live: all four settings files byte-identical before/after, and `~/.claude.json` gains no permission-shaped key and never names the granted path. The guarantee is also in the TYPE: `SessionPermissionUpdate` cannot express `addRules`, `setMode` or a disk destination
+- [x] The main process authors the permission update; the renderer sends only a decision — `PermissionChoice` was EXTENDED with `{ choice: "grant", scope }`, carrying a scope word and no path; main resolves the path from the `SessionGrantOption` it published
+- [x] A directory-add typed into the composer does not widen the scope, and is surfaced — **met by a narrower mechanism than this page assumed**: the CLI refuses `/add-dir` outright in an SDK session and says so in the transcript; the `DirectoryAdded` hook is registered but unreachable from the pane
+- [x] A working-directory change is observed and does not silently move the boundary — **likewise narrower**: the `CwdChanged` hook is registered and unreachable; what is pinned is that the boundary stays anchored to `request.cwd`
+- [x] The isolation tests fail if the renderer gains the ability to author a permission update or set a permission mode — the existing _"lets the renderer send a permission CHOICE and never a permission result"_ block was widened, and two new blocks added (a grant dies with the session and is written nowhere; the other doors are watched and followed by nothing)
 
 ## Blocked by
 

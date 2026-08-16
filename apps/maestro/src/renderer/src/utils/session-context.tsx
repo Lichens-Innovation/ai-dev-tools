@@ -69,6 +69,14 @@ interface SessionContextValue {
   say(text: string): Promise<void>;
   /** Answer one parked request. A choice crosses the wire; main builds the permission result. */
   answer(requestId: string, choice: PermissionChoice): Promise<void>;
+  /**
+   * Take back a directory granted earlier in this session.
+   *
+   * The only call in this module that names a path, and it can only narrow: main matches it against
+   * the grants it is holding. A grant goes the other way — `answer` sends a scope word and main
+   * resolves the path from the prompt it asked.
+   */
+  revoke(path: string): Promise<void>;
   /** Interrupt the turn in flight, leaving the session usable. */
   stop(): Promise<void>;
   /** End the session and clear the transcript. */
@@ -114,6 +122,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // session resolved on its own — a window closing, a project switch — stops asking too.
         setPending((prev) => prev.filter((p) => p.requestId !== event.requestId));
         setOutcomes((prev) => ({ ...prev, [event.requestId]: event.outcome }));
+        return;
+      }
+      if (event.kind === "scope") {
+        // NOT A TRANSCRIPT ENTRY: it is the header's answer changing underneath it. The read scope
+        // became mutable the moment a grant existed, and the disclosure has to follow the boundary
+        // or the pane goes on describing a session that no longer exists. Main re-derives both from
+        // one place; this only records what it sent.
+        setInfo((prev) => (prev ? { ...prev, read: event.read, grants: event.grants } : prev));
         return;
       }
       append(event);
@@ -219,6 +235,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) setError(res.error);
   }, []);
 
+  const revoke = useCallback(async (target: string) => {
+    const id = sessionId.current;
+    if (!id) return;
+    // No optimistic removal. Unlike a pending prompt — where the buttons have to stop being
+    // clickable immediately — a grant's whole point is that the header and the boundary agree, so
+    // the list is only ever redrawn from the `scope` event main sends after it has actually moved.
+    const res = await callMain(() => window.maestro.session.revoke(id, target));
+    if (!res.ok) setError(res.error);
+  }, []);
+
   const stop = useCallback(async () => {
     const id = sessionId.current;
     if (!id) return;
@@ -253,10 +279,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       start,
       say,
       answer,
+      revoke,
       stop,
       end,
     }),
-    [answer, busy, end, entries, error, info, live, open, outcomes, pending, say, start, starting, stop, width]
+    [answer, busy, end, entries, error, info, live, open, outcomes, pending, revoke, say, start, starting, stop, width]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

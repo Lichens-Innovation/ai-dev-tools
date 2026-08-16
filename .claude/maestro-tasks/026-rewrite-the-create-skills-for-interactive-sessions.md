@@ -45,6 +45,23 @@ drift apart with nothing to catch it.
   `AskUserQuestion` is in no tool set in the app, so the facility these skills are meant to be the
   first real consumer of arrives one slice later. Do not write a skill that assumes it before then.
 
+### What `020` and `023` changed about being refused, and what a skill may now say
+
+- **A refused call in the pane is a question, not a wall.** `020` routes a write outside the write
+  scope, and a read outside the read boundary, into a prompt the user answers per call. So a skill
+  running in the pane should not describe a refusal as final or route around it pre-emptively — the
+  user is right there. The headless entry is unchanged: there a refusal is still the end of it, and
+  the skill has to say which entry it is describing.
+- **A read outside the boundary can now be authorised for the session, which is exactly the
+  "make it like my existing one" case these skills exist to serve.** `023` added a grant button that
+  offers the file or its containing directory; a user's own global skills live outside the project
+  and outside every marketplace, so a skill may point the model at such a path and let the prompt
+  handle consent. What it must not do is **assume** the access — the first read there raises a
+  prompt, and a skill that treats the read as certain will write confidently about a file it never
+  saw. Grants die with the session, so the next session asks again.
+- **On the terminal entry none of this applies.** No boundary, no pane, no prompt — which is another
+  reason the two entries need distinct wording rather than one paragraph hedged to cover both.
+
 **Each skill must handle both entries.** These files are invoked from the terminal too, where no
 scaffold exists:
 

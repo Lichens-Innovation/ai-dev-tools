@@ -743,6 +743,89 @@ describe("the session pane", () => {
     const pane = stripComments(read("src/renderer/src/components/session-pane.tsx"));
     expect(pane).toMatch(/DEFAULT_DENY_REASON/);
     expect(stripComments(read("src/main/claude-session.ts"))).toMatch(/permissionReason\(/);
+
+    // ── `023` widened this block rather than writing a second one ────────────
+    // A session grant is the first thing in this app that puts a value in `updatedPermissions` at
+    // all, so the assertions above stopped being "nobody authors one" and became "only MAIN does,
+    // and only one shape of one". The four below are what that costs.
+
+    // 1. THE RENDERER SENDS A SCOPE WORD, NEVER A PATH. `PermissionChoice`'s grant arm carries
+    //    `file` or `directory`; main resolves it against the prompt IT asked. A renderer that could
+    //    name a directory here would be authoring the grant rather than answering the question —
+    //    the same defect as `create:scaffold` taking a destination path.
+    const choice = read("src/core/contracts.ts");
+    const grantArm = choice.slice(choice.indexOf("export type PermissionChoice"));
+    const grantMember = grantArm.slice(grantArm.indexOf('choice: "grant"'), grantArm.indexOf("};"));
+    expect(grantMember, "the renderer can nominate a directory on a grant").not.toMatch(/path|director(y|ies)/i);
+
+    // 2. THE UPDATE IS TYPED SO NARROWLY IT CANNOT REACH DISK. The SDK's own `PermissionUpdate`
+    //    also carries `addRules`, `setMode` (including `bypassPermissions`) and four destinations,
+    //    three of which write — to the user's repository, their machine-local project settings, or
+    //    their home directory. `SessionPermissionUpdate` is the app's whole vocabulary for this.
+    const update = choice.slice(choice.indexOf("export interface SessionPermissionUpdate"));
+    const body = update.slice(0, update.indexOf("}"));
+    expect(body).toMatch(/type:\s*"addDirectories"/);
+    expect(body).toMatch(/destination:\s*"session"/);
+    expect(body, "a grant gained a destination that writes to disk").not.toMatch(
+      /userSettings|projectSettings|localSettings|cliArg/
+    );
+    expect(body, "the app's permission update can express a rule or a mode").not.toMatch(/addRules|setMode|behavior/);
+
+    // 3. NO OTHER DESTINATION EXISTS ANYWHERE UNDER src/. The type above is the enforcement, but a
+    //    literal cast or a second update built by hand would slip past it, and the failure writes a
+    //    permission rule into a file the user did not open this app to edit.
+    const everywhere = sourcesUnder("src")
+      .map((f) => stripComments(fs.readFileSync(f, "utf8")))
+      .join("\n");
+    expect(everywhere, "something authors a permission update that lands on disk").not.toMatch(
+      /destination:\s*"(userSettings|projectSettings|localSettings|cliArg)"/
+    );
+    expect(everywhere, "a session grant is written somewhere it can outlive the session").not.toMatch(
+      /type:\s*"(addRules|replaceRules|removeRules|setMode)"/
+    );
+
+    // 4. A GRANT REACHES BOTH HALVES, OR THE HEADER AND THE BOUNDARY DISAGREE. `updatedPermissions`
+    //    only tells the CLI's permission system to stop prompting; the `PreToolUse` hook runs FIRST
+    //    and would go on routing the same path into a prompt forever. So main widens the hook's list
+    //    and then answers, and the pane re-derives its disclosure from the widened list.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    const grantFn = session.slice(
+      session.indexOf("async function grantAndAllow"),
+      session.indexOf("export async function revokeGrant")
+    );
+    expect(grantFn, "a grant widens the SDK's scope but not the app's own boundary").toMatch(/session\.grant\(/);
+    expect(grantFn).toMatch(/updatedPermissions:/);
+    expect(grantFn, "the header goes on describing a scope that has moved").toMatch(/announceScope\(/);
+    // And the boundary is read fresh on every call, not captured when the session started.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const paneSession = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    expect(paneSession).toMatch(/directories:\s*readable\(\)/);
+    expect(paneSession, "the readable set is captured once and can no longer move").not.toMatch(
+      /directories:\s*readable,/
+    );
+  });
+
+  it("lets a grant die with the session, and writes it nowhere", () => {
+    // THE THIRD PROPERTY, inherited from the chat's confirmation opt-out: it defaults to asking, it
+    // DIES WITH THE SESSION, and it is visible and revocable from the header. The first is the
+    // prompt's existence and the third is a control; this one is an absence, which is the kind that
+    // regresses without anything failing.
+    //
+    // Both places a grant is held are in-memory and window-scoped: a closure inside
+    // `startPaneSession`, and the `LiveSession` entry keyed by `webContents.id` that every teardown
+    // path already deletes. Neither module may acquire a way to persist one.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    expect(session, "the session owner learned to write files").not.toMatch(/node:fs|writeFile|readFile/);
+    expect(session).toMatch(/grants:\s*SessionGrant\[\]/);
+    // The grant list lives on the per-window entry, which `endSession` deletes outright — so there
+    // is nothing to clear separately and nothing that could survive into the next session.
+    expect(session).toMatch(/sessions\.delete\(webContentsId\)/);
+
+    // Revoking narrows and can do nothing else: it removes an entry main is already holding, which
+    // is why a PATH is allowed to cross the wire here while granting sends only a scope word.
+    expect(session).toMatch(/entry\.grants\.findIndex/);
+    const preload = stripComments(read("src/preload/index.ts"));
+    expect(preload).toMatch(/invoke\(IPC\.sessionRevoke,\s*id,\s*path\)/);
   });
 
   it("writes down a refusal whichever of the four routes it arrived by", () => {
@@ -762,6 +845,31 @@ describe("the session pane", () => {
     for (const source of ['"write-scope"', '"read-boundary"', '"user"', '"auto"']) {
       expect(both, `no refusal is ever attributed to ${source}`).toContain(`source: ${source}`);
     }
+  });
+
+  it("watches the other doors into the read scope, and does not follow any of them", () => {
+    // A permission prompt is not the only thing that can move what a session sees. A directory
+    // added to the CLI's OWN working roots and the working directory moving are both invisible to
+    // `canUseTool`, and neither widens this app's boundary — so the failure is not an open door,
+    // it is a silent DISAGREEMENT between the header and the hook, which is the one shape of this
+    // bug nobody can diagnose from the outside.
+    //
+    // Both handlers are currently unreachable from the pane, measured in the window: `/add-dir`
+    // answers "isn't available in this environment" in an SDK session, and nothing here moves the
+    // cwd. They are pinned anyway — the point of a handler for something that cannot happen yet is
+    // that the first time it can, it is not silent.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    expect(pane, "a directory added to the CLI's own roots would pass unremarked").toMatch(/DirectoryAdded:\s*\[/);
+    expect(pane, "the working directory could move with nothing said").toMatch(/CwdChanged:\s*\[/);
+
+    // And the boundary stays ANCHORED. `decideBoundary` resolves relative paths against a cwd; if
+    // that cwd followed the session's, a `..` target would quietly mean somewhere else.
+    const hook = pane.slice(pane.indexOf("PreToolUse:"), pane.indexOf("canUseTool:"));
+    expect(hook).toMatch(/cwd:\s*request\.cwd/);
+    expect(hook, "the boundary follows the working directory instead of anchoring it").not.toMatch(
+      /cwd:\s*(?!request\.cwd)\w/
+    );
   });
 
   it("ends a session on a project switch and reaps it on quit", () => {

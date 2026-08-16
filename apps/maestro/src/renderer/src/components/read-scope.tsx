@@ -40,6 +40,9 @@ export default function ReadScope({ read, compact = false }: { read: ClaudeReadS
       <ul data-testid="claude-read-dirs" className="list-none p-0 m-0 flex flex-col gap-0.5">
         {read.directories.map((d) => (
           <li key={d.path} data-origin={d.origin} className={`${text} text-(--ink-3)`}>
+            {/* The one origin a PERSON authored, marked as such. A grant that reads like the app's
+                own choice has lost the distinction it exists to make. */}
+            {d.origin === "session" && <span className="mr-1 text-amber-500">●</span>}
             <span className="font-mono text-(--ink-2) break-all">{d.path}</span>
             <span> — {d.note}</span>
             {d.file && <span className="font-mono break-all"> ({d.file})</span>}

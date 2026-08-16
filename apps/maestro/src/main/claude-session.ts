@@ -17,6 +17,7 @@
 import { BrowserWindow } from "electron";
 import {
   buildReadScope,
+  grantOptionFor,
   listMarketplaces,
   nodeSettings,
   paneSessionTarget,
@@ -30,7 +31,15 @@ import {
 } from "../core/index.js";
 import { bundledPluginDir } from "./bundled-assets.js";
 import { IPC_EVENTS } from "../shared/ipc.js";
-import type { ClaudeReadScope, PermissionAnswer, PermissionChoice, SessionEvent, SessionInfo } from "../shared/ipc.js";
+import type {
+  ClaudeReadScope,
+  PermissionAnswer,
+  PermissionChoice,
+  PermissionPrompt,
+  SessionEvent,
+  SessionGrant,
+  SessionInfo,
+} from "../shared/ipc.js";
 
 /**
  * The child `spawnClaudeChild` produced.
@@ -49,6 +58,17 @@ interface LiveSession {
   session: PaneSession;
   /** The child the spawn function produced, so the whole GROUP can be signalled on teardown. */
   child: ClaudeChild | null;
+  /**
+   * The prompts still waiting on a person, by request id.
+   *
+   * WHY MAIN KEEPS ITS OWN COPY. A grant answers a question about a NAMED path, and the renderer
+   * sends only the word `file` or `directory` — so the path has to be recovered on this side of the
+   * wire, from the question that was actually asked. Reading it off the event main just sent is what
+   * makes "the renderer never nominates a directory" true rather than merely intended.
+   */
+  prompts: Map<string, PermissionPrompt>;
+  /** What a person has granted, in force. Never written anywhere; dies with the entry. */
+  grants: SessionGrant[];
 }
 
 /** Keyed by the webContents that asked for it — one session per window, never one per subscriber. */
@@ -93,9 +113,10 @@ function additionalDirectories(): Array<{ path: string; note: string }> {
  */
 async function readScopeFor(
   projectRoot: string,
-  extra: Array<{ path: string; note: string }>
+  extra: Array<{ path: string; note: string }>,
+  granted: Array<{ path: string; note: string }> = []
 ): Promise<ClaudeReadScope> {
-  const base = { projectRoot, cwd: projectRoot, targets: [], additional: extra };
+  const base = { projectRoot, cwd: projectRoot, targets: [], additional: extra, granted };
   try {
     return buildReadScope({ ...base, settings: await nodeSettings().resolve(projectRoot) });
   } catch (err) {
@@ -109,17 +130,33 @@ async function readScopeFor(
 
 /** What a window's session can see and do right now. Starts nothing; `id` is null when none runs. */
 export async function sessionInfo(webContentsId: number, projectRoot: string): Promise<SessionInfo> {
-  return describeSession(projectRoot, sessions.get(webContentsId)?.id ?? null);
+  const entry = sessions.get(webContentsId);
+  return describeSession(projectRoot, entry?.id ?? null, entry?.grants ?? []);
+}
+
+/** How one grant reads in the disclosure, next to the app's own directories. */
+function grantNote(grant: SessionGrant): string {
+  const what = grant.scope === "file" ? "this file" : "this folder";
+  return `You opened ${what} during this session, answering a ${grant.tool} prompt about ${grant.target}. It lasts until the session ends and nothing was written to disk.`;
 }
 
 /** The header's answer for a given session id — same fields whether or not one is running. */
-export async function describeSession(projectRoot: string, id: string | null): Promise<SessionInfo> {
+export async function describeSession(
+  projectRoot: string,
+  id: string | null,
+  grants: readonly SessionGrant[] = []
+): Promise<SessionInfo> {
   const cli = paneSessionTarget();
   return {
     id,
     projectRoot,
     cwd: projectRoot,
-    read: await readScopeFor(projectRoot, projectRoot ? additionalDirectories() : []),
+    read: await readScopeFor(
+      projectRoot,
+      projectRoot ? additionalDirectories() : [],
+      grants.map((g) => ({ path: g.path, note: grantNote(g) }))
+    ),
+    grants: [...grants],
     // Empty, and nothing in this slice can add to it. `022` is the first thing allowed to.
     writable: [],
     tools: [...PANE_TOOLS],
@@ -154,7 +191,14 @@ export async function startSession(webContentsId: number, projectRoot: string): 
 
   const extra = additionalDirectories();
   const id = `s${++nextId}`;
-  const entry: LiveSession = { id, projectRoot, session: null as unknown as PaneSession, child: null };
+  const entry: LiveSession = {
+    id,
+    projectRoot,
+    session: null as unknown as PaneSession,
+    child: null,
+    prompts: new Map(),
+    grants: [],
+  };
 
   entry.session = startPaneSession({
     cwd: projectRoot,
@@ -164,7 +208,14 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     // means no installed plugin reaches the session, and the help skill the deleted chat asked for
     // by name is the whole reason `Skill` is in the pane's tool set.
     pluginDir: bundledPluginDir(),
-    emit: (event) => send(webContentsId, event),
+    emit: (event) => {
+      // Every question is kept until it is answered, because answering a GRANT needs the path the
+      // question named and the renderer does not send one. Resolved requests are dropped so the map
+      // is bounded by what is actually on screen.
+      if (event.kind === "permission") entry.prompts.set(event.request.requestId, event.request);
+      if (event.kind === "permission-resolved") entry.prompts.delete(event.requestId);
+      send(webContentsId, event);
+    },
     spawn: (options) => {
       const child = spawnClaudeChild(options);
       entry.child = child;
@@ -186,7 +237,23 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     if (entry.child) terminateChildGroup(entry.child);
   });
 
-  return describeSession(projectRoot, id);
+  return describeSession(projectRoot, id, entry.grants);
+}
+
+/**
+ * Tell the window the read scope moved.
+ *
+ * THE SECOND HALF OF A GRANT, and the one with nothing to make it happen automatically. `020`
+ * resolved the readable set once at session start, so widening the boundary without re-deriving the
+ * disclosure leaves the header describing a session that no longer exists — and nothing fails. This
+ * is why a grant is an event rather than a return value: the pane's header re-reads what it can see
+ * from the same derivation the boundary uses, not from what a button click implied.
+ */
+async function announceScope(webContentsId: number, entry: LiveSession): Promise<void> {
+  const info = await describeSession(entry.projectRoot, entry.id, entry.grants);
+  // The session may have gone away while the settings cascade was being resolved.
+  if (sessions.get(webContentsId) !== entry) return;
+  send(webContentsId, { kind: "scope", seq: --injectedSeq, read: info.read, grants: info.grants });
 }
 
 /**
@@ -236,14 +303,16 @@ export async function stopSession(webContentsId: number, id: string): Promise<bo
  * promise rather than a restatement of it: a deny whose message is `""` reaches the model as a bare
  * refusal, and the model reads denial messages to decide what to do instead.
  */
-export function answerPermission(
+export async function answerPermission(
   webContentsId: number,
   id: string,
   requestId: string,
   choice: PermissionChoice
-): boolean {
+): Promise<boolean> {
   const entry = sessions.get(webContentsId);
   if (!entry || entry.id !== id) return false;
+
+  if (choice?.choice === "grant") return grantAndAllow(webContentsId, entry, String(requestId ?? ""), choice.scope);
 
   const answer: PermissionAnswer =
     choice?.choice === "allow"
@@ -262,6 +331,95 @@ export function answerPermission(
         };
 
   return entry.session.answer(String(requestId ?? ""), answer);
+}
+
+/**
+ * Allow this call, and stop asking about this path for the rest of the session.
+ *
+ * THREE THINGS HAPPEN HERE, and leaving out any one of them produces a boundary that is wrong in a
+ * way nothing reports:
+ *
+ *   1. **The hook's list is widened.** It runs before the permission flow and would otherwise route
+ *      the same path into a prompt on the very next call — the grant would appear to have done
+ *      nothing.
+ *   2. **The answer carries `updatedPermissions`.** `destination: "session"` and nothing else: the
+ *      CLI stops prompting for the tree, and NO FILE IS WRITTEN. `localSettings` would land a rule
+ *      in the user's repository, `userSettings` on their whole machine, and both would outlive the
+ *      conversation the user was actually asked about. `SessionPermissionUpdate` cannot express
+ *      either, which is where that guarantee lives.
+ *   3. **The disclosure is re-derived.** The header and the boundary have to agree, and the header
+ *      has no other way to learn that they stopped agreeing.
+ *
+ * The PATH comes from the prompt this answers, never from the renderer. A `scope` naming no option
+ * on that prompt grants nothing and falls back to letting the one call through, which is the safe
+ * direction to be wrong in: the user pressed a button meaning "yes".
+ */
+async function grantAndAllow(
+  webContentsId: number,
+  entry: LiveSession,
+  requestId: string,
+  scope: string
+): Promise<boolean> {
+  const prompt = entry.prompts.get(requestId);
+  const option = grantOptionFor(prompt?.grants ?? [], scope);
+  if (!option) return entry.session.answer(requestId, { behavior: "allow" });
+
+  const added = entry.session.grant([option.path]);
+  const answered = entry.session.answer(requestId, {
+    behavior: "allow",
+    updatedPermissions: [{ type: "addDirectories", directories: [option.path], destination: "session" }],
+  });
+
+  if (!answered) {
+    // The request was already resolved — a double click, or the session going away underneath it.
+    // The boundary must not stay widened for a question nobody answered.
+    for (const path of added) entry.session.revoke(path);
+    return false;
+  }
+
+  entry.grants.push({
+    path: option.path,
+    scope: option.scope,
+    target: prompt?.target ?? option.path,
+    tool: prompt?.tool ?? "a tool",
+    grantedAt: Date.now(),
+  });
+  send(webContentsId, {
+    kind: "notice",
+    seq: --injectedSeq,
+    text: `${option.path} is readable for the rest of this session. Nothing was written to disk; revoke it from the scope panel (the eye icon) at any time.`,
+  });
+  await announceScope(webContentsId, entry);
+  return true;
+}
+
+/**
+ * Take a grant back.
+ *
+ * The renderer sends a PATH here and that is not a hole: this call can only ever REMOVE an entry
+ * that is already in `entry.grants`, so a path it does not recognise does nothing at all. There is
+ * no shape of argument by which it could widen anything.
+ *
+ * What it can actually undo is this app's own boundary — the SDK has no API for withdrawing a
+ * `PermissionUpdate` — and that is enough, because the hook runs first: a path the hook stops
+ * recognising is routed back into a prompt before the CLI's permission system is ever consulted.
+ */
+export async function revokeGrant(webContentsId: number, id: string, target: string): Promise<boolean> {
+  const entry = sessions.get(webContentsId);
+  if (!entry || entry.id !== id) return false;
+
+  const at = entry.grants.findIndex((g) => g.path === target);
+  if (at < 0) return false;
+
+  entry.grants.splice(at, 1);
+  entry.session.revoke(target);
+  send(webContentsId, {
+    kind: "notice",
+    seq: --injectedSeq,
+    text: `${target} is out of scope again. The session can no longer read it without asking.`,
+  });
+  await announceScope(webContentsId, entry);
+  return true;
 }
 
 /**

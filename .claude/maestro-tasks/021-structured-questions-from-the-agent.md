@@ -38,6 +38,18 @@ the shape this slice's own carve-out has to take. Reuse three things rather than
   the pane; `top-nav.tsx` already carries the amber pending badge. A question is another pending item
   on those, not a parallel set of state.
 
+**Those three shapes grew in `023`, and a question must extend them the same way rather than
+replacing them.** `PermissionChoice` has **four** arms now — the fourth is
+`{ choice: "grant", scope: "file" | "directory" }` — so adding an answer arm is an established move
+rather than a new one, and the precedent it sets is the one this slice needs: the grant carries a
+scope **word and no path**, because main holds the prompt and resolves the path from the
+`SessionGrantOption` it published with it. A question's answer is the same trade — the renderer sends
+which labels were picked, main rebuilds the payload and validates every label against the options it
+sent. `PermissionPrompt` likewise gained a `grants` field and `SessionEvent` gained a
+`{ kind: "scope" }` member, which `session-context.tsx` handles as a scope update and **not** as a
+transcript entry. If a question needs a field of its own, add it beside these; do not widen an
+existing one to mean two things.
+
 Previews are opt-in: without declaring the preview format at session start, no previews are emitted
 at all and the option list arrives bare.
 

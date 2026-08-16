@@ -51,6 +51,10 @@ import type {
   PermissionOutcome,
   PermissionPrompt,
   RefusalSource,
+  GrantScope,
+  SessionGrant,
+  SessionGrantOption,
+  SessionPermissionUpdate,
   SessionEvent,
   SessionInfo,
   CreateOptions,
@@ -113,6 +117,10 @@ export type {
   PermissionOutcome,
   PermissionPrompt,
   RefusalSource,
+  GrantScope,
+  SessionGrant,
+  SessionGrantOption,
+  SessionPermissionUpdate,
   SessionEvent,
   SessionInfo,
   CreateOptions,
@@ -258,6 +266,9 @@ export const IPC = {
   // The answer to one parked permission request. A CHOICE, not a permission result — see
   // `PermissionChoice`, and `MaestroApi.session.answer` below.
   sessionPermission: "session:permission",
+  // Take back a directory the user granted earlier in this session. Narrows only: it can remove an
+  // entry from the grant list and has no shape by which it could add one.
+  sessionRevoke: "session:revoke",
   sessionEnd: "session:end",
   sessionInfo: "session:info",
 
@@ -426,6 +437,17 @@ export interface MaestroApi {
      * it, both of which are ordinary rather than errors.
      */
     answer(id: string, requestId: string, choice: PermissionChoice): Promise<boolean>;
+    /**
+     * Revoke a directory this session granted, naming it by path.
+     *
+     * A PATH crosses here and that is not the hole it looks like: main matches it against the grants
+     * it is already holding and removes one, so an unrecognised path does nothing. The direction is
+     * the guarantee — this call can only ever narrow what the session may read. Granting still goes
+     * through `answer`, where the renderer sends a scope word and main resolves the path itself.
+     *
+     * False when no grant matches, or when the session is gone. Both are ordinary.
+     */
+    revoke(id: string, path: string): Promise<boolean>;
     /** End the session and reap the CLI's process group. */
     end(): Promise<void>;
     /**

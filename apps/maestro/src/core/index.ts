@@ -249,9 +249,14 @@ export {
 // What a live session may READ, decided per tool call by a `PreToolUse` hook. Pure, and a THIRD
 // module rather than a branch of the two above: `decideWrite` structurally cannot bound reads
 // (`canUseTool` never sees them) and `read-scope.ts` only discloses. See ./session-scope.ts.
+// `grantOptionsFor`/`grantOptionFor` are the other half of the same boundary: what a PERSON could
+// open in answer to a prompt, and which of those options an answer named. Still pure — whether the
+// path is a directory is the caller's answer, because that is the one part that needs the disk.
 export {
   decideBoundary,
   boundaryTargetOf,
+  grantOptionFor,
+  grantOptionsFor,
   BOUNDED_TOOLS,
   UNBOUNDED_TOOLS,
   type BoundaryDecision,

@@ -46,7 +46,11 @@ the ceiling. `sessionId` is also what **Continue** resumes against, and what `02
   difference between a door and a crash.
 - **The surfaces to render on already exist.** `SessionInfo` and `session:info` are there to carry
   spend-to-date, `session:event` is the stream to push it on, and the pane header is where `019` put
-  the read-scope disclosure — that is where an effort level and a model selector belong.
+  the read-scope disclosure — that is where an effort level and a model selector belong. Both grew in
+  `023`: `SessionInfo` also carries `grants: SessionGrant[]`, `SessionEvent` has a
+  `{ kind: "scope" }` member, and the header's scope panel now lists session grants with a Revoke
+  button each. Extend those; a spend figure and an effort control are two more fields on the same
+  info object, not a second header.
 - **`interrupt()`'s receipt is no longer discarded — `020` picked it up, and this slice does not own
   it.** `stop()` in `src/core/agent-sdk.ts` returns `{ stillQueued }` off the `query.interrupt()`
   receipt, and `stopSession` in `src/main/claude-session.ts` emits a `notice` when the interrupt left

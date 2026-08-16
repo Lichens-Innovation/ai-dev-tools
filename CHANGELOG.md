@@ -5,6 +5,61 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — a directory you can authorise for the session, and take back
+
+- **The prompt gained its missing button.** `020` routed an out-of-scope read into a prompt with
+  Allow once / Deny / Stop; a read now also offers **grant this file** or **grant its directory** for
+  the rest of the session. Each option is its own button carrying its own path and its own sentence —
+  "Allow this folder" is a promise the folder is the obvious one, and this prompt exists for the case
+  where it is not.
+- **A grant never touches disk, and the type is what guarantees it.** `SessionPermissionUpdate` in
+  `contracts.ts` is a hand-narrowed member of the SDK's `PermissionUpdate` union: it can express only
+  `{ type: "addDirectories", directories, destination: "session" }` — never `addRules`, never
+  `setMode`, and none of the three destinations that write (`localSettings`, `projectSettings`,
+  `userSettings`). `test/isolation.test.ts` also fails on any of those literals anywhere under
+  `src/`. Verified in the window: after granting, every settings file is byte-identical and
+  `~/.claude.json` gains no permission-shaped key and never names the granted path.
+- **The renderer still nominates no directory — on the permission wire either.** `PermissionChoice`
+  is **extended** with a fourth arm `{ choice: "grant", scope: "file" | "directory" }`, carrying a
+  scope word and **no path**; main holds the prompt and resolves the path from the
+  `SessionGrantOption` it published. Same discipline as `create:scaffold` taking a request and
+  `claude:run` taking a token.
+- **A grant reaches both enforcement layers or it reaches neither usefully.** `PreToolUse` runs
+  _before_ the CLI's permission system, so `updatedPermissions` alone leaves the hook re-prompting
+  forever and the hook alone leaves the permission system refusing. Main does three things:
+  `session.grant([path])`, the `updatedPermissions` on the allow, and a re-derived disclosure pushed
+  as a new `{ kind: "scope" }` `SessionEvent`.
+- **The read scope is mutable mid-session for the first time**, so `readable` is now a **function**
+  (`readable()`) read fresh per call rather than an array captured at session start — no call site
+  can go on answering the old question after a grant.
+- **Visible and revocable, or the boundary is not optional but gone.** Grants list in the pane's
+  scope panel with a Revoke button and inside `ReadScope` as the fourth `ReadScopeOrigin`,
+  `"session"` (dotted amber); the summary gains "You granted N more paths during this session…". New
+  IPC `session:revoke` (`MaestroApi.session.revoke(id, path)`) carries a path, which is safe in one
+  direction only: it can remove an entry main already holds and has no shape by which it could add
+  one. The SDK has no API for withdrawing a `PermissionUpdate` — revocation works because the **hook**
+  is the authority and runs before the permission system sees the call.
+- **Only a read is grantable.** `PaneVerdict`'s ask arm gained `grantable`, true in the read-boundary
+  branch and nowhere else: a refused write keeps Allow once / Deny / Stop (widening writes is still
+  `022`'s), and `WebFetch`/`WebSearch` have no path to grant. A directory ≤2 segments deep, or one
+  containing something already in scope, is flagged `broad` and rendered in amber with what it would
+  swallow.
+- **The other two doors are closed by the CLI, not by us — measured.** `/add-dir` typed into the
+  composer answers `/add-dir isn't available in this environment.` in an SDK session, inside the cwd
+  and outside it alike, and that refusal is already an assistant turn in the transcript. The
+  `DirectoryAdded` and `CwdChanged` hooks are registered anyway and are currently **unreachable** from
+  the pane; the boundary stays anchored to `request.cwd` and does not follow a working directory that
+  moves. Both are pinned so the first time either becomes reachable it is not silent.
+- New contracts: `SessionPermissionUpdate`, `GrantScope`, `SessionGrantOption`, `SessionGrant`;
+  `ReadScopeOrigin` gained `"session"`, `PermissionPrompt` gained `grants`, `SessionInfo` gained
+  `grants`, `SessionEvent` gained `scope`. New pure exports `grantOptionsFor` / `grantOptionFor` in
+  `session-scope.ts`.
+- Tests: the existing _"lets the renderer send a permission CHOICE and never a permission result"_
+  isolation block was **widened** rather than duplicated, plus two new blocks — a grant dies with the
+  session and is written nowhere, and the other doors are watched and followed by nothing —
+  **425 tests**. Verified in a real Electron window over CDP: 16/16 on the grant flow, 5/5 on the
+  other doors.
+
 ### maestro — the pane asks before it acts
 
 - **A tool call the app will not answer for now raises a prompt**, pinned above the composer, with
