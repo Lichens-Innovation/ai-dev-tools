@@ -50,6 +50,16 @@ sent. `PermissionPrompt` likewise gained a `grants` field and `SessionEvent` gai
 transcript entry. If a question needs a field of its own, add it beside these; do not widen an
 existing one to mean two things.
 
+**`022` extended the same three surfaces again, which settles the precedent rather than changing
+it.** `SessionEvent` gained `{ kind: "context", title, text }` — a collapsible transcript entry, so
+the union now carries both kinds of member and `session-context.tsx` routes on `kind` rather than on
+a convention; its `scope` member gained `writable` and `writes`, and `SessionInfo` gained
+`writes: SessionWrite[]` (with `writable` derived from it) alongside `grants`. A question is still
+another pending item on `pending`/`outcomes`, not a parallel set of state. Note also that the pane's
+write scope is **no longer always empty** — a create-\* handoff opens exactly one directory — so a
+prompt body that says "this session may write nothing" is wrong on the handoff path;
+`decidePaneCall` already writes two different reasons for those two states.
+
 Previews are opt-in: without declaring the preview format at session start, no previews are emitted
 at all and the option list arrives bare.
 

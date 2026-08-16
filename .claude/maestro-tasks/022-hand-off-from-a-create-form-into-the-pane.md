@@ -119,14 +119,75 @@ sentence stops being checkable.
 
 ## Acceptance criteria
 
-- [ ] A create-\* submit can hand off into the pane, and still shows its confirmation first, with the artifact already on disk
-- [ ] The handoff adds exactly one directory to the write scope, announced in the transcript and listed in the header
-- [ ] A second submit grows the scope by one more; nothing else in the app can add to it
-- [ ] The seeded context does not trigger a model turn and costs nothing until the user types
-- [ ] The model does not re-ask for fields the form already captured
-- [ ] A write inside the granted directory succeeds **without** raising a prompt; a write outside every granted directory still raises `020`'s prompt, and allowing it once does not grow the scope
-- [ ] The existing headless finish still works and produces the same artifacts
-- [ ] Switching projects clears the accumulated write scope along with the session
+Settled in a real window over three probe passes — 13 mechanics assertions, 11 against a live
+model, 6 against the headless path — plus 443 unit tests. Each item says how, because two of them
+are about something that must NOT happen and saying "verified" about an absence is worth spelling
+out.
+
+- [x] A create-\* submit can hand off into the pane, and still shows its confirmation first, with the
+      artifact already on disk — **verified live.** The form was driven in the packaged build; at
+      the moment the confirmation appeared, `SKILL.md` existed with the frontmatter the live preview
+      had shown. The dialog now offers two buttons over the same single-use token: **Run** and
+      **Continue in the pane**, with the directory the second one would open rendered beside them.
+- [x] The handoff adds exactly one directory to the write scope, announced in the transcript and
+      listed in the header — **verified live.** One `notice` naming the directory and the form that
+      opened it, and one entry in the pane's scope panel (`data-count="1"`), which `main` and the
+      renderer both derive from the same list.
+- [x] A second submit grows the scope by one more; nothing else in the app can add to it — **verified
+      live.** Two submits → two entries. A `maestro-task` preview carries `handoff: null` and
+      `session:handoff` refuses its token outright (its write target is the whole project); a
+      replayed token is refused by `claimInvocation`; and the wire carries no path at all.
+- [x] The seeded context does not trigger a model turn and costs nothing until the user types —
+      **verified live, and it needed a fix.** The session's own event stream after a handoff is
+      `context`, `notice`, `scope` and nothing else. It was `context, notice, scope, turn` first
+      time: a `shouldQuery: false` append is answered with its own `result` message
+      (`total_cost_usd: 0`, no assistant text), which was being reported as a turn — claiming
+      something ran, and clearing the renderer's `busy`. `startPaneSession` now counts outstanding
+      user turns and drops a zero-cost result that answers none of them.
+- [x] The model does not re-ask for fields the form already captured — **verified live**, and more
+      strongly than expected: told to "go ahead", the session read the seeded frontmatter, rewrote
+      the body (304 → 2 989 bytes) and left the `description:` the user approved byte-identical. In
+      an earlier probe it also rejected an instruction of the probe's own as an injection against
+      the seeded task, which is the seed carrying real weight rather than decorating the transcript.
+- [x] A write inside the granted directory succeeds **without** raising a prompt; a write outside
+      every granted directory still raises `020`'s prompt, and allowing it once does not grow the
+      scope — **verified live, and this one also needed a fix.** Inside: `Edit` on the skill body,
+      no `permission` event, no refusal. Outside: `Write` on the project's `README.md` raised the
+      prompt with the path, no grant button, and a reason naming the scope that exists rather than
+      `020`'s "nothing has given this session write access"; Deny left no file, Allow-once wrote it
+      and left the scope at one entry. The fix was the SEED'S WORDING — it first said writes outside
+      were "refused, or come back to the user as a question", and the session declined to attempt
+      one at all, explaining it could not bypass the app's boundary. That silently deletes `020`, so
+      the seed now says plainly that a write elsewhere asks and can be allowed.
+- [x] The existing headless finish still works and produces the same artifacts — **verified live.**
+      Same form, **Run** instead: outcome `ok` in 26.7s, body written, frontmatter untouched, and no
+      session started and no write scope granted by any of it.
+- [x] Switching projects clears the accumulated write scope along with the session — **verified
+      live.** After a switch: `id: null`, `writable: []`, `writes: 0`. There is no revoke for a
+      write scope entry and none is owed — a grant answers a question the session asked, a write
+      scope entry answers a form the user submitted, and ending the session is how it is withdrawn.
+
+## What diverged from the plan
+
+Four things, each recorded because a later task builds on this surface.
+
+- **The channel is `session:handoff`, taking a preview TOKEN**, which is the shape the plan asked
+  for ("pass a completed preview token, never a resolved path") made literal. `HandoffContext` rides
+  on `ClaudeInvocation` beside `writable`, built by `claude-preview.ts` from the same
+  `resolveCreateTarget` the scaffold wrote with.
+- **The scope entry is the artifact's own directory, except where the artifact owns none.**
+  `CreateTarget` gained `dir`, and it is `""` for a project-target subagent — one `.md` file inside
+  `.claude/agents/`, a directory it shares with every other agent in the project. That case grants
+  the FILE. Every other shape grants a directory, so "exactly one directory" holds wherever there is
+  one to grant.
+- **Anything writable is also readable.** `readable()` in `startPaneSession` includes the write
+  scope, and the disclosure lists a handed-off directory as `origin: "app"` only when nothing
+  already in scope contains it. A session that may write a file it may not read is asked about the
+  read half of every edit, which is the prompt this slice exists to remove.
+- **Telling the CLI about the directory is LAZY, because the SDK has no control request for it.**
+  `updatedPermissions` rides on a permission answer and nowhere else, and a handoff has no answer to
+  ride on. `startPaneSession` therefore carries the `addDirectories` update on the first allow that
+  lands inside a newly-opened directory (`unannounced`), once, with `destination: "session"`.
 
 ## Blocked by
 

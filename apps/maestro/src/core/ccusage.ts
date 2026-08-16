@@ -203,6 +203,9 @@ export function previewUsageStats(
     prompt: "",
     // A reader, not an author. The field is on every invocation so no run path can forget to say.
     writable: [],
+    // Nor is there a conversation to continue this in: `session:handoff` refuses a token whose
+    // invocation names no artifact, so a stats preview cannot open a directory in the pane.
+    handoff: null,
   });
 
   return {

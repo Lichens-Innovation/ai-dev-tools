@@ -5,6 +5,55 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — finish a create-\* artifact in the pane instead of watching a run
+
+- **The confirmation now offers two buttons over one single-use token.** **Run** is the headless
+  finish, unchanged; **Continue in the pane** spends the same token on `session:handoff`, with the
+  directory it would open rendered beside it. The scaffold still runs first and the artifact is still
+  on disk before Claude is mentioned.
+- **This is the only thing in the app that can grow a session's write scope**, and it takes a
+  **preview token and nothing else** — the discipline `claude:run` already had, applied to paths.
+  Main claims the token, refuses any preview whose `handoff` is null (a `maestro-task`'s write target
+  is the whole project), and appends exactly one path: the artifact's own directory, or the artifact
+  **file** where it has none of its own (a project-target subagent shares `.claude/agents/`). Two
+  submits, two entries; a replayed token is refused; no path crosses the wire.
+- **A write inside that directory stops asking; everything else still does.** `020`'s prompt is
+  unchanged and `grantable` is still false for every write — but the refusal reason now has two
+  forms, so a session that was handed a directory is told which scope it just reached outside of
+  rather than being told nothing was ever granted.
+- **The conversation is seeded without spending a turn.** The `HandoffContext` — the artifact, the
+  frontmatter or directory listing read off disk, `016`'s repository state, and the previewed prompt
+  verbatim — is appended with `shouldQuery: false` and shown as a collapsible `{ kind: "context" }`
+  transcript entry. The user's first typed message is the first thing that costs anything, and the
+  model does not re-ask for the name the form captured.
+- **Two things were learned in a real window and could not have been caught by a test.** A
+  `shouldQuery: false` append is answered by its own zero-cost `result` message, which must not be
+  reported as a turn (it clears the renderer's `busy` and takes the Stop button off a live turn); and
+  seed wording that describes the boundary as absolute makes the model decline to attempt an outside
+  write at all — silently deleting `020`'s "you can allow this once" — so the seed says plainly that
+  such a write asks and can be allowed.
+- **Anything writable is also readable.** `readable()` includes the write scope, or the read half of
+  every edit raises a prompt; the disclosure lists a handed-off directory only when nothing already
+  in scope contains it. Telling the CLI about the directory is lazy — `updatedPermissions` rides on a
+  permission answer and a handoff has none, so `addDirectories` (`destination: "session"`) is carried
+  on the first allow that lands inside a newly-opened directory.
+- **The write scope is visible and deliberately not revocable.** A `WriteScope` panel sits beside the
+  grants in the pane header, each entry naming the form that opened it and carrying no Revoke button:
+  a grant answers a question the session asked, a write scope entry answers a form the user submitted,
+  and ending the session — which a project switch does — is how it is withdrawn.
+- New core module `session-handoff.ts` (pure: `handoffSeed`, `handoffNotice`, `handoffTitle`,
+  `writeScopeNote`). New contracts `HandoffContext` and `SessionWrite`; `ClaudePreview.handoff`,
+  `ClaudeInvocation.handoff`, `SessionInfo.writes` (with `writable` derived from it), `SessionEvent`
+  gained `{ kind: "context" }` and its `scope` member gained `writable`/`writes`; `CreateTarget`
+  gained `dir`. New IPC `session:handoff` / `MaestroApi.session.handoff(token)`. `startPaneSession`
+  gained `seed`, `allowWrites` and `writable()` — a function, never a captured array, for the reason
+  `023` established for `readable()`.
+- Tests: the isolation block _"gives the pane an empty write scope with no channel that could widen
+  it"_ was **replaced** by "grows the pane's write scope only from a claimed preview token, and never
+  from the renderer", plus a new block "seeds a handoff's context without spending a turn, and says so
+  in the transcript" — **443 tests**. Verified in a real Electron window over three probe passes: 13
+  mechanics assertions, 11 against a live model, 6 against the headless path.
+
 ### maestro — a directory you can authorise for the session, and take back
 
 - **The prompt gained its missing button.** `020` routed an out-of-scope read into a prompt with

@@ -588,7 +588,8 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
    machine-wide managed-settings tier survives, and writing one needs root), so it is covered by unit
    tests over the pure `autoRefusal` plus an isolation pin, and that is the whole of it.
 6. A create-\* handoff still shows the confirmation dialog before its first turn, and the artifact is
-   on disk before the pane opens. — **`022`**
+   on disk before the pane opens. — **`022`**, verified live: the dialog appeared with `SKILL.md`
+   already written, and **Continue in the pane** is a second button on the same single-use token.
 7. `test/isolation.test.ts` fails if the preload gains a raw `updatedInput` or `updatedPermissions`,
    a generic invoke, or a `session:say` call site whose payload is not a user input value.
    — **`019`** + **`020`**, and **widened by `023`**: the same block now also fails if the grant arm
@@ -618,9 +619,9 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
 - [x] Permission requests render per-tool (path + diff, full URL) and are answerable (`020`)
 - [ ] `AskUserQuestion` renders as a structured choice, answered by validated selection — `021`;
       the tool is still not in `PANE_TOOLS`
-- [ ] Read scope is disclosed before a session starts; write scope starts empty and grows only per submit
-      — disclosed and empty since `019`, and `023` made the READ half mutable mid-session; the
-      per-submit write growth is still `022`
+- [x] Read scope is disclosed before a session starts; write scope starts empty and grows only per submit
+      — disclosed and empty since `019`, `023` made the READ half mutable mid-session, and `022`
+      closed the write half: one directory per claimed preview token, and nothing else in the app
 - [x] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
       (`019` built it as a deny, `020` routed it to `"ask"`) — with one surviving deny, for the call
       that names no path and therefore has nothing for a person to authorise
@@ -633,8 +634,9 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
 - [ ] A per-session budget ceiling is enforced, surfaced, and continuable — `024`
 - [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`
 - [ ] `test/isolation.test.ts` pins the invariant properties above — partially; `019` added the
-      **"the session pane"** describe, `020` added three blocks to it and `023` widened one of those
-      and added two more
+      **"the session pane"** describe, `020` added three blocks to it, `023` widened one of those
+      and added two more, and `022` replaced the empty-write-scope block with one that pins how the
+      scope grows and added a block for the no-turn seed
 
 ## Drift log — where the build left the plan
 
@@ -661,10 +663,10 @@ tool call has to render pinned above the composer and a separate file for one ca
 `session:answer`, `session:message`, `session:ask` and `session:ended`. What shipped is
 `session:permission` for the answer, `session:event` for **everything** streamed back (a discriminated
 `SessionEvent` union — `assistant`, `tool`, `refusal`, `permission`, `permission-resolved`, `scope`,
-`notice`, `turn`, `ended`), and no `session:answer` at all yet. `021` owns that last one and should
+`context`, `notice`, `turn`, `ended`), and no `session:answer` at all yet. `021` owns that last one and should
 decide whether an `AskUserQuestion` answer is a sixth channel or a second arm of `session:permission`,
-now that `023` has demonstrated the arm-extension pattern. `023` added `session:revoke`, which the
-plan did not anticipate at all.
+now that `023` has demonstrated the arm-extension pattern. `023` added `session:revoke` and `022`
+added `session:handoff`, neither of which the plan anticipated at all.
 
 ### `020` — permission prompts in the pane
 
@@ -753,3 +755,49 @@ promised is true; the mechanism is bigger than the paragraph.
   out of scope, and — the criterion this whole design exists for — **every settings file on disk
   byte-identical before and after**, with `~/.claude.json` gaining no permission-shaped key and never
   naming the granted path.
+
+### `022` — hand off from a create-form into the pane
+
+The last of the pane's fixed scopes. The plan's "a submitted form adds one directory, and nothing
+else can" is what shipped; four things about how are not on the page above.
+
+- **The channel is `session:handoff` and it carries a preview TOKEN.** The plan said "pass a
+  completed preview token, never a resolved path" and left the entry point unnamed. `HandoffContext`
+  rides on `ClaudeInvocation` beside `writable`, built by `claude-preview.ts` from the same
+  `resolveCreateTarget` the scaffold wrote with, and main claims the token through
+  `claimInvocation(token, "claude")`. A `maestro-task` preview carries `handoff: null` and the
+  channel refuses it outright — its write target is the whole project.
+- **The scope entry is the artifact's own directory, except where the artifact owns none.**
+  `CreateTarget` gained `dir`, which is `""` for a project-target subagent — one `.md` inside
+  `.claude/agents/`, shared with every other agent in the project. That case grants the FILE, so
+  "exactly one directory" holds wherever there is one to grant.
+- **Anything writable is also readable.** `readable()` in `startPaneSession` includes the write
+  scope, and `describeSession` lists a handed-off directory as `origin: "app"` only when nothing
+  already in scope contains it. A session that may write a file it may not read is asked about the
+  read half of every edit — the prompt this slice exists to remove.
+- **Telling the CLI about the directory is LAZY, because the SDK has no control request for it.**
+  `updatedPermissions` rides on a permission answer and a handoff has no answer to ride on, so the
+  `addDirectories` (`destination: "session"`) is carried on the first allow that lands inside a
+  newly-opened directory, once.
+- **`023`'s function-not-array lesson transferred exactly as it predicted.** `writable()` replaced
+  the `writable: []` literal in `canUseTool` and is read fresh per call; `allowWrites(paths)` is its
+  only writer.
+- **Two things were only learnable in a real window, and one of them silently deleted `020`.**
+  A `shouldQuery: false` append is answered with its **own** zero-cost `result` message, which was
+  being reported as a `turn` — claiming something ran and clearing the renderer's `busy`;
+  `startPaneSession` now counts outstanding user turns and drops a zero-cost result that answers
+  none. And the seed's **wording** decides whether the boundary is usable at all: told that writes
+  outside the scope were "refused, or come back to the user as a question", the session declined to
+  attempt one and explained it could not bypass the app's boundary — so the user never got the
+  prompt `020` built. The seed now says plainly that a write elsewhere asks and can be allowed.
+- **The write scope has no Revoke and is not owed one.** A grant answers a question the session
+  asked and can be taken back because the session can be made to ask again; a write scope entry
+  answers a form the user submitted, and ending the session — which a project switch does — is how
+  it is withdrawn.
+- **Verified live over three probe passes** — 13 mechanics assertions, 11 against a live model, 6
+  against the headless path, plus 443 unit tests: the confirmation still first with the artifact
+  already on disk, one entry per submit and two after two, the post-handoff event stream exactly
+  `context`, `notice`, `scope`, an `Edit` inside the directory raising no prompt, a `Write` on the
+  project's `README.md` raising `020`'s prompt with no grant button and leaving the scope at one
+  entry when allowed, the headless **Run** path unchanged (`ok` in 26.7s, no session, no scope), and
+  a project switch clearing it to `writable: []`.

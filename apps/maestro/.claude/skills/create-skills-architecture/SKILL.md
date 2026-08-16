@@ -42,12 +42,16 @@ utils/create-flow.tsx  — the submit path all four routes share
                   run can READ; returns a TOKEN. Async. Spawns nothing.
               ClaudeRunDialog shows what it can read, then the full prompt,
                 the EQUIVALENT command line, cwd, targets
-                → Copy prompt / Cancel / Run
+                → Copy prompt / Cancel / Run / Continue in the pane
               window.maestro.claude.run(token)            IPC `claude:run`
                 → starts an Agent SDK session over that invocation and streams it;
                   `canUseTool` allows writes to `targets` and denies everything
                   else with a reason; no shell, no subagents
                 → `claude:cancel` closes the query, then kills the process group
+              window.maestro.session.handoff(token)       IPC `session:handoff`
+                → the SAME single-use token, spent on the session pane instead:
+                  opens the artifact's own directory for writing, seeds what was
+                  scaffolded without spending a turn, and the user drives it
         │
         ▼
 The headless run reads plugins/ai-tools-manager/skills/create-<name>/SKILL.md
@@ -59,6 +63,16 @@ cancelling the confirmation — or having no CLI installed at all — still leav
 thing they asked for. `needsModel` decides whether the dialog opens by itself: an auto-mode body or
 a brand-new marketplace's docs need one; a manual-mode skeleton and a plugin manifest are complete
 as written. **Finish with Claude** on the result card stays available either way.
+
+**Two buttons spend the same token, and only one of them widens anything** (`022`). **Run** is the
+headless finish above. **Continue in the pane** calls `session:handoff` with the token and nothing
+else: main claims it, reads `ClaudePreview.handoff` (a `HandoffContext` — kind, name, artifact,
+`writeScope`, `scope`, the frontmatter or directory listing read off disk, and `016`'s repository
+state), adds that **one** path to the pane session's write scope, and seeds the context with
+`shouldQuery: false` so nothing is spent until the user types. `handoff` is `null` for a
+`maestro-task` preview and the channel refuses such a token — a task's write target is the whole
+project. The scope entry is the artifact's own directory (`CreateTarget.dir`), or the artifact FILE
+where `dir` is `""` — a project-target subagent shares `.claude/agents/` with every other agent.
 
 There is no hook in this path, no result file, and no blocking wait. `/create-skill` typed into a
 session is a different thing entirely: the skill prompt with no payload and nothing pre-scaffolded,
@@ -75,9 +89,10 @@ Renderer paths are relative to `apps/maestro/`.
 | The scaffold → preview → dialog path, shared by all four                             | `src/renderer/src/utils/create-flow.tsx`                                                                         |
 | What landed on disk, plus **Finish with Claude**                                     | `src/renderer/src/components/create-result.tsx`                                                                  |
 | The confirmation: read scope, prompt, equivalent argv, cwd, targets, streamed output | `src/renderer/src/components/claude-run-dialog.tsx`                                                              |
+| **Continue in the pane**: what a handoff says to the session (seed, notice, title)   | `session-handoff.ts` in `apps/maestro/src/core/` (pure), spent by `src/main/claude-session.ts`                   |
 | "What it can read" — ONE component, both confirmations                               | `src/renderer/src/components/read-scope.tsx`                                                                     |
 | Live file preview components                                                         | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
-| The typed channel contract                                                           | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`)       |
+| The typed channel contract                                                           | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview\|run\|cancel`, `session:handoff`)      |
 | Main-process handlers                                                                | `src/main/ipc.ts`                                                                                                |
 | **Deterministic scaffold** + `resolveCreateTarget`                                   | `scaffold.ts` in `apps/maestro/src/core/`                                                                        |
 | Making a new marketplace a repository, via `execFile`                                | `git.ts` in `apps/maestro/src/core/` (a `GitPort`, injected)                                                     |

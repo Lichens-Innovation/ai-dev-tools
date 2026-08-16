@@ -77,6 +77,12 @@ const api: MaestroApi = {
     // No argument: the project comes from main's own state, exactly as `claude:preview` takes its
     // cwd from there. A renderer cannot start a session against a directory of its choosing.
     start: () => ipcRenderer.invoke(IPC.sessionStart),
+    // THE TOKEN AND NOTHING ELSE, exactly as on `claude:run` above, and here it is the write scope
+    // rather than the prompt that rides on it: the invocation main recorded names the artifact its
+    // own resolution chose, so whatever this renderer believes it is handing over, what the session
+    // is given is the directory the confirmation displayed. An extra argument here — a path, a name,
+    // a "cwd" — is the whole hole, and it is the only hole this channel could have.
+    handoff: (token) => ipcRenderer.invoke(IPC.sessionHandoff, token),
     info: () => ipcRenderer.invoke(IPC.sessionInfo),
     // The session id and the USER'S TEXT. Nothing else crosses — no system prompt, no history, no
     // tool list, no directory. Main stamps the turn as human-authored; a preload that let the

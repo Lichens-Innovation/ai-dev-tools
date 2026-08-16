@@ -77,6 +77,24 @@ describe("what a person is asked about", () => {
     expect(verdict).toEqual({ outcome: "settled", decision: { behavior: "allow" } });
   });
 
+  it("describes a write scope that EXISTS rather than one that was never given", () => {
+    // `022` made the scope non-empty, which gave this branch a second state to describe. Telling a
+    // user "nothing has given this session write access" while the pane header lists a directory it
+    // may write is the kind of wrong that teaches people to stop reading prompts.
+    const scope = `${marketplace}/plugins/p/skills/a`;
+    const verdict = decide("Write", { file_path: `${marketplace}/README.md`, content: "x" }, [scope]);
+    expect(verdict.outcome).toBe("ask");
+    if (verdict.outcome !== "ask") return;
+    expect(verdict.reason).toContain(`${marketplace}/README.md`);
+    expect(verdict.reason).toContain(scope);
+    expect(verdict.reason).toContain("adds nothing to the list");
+    expect(verdict.reason, "still claiming nothing was ever given").not.toContain("Nothing has given");
+    // The model's sentence is still `decideWrite`'s, and it names what may be written.
+    expect(verdict.denyReason).toContain(scope);
+    // And allowing it is still a one-call answer: nothing here reports a wider scope back.
+    expect(verdict.grantable).toBe(false);
+  });
+
   it("REFUSES a tool the session never offered rather than offering it as a button", () => {
     // The line that keeps a permission prompt from becoming a hole with a dialog on it. "May I use
     // Bash" is not a question for a dialog box: the tool is absent from the session's context on
@@ -225,8 +243,9 @@ describe("which prompts may offer a session grant", () => {
   });
 
   it("NEVER offers one on a write, however far outside the scope it is", () => {
-    // Widening writes is `022`'s. A grant button here would widen READS from a write prompt, which
-    // is both the wrong surface and the one the user did not think they were answering about.
+    // Widening writes is the create-* handoff's, and `022` built that WITHOUT touching this: a
+    // grant button here would widen READS from a write prompt, which is both the wrong surface and
+    // the one the user did not think they were answering about.
     for (const tool of ["Write", "Edit", "MultiEdit"]) {
       const verdict = decide(tool, { file_path: outside, content: "x", new_string: "x" });
       expect(verdict.outcome).toBe("ask");

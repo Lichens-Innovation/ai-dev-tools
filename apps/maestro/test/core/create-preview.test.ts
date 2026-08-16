@@ -23,7 +23,7 @@ import path from "node:path";
 import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../../src/core/claude-preview.js";
 import { scaffoldCreate } from "../../src/core/scaffold.js";
 import { nodeGit } from "../../src/core/git.js";
-import { clearInvocations } from "../../src/core/claude-tokens.js";
+import { claimInvocation, clearInvocations } from "../../src/core/claude-tokens.js";
 import type { CreateRequest, EffectiveSettingsSnapshot, SettingsPort } from "../../src/core/contracts.js";
 
 let tmp: string;
@@ -152,6 +152,96 @@ describe("where the run happens", () => {
     const priv = await previewClaudeRun(project, { ...marketplaceRequest(targetDir), privateRepo: true }, opts());
     expect(plain.prompt).not.toMatch(/GITHUB_TOKEN/);
     expect(priv.prompt).toMatch(/GITHUB_TOKEN/);
+  });
+});
+
+describe("what continuing in the pane would open", () => {
+  // The write scope the session pane accumulates comes from here and from nowhere else, so the
+  // resolution is the whole security surface of the handoff: whatever this returns is what a
+  // session may write for as long as it lasts. Two failures matter and neither is visible on
+  // screen — a scope wider than the artifact (the session gets somebody else's files) and a scope
+  // that is not on the token at all (the renderer would have to name one).
+
+  it("is the artifact's OWN directory, for an artifact the scaffold made one for", async () => {
+    const written = scaffoldCreate(project, skill, { home });
+    const preview = await previewClaudeRun(project, skill, opts());
+
+    expect(preview.handoff).not.toBeNull();
+    expect(preview.handoff!.scope).toBe("directory");
+    expect(preview.handoff!.writeScope).toBe(path.dirname(written.path));
+    expect(preview.handoff!.artifact).toBe(written.path);
+    // Narrower than the marketplace it sits in and narrower than the plugin: the form was about one
+    // skill, and the directory the scaffold made for it is the whole of what it asked for.
+    expect(preview.handoff!.writeScope.startsWith(path.join(market, "plugins", "toolkit", "skills"))).toBe(true);
+    expect(preview.handoff!.writeScope).not.toBe(market);
+  });
+
+  it("is the FILE, for a project subagent, which owns no directory", async () => {
+    // `.claude/agents/` holds every agent the project has. Opening it because a form created one of
+    // them would hand the session the rest, which no form asked for — so the lone file is the scope.
+    const request: CreateRequest = {
+      kind: "create-subagent",
+      mode: "auto",
+      target: "project",
+      name: "reviewer",
+      idea: "Reviews pull requests.",
+      description: "",
+      triggers: ["a PR opens"],
+      tools: [],
+      marketplace: "",
+      plugin: "",
+    };
+    const written = scaffoldCreate(project, request, { home });
+    const preview = await previewClaudeRun(project, request, opts());
+
+    expect(preview.handoff!.scope).toBe("file");
+    expect(preview.handoff!.writeScope).toBe(written.path);
+    expect(preview.handoff!.writeScope).not.toBe(path.join(project, ".claude", "agents"));
+  });
+
+  it("carries the frontmatter the scaffold wrote, read back off the disk", async () => {
+    // Read here rather than taken from a `ScaffoldResult`: the renderer holds one of those, and a
+    // seed that trusted it would be the renderer describing what a session may write.
+    scaffoldCreate(project, skill, { home });
+    const preview = await previewClaudeRun(project, skill, opts());
+    expect(preview.handoff!.state).toContain("name: migration-reviewer");
+    expect(preview.handoff!.state.startsWith("---")).toBe(true);
+  });
+
+  it("reports the repository state, so a session does not offer to init one that exists", async () => {
+    fs.mkdirSync(path.join(market, ".git"), { recursive: true });
+    scaffoldCreate(project, skill, { home });
+    const preview = await previewClaudeRun(project, skill, opts());
+    expect(preview.handoff!.repo).toContain(market);
+    expect(preview.handoff!.repo).toContain("do not run git init");
+  });
+
+  it("rides on the invocation, not just on the preview the renderer sees", async () => {
+    // `session:handoff` takes a token and nothing else. The directory therefore has to be on the
+    // invocation this process recorded, or the channel would need an argument naming one.
+    scaffoldCreate(project, skill, { home });
+    const preview = await previewClaudeRun(project, skill, opts());
+    const invocation = claimInvocation(preview.token, "claude");
+    expect(invocation.handoff).toEqual(preview.handoff);
+  });
+
+  it("is resolved for all four forms", async () => {
+    for (const request of allFour()) {
+      const preview = await previewClaudeRun(project, request, opts());
+      expect(preview.handoff, request.kind).not.toBeNull();
+      expect(path.isAbsolute(preview.handoff!.writeScope), request.kind).toBe(true);
+    }
+  });
+
+  it("is NULL for a task run, whose write target is the whole project", async () => {
+    // The one preview kind that must never be continuable in the pane: a task decides for itself
+    // what it edits, so its `writable` is the project root, and one click would swallow it.
+    const tasks = path.join(project, ".claude", "maestro-tasks");
+    fs.mkdirSync(tasks, { recursive: true });
+    fs.writeFileSync(path.join(tasks, "001-a-task.md"), "# A task\n");
+    const preview = await previewClaudeRun(project, { kind: "maestro-task", filename: "001-a-task.md" }, opts());
+    expect(preview.handoff).toBeNull();
+    expect(claimInvocation(preview.token, "claude").handoff).toBeNull();
   });
 });
 

@@ -34,6 +34,7 @@ export type TranscriptEntry =
   | Extract<SessionEvent, { kind: "tool" }>
   | Extract<SessionEvent, { kind: "refusal" }>
   | Extract<SessionEvent, { kind: "permission" }>
+  | Extract<SessionEvent, { kind: "context" }>
   | Extract<SessionEvent, { kind: "notice" }>
   | Extract<SessionEvent, { kind: "turn" }>
   | Extract<SessionEvent, { kind: "ended" }>;
@@ -65,6 +66,15 @@ interface SessionContextValue {
   error: string | null;
   /** Start a session against the open project. Nothing starts implicitly — the user asks. */
   start(): Promise<void>;
+  /**
+   * Continue a create-\* form's work in the pane, with the token its confirmation was built from.
+   *
+   * The only call in this module that widens anything, and it names nothing: a token crosses, and
+   * main resolves the artifact, the directory and the seeded context from the preview it recorded.
+   * Starts a session if there is none, and opens the pane, because a handoff whose result is
+   * invisible is a scope that grew where the user was not looking.
+   */
+  handoff(token: string): Promise<boolean>;
   /** Send one turn, exactly as typed. Starts a session first if there is none. */
   say(text: string): Promise<void>;
   /** Answer one parked request. A choice crosses the wire; main builds the permission result. */
@@ -126,10 +136,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       if (event.kind === "scope") {
         // NOT A TRANSCRIPT ENTRY: it is the header's answer changing underneath it. The read scope
-        // became mutable the moment a grant existed, and the disclosure has to follow the boundary
-        // or the pane goes on describing a session that no longer exists. Main re-derives both from
-        // one place; this only records what it sent.
-        setInfo((prev) => (prev ? { ...prev, read: event.read, grants: event.grants } : prev));
+        // became mutable the moment a grant existed, and the WRITE scope the moment a form could be
+        // handed off; both have to follow the boundary or the pane goes on describing a session that
+        // no longer exists. Main re-derives all of it from one place; this only records what it sent.
+        setInfo((prev) =>
+          prev
+            ? { ...prev, read: event.read, grants: event.grants, writable: event.writable, writes: event.writes }
+            : prev
+        );
         return;
       }
       append(event);
@@ -192,6 +206,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setStarting(false);
     }
   }, [projectRoot, starting]);
+
+  /**
+   * Continue a create-\* form's work here.
+   *
+   * The pane is opened FIRST and unconditionally: this is the app's one path to a wider write
+   * scope, and a widening the user cannot see is not one they agreed to. The rest is main's — the
+   * session it starts or reuses, the directory it opens, the context it seeds — and all this
+   * records is the `SessionInfo` that came back, which already describes every one of those.
+   */
+  const handoff = useCallback(async (token: string) => {
+    setOpen(true);
+    setError(null);
+    const res = await callMain(() => window.maestro.session.handoff(token));
+    if (!res.ok) {
+      setError(res.error);
+      return false;
+    }
+    setInfo(res.value);
+    sessionId.current = res.value.id;
+    setLive(res.value.id !== null);
+    if (res.value.id === null) setError(res.value.unavailable);
+    return res.value.id !== null;
+  }, []);
 
   const say = useCallback(
     async (text: string) => {
@@ -277,13 +314,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       starting,
       error,
       start,
+      handoff,
       say,
       answer,
       revoke,
       stop,
       end,
     }),
-    [answer, busy, end, entries, error, info, live, open, outcomes, pending, revoke, say, start, starting, stop, width]
+    [
+      answer,
+      busy,
+      end,
+      entries,
+      error,
+      handoff,
+      info,
+      live,
+      open,
+      outcomes,
+      pending,
+      revoke,
+      say,
+      start,
+      starting,
+      stop,
+      width,
+    ]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

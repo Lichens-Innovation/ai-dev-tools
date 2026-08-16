@@ -635,26 +635,77 @@ describe("the session pane", () => {
     expect(stripComments(read("src/renderer/src/components/session-pane.tsx"))).not.toMatch(/window\.maestro/);
   });
 
-  it("gives the pane an empty write scope with no channel that could widen it", () => {
-    // The pane's write scope is empty and only `022` may add to it. Two properties, both of which
-    // fail silently: the decision is the same engine the form path uses (a second one would drift),
-    // and it is handed a literal empty list rather than anything a caller supplied.
-    //
-    // `020` moved the CALL rather than the property. `decidePaneCall` composes `decideWrite` and
-    // `decideBoundary` and adds the third answer neither can give — "ask a person" — so the pane
-    // passes the empty list to that, and the write decision itself still comes from `write-scope.ts`.
+  it("grows the pane's write scope only from a claimed preview token, and never from the renderer", () => {
+    // `022` REPLACED THE LITERAL, NOT THE PROPERTY. The pane's write scope used to be `writable: []`
+    // at the call site — unwidenable because there was nothing to widen it with. It is a function
+    // now, for the reason `023` made `readable()` one: a form submitted mid-session has to reach the
+    // live callback rather than the list that existed when the pane opened. What replaces the
+    // literal's guarantee is the SOURCE of that list, and every assertion here is one hop of it.
     const sdk = stripComments(read("src/core/agent-sdk.ts"));
     const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
-    expect(pane).toMatch(/decidePaneCall\(\{\s*tool,\s*input,\s*writable:\s*\[\],/);
+
+    // Still one engine, still handed the scope rather than deciding it.
+    expect(pane).toMatch(/decidePaneCall\(\{\s*tool,\s*input,\s*writable:\s*writable\(\),/);
     expect(stripComments(read("src/core/session-permission.ts"))).toMatch(
       /decideWrite\(\{ tool, input, writable, cwd \}\)/
     );
     expect(pane, "the pane grew its own permission engine").not.toMatch(/behavior:\s*"deny"/);
+    // Read fresh per call. A captured copy is the `023` failure applied to writes: the header and
+    // the boundary go on answering different questions and nothing fails.
+    expect(pane).toMatch(/const writable = \(\): string\[\] => \[\.\.\.writes\]/);
 
-    // Nothing on the wire names a writable path, so `022` has to add a channel rather than a field.
-    const shared = read("src/shared/ipc.ts");
-    const session = shared.slice(shared.indexOf("  session: {"), shared.indexOf("  stats: {"));
-    expect(session).not.toMatch(/writable|writeable|addDirector/i);
+    // The accumulator has exactly one entry point, and it is not reachable from the renderer.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    const callers = sourcesUnder("src")
+      .filter((f) => /\.allowWrites\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(callers).toEqual(["src/main/claude-session.ts"]);
+    // …and that caller reaches it only after claiming a token, which is what makes the directory
+    // the one the confirmation displayed rather than one a caller chose.
+    const handoff = session.slice(session.indexOf("export async function handoffToSession"));
+    expect(handoff).toMatch(/claimInvocation\(token, "claude"\)/);
+    expect(handoff).toMatch(/allowWrites\(\[handoff\.writeScope\]\)/);
+    expect(handoff, "a preview with no artifact must not open anything").toMatch(/if \(!handoff\)/);
+
+    // Nothing on the wire names a writable path: the handoff channel carries a TOKEN, exactly as
+    // `claude:run` does, so a renderer can no more nominate a directory than it can a prompt.
+    // Comments stripped first: the channel is now DOCUMENTED as the one that widens the write
+    // scope, and the property being pinned is the shape of the wire, not the absence of the word.
+    const shared = stripComments(read("src/shared/ipc.ts"));
+    const api = shared.slice(shared.indexOf("  session: {"), shared.indexOf("  stats: {"));
+    expect(api).toMatch(/handoff\(token: string\)/);
+    expect(api).not.toMatch(/writable|writeable|addDirector/i);
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.sessionHandoff, token\)/);
+    expect(preload, "the renderer picks what the session may write").not.toMatch(/sessionHandoff,\s*token,/);
+  });
+
+  it("seeds a handoff's context without spending a turn, and says so in the transcript", () => {
+    // THE WHOLE POINT OF THE SEED IS WHAT IT DOES NOT DO. `shouldQuery: false` appends the context
+    // and starts nothing; drop it and every create-* handoff silently spends a model call the user
+    // did not ask for, with nothing on screen distinguishing it from one they did.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/shouldQuery: false/);
+    // And it is NOT stamped as a person's words. `origin: { kind: "human" }` belongs to `say` and to
+    // nothing else — a seeded message wearing it would defeat the one check that makes "the user
+    // writes the prompts" enforceable at the SDK boundary.
+    const context = sdk.slice(sdk.indexOf("function contextTurn"), sdk.indexOf("function contextTurn") + 800);
+    expect(context).not.toMatch(/origin/);
+
+    // AND THE RECEIPT IT PRODUCES IS NOT A TURN. Measured in the window: a `shouldQuery: false`
+    // append is answered with its own `result` message — success, `total_cost_usd: 0`, no assistant
+    // text — and reporting it as a turn both claims something happened and clears the renderer's
+    // `busy`, which can take the Stop button away from a turn that is still running.
+    expect(sdk).toMatch(/if \(awaitingTurns > 0\) awaitingTurns--;/);
+    expect(sdk).toMatch(/else if \(spent === 0 \|\| spent === null\) continue;/);
+
+    // What the model was given is what the transcript shows — one string, built once.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    expect(session).toMatch(/const seed = handoffSeed\(handoff, invocation\.prompt\)/);
+    expect(session).toMatch(/entry\.session\.seed\(seed\)/);
+    expect(session).toMatch(/kind: "context"[\s\S]{0,120}text: seed/);
+    // The addition itself is announced inline, beside it.
+    expect(session).toMatch(/handoffNotice\(handoff\)/);
   });
 
   it("bounds what a live session may READ with a hook, not with the write callback", () => {
