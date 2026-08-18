@@ -111,7 +111,10 @@ const s = await cdp.sampleSummary();
 // s.firstFrameWithNodes, s.distinctViewportTransforms, s.settledViewportTransform
 ```
 
-**Assert a layout is sane** (no stacking, no overlap, all on screen):
+**Assert a layout is sane** (no stacking, no overlap, all on screen). If you are *computing* where
+something on the canvas should go — an edge label anchor, a handle coordinate, a node's extent —
+read `react-flow-canvas-geometry` first; the arithmetic has a trap that a window check will not
+catch on its own:
 
 ```js
 const g = await cdp.geometry();

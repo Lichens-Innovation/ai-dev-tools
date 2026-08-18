@@ -411,11 +411,45 @@ nothing off-origin, and the woff2 files are emitted beside it.
 
 ---
 
-## Still open
-
-### Seeded starter graph: condition labels overlap nodes
+## Seeded starter graph: condition labels overlap nodes — closed
 
 In the starter configuration handed to an unconfigured project, several condition-edge labels
-render on top of the nodes below them. These are the seed's own coordinates in `seed.ts`, not a
-canvas defect — the labels are draggable and carry a `label_offset` once moved. Cosmetic, and
-untouched here because it belongs with M3's repo-detection rework of the seeded chain.
+rendered on top of the nodes below them. These were the seed's own coordinates in `seed.ts`, not a
+canvas defect — the labels are draggable and carry a `label_offset` once moved.
+
+**Fixed in the seed**, in `packages/maestro-core/src/label-layout.ts`. Fixing it once in the canvas
+was considered — a label that auto-avoided node bounds would help every workflow, not only the
+seeded ones — and rejected: it would leave `maestro.json` with no label positions at all, so the
+canvas would have to recompute the avoidance on every open and the file would never say where the
+labels are. The seed decides the geometry, so the seed writes the positions.
+
+Measured in a rendered window before and after:
+
+| | before | after |
+|---|---|---|
+| Labels sitting on a node (`default` / `tdd` / `Tests`) | 6 / 6 / 3 | **0 / 0 / 0** |
+| Labels sitting on another label | — | **0** |
+| Labels outside the canvas | — | **0** |
+
+Also verified in a window for a multi-agent impl chain and for instances carrying enough skills to
+make the cards visibly taller — neither is reachable by simply opening an unconfigured project,
+so both were driven from a seeded fixture written by `defaultV3Config()` itself.
+
+The one thing worth carrying forward: **a node's x extent is exact here, its height is not.** Skill
+chips wrap by text width, so five nodes carrying 1–4 skills measured 78/78/103/129/129px tall
+against the "50 + 30 per skill" rhythm's 80/110/110/170/170. The first cut of this placement
+trusted that model, and the skill-heavy `tdd` variant put "FAIL: a test" 0.4px onto the human-review
+node — passing a unit test that shared the same wrong model, and caught only by the window probe.
+So a label is now placed by *x*, into a vertical lane no node occupies at any height, and the
+height model only has to be good enough to keep two labels apart. `test/label-layout.test.ts` runs
+every variant against four different height models for that reason.
+
+A seeded offset is a starting position, not a lock: dragging a label still overwrites it, and the
+drag still survives a save and reopen. A config that already carries label positions opens and
+round-trips byte-identically — this path only runs when there is no `maestro.json` to read.
+
+---
+
+## Still open
+
+*(nothing outstanding from this review)*
