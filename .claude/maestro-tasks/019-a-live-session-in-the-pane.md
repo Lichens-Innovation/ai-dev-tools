@@ -36,6 +36,12 @@ Structural decisions that are not details:
   merely intended.
 - The read loop ends on the session's own result message, not on the first quiet moment.
 
+The read scope is not a new idea by the time you get here: `017` added `ClaudeReadScope` /
+`ClaudeReadDirectory` / `SettingsPort` to `src/core/contracts.ts`, derived by
+`src/core/read-scope.ts` and rendered by `components/read-scope.tsx`. Extend those shapes for the
+pane rather than inventing a second notion of "what this session can see" — including for the
+header, which needs to show the same thing the confirmation already shows.
+
 Reuse the existing humanizer for rendering tool calls. Do **not** reuse the log view's instance
 segmentation: it reads a hook-written file with different shapes and correlates by agent, and
 forcing a live message stream through it will mislead.

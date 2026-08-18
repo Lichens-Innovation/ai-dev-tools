@@ -44,6 +44,22 @@ A related note for whoever revisits the isolation tests here: the reviewed spawn
 itself with an argument vector — it is **not** a path to Claude, and it must survive this slice. The
 existing comment there about narrowing the `resolveClaudeCli` caller list is about a different list.
 
+Four things `017` left standing here, and one of them is a trap:
+
+- `previewClaudeRun` is already **async** and already takes a `SettingsPort`. Any caller you touch
+  must `await` it.
+- The confirmation already discloses what the run can **read**, resolved from the effective settings
+  cascade for the run's own cwd. `017` made that disclosure honest about *today's* behaviour first
+  on purpose, so this slice's change lands as a visible **narrowing** rather than arriving with it.
+- **If this slice changes what the run is configured with — a narrower `settingSources`, an explicit
+  `additionalDirectories`, a different permission mode — then `resolveEffectiveSettings()` in
+  `src/core/agent-sdk.ts` must change with it.** It currently leaves `settingSources` unset, which
+  loads every tier, because that is what a `claude -p` run gets. Configure the run differently and
+  leave the resolution alone and the disclosure silently becomes a lie: it will keep describing a
+  session that no longer exists, and nothing fails.
+- `agent-sdk.ts` is now user-facing — `nodeSettings()` backs that disclosure — and is still the only
+  module in the app that imports the SDK.
+
 When this lands, edit pre-acceptance exists nowhere in the app.
 
 ## Acceptance criteria

@@ -198,7 +198,7 @@ describe("the token contract", () => {
     const { dir: claudeDir } = fakeBin("claude", "true");
     const { dir: ccusageDir } = fakeBin("ccusage", "true");
 
-    const claudePreview = previewClaudeRun(
+    const claudePreview = await previewClaudeRun(
       project,
       { kind: "maestro-task", filename: "001-a.md" },
       only([claudeDir], home)

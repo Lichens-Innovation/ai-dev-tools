@@ -33,6 +33,12 @@ is close to ceremonial: the model cannot propose a write the user has not alread
 submitting the form. That is intended. The prompts worth the user's attention are the ones for
 anything outside it.
 
+**The read scope has to survive the handoff too.** Since `017` the create confirmation carries a
+`ClaudeReadScope` — the directories the run can read, each with its origin and settings tier — and
+the pane it hands off into must carry that across rather than dropping it. A handoff that moves only
+the write target leaves the user having consented to a read scope the session then never shows them
+again.
+
 The existing headless finish stays available. The two paths differ in who is driving, not in what
 they are allowed to do.
 

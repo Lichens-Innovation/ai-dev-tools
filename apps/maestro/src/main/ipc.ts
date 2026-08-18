@@ -36,6 +36,7 @@ import {
   readDoc,
   docSections,
   previewClaudeRun,
+  nodeSettings,
   runPreviewedClaude,
   cancelClaudeRun,
   disposeClaudeRuns,
@@ -335,10 +336,19 @@ export function registerIpc(): void {
   // token that preview issued and nothing else — there is no argument on this channel by which a
   // renderer could describe a different run, which is why "the only executable prompts are ones
   // the user was shown" is a property of the wiring rather than of the UI behaving itself.
-  ipcMain.handle(IPC.claudePreview, (_e, request: ClaudeRequest): ClaudePreview => {
+  //
+  // `nodeSettings()` is the second capability this file supplies, alongside `nodeGit()` above and
+  // for the same structural reason: resolving the settings cascade lives in the Agent SDK, which
+  // can start processes, and `claude-preview.ts` may import nothing that can. Injected here, the
+  // preview reports what a run will ACTUALLY be able to read — including directories and permission
+  // rules contributed by settings files the app never chose — instead of echoing its own arguments.
+  // Drop this argument and the disclosure does not break: it correctly starts saying the settings
+  // were not consulted, which is a quieter regression than a missing repository, so
+  // `test/isolation.test.ts` pins this line too.
+  ipcMain.handle(IPC.claudePreview, async (_e, request: ClaudeRequest): Promise<ClaudePreview> => {
     const root = currentRoot();
     if (!root) throw new Error("No project is open.");
-    return previewClaudeRun(root, request);
+    return previewClaudeRun(root, request, { settings: nodeSettings() });
   });
 
   ipcMain.handle(

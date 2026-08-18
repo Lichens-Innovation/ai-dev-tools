@@ -22,8 +22,9 @@ import path from "node:path";
 
 import { previewClaudeRun, CLAUDE_BASE_FLAGS } from "../../src/core/claude-preview.js";
 import { scaffoldCreate } from "../../src/core/scaffold.js";
+import { nodeGit } from "../../src/core/git.js";
 import { clearInvocations } from "../../src/core/claude-tokens.js";
-import type { CreateRequest } from "../../src/core/contracts.js";
+import type { CreateRequest, EffectiveSettingsSnapshot, SettingsPort } from "../../src/core/contracts.js";
 
 let tmp: string;
 let home: string;
@@ -82,9 +83,9 @@ afterEach(() => {
 });
 
 describe("the finishing prompt", () => {
-  it("names the exact file the scaffold wrote", () => {
+  it("names the exact file the scaffold wrote", async () => {
     const written = scaffoldCreate(project, skill, { home });
-    const preview = previewClaudeRun(project, skill, opts());
+    const preview = await previewClaudeRun(project, skill, opts());
 
     expect(written.scaffolded).toBe(true);
     expect(preview.prompt).toContain(written.path);
@@ -92,32 +93,32 @@ describe("the finishing prompt", () => {
     expect(preview.targets[0].action).toBe("modify");
   });
 
-  it("tells the run to finish the artifact rather than recreate it or touch its frontmatter", () => {
-    const preview = previewClaudeRun(project, skill, opts());
+  it("tells the run to finish the artifact rather than recreate it or touch its frontmatter", async () => {
+    const preview = await previewClaudeRun(project, skill, opts());
     expect(preview.prompt).toMatch(/already written/);
     expect(preview.prompt).toMatch(/Do not recreate it/);
     expect(preview.prompt).toMatch(/do not change its frontmatter/);
   });
 
-  it("carries the form's own words, so the run is about the artifact the user described", () => {
-    const preview = previewClaudeRun(project, skill, opts());
+  it("carries the form's own words, so the run is about the artifact the user described", async () => {
+    const preview = await previewClaudeRun(project, skill, opts());
     expect(preview.prompt).toContain("Reviews database migrations for safety issues.");
     expect(preview.prompt).toContain("a .sql file changes or a migration is added");
   });
 
-  it("is prose, never a slash command that would re-enter the form flow", () => {
+  it("is prose, never a slash command that would re-enter the form flow", async () => {
     // `/create-skill` in a headless run fires the plugin's UserPromptExpansion hook, which brings
     // the Docker app up and waits for a submission that can never arrive.
     for (const request of allFour()) {
-      const preview = previewClaudeRun(project, request, opts());
+      const preview = await previewClaudeRun(project, request, opts());
       expect(preview.prompt, request.kind).not.toMatch(/(^|\s)\/create-(skill|subagent|plugin|marketplace)/);
       expect(preview.prompt, request.kind).not.toMatch(/(^|\s)\/ai-tools/);
     }
   });
 
-  it("covers all four kinds", () => {
+  it("covers all four kinds", async () => {
     for (const request of allFour()) {
-      const preview = previewClaudeRun(project, request, opts());
+      const preview = await previewClaudeRun(project, request, opts());
       expect(preview.prompt.length, request.kind).toBeGreaterThan(80);
       expect(preview.targets.length, request.kind).toBeGreaterThan(0);
       // Exactly what the modal shows and exactly what runs — prompt included, verbatim.
@@ -127,46 +128,46 @@ describe("the finishing prompt", () => {
 });
 
 describe("where the run happens", () => {
-  it("is the project, for an artifact written into the project", () => {
-    const preview = previewClaudeRun(project, { ...skill, target: "project" }, opts());
+  it("is the project, for an artifact written into the project", async () => {
+    const preview = await previewClaudeRun(project, { ...skill, target: "project" }, opts());
     expect(preview.cwd).toBe(project);
   });
 
-  it("is the marketplace repo, for an artifact written into one", () => {
+  it("is the marketplace repo, for an artifact written into one", async () => {
     // Not the open project: every edit would then be outside the CLI's working directory, where
     // `--permission-mode acceptEdits` does not apply and a headless run has nobody to ask.
-    expect(previewClaudeRun(project, skill, opts()).cwd).toBe(market);
+    expect((await previewClaudeRun(project, skill, opts())).cwd).toBe(market);
   });
 
-  it("is the new marketplace's own directory, for create-marketplace", () => {
+  it("is the new marketplace's own directory, for create-marketplace", async () => {
     const targetDir = path.join(tmp, "brand-new");
-    const preview = previewClaudeRun(project, marketplaceRequest(targetDir), opts());
+    const preview = await previewClaudeRun(project, marketplaceRequest(targetDir), opts());
     expect(preview.cwd).toBe(targetDir);
     expect(preview.prompt).toContain("CLAUDE.md");
   });
 
-  it("mentions private-repo token setup only when the form asked for it", () => {
+  it("mentions private-repo token setup only when the form asked for it", async () => {
     const targetDir = path.join(tmp, "private-one");
-    const plain = previewClaudeRun(project, marketplaceRequest(targetDir), opts());
-    const priv = previewClaudeRun(project, { ...marketplaceRequest(targetDir), privateRepo: true }, opts());
+    const plain = await previewClaudeRun(project, marketplaceRequest(targetDir), opts());
+    const priv = await previewClaudeRun(project, { ...marketplaceRequest(targetDir), privateRepo: true }, opts());
     expect(plain.prompt).not.toMatch(/GITHUB_TOKEN/);
     expect(priv.prompt).toMatch(/GITHUB_TOKEN/);
   });
 });
 
 describe("a request the app will not run", () => {
-  it("is refused at preview, so no token is ever issued for it", () => {
-    expect(() => previewClaudeRun(project, { ...skill, marketplace: "invented" }, opts())).toThrow(
+  it("is refused at preview, so no token is ever issued for it", async () => {
+    await expect(previewClaudeRun(project, { ...skill, marketplace: "invented" }, opts())).rejects.toThrow(
       /No local marketplace/
     );
-    expect(() => previewClaudeRun(project, { ...skill, name: "Not Kebab" }, opts())).toThrow(/kebab-case/);
+    await expect(previewClaudeRun(project, { ...skill, name: "Not Kebab" }, opts())).rejects.toThrow(/kebab-case/);
   });
 });
 
 describe("with no CLI installed", () => {
-  it("still hands back the whole prompt, and nothing runnable", () => {
+  it("still hands back the whole prompt, and nothing runnable", async () => {
     const nothing = fs.mkdtempSync(path.join(tmp, "empty-bin-"));
-    const preview = previewClaudeRun(project, skill, { env: { PATH: nothing }, home, platform: "linux" });
+    const preview = await previewClaudeRun(project, skill, { env: { PATH: nothing }, home, platform: "linux" });
 
     expect(preview.available).toBe(false);
     expect(preview.token).toBeNull();
@@ -175,6 +176,151 @@ describe("with no CLI installed", () => {
     expect(preview.prompt).toContain("Reviews database migrations for safety issues.");
   });
 });
+
+describe("what the run will be able to read", () => {
+  // A `SettingsPort` standing in for the Agent SDK's resolution. The port exists precisely so this
+  // is possible: `claude-preview.ts` must import nothing that can start a process, so the cascade
+  // arrives as an argument and a test can hand over a fixture instead of the developer's own
+  // ~/.claude. What it cannot fake is WHICH directory gets resolved — that comes from the preview.
+  const port = (snapshot: EffectiveSettingsSnapshot, seen?: string[]): SettingsPort => ({
+    resolve: async (cwd) => {
+      seen?.push(cwd);
+      return snapshot;
+    },
+  });
+
+  const empty: EffectiveSettingsSnapshot = {
+    sources: [],
+    effective: { additionalDirectories: [], allow: [], deny: [], ask: [], defaultMode: null },
+  };
+
+  it("resolves the settings against the RUN's directory, not the open project", () => {
+    // Project-tier settings are read relative to where the session starts. For a marketplace-bound
+    // artifact that is the marketplace, so resolving against the open project would report a
+    // different repo's `.claude/settings.json` than the one about to apply.
+    const seen: string[] = [];
+    return previewClaudeRun(project, skill, { ...opts(), settings: port(empty, seen) }).then((preview) => {
+      expect(seen).toEqual([market]);
+      expect(preview.cwd).toBe(market);
+    });
+  });
+
+  it("says the open project is out of scope when the run happens in a marketplace", async () => {
+    const preview = await previewClaudeRun(project, skill, { ...opts(), settings: port(empty) });
+
+    expect(preview.read.directories.map((d) => d.path)).toEqual([market]);
+    expect(preview.read.projectReadable).toBe(false);
+    expect(preview.read.summary).toContain(project);
+    expect(preview.read.unresolved).toBeNull();
+  });
+
+  it("carries directories a settings file added, with the file that added them", async () => {
+    const snapshot: EffectiveSettingsSnapshot = {
+      sources: [
+        {
+          tier: "user",
+          path: path.join(home, ".claude", "settings.json"),
+          permissions: {
+            additionalDirectories: [project],
+            allow: ["Bash(ls:*)"],
+            deny: [],
+            ask: [],
+            defaultMode: null,
+          },
+        },
+      ],
+      effective: {
+        additionalDirectories: [project],
+        allow: ["Bash(ls:*)"],
+        deny: [],
+        ask: [],
+        defaultMode: null,
+      },
+    };
+    const preview = await previewClaudeRun(project, skill, { ...opts(), settings: port(snapshot) });
+
+    expect(preview.read.directories.map((d) => d.path)).toEqual([market, project]);
+    expect(preview.read.directories[1]).toMatchObject({
+      origin: "settings",
+      tier: "user",
+      file: path.join(home, ".claude", "settings.json"),
+    });
+    expect(preview.read.projectReadable).toBe(true);
+    expect(preview.read.rules).toContainEqual({
+      list: "allow",
+      rule: "Bash(ls:*)",
+      tier: "user",
+      file: path.join(home, ".claude", "settings.json"),
+    });
+  });
+
+  it("reports the cascade as unresolved rather than failing the whole preview", async () => {
+    // A disclosure detail must not cost the user the prompt and the Copy-prompt fallback. What it
+    // must not do either is silently report only the cwd, which would read as a complete answer.
+    const broken: SettingsPort = {
+      resolve: async () => {
+        throw new Error("no such file");
+      },
+    };
+    const preview = await previewClaudeRun(project, skill, { ...opts(), settings: broken });
+
+    expect(preview.prompt).toContain("Reviews database migrations for safety issues.");
+    expect(preview.read.directories.map((d) => d.path)).toEqual([market]);
+    expect(preview.read.unresolved).toMatch(/could not be read: no such file/);
+  });
+
+  it("is disclosed even with no CLI installed, since Copy prompt grants exactly the same scope", async () => {
+    const nothing = fs.mkdtempSync(path.join(tmp, "no-cli-"));
+    const preview = await previewClaudeRun(project, skill, {
+      env: { PATH: nothing },
+      home,
+      platform: "linux",
+      settings: port(empty),
+    });
+
+    expect(preview.available).toBe(false);
+    expect(preview.read.directories.map((d) => d.path)).toEqual([market]);
+  });
+});
+
+describe("cancelling the confirmation", () => {
+  it("leaves the scaffolded marketplace on disk, repository and all", async () => {
+    // Preview is the whole of what happens before Run: it builds a prompt, resolves the CLI and now
+    // reads the settings cascade. None of that may touch the artifact the scaffold already wrote —
+    // including the `.git` it made for a new marketplace, which is the part a user would notice
+    // last and mind most. Cancel is then a no-op by construction: no token is ever spent.
+    const targetDir = path.join(tmp, "cancelled-marketplace");
+    const written = scaffoldCreate(project, marketplaceRequest(targetDir), { home, git: nodeGit() });
+    expect(written.scaffolded).toBe(true);
+
+    const before = snapshotTree(targetDir);
+    // On a machine with `git` the scaffold made a repository, and that is the part of the artifact
+    // a user would notice last and mind most. Without one the marketplace is still complete — the
+    // scaffold reports which of the three happened — and the untouched-tree check below is the
+    // assertion either way, so this is conditional rather than a requirement on the test machine.
+    if (written.repo?.initialized) expect(before).toContain(".git");
+
+    const preview = await previewClaudeRun(project, marketplaceRequest(targetDir), opts());
+    // …and the user closes the dialog. Nothing claims the token; nothing spawns.
+    expect(preview.token).toBeTruthy();
+
+    expect(snapshotTree(targetDir)).toEqual(before);
+  });
+});
+
+/** Every path under `root`, relative and sorted — enough to catch a file added, removed or moved. */
+function snapshotTree(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, prefix: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      out.push(rel);
+      if (entry.isDirectory()) walk(path.join(dir, entry.name), rel);
+    }
+  };
+  walk(root, "");
+  return out;
+}
 
 function marketplaceRequest(targetDir: string): CreateRequest {
   return {

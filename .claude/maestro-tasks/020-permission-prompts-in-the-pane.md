@@ -41,6 +41,11 @@ because the gap stays invisible until someone wonders why a tool did nothing.
 A prompt can arrive while the user is on another route, so it must be answerable from wherever they
 are and impossible to miss.
 
+When a prompt has to name what the session may already reach, use the shapes `017` added —
+`ClaudeReadScope` and `ClaudePermissionRule` in `src/core/contracts.ts`, which already carry each
+value's tier and originating file. A prompt that re-derives that list will disagree with the one the
+header and the confirmation are showing.
+
 ## Acceptance criteria
 
 - [ ] A fetch raises a prompt showing the complete URL; Deny refuses it and the model continues; Stop ends the turn

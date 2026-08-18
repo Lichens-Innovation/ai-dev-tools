@@ -85,13 +85,13 @@
     "blockedBy": []
   },
   "017-disclose-what-a-run-can-read.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "015-externalize-the-agent-sdk.md"
     ]
   },
   "018-run-create-authoring-on-the-agent-sdk.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "015-externalize-the-agent-sdk.md",
       "016-git-init-a-new-marketplace-without-a-shell.md",

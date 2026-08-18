@@ -18,10 +18,11 @@
 - 014
 - 015
 - 016
+- 017
 
 ## Next
 
-- 017-disclose-what-a-run-can-read.md — its only blocker, 015, is done.
+- 018-run-create-authoring-on-the-agent-sdk.md — all three blockers (015, 016, 017) are done.
 
 ## Prompt
 

@@ -35,6 +35,10 @@ Rewrite them to ask rather than guess. A skill that needs a decision should put 
 of the user, with enough description to choose between them — that facility exists now and these
 skills are its first real consumer.
 
+Note that the create-\* confirmation surface changed shape in `017`: it now opens with **what the run
+can read** and only then says what it may write. Any of these skills that describes the confirmation
+to the user, or assumes the write targets are the first thing on it, is describing the old dialog.
+
 Since these files also serve terminal users, the rewrite changes behaviour outside the app. That is
 intended, and it is why this comes last: only once the handoff is working is it clear what the model
 actually receives.
