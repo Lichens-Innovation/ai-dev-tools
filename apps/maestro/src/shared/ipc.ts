@@ -28,6 +28,8 @@ import type {
   SaveResult,
   InstallStatus,
   InstallReport,
+  UninstallPlan,
+  UninstallReport,
 } from "@repo/maestro-core/contracts";
 
 export type {
@@ -47,6 +49,8 @@ export type {
   SaveResult,
   InstallStatus,
   InstallReport,
+  UninstallPlan,
+  UninstallReport,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -106,6 +110,8 @@ export const IPC = {
 
   installStatus: "install:status",
   installRun: "install:run",
+  installUninstallPlan: "install:uninstall-plan",
+  installUninstall: "install:uninstall",
 
   logSubscribe: "log:subscribe",
   logUnsubscribe: "log:unsubscribe",
@@ -149,6 +155,17 @@ export interface MaestroApi {
      * than half-writing) when it cannot proceed — so the caller must go through `callMain`.
      */
     run(): Promise<InstallReport>;
+    /**
+     * What each level of an uninstall would remove, right now. Reads only — this is what fills
+     * the purge confirmation, so it can name the files before anything is deleted.
+     */
+    uninstallPlan(): Promise<UninstallPlan>;
+    /**
+     * Remove the runtime. `purge` is the destructive level: it also deletes the orchestrator
+     * skill, the copied scripts and `maestro.json`. It defaults to false ON THE MAIN SIDE too —
+     * the renderer has to ask for it explicitly, so no call can turn into a purge by accident.
+     */
+    uninstall(opts?: { purge?: boolean }): Promise<UninstallReport>;
   };
   log: {
     /**

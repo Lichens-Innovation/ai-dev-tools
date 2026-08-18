@@ -26,6 +26,7 @@ a graph.
 | `render.ts` | Rewrites the `Maestro:HANDOFFS` table from `maestro.json` |
 | `session-runtime.ts` | Ephemeral session file + append-only log helpers |
 | `install.ts` | Installs/updates the runtime into a project, and reports whether it is stale |
+| `uninstall.ts` | Removes it again, at two levels — the mirror of `install.ts` |
 
 ### `install.ts` — the project owns its runtime
 
@@ -49,6 +50,32 @@ Three invariants, each with tests in `test/install.test.ts`:
 Staleness is content-addressed (`installedRuntimeId` vs `shippedRuntimeId`, sha-256 over the
 manifest) and never mtime-based — a `git clone` rewrites every mtime, and two checkouts of one
 commit must agree.
+
+### `uninstall.ts` — two levels, and the default is the safe one
+
+Install writes files the app owns; uninstall deletes files the **user** may have hours of work in.
+That asymmetry is the design:
+
+- **Default** — unregister the hooks, delete the ephemeral session files, and **keep
+  `maestro.json`**. Someone who wants the hooks to stop firing has not asked to throw away their
+  workflow graph and rule assignments.
+- **Purge** (`{ purge: true }`) — also delete the orchestrator skill (and its `.bak`), the copied
+  scripts, the installed handoff protocols, and the config.
+
+Collapsing the two, or defaulting to the destructive one, turns "stop the hooks" into silent data
+loss — so `uninstallPlan()` exists to let a UI **name the files** before it deletes them, and the
+`purge` flag is explicit at every hop (renderer → IPC handler → core).
+
+Hook removal mirrors registration and inherits its trap: a command is Maestro's only if it points
+into `.claude/scripts/` **and** names a script we register. Path alone would claim a user's own
+script living there; name alone would claim `~/bin/maestro-session-log.cjs`. Entries and events are
+pruned only where we emptied them, an unparseable `settings.json` **aborts the uninstall** the same
+way it aborts an install, and directories are removed only when the deletions left them empty.
+
+Purge targets come from the runtime manifest **plus** a sweep of the two directories the app owns
+(`.claude/scripts/`, `.claude/templates/handoffs/`), so a project installed by an older release
+isn't left with orphans of scripts that release shipped. `.claude/handoffs/` is the user's override
+location and is never touched.
 
 `success_path` is **derived**, never stored — `successPathSteps()` is the sole source of truth for
 "what steps this workflow has, in order".
@@ -87,6 +114,10 @@ Two kinds:
   from a symlinked plugin root and asserts its whole output tree is a byte-identical subset of
   ours, then covers what the port adds: hook registration, idempotency over five runs, settings
   preservation, the refusal path, and executing the copied hook scripts with a synthetic payload.
+- **Uninstall** (`test/uninstall.test.ts`) — asserts what is **left behind** at each level, not
+  only what went: the config after a default uninstall, the user's hooks and keys after either, a
+  same-named script outside `.claude/scripts/`, `.claude/handoffs/`, and that install-after-
+  uninstall returns a working installation.
 - **Byte-identity** (`test/render.test.ts`) — runs the snapshotted legacy renderer as a
   subprocess against a temp project and asserts the rendered `SKILL.md` matches ours byte for
   byte, plus that `maestro.json` keeps its canonical format (2-space indent, **no trailing

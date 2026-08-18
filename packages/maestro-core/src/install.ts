@@ -73,7 +73,7 @@ export function defaultPluginRoot(): string | null {
   return findUpPluginRoot(import.meta.dirname);
 }
 
-function requirePluginRoot(pluginRoot?: string): string {
+export function requirePluginRoot(pluginRoot?: string): string {
   const root = pluginRoot ?? defaultPluginRoot();
   if (!root) {
     throw new Error(
@@ -218,17 +218,19 @@ export const HOOK_REGISTRATIONS: HookRegistration[] = [
   nodeHook("SessionEnd", "", "maestro-session-cleanup.cjs"),
 ];
 
-interface HookCommand {
+// Exported for uninstall.ts, which is this file's mirror: it has to read the same settings.json
+// with the same tolerance for keys neither module wrote.
+export interface HookCommand {
   type?: string;
   command?: string;
   [k: string]: unknown;
 }
-interface HookEntry {
+export interface HookEntry {
   matcher?: string;
   hooks?: HookCommand[];
   [k: string]: unknown;
 }
-interface Settings {
+export interface Settings {
   hooks?: Partial<Record<string, HookEntry[]>>;
   [k: string]: unknown;
 }
@@ -271,7 +273,7 @@ function addMissingHooks(settings: Settings, regs: HookRegistration[] = HOOK_REG
   return added;
 }
 
-function settingsPathFor(projectRoot: string): string {
+export function settingsPathFor(projectRoot: string): string {
   return path.join(projectRoot, ".claude", "settings.json");
 }
 
@@ -282,7 +284,7 @@ function settingsPathFor(projectRoot: string): string {
  * user's whole settings file with just our hook. A settings.json that doesn't parse is a mistake
  * the user has to see, and the only safe response is to write nothing.
  */
-function readSettings(settingsPath: string): Settings {
+export function readSettings(settingsPath: string): Settings {
   if (!fs.existsSync(settingsPath)) return {};
   const raw = fs.readFileSync(settingsPath, "utf8");
   try {
@@ -298,7 +300,7 @@ function readSettings(settingsPath: string): Settings {
 }
 
 /** Write JSON where a crash mid-write cannot leave a truncated file behind. */
-function writeJsonAtomic(target: string, value: unknown): void {
+export function writeJsonAtomic(target: string, value: unknown): void {
   ensureDir(path.dirname(target));
   const tmp = `${target}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
@@ -311,7 +313,7 @@ function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-function projectPath(projectRoot: string, dest: string): string {
+export function projectPath(projectRoot: string, dest: string): string {
   return path.join(projectRoot, ...dest.split("/"));
 }
 
