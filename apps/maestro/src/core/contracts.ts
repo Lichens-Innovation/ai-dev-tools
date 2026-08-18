@@ -814,8 +814,41 @@ export type SessionEvent =
   | { kind: "notice"; seq: number; text: string }
   /** A turn finished. `ok: false` means the session reported an error rather than an answer. */
   | { kind: "turn"; seq: number; ok: boolean; error: string | null; costUsd: number | null }
-  /** The session is over — no further turn can be sent. `error` is null on a clean close. */
-  | { kind: "ended"; seq: number; error: string | null };
+  /**
+   * SPEND MOVED — pushed as it accrues, rather than only at the end (`024`).
+   *
+   * Fed from exactly the place that decides whether a `result` message was a turn at all: a
+   * `shouldQuery: false` append is answered by its own zero-cost result, and a running figure that
+   * counted it would report a turn that never ran. Same guard, same branch, one source.
+   */
+  | { kind: "spend"; seq: number; spend: SessionSpend }
+  /**
+   * The effort level or the model changed, or the session learned which models it could offer.
+   *
+   * Both are changeable on a LIVE session without losing the conversation — `setModel()` mid-turn,
+   * `applyFlagSettings({ effortLevel })` from the next turn — so the header cannot render them from
+   * what a click implied. It re-reads them from here, exactly as it re-reads the scope from
+   * `{ kind: "scope" }`.
+   */
+  | { kind: "settings"; seq: number; effort: SessionEffort; model: string | null; models: SessionModel[] }
+  /**
+   * The session is over — no further turn can be sent. `error` is null on a clean close.
+   *
+   * `024` GAVE THE ENDING A REASON, and that is the difference between a door and a crash. A budget
+   * or turn ceiling ends the query the same way a failure does; without `reason` the pane can only
+   * render both as "the session ended", and the transcript the user is entitled to continue from
+   * looks exactly like one that broke. `canContinue` is the door itself: true only for a ceiling,
+   * never for an error, because a session that failed is not one that ran out of allowance.
+   */
+  | {
+      kind: "ended";
+      seq: number;
+      error: string | null;
+      reason: SessionEndReason;
+      /** What it had spent when it stopped. Null when the session never reached a first turn. */
+      spend: SessionSpend | null;
+      canContinue: boolean;
+    };
 
 /**
  * Who refused a tool call — and the reason this is a field rather than a comment.
@@ -917,6 +950,71 @@ export interface SessionPermissionUpdate {
 
 /** Grant just the file that was asked about, or the directory containing it. */
 export type GrantScope = "file" | "directory";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// What a session may SPEND, and what it says when it has spent it (`024`).
+//
+// The third mutable thing about a live session, after what it may read (`023`) and what it may
+// write (`022`) — and the first one that can END it. The decisions behind these types are written
+// once, in `src/core/session-budget.ts`; what is here is only the shape they cross a process
+// boundary in. Two of them are worth reading before the rest:
+//
+//   • `SessionEndReason` is the field this whole surface turns on. `019`'s pane ended when the SDK
+//     stream ended and carried no reason with it, which is fine for a crash and useless for a door:
+//     "the ceiling fires, the session ends cleanly, and the pane offers Continue" cannot be built on
+//     an ending that cannot say why it happened.
+//   • `SessionSpend` is an ESTIMATE throughout. It is the CLI's own client-side figure — the same
+//     one the ceiling is compared against — and the work draws on the user's subscription. Rendering
+//     it as an accounting figure promises something this app cannot deliver.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Which ceiling ended a session, when one did. Both are doors: each offers Continue. */
+export type SpendCeiling = "budget" | "turns";
+
+/** How a session ended, in one word a UI can branch on. `closed` is a person or a teardown. */
+export type SessionEndReason = "closed" | "budget" | "turns" | "error";
+
+/** How hard the model thinks per turn. A larger lever than model choice for a session that reads. */
+export type SessionEffort = "low" | "medium" | "high" | "xhigh" | "max";
+
+/**
+ * A model the session could run on, as the CLI itself lists them.
+ *
+ * Resolved by main from the SDK's `supportedModels()` and published with the session, so the
+ * renderer picks an id off a list this process produced rather than naming one of its own — the
+ * same discipline a grant's scope word follows.
+ */
+export interface SessionModel {
+  id: string;
+  label: string;
+  description: string;
+  /** Effort levels this model accepts. Empty when it supports none, and the control says so. */
+  effortLevels: SessionEffort[];
+}
+
+/**
+ * What a session has spent, as far as anyone can tell.
+ *
+ * `estimateUsd` is the conversation's lifetime figure and `allowanceUsd` is what has gone against
+ * the ceiling in force right now. They are equal until the first Continue, and after one they are
+ * the honest pair: the user is agreeing to another `ceilingUsd`, not being told the conversation
+ * has spent nothing.
+ */
+export interface SessionSpend {
+  /** The whole conversation's estimated spend, across every allowance it has been given. */
+  estimateUsd: number;
+  /** Estimated spend inside the CURRENT allowance — what `ceilingUsd` is measured against. */
+  allowanceUsd: number;
+  ceilingUsd: number;
+  /** User turns answered in this conversation. A seeded `shouldQuery: false` context is not one. */
+  turns: number;
+  /** The CLI's per-allowance agentic-turn ceiling. */
+  maxTurns: number;
+  /** 1 when the session starts, +1 for every Continue. */
+  allowances: number;
+  /** Which ceiling ended it, or null while it runs. */
+  ended: SpendCeiling | null;
+}
 
 /**
  * One thing the user can grant in answer to a prompt, resolved by the main process.
@@ -1226,6 +1324,23 @@ export interface SessionInfo {
    * cannot find again has not made the boundary optional, it has removed it.
    */
   grants: SessionGrant[];
+  /**
+   * What it has spent and what it may spend, as an ESTIMATE (`024`).
+   *
+   * Present whether or not a session is running: with none, it is what one WOULD be given, which is
+   * how the header can state the ceiling before the user has spent anything at all.
+   */
+  spend: SessionSpend;
+  /** Which ceiling ended the session, if one did — the pane offers Continue on either. */
+  endReason: SessionEndReason | null;
+  /** True while a session is resumable: it ended on a ceiling and its transcript is intact. */
+  canContinue: boolean;
+  /** The effort level in force. Changeable mid-session without losing the conversation. */
+  effort: SessionEffort;
+  /** The model in force, as the CLI reported it. Null before a session has initialised. */
+  model: string | null;
+  /** What the model selector may offer, resolved by main from the CLI's own list. */
+  models: SessionModel[];
   /** The tools the session was offered, so the header can name them rather than imply them. */
   tools: string[];
   /** Skills declared for the session, including the help skill the deleted chat asked for by name. */

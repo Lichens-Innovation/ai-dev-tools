@@ -5,6 +5,34 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — a budget ceiling you can continue past
+
+- **A session runs under three limits, and a Continue that makes a low ceiling survivable.**
+  `maxBudgetUsd` (default $0.50) hard-stops against the CLI's own client-side estimate, `taskBudget`
+  tells the model how much room is left so it wraps up rather than being cut off, and `maxTurns`
+  (40 per allowance) brakes a cheap non-converging loop. `session:continue` carries a session id and
+  nothing else: main resumes the same CLI session, renews the allowance, keeps the lifetime figure,
+  and carries the grants, write scope, effort and model across. New pure module
+  `src/core/session-budget.ts` holds the policy and every user-facing sentence about it.
+- **Divergence from the plan: reaching the ceiling does not end a streaming-input query.** Measured in
+  a window — after the `error_max_budget_usd` result the pump stays open and the CLI answers 12
+  further turns with error results in 1.6 seconds, none reaching the model, while the composer stays
+  enabled. The read loop now leaves on a ceiling (`break`, `finish`, `query.close()`) instead of
+  waiting for a stream end that never arrives; the latch is still read in the `catch` for the one-shot
+  shape. Also measured: `maxTurns` counts **agent** turns inside a request rather than user messages,
+  `total_cost_usd` is cumulative for the query rather than per turn, and Haiku 4.5 rejects
+  `taskBudget` with a 400 on every turn with nothing in `ModelInfo` advertising it — hence
+  `isPacingUnsupported` and a reopen without the pacing budget, leaving the hard ceiling intact.
+- `startPaneSession` also passes `effort`, `persistSession: true`, `enableFileCheckpointing: true` and
+  `resume`; new `session:effort` and `session:model` channels change a live session from the header,
+  choosing only from the list `supportedModels()` published. `contracts.ts` was extended in place
+  (`SpendCeiling`, `SessionEndReason`, `SessionEffort`, `SessionModel`, `SessionSpend`; `spend` /
+  `settings` / an extended `ended` on `SessionEvent`; `spend`, `endReason`, `canContinue`, `effort`,
+  `model`, `models` on `SessionInfo`). `MAESTRO_SESSION_CEILING_USD` / `MAESTRO_SESSION_MAX_TURNS` are
+  read from the launching process's environment only, so the ceiling can be demonstrated for cents.
+- Tests: `test/core/session-budget.test.ts` (15) plus two isolation blocks; 477 passing, both
+  typechecks clean, packaged build green and driven in a real window.
+
 ### maestro — rewrite the create-\* skills for interactive sessions
 
 - **One copy of the create-\* finishing guidance, not two.** The four

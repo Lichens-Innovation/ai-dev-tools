@@ -87,6 +87,7 @@ second.
 | `session-handoff.ts`                    | What a create-\* handoff says to the session it opens: seed, notice, title. Pure       |
 | `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
 | `session-question.ts`                   | A structured question, read out of the tool call and answered back into it. Pure       |
+| `session-budget.ts`                     | What a session may spend, and every sentence it says about having spent it. Pure       |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
@@ -518,6 +519,7 @@ src/core/session-permission.ts                  settled, or ask a person (pure) 
 src/core/permission-registry.ts                 the parked promises, one per outstanding ask (pure)
 src/core/session-question.ts                    the OTHER kind of ask: read a question, build its answer (pure)
 src/core/session-handoff.ts                     what a create-* handoff says: seed, notice, title (pure)
+src/core/session-budget.ts                      what it may spend, and every sentence about it (pure)
 src/main/claude-session.ts                      one session per webContents.id
 src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope + PermissionCard
 src/renderer/src/components/agent-question.tsx  the question card — options, previews, freeform reply
@@ -527,12 +529,15 @@ src/renderer/src/utils/session-context.tsx      SessionProvider / useSession —
 ```
 session:start      → SessionInfo              no argument; the cwd comes from main's project state
 session:handoff    → (token) → SessionInfo    A PREVIEW TOKEN ONLY; the one call that widens writes
+session:continue   → (id) → SessionInfo       A SESSION ID ONLY; a fresh allowance on the same transcript
 session:info       → SessionInfo              reads only
 session:say        → (id, text)               USER-TYPED TEXT ONLY
 session:stop       → (id)                     interrupt the turn; the session stays usable
 session:permission → (id, requestId, choice)  A PermissionChoice, never a PermissionAnswer
 session:question   → (id, requestId, choice)  A QuestionChoice — a SELECTION, never the answer payload
 session:revoke     → (id, path)               take back a grant; NARROWS ONLY
+session:effort     → (id, effort)             one of EFFORT_LEVELS, checked before it reaches the CLI
+session:model      → (id, model)              an id from the list MAIN published, or null for default
 session:end        → ()                       end, and reap the process group
 session:event      ← SessionEvent             the streamed transcript
 ```
@@ -753,9 +758,68 @@ session:event      ← SessionEvent             the streamed transcript
     `DirectoryAdded` and `CwdChanged` hooks are registered anyway and are currently unreachable from
     the pane; the boundary stays anchored to `request.cwd` and does not follow a working directory
     that moves. `test/isolation.test.ts` pins both handlers and the anchoring.
-- **Nothing budget-related is passed.** No `maxBudgetUsd`, `taskBudget`, `effort`,
-  `enableFileCheckpointing` or `persistSession`; `startPaneSession` simply ends the session when the
-  SDK stream ends. All of that is `024`.
+- **The session runs under three ceilings, and they are three different mechanisms rather than one
+  written three ways** (`024`). `maxBudgetUsd` is the hard stop, enforced by the CLI against its own
+  client-side estimate; `taskBudget` is the opposite kind of thing — the **model** is told how much
+  room is left so it wraps up instead of being cut off mid-write; `maxTurns` is the brake for the
+  loop neither catches, cheap per turn and never converging. The policy, the arithmetic and every
+  user-facing sentence about them live in `src/core/session-budget.ts` (pure, a fifth module beside
+  the four scope ones); `startPaneSession` also passes `effort`, `persistSession: true`,
+  `enableFileCheckpointing: true` and, on a Continue, `resume`.
+  - **A CEILING WITHOUT A DOOR DEFEATS ITSELF**, which is why this is a module and not a constant at
+    the query. Reaching the ceiling ends the query, which on a conversation means the session is
+    over — so a user who loses a transcript to it raises the ceiling until it never fires, and the
+    control stops being one. `session:continue` carries a session id and nothing else; main resumes
+    the CLI's own session, `renewAllowance` zeroes what is measured against the ceiling and keeps the
+    lifetime figure, and the grants, write scope, effort and model carry over because they are main's
+    own records. `openSession` is the **single** builder behind start, continue and the pacing
+    reopen, differing only in a `CarriedSession` — a second builder is how a resumed session ends up
+    with a different tool set than the one it is continuing. The exhausted `LiveSession` entry is
+    kept **only for a ceiling**, because it holds the id to resume against; every other ending
+    deletes it, and the three teardown paths are unchanged.
+  - **REACHING THE CEILING DOES NOT END A STREAMING-INPUT QUERY, and the pane is one.** Measured:
+    after the `error_max_budget_usd` result the pump is still open, so the CLI takes the next turn and
+    answers it with another error result — 12 turns in 1.6 seconds, none of which reached the model,
+    while the pane looked alive and the composer stayed enabled. So the read loop **leaves** on a
+    ceiling (`break`, `finish`, then `query.close()`) rather than waiting for a stream end that never
+    comes. A latch alone makes the ceiling decoration; `ceilingHit` is still read in the `catch`
+    because the one-shot shape genuinely does throw. This is the first thing to know before touching
+    that loop.
+  - **`maxTurns` counts AGENT turns inside one request, not user messages.** Twelve one-word user
+    turns under `maxTurns: 1` never trip it — the turn ceiling only fires on a request that cannot
+    finish without going round again. Anyone writing a turn-ceiling test needs this or they will
+    conclude the option is broken.
+  - **`total_cost_usd` is CUMULATIVE for the query**, not the price of a turn (0.00196, 0.00351,
+    0.00529, 0.00726 over four one-word turns), so `accrueTurn` takes the latest with `Math.max`
+    rather than summing. It is fed from the `result` branch behind `022`'s outstanding-turn guard, or
+    a seeded append that cost nothing counts as a turn that did. And a pane turn is **not** cheap:
+    the first costs ≈ $0.01–$0.10 depending on cache state — the tool set, the plugin's skills and
+    the preset prompt are uncached — so the $0.50 default is tens of turns, not hundreds.
+  - **The figure is an ESTIMATE and the markup says so itself.** `data-testid="session-spend"` renders
+    `≈ $x / $y` with the word "estimate" and the subscription sentence in its title text. It is the
+    same client-side figure the ceiling is compared against, which is exactly why it must not look
+    like an accounting number — a user who reconciles it against a bill will trust nothing else on
+    the header either. The renderer formats dollars locally rather than importing the module, because
+    it may import only `contracts` and `text` from `src/core`.
+  - **Some models refuse a pacing budget and nothing advertises which.** Measured: with `taskBudget`
+    set, Haiku 4.5 answers every turn with a 400 —
+    `This model does not support user-configurable task budgets` — and does no work at all;
+    `ModelInfo` has a `supportsEffort` flag and no equivalent for budgets.
+    `isPacingUnsupported` spots it on the way past, `onPacingRejected` fires once, and
+    `reopenWithoutPacing` resumes the same conversation with the budget **omitted** rather than
+    zeroed, posting `PACING_UNSUPPORTED_NOTICE`. The hard ceiling is untouched, which is what makes
+    that recovery safe rather than a quiet widening.
+  - **Effort and model change a LIVE session**, through `session:effort` / `session:model` onto
+    `setEffort` / `setModel` — effort from the next turn, model during the current one, neither
+    touching the transcript, which is why they are header controls and not a "start a session with…"
+    dialog. The selector offers only what the CLI's own `supportedModels()` published and only the
+    effort levels the **current** model accepts; a CLI too old to answer leaves the list empty and the
+    header still states what is in force.
+  - **The ceiling is demonstrable for cents.** `sessionBudget()` reads `MAESTRO_SESSION_CEILING_USD`
+    and `MAESTRO_SESSION_MAX_TURNS` from the launching process's environment **only** — the
+    `MAESTRO_AGENT_SDK_SMOKE` precedent — because proving the CLI really stops at $0.50 costs $0.50 of
+    somebody's subscription each time, and that is a check people run once. Nothing on any channel
+    reaches it, and `paneBudget` clamps a nonsense value back to the default.
 - **`interrupt()`'s receipt is surfaced.** `stop()` returns `{ stillQueued }` off the
   `query.interrupt()` receipt and `stopSession` emits a `notice` when the interrupt left messages
   queued. `020` picked this up; `024` no longer owns it.
@@ -1092,7 +1156,16 @@ false`, the absence of an `origin` stamp on the seeded message, the zero-cost-re
   in exactly two files (`contracts.ts` declares it, `agent-sdk.ts` fills it in) and in nothing under
   `src/renderer` or `src/main`, that the labels are validated **before** anything is answered, that
   `AskUserQuestion` is in `PANE_TOOLS` with the `toolConfig` opt-in and never in `allowedTools`, and
-  that there is still exactly one registry behind both kinds of ask.
+  that there is still exactly one registry behind both kinds of ask. `024` added two more:
+  **"stops a session at a spend ceiling and gives the ending a door"** pins the three limits,
+  `persistSession: true`, both halves of the ceiling exit (the latch read in the `catch` **and** the
+  `break` the streaming pump needs), that the spend figure is fed behind `022`'s zero-cost-result
+  guard, that the exhausted entry is kept only for a ceiling, that `session:continue` carries an id
+  and nothing else, and that `startPaneSession` is called from **exactly one** place in
+  `claude-session.ts` — a second builder is how a resumed session quietly gets a different tool set;
+  and **"changes effort and model on a live session, from lists main published"** pins that both are
+  checked against something this process produced (`isEffortLevel`, `entry.models.some`), which is the
+  permission wire's discipline applied to a header control.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

@@ -105,6 +105,15 @@ const api: MaestroApi = {
     // Narrowing only — see MaestroApi.session.revoke. Main matches the path against the grants it
     // already holds, so nothing here can open a directory that was not opened by an answered prompt.
     revoke: (id, path) => ipcRenderer.invoke(IPC.sessionRevoke, id, path),
+    // THE SESSION ID AND NOTHING ELSE. A continuation is the same conversation with a fresh
+    // allowance, and every part of it — which transcript to resume, what has been spent so far,
+    // what the session had been given — comes off main's own record of the session that stopped.
+    // An extra argument here (a ceiling, a session to resume) is the only hole this channel could
+    // have, and it is the same hole `claude:run` refuses by taking a token alone.
+    continue: (id) => ipcRenderer.invoke(IPC.sessionContinue, id),
+    // A word from a closed set, and a model id from the list main published with the session.
+    setEffort: (id, effort) => ipcRenderer.invoke(IPC.sessionEffort, id, effort),
+    setModel: (id, model) => ipcRenderer.invoke(IPC.sessionModel, id, model),
     end: () => ipcRenderer.invoke(IPC.sessionEnd),
     subscribe: (onEvent) => {
       const listener = (_e: unknown, event: SessionEvent) => onEvent(event);

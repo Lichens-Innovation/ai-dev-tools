@@ -76,16 +76,82 @@ Surface spend as it accrues rather than only at the end, and put an effort level
 selector in the header — both can change on a live session without losing the conversation, and
 effort is a larger lever than model choice for a session that mostly reads.
 
+### What this slice built, and where the plan above was wrong
+
+**Delivered.** The policy and every user-facing sentence about it live in one new pure module,
+`src/core/session-budget.ts` — a fifth module beside the four scope ones, no `fs`, no spawn, no SDK.
+It exports the three ceilings (`DEFAULT_CEILING_USD` `0.5`, `DEFAULT_MAX_TURNS` `40`,
+`PACING_TOKENS_PER_USD`), the arithmetic (`paneBudget`, `newSpend`, `accrueTurn`, `exhaust`,
+`renewAllowance`, `ceilingOf`), the wording (`formatUsd`, `spendLabel`, `spendNote`,
+`ceilingTurnNote`, `ceilingEnding`, `PACING_UNSUPPORTED_NOTICE`) and the effort vocabulary
+(`EFFORT_LEVELS`, `DEFAULT_EFFORT`, `isEffortLevel`, `isPacingUnsupported`). `startPaneSession` was
+extended as the page asked — `maxBudgetUsd`, `maxTurns`, `taskBudget`, `effort`, `persistSession:
+true`, `resume`, `enableFileCheckpointing: true` — and `agent-sdk.ts` is still the only SDK importer.
+`contracts.ts` was extended in place, never forked: `SpendCeiling`, `SessionEndReason`
+(`closed | budget | turns | error`), `SessionEffort`, `SessionModel`, `SessionSpend`; `SessionEvent`
+gained `spend` and `settings` and an `ended` that carries a reason; `SessionInfo` gained `spend`,
+`endReason`, `canContinue`, `effort`, `model`, `models`. Three channels are new — `session:continue`
+(the session id and nothing else), `session:effort`, `session:model`. Tests:
+`test/core/session-budget.test.ts` (15) plus two blocks in `test/isolation.test.ts` — _"stops a
+session at a spend ceiling and gives the ending a door"_ and _"changes effort and model on a live
+session, from lists main published"_. 477 passing, both typechecks clean, packaged build green.
+
+Seven things were measured rather than reasoned about, and five of them contradict the page above.
+
+- **Reaching the ceiling does NOT end the query in streaming-input mode, which is what the pane is,
+  and this is the single most important fact for anyone who touches the read loop next.** After the
+  `error_max_budget_usd` result the pump is still open, so the CLI takes the next turn and answers it
+  with another error result — measured at 12 further turns inside 1.6 seconds, none of which reached
+  the model, while the pane still looked alive and the composer stayed enabled. So the read loop
+  **leaves** on a ceiling (`break`, then `finish`, then `query.close()`) rather than waiting for a
+  stream end that never comes. A latch alone — which the first implementation had, and which the
+  one-shot case genuinely needs, since there the SDK throws instead of yielding — makes the ceiling
+  decoration. `ceilingHit` is therefore both: read at the `break` and again in the `catch`.
+- **`maxTurns` counts AGENT turns inside one request, not user messages.** Twelve one-word user turns
+  under `maxTurns: 1` never trip it; the turn ceiling only fires on a request that cannot finish
+  without going round again — one needing two tool calls, say. Anyone planning a turn-ceiling test
+  needs this or they will conclude the option is broken.
+- **`total_cost_usd` is CUMULATIVE for the query, not the price of a turn.** Four one-word turns
+  reported 0.00196, 0.00351, 0.00529, 0.00726 — each restating the running total. `accrueTurn` takes
+  the latest with `Math.max`; summing it treble-counts.
+- **A pane turn is not a cheap turn, so the default ceiling is tens of turns rather than hundreds.**
+  The first turn of a pane session costs roughly $0.01–$0.10 depending on cache state — the whole
+  tool set, the plugin's skills and the preset system prompt are uncached — and subsequent one-word
+  turns run ≈ $0.006.
+- **Haiku 4.5 refuses `taskBudget` outright, and nothing advertises that it will.** Every turn comes
+  back `API Error: 400 This model does not support user-configurable task budgets`, with no work
+  done; `ModelInfo` has a `supportsEffort` flag and no equivalent for budgets, so the only way to
+  know is to try. Hence `isPacingUnsupported`, the `onPacingRejected` callback, and
+  `reopenWithoutPacing`, which resumes the same conversation with the pacing budget **omitted** (not
+  zeroed) and posts `PACING_UNSUPPORTED_NOTICE`. The hard ceiling is unaffected, which is what makes
+  that recovery safe rather than a quiet widening.
+- **One `openSession` builder in `src/main/claude-session.ts` serves start, continue and the pacing
+  reopen**, differing only in a `CarriedSession` — resume id, spend, grants, writes, effort, model,
+  pacing — every field of which is main's own record and none of which a renderer can supply. And the
+  exhausted `LiveSession` entry is **kept, but only for a ceiling**: that entry holds the id
+  `session:continue` resumes against, the figures to show and the scope the conversation already had.
+  Every other ending deletes it, and all three teardown paths are unchanged.
+- **The ceiling is demonstrable for cents.** `sessionBudget()` reads `MAESTRO_SESSION_CEILING_USD` and
+  `MAESTRO_SESSION_MAX_TURNS` from the launching process's environment **only** — the
+  `MAESTRO_AGENT_SDK_SMOKE` precedent — because proving the CLI actually stops at $0.50 costs $0.50 of
+  somebody's subscription every time, which is the kind of check people run once and then stop
+  running. Nothing on any channel reaches it and `paneBudget` clamps nonsense back to the default.
+- **The renderer formats dollars locally rather than importing the module**, because the renderer may
+  import only `contracts` and `text` from `src/core`. Two copies of `formatUsd`-shaped code is the
+  cost of that rule and is paid deliberately.
+- **`interrupt()`'s `still_queued` receipt, listed on this page, had already been done by `020`.**
+  `024` did not own it and did not touch it.
+
 ## Acceptance criteria
 
-- [ ] A session has a spend ceiling, set low by default, and spend-to-date is visible while it runs
-- [ ] Reaching the ceiling ends the session cleanly rather than erroring or hanging
-- [ ] Continue resumes the same conversation with a fresh allowance, transcript intact
-- [ ] The model is given a budget it can pace against, and wraps up rather than being cut off mid-action
-- [ ] A turn ceiling stops a cheap non-converging loop
-- [ ] Spend is presented as an estimate, not as a bill
-- [ ] Effort level and model can be changed mid-session without losing the transcript
-- [ ] A runaway session is stopped by the ceiling — demonstrated, not assumed
+- [x] A session has a spend ceiling, set low by default, and spend-to-date is visible while it runs — `DEFAULT_CEILING_USD` is $0.50, and the header carries `≈ $x / $y` with a bar (`data-testid="session-spend"`) fed by the `{ kind: "spend" }` event
+- [x] Reaching the ceiling ends the session cleanly rather than erroring or hanging — and **not** by the mechanism this page assumed: the read loop `break`s on the ceiling result, because a streaming-input query does not tear itself down
+- [x] Continue resumes the same conversation with a fresh allowance, transcript intact — `session:continue` carries the session id and nothing else; `renewAllowance` zeroes the allowance and keeps the lifetime figure, and grants, writes, effort and model carry over
+- [x] The model is given a budget it can pace against, and wraps up rather than being cut off mid-action — `taskBudget: { total: pacingTokens(ceiling) }`, with the measured caveat that some models refuse one and are reopened without it
+- [x] A turn ceiling stops a cheap non-converging loop — `maxTurns: 40` per allowance; note it counts **agent** turns inside a request, not user messages
+- [x] Spend is presented as an estimate, not as a bill — the `≈`, the word "estimate" and the subscription sentence are in the pure module and in the markup's own title text
+- [x] Effort level and model can be changed mid-session without losing the transcript — `session:effort` / `session:model` over `setEffort` / `setModel`; the selectors offer only what the CLI's own `supportedModels()` published
+- [x] A runaway session is stopped by the ceiling — demonstrated, not assumed — driven in a real window at a two-cent ceiling, which is what `MAESTRO_SESSION_CEILING_USD` exists for
 
 ## Blocked by
 

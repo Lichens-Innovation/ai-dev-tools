@@ -21,20 +21,28 @@
 import { BrowserWindow } from "electron";
 import {
   buildReadScope,
+  ceilingEnding,
   claimInvocation,
+  formatUsd,
   grantOptionFor,
   handoffNotice,
   handoffSeed,
   handoffTitle,
+  isEffortLevel,
   listMarketplaces,
+  newSpend,
   nodeSettings,
+  paneBudget,
   paneSessionTarget,
   permissionReason,
+  renewAllowance,
   spawnClaudeChild,
   startPaneSession,
   terminateChildGroup,
   withinDirectory,
   writeScopeNote,
+  DEFAULT_EFFORT,
+  PACING_UNSUPPORTED_NOTICE,
   PANE_SKILLS,
   PANE_TOOLS,
   type PaneSession,
@@ -47,9 +55,13 @@ import type {
   PermissionChoice,
   PermissionPrompt,
   QuestionChoice,
+  SessionEffort,
+  SessionEndReason,
   SessionEvent,
   SessionGrant,
   SessionInfo,
+  SessionModel,
+  SessionSpend,
   SessionWrite,
 } from "../shared/ipc.js";
 
@@ -86,6 +98,61 @@ interface LiveSession {
    * disk — and one more property: it can only ever have been appended by a claimed preview token.
    */
   writes: SessionWrite[];
+  /**
+   * What the conversation has spent, across every allowance it has been given (`024`).
+   *
+   * Recorded from the session's own `spend` events rather than accumulated here: the session is
+   * the only thing that knows which `result` messages were turns, and a second accumulator would
+   * be a second answer to the same question.
+   */
+  spend: SessionSpend;
+  effort: SessionEffort;
+  model: string | null;
+  models: SessionModel[];
+  /**
+   * The CLI's id for this conversation, which is what a Continue resumes against.
+   *
+   * Read off the session when it ends rather than when it starts — the id is only known once the
+   * CLI has initialised, and the moment it matters is the moment the session is over.
+   */
+  resumeId: string | null;
+  /**
+   * Set when the session has ended. THE ENTRY OUTLIVES A CEILING ON PURPOSE.
+   *
+   * A session that ran out of allowance leaves a transcript on disk and a user entitled to carry on
+   * from it, so its entry stays — holding the id to resume, the figures to show, and the scope the
+   * conversation already had. Every other ending deletes it, and so does every teardown path there
+   * has ever been: `endSession`, a project switch, and quit are unchanged.
+   */
+  endReason: SessionEndReason | null;
+  /** False once a model has refused a pacing budget, so the reopen does not send another. */
+  pacing: boolean;
+}
+
+/** A session that can still take a turn. An exhausted entry is a record, not a conversation. */
+function isLive(entry: LiveSession | undefined): entry is LiveSession {
+  return Boolean(entry) && entry!.endReason === null;
+}
+
+/**
+ * The ceilings this app runs sessions under, with a way to lower them for a probe.
+ *
+ * WHY AN ENVIRONMENT VARIABLE EXISTS AT ALL. The one thing about this feature that cannot be
+ * unit-tested is the only thing that matters: that the CLI actually stops at the ceiling, that the
+ * ending says which one, and that continuing resumes the conversation. Demonstrating that against
+ * the $0.50 default costs $0.50 of somebody's subscription every time, which is the kind of check
+ * people run once and then stop running. `MAESTRO_SESSION_CEILING_USD=0.02` makes it a cent, in
+ * exactly the way `MAESTRO_AGENT_SDK_SMOKE` exists so the SDK's packaging failures can be seen from
+ * a real launch. It can only ever be read from the environment of the process the user started —
+ * nothing on any channel reaches it — and `paneBudget` clamps a nonsense value back to the default.
+ */
+function sessionBudget(): ReturnType<typeof paneBudget> {
+  const ceiling = Number(process.env.MAESTRO_SESSION_CEILING_USD);
+  const turns = Number(process.env.MAESTRO_SESSION_MAX_TURNS);
+  return paneBudget({
+    maxBudgetUsd: Number.isFinite(ceiling) && ceiling > 0 ? ceiling : undefined,
+    maxTurns: Number.isFinite(turns) && turns >= 1 ? turns : undefined,
+  });
 }
 
 /** Keyed by the webContents that asked for it — one session per window, never one per subscriber. */
@@ -147,8 +214,7 @@ async function readScopeFor(
 
 /** What a window's session can see and do right now. Starts nothing; `id` is null when none runs. */
 export async function sessionInfo(webContentsId: number, projectRoot: string): Promise<SessionInfo> {
-  const entry = sessions.get(webContentsId);
-  return describeSession(projectRoot, entry?.id ?? null, entry?.grants ?? [], entry?.writes ?? []);
+  return describeSession(projectRoot, sessions.get(webContentsId) ?? null);
 }
 
 /** How one grant reads in the disclosure, next to the app's own directories. */
@@ -174,22 +240,31 @@ function writeNote(write: SessionWrite): string {
  * already opened is not a new place the session can look, and listing it twice would make the one
  * list that is supposed to answer "what can this see" answer it twice, differently.
  */
-export async function describeSession(
-  projectRoot: string,
-  id: string | null,
-  grants: readonly SessionGrant[] = [],
-  writes: readonly SessionWrite[] = []
-): Promise<SessionInfo> {
+export async function describeSession(projectRoot: string, entry: LiveSession | null): Promise<SessionInfo> {
   const cli = paneSessionTarget();
+  const grants: readonly SessionGrant[] = entry?.grants ?? [];
+  const writes: readonly SessionWrite[] = entry?.writes ?? [];
   const extra = projectRoot ? additionalDirectories() : [];
   const covered = [projectRoot, ...extra.map((d) => d.path), ...grants.map((g) => g.path)].filter(Boolean);
   const fromWrites = writes
     .filter((w) => !covered.some((root) => withinDirectory(root, w.path)))
     .map((w) => ({ path: w.path, note: writeNote(w) }));
+  // With no session, the figures describe the one the user WOULD get — which is how the header can
+  // state the ceiling before anything has been spent against it.
+  const spend = entry?.spend ?? newSpend(sessionBudget());
 
   return {
-    id,
+    id: entry?.id ?? null,
     projectRoot,
+    spend,
+    endReason: entry?.endReason ?? null,
+    // The door. Open only when a ceiling ended the session AND there is a transcript to resume.
+    canContinue: Boolean(
+      entry?.endReason && entry.endReason !== "closed" && entry.endReason !== "error" && entry.resumeId
+    ),
+    effort: entry?.effort ?? DEFAULT_EFFORT,
+    model: entry?.model ?? null,
+    models: entry?.models ?? [],
     cwd: projectRoot,
     read: await readScopeFor(
       projectRoot,
@@ -223,6 +298,39 @@ function send(webContentsId: number, event: SessionEvent): void {
  */
 export async function startSession(webContentsId: number, projectRoot: string): Promise<SessionInfo> {
   endSession(webContentsId);
+  return openSession(webContentsId, projectRoot, {});
+}
+
+/**
+ * What a continued (or reopened) conversation carries into its next session.
+ *
+ * Everything here is main's OWN record. Nothing on this shape can be supplied by a renderer, which
+ * is what lets a Continue keep the scope the conversation already had: the grants came from prompts
+ * a person answered and the writes from a claimed preview token, and carrying them forward moves
+ * neither of those decisions anywhere new.
+ */
+interface CarriedSession {
+  /** The CLI session id to pick the transcript back up from. */
+  resume?: string | null;
+  /** The lifetime figures, with a fresh allowance already applied. */
+  spend?: SessionSpend;
+  grants?: SessionGrant[];
+  writes?: SessionWrite[];
+  effort?: SessionEffort;
+  model?: string | null;
+  /** False when a model has already refused a pacing budget — see `PACING_UNSUPPORTED_NOTICE`. */
+  pacing?: boolean;
+}
+
+/**
+ * Open a session against the project — the one place a `startPaneSession` call is made.
+ *
+ * `startSession`, `continueSession` and the pacing reopen all land here, because the three differ
+ * only in what they carry in. A second builder would be a second set of query options to keep in
+ * step, which is exactly how a resumed session ends up with a different tool set or a different
+ * boundary than the one it is continuing.
+ */
+async function openSession(webContentsId: number, projectRoot: string, carried: CarriedSession): Promise<SessionInfo> {
   if (!projectRoot) throw new Error("No project is open.");
 
   const cli = paneSessionTarget();
@@ -240,8 +348,15 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     session: null as unknown as PaneSession,
     child: null,
     prompts: new Map(),
-    grants: [],
-    writes: [],
+    grants: carried.grants ? [...carried.grants] : [],
+    writes: carried.writes ? [...carried.writes] : [],
+    spend: carried.spend ?? newSpend(sessionBudget()),
+    effort: carried.effort ?? DEFAULT_EFFORT,
+    model: carried.model ?? null,
+    models: [],
+    resumeId: carried.resume ?? null,
+    endReason: null,
+    pacing: carried.pacing !== false,
   };
 
   entry.session = startPaneSession({
@@ -252,12 +367,29 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     // means no installed plugin reaches the session, and the help skill the deleted chat asked for
     // by name is the whole reason `Skill` is in the pane's tool set.
     pluginDir: bundledPluginDir(),
+    budget: sessionBudget(),
+    spend: entry.spend,
+    effort: entry.effort,
+    model: entry.model,
+    resume: entry.resumeId,
+    pacing: entry.pacing,
+    // The model would not take a pacing budget. Reopening without one is the whole recovery — the
+    // hard ceiling is untouched, so nothing is widened by it.
+    onPacingRejected: () => void reopenWithoutPacing(webContentsId, entry),
     emit: (event) => {
       // Every question is kept until it is answered, because answering a GRANT needs the path the
       // question named and the renderer does not send one. Resolved requests are dropped so the map
       // is bounded by what is actually on screen.
       if (event.kind === "permission") entry.prompts.set(event.request.requestId, event.request);
       if (event.kind === "permission-resolved") entry.prompts.delete(event.requestId);
+      // The session owns the figures — it is the only thing that knows which results were turns —
+      // so this records them rather than deriving a second answer beside it.
+      if (event.kind === "spend") entry.spend = event.spend;
+      if (event.kind === "settings") {
+        entry.effort = event.effort;
+        entry.model = event.model;
+        entry.models = event.models;
+      }
       send(webContentsId, event);
     },
     spawn: (options) => {
@@ -276,12 +408,107 @@ export async function startSession(webContentsId: number, projectRoot: string): 
 
   sessions.set(webContentsId, entry);
   // The child is detached, so a session that ends on its own still has to be reaped.
-  void entry.session.ended.then(() => {
-    if (sessions.get(webContentsId) === entry) sessions.delete(webContentsId);
+  void entry.session.ended.then((end) => {
     if (entry.child) terminateChildGroup(entry.child);
+    entry.child = null;
+    entry.spend = end.spend;
+    entry.endReason = end.reason;
+    entry.resumeId = entry.session.sessionId() ?? entry.resumeId;
+    if (sessions.get(webContentsId) !== entry) return;
+    // A CEILING KEEPS THE ENTRY. It is what Continue resumes from — the id, the figures, and the
+    // scope the conversation already had — and it is deleted by the same three teardown paths as
+    // any other session. Every other ending is gone here and now, exactly as before.
+    const continuable = (end.reason === "budget" || end.reason === "turns") && entry.resumeId !== null;
+    if (!continuable) sessions.delete(webContentsId);
+    else {
+      // The ending itself is already in the transcript; this is the sentence that says what was
+      // spent and what the button does, written where the pure module keeps every other one.
+      send(webContentsId, {
+        kind: "notice",
+        seq: --injectedSeq,
+        text: ceilingEnding(end.spend.ended ?? "budget", end.spend).text,
+      });
+    }
   });
 
-  return describeSession(projectRoot, id, entry.grants, entry.writes);
+  return describeSession(projectRoot, entry);
+}
+
+/**
+ * Reopen a session whose model refused the pacing budget, without one.
+ *
+ * NOT A CONTINUE, and the difference matters: no allowance is renewed and nothing was spent — the
+ * turns that provoked this did no work at all, they came back as a 400. The conversation is resumed
+ * so the user does not lose what they typed, and the notice says plainly what was given up.
+ */
+async function reopenWithoutPacing(webContentsId: number, entry: LiveSession): Promise<void> {
+  if (sessions.get(webContentsId) !== entry || !entry.pacing) return;
+  const resume = entry.session.sessionId();
+  entry.pacing = false;
+  send(webContentsId, { kind: "notice", seq: --injectedSeq, text: PACING_UNSUPPORTED_NOTICE });
+  if (!resume) return;
+  sessions.delete(webContentsId);
+  entry.session.close();
+  if (entry.child) terminateChildGroup(entry.child);
+  await openSession(webContentsId, entry.projectRoot, {
+    resume,
+    spend: entry.spend,
+    grants: entry.grants,
+    writes: entry.writes,
+    effort: entry.effort,
+    model: entry.model,
+    pacing: false,
+  });
+  const next = sessions.get(webContentsId);
+  if (next) await announceScope(webContentsId, next);
+}
+
+/**
+ * Give an exhausted conversation a fresh allowance and pick it up where it stopped.
+ *
+ * THE DOOR IN THE CEILING, and the reason the ceiling can be low enough to matter. Everything about
+ * it is a deliberate pair:
+ *
+ *   • **The conversation is resumed, not restarted.** `resume` hands the CLI its own session id and
+ *     the transcript comes back with it, so the user loses nothing by having been stopped.
+ *   • **The allowance is fresh and the total is not.** `renewAllowance` zeroes what is measured
+ *     against the ceiling and keeps the lifetime figure, because the user is agreeing to spend
+ *     another ceiling's worth — not being told the conversation has cost nothing so far.
+ *   • **The scope carries over.** The grants and the write scope are main's own records, from
+ *     prompts a person answered and a preview token that was claimed; making the user re-answer all
+ *     of them is exactly the friction that teaches people to raise the ceiling until it never fires.
+ */
+export async function continueSession(webContentsId: number, id: string): Promise<SessionInfo> {
+  const entry = sessions.get(webContentsId);
+  if (!entry || entry.id !== id) {
+    throw new Error("That session is no longer here, so there is nothing to continue. Start a new one.");
+  }
+  if (!entry.endReason || !entry.resumeId) {
+    throw new Error("That session did not stop at a ceiling, so it has nothing to continue from.");
+  }
+
+  sessions.delete(webContentsId);
+  const spend = renewAllowance(entry.spend, sessionBudget());
+  const info = await openSession(webContentsId, entry.projectRoot, {
+    resume: entry.resumeId,
+    spend,
+    grants: entry.grants,
+    writes: entry.writes,
+    effort: entry.effort,
+    model: entry.model,
+    pacing: entry.pacing,
+  });
+  send(webContentsId, {
+    kind: "notice",
+    seq: --injectedSeq,
+    text:
+      // `formatUsd`, not `toFixed(2)` — a two-cent probe ceiling renders as `0.02 USD` one way and
+      // `$0.02` the other, and every other figure in the pane comes from the pure module.
+      `Continued with a fresh ceiling of ${formatUsd(spend.ceilingUsd)} (allowance ${spend.allowances}). ` +
+      `The conversation was resumed rather than restarted, so everything above is still in front of the model` +
+      `${entry.grants.length + entry.writes.length > 0 ? ", and what you had opened for it stays open" : ""}.`,
+  });
+  return info;
 }
 
 /**
@@ -329,7 +556,10 @@ export async function handoffToSession(
   // this window has moved off. A handoff is an addition to a session, not a new one — that is what
   // makes a second submit grow the scope by one rather than replace it.
   let entry = sessions.get(webContentsId);
-  if (!entry || entry.projectRoot !== projectRoot) {
+  // An exhausted entry counts as no session here: it holds a transcript to continue, not a
+  // conversation a form can be handed into, and starting fresh is what the user pressed the button
+  // for. Continue is the other door and stays where it is.
+  if (!isLive(entry) || entry.projectRoot !== projectRoot) {
     await startSession(webContentsId, projectRoot);
     entry = sessions.get(webContentsId);
   }
@@ -370,7 +600,7 @@ export async function handoffToSession(
   }
 
   await announceScope(webContentsId, entry);
-  return describeSession(projectRoot, entry.id, entry.grants, entry.writes);
+  return describeSession(projectRoot, entry);
 }
 
 /**
@@ -383,7 +613,7 @@ export async function handoffToSession(
  * from the same derivation the boundary uses, not from what a button click implied.
  */
 async function announceScope(webContentsId: number, entry: LiveSession): Promise<void> {
-  const info = await describeSession(entry.projectRoot, entry.id, entry.grants, entry.writes);
+  const info = await describeSession(entry.projectRoot, entry);
   // The session may have gone away while the settings cascade was being resolved.
   if (sessions.get(webContentsId) !== entry) return;
   send(webContentsId, {
@@ -405,16 +635,48 @@ async function announceScope(webContentsId: number, entry: LiveSession): Promise
  */
 export function saySession(webContentsId: number, id: string, text: string): boolean {
   const entry = sessions.get(webContentsId);
-  if (!entry || entry.id !== id) return false;
+  // `isLive` rather than an existence check: an entry kept for Continue still answers to its id, and
+  // a turn typed into an exhausted session must be refused rather than dropped into a closed pump.
+  if (!isLive(entry) || entry.id !== id) return false;
   const trimmed = String(text ?? "").trim();
   if (!trimmed) return false;
   return entry.session.say(trimmed);
 }
 
+/**
+ * Change how hard the model thinks, mid-conversation.
+ *
+ * A WORD FROM A CLOSED SET, checked here rather than trusted: `isEffortLevel` is the same list the
+ * query is configured from, so a renderer cannot put an arbitrary string into the CLI's flag layer.
+ * Applied from the next turn, with the transcript untouched — which is the whole reason this is a
+ * header control and not a reason to start a new session.
+ */
+export async function setSessionEffort(webContentsId: number, id: string, effort: unknown): Promise<boolean> {
+  const entry = sessions.get(webContentsId);
+  if (!isLive(entry) || entry.id !== id || !isEffortLevel(effort)) return false;
+  return entry.session.setEffort(effort);
+}
+
+/**
+ * Change the model, mid-conversation.
+ *
+ * THE ID IS CHECKED AGAINST THE LIST MAIN PUBLISHED. `entry.models` came from the CLI's own
+ * `supportedModels()`, so what crosses the wire is a choice from a list this process produced
+ * rather than a model name a renderer invented — the same discipline as a grant's scope word.
+ * `null` is the one value that names no model: it resets to the CLI's own default.
+ */
+export async function setSessionModel(webContentsId: number, id: string, model: unknown): Promise<boolean> {
+  const entry = sessions.get(webContentsId);
+  if (!isLive(entry) || entry.id !== id) return false;
+  if (model === null) return entry.session.setModel(null);
+  if (typeof model !== "string" || !entry.models.some((m) => m.id === model)) return false;
+  return entry.session.setModel(model);
+}
+
 /** Interrupt the turn in flight. The session stays usable — this is not Stop-the-session. */
 export async function stopSession(webContentsId: number, id: string): Promise<boolean> {
   const entry = sessions.get(webContentsId);
-  if (!entry || entry.id !== id) return false;
+  if (!isLive(entry) || entry.id !== id) return false;
   const { stillQueued } = await entry.session.stop();
   // A Stop that left messages queued is not the Stop the user pressed the button for: each one runs
   // as its own turn the moment the interrupt lands. Saying so beats a pane that goes quiet and then

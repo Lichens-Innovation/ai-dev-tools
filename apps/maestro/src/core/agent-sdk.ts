@@ -70,6 +70,18 @@ import {
   QUESTION_UNRENDERABLE,
 } from "./session-question.js";
 import { createPermissionRegistry } from "./permission-registry.js";
+import {
+  accrueTurn,
+  ceilingOf,
+  ceilingTurnNote,
+  exhaust,
+  isPacingUnsupported,
+  newSpend,
+  paneBudget,
+  DEFAULT_EFFORT,
+  EFFORT_LEVELS,
+  type BudgetPolicy,
+} from "./session-budget.js";
 import type {
   AgentQuestion,
   ClaudeOutputChunk,
@@ -77,8 +89,12 @@ import type {
   ParkedAnswer,
   PermissionAnswer,
   QuestionChoice,
+  SessionEffort,
+  SessionEndReason,
   SessionEvent,
   SessionEventBody,
+  SessionModel,
+  SessionSpend,
   SettingsPermissions,
   SettingsPort,
   SettingsSourceInfo,
@@ -782,6 +798,49 @@ export interface PaneSessionRequest {
   /** Everything that happens, in order, as it happens. */
   emit(event: SessionEvent): void;
   envOptions?: ResolveOptions;
+  /**
+   * What this session may spend before it stops and offers to continue (`024`).
+   *
+   * Resolved by `paneBudget` when absent, which is the case in the app: the ceiling is a policy
+   * decision and lives in `session-budget.ts` rather than at this call site. The argument exists so
+   * a test — or a Continue granting a fresh allowance — can state one without editing the default.
+   */
+  budget?: Partial<Pick<BudgetPolicy, "maxBudgetUsd" | "maxTurns">>;
+  /**
+   * The figures a CONTINUED conversation carries in — its lifetime estimate and turn count, with a
+   * fresh allowance already applied by `renewAllowance`.
+   *
+   * Seeded here rather than merged by the caller so there is one accumulator rather than two. The
+   * SDK's own cost counter restarts with the resumed query, which is exactly what an allowance is;
+   * what must NOT restart is the total the user is shown, and this is how it survives.
+   */
+  spend?: SessionSpend;
+  /** How hard the model thinks per turn. Changeable afterwards through `setEffort`. */
+  effort?: SessionEffort;
+  /** The model to run on, or null for the CLI's own default. Changeable through `setModel`. */
+  model?: string | null;
+  /**
+   * A CLI session id to resume — the whole of what makes Continue a door rather than a restart.
+   *
+   * The transcript lives on disk under the CLI's own session store (`persistSession`, which this
+   * query passes explicitly rather than inheriting), so resuming picks the conversation up with
+   * every turn intact and the SDK's own spend counter back at zero. That is exactly "a fresh
+   * allowance for the same conversation", and it is why the ceiling can be set low enough to fire.
+   */
+  resume?: string | null;
+  /**
+   * Send the model a pacing budget. True in the app, and false only on the reopen that follows a
+   * model refusing one — see `isPacingUnsupported` and `onPacingRejected` below.
+   */
+  pacing?: boolean;
+  /**
+   * The model would not accept a pacing budget, so the session has to be reopened without one.
+   *
+   * A CALLBACK RATHER THAN AN EVENT, because the caller is the only thing that can act on it: this
+   * closure owns no child and no entry, and cannot restart itself. Measured behaviour, not a
+   * defensive branch — Haiku 4.5 answers every turn with a 400 while `taskBudget` is set.
+   */
+  onPacingRejected?(): void;
 }
 
 export interface PaneSession {
@@ -875,8 +934,39 @@ export interface PaneSession {
   stop(): Promise<{ stillQueued: string[] }>;
   /** End the session and release the CLI. Idempotent, and safe before the import resolves. */
   close(): void;
-  /** Resolves when the session is over. Never rejects. */
-  ended: Promise<{ error: string | null }>;
+  /**
+   * Resolves when the session is over. Never rejects.
+   *
+   * `reason` is what `024` added and it is the whole difference between a door and a crash: a
+   * ceiling ends the query exactly as a failure does, and a caller that cannot tell them apart
+   * cannot offer to continue one and not the other.
+   */
+  ended: Promise<{ error: string | null; reason: SessionEndReason; spend: SessionSpend }>;
+  /**
+   * The CLI's own session id, once the session has initialised — what a Continue resumes against.
+   *
+   * Null until the init message arrives, which is also the window in which nothing has been spent,
+   * so there is nothing to continue from yet.
+   */
+  sessionId(): string | null;
+  /** What has been spent, as an estimate, right now. */
+  spend(): SessionSpend;
+  /**
+   * Change the effort level for the turns to come.
+   *
+   * Applied from the NEXT turn — the SDK is explicit about that — and the conversation is untouched,
+   * which is the property that makes this a header control rather than a reason to start again.
+   */
+  setEffort(effort: SessionEffort): Promise<boolean>;
+  /**
+   * Change the model, mid-conversation.
+   *
+   * Applied DURING the current turn: whatever Claude is already generating finishes on the old
+   * model and the next model call uses the new one. The transcript is unaffected either way.
+   */
+  setModel(model: string | null): Promise<boolean>;
+  /** What this session could run on, as the CLI lists it. Empty when it cannot be asked. */
+  models(): Promise<SessionModel[]>;
 }
 
 /**
@@ -952,6 +1042,32 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
   const { env } = agentChildEnv(request.envOptions);
 
   /**
+   * The three ceilings, and the running figure they are measured against.
+   *
+   * `spend` moves in exactly one place — the `result` branch of the read loop, behind the same
+   * guard that decides whether a result was a turn at all. That is not tidiness: a
+   * `shouldQuery: false` append is answered by its own zero-cost result, and a spend figure fed
+   * from anywhere else would count an append that cost nothing as a turn that did.
+   */
+  const policy = paneBudget(request.budget);
+  let spend = request.spend ?? newSpend(policy);
+
+  /**
+   * The two levers the header can move on a LIVE session, and the model the CLI actually chose.
+   *
+   * Held here rather than derived from the query because both are set-once-then-changed: `effort`
+   * goes in at the query and afterwards through `applyFlagSettings`, and `model` is whatever the
+   * caller asked for — or, until it asks for anything, whatever the CLI's own default turns out to
+   * be, which is only knowable from the init message.
+   */
+  let effort: SessionEffort = request.effort ?? DEFAULT_EFFORT;
+  let activeModel: string | null = request.model ?? null;
+  /** Announced once, on the first init. Every later turn re-inits and would re-announce the same. */
+  let announcedSettings = false;
+  /** Latched so one refused pacing budget produces one reopen, not one per turn. */
+  let pacingRejected = false;
+
+  /**
    * What a PERSON opened, mid-session, by answering a prompt.
    *
    * `020` resolved the readable set once and handed the same array to the hook and the disclosure.
@@ -1025,11 +1141,46 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     }
   }
 
-  let query: { close(): void; interrupt(): Promise<{ still_queued?: string[] } | undefined> } | null = null;
-  let resolveEnded: (value: { error: string | null }) => void = () => {};
-  const ended = new Promise<{ error: string | null }>((resolve) => {
+  let query: {
+    close(): void;
+    interrupt(): Promise<{ still_queued?: string[] } | undefined>;
+    setModel(model?: string): Promise<void>;
+    applyFlagSettings(settings: { effortLevel?: SessionEffort | null }): Promise<void>;
+    supportedModels(): Promise<
+      Array<{
+        value: string;
+        displayName?: string;
+        description?: string;
+        supportsEffort?: boolean;
+        supportedEffortLevels?: readonly string[];
+      }>
+    >;
+  } | null = null;
+  type Ending = { error: string | null; reason: SessionEndReason; spend: SessionSpend };
+  let resolveEnded: (value: Ending) => void = () => {};
+  const ended = new Promise<Ending>((resolve) => {
     resolveEnded = resolve;
   });
+
+  /** The CLI's own id for this conversation, read off the init message. What a Continue resumes. */
+  let cliSessionId: string | null = request.resume ?? null;
+
+  /**
+   * The ceiling that ended the query, recorded off the RESULT rather than off the teardown.
+   *
+   * MEASURED, AND THE ONE THING THAT MAKES THE DOOR WORK — and the teardown it has to survive comes
+   * in two shapes, which is why the reason is latched rather than derived at the exit:
+   *
+   *   • ONE-SHOT: the SDK delivers the `error_max_budget_usd` result, the child exits non-zero, and
+   *     the very next turn of the `for await` THROWS — `Claude Code returned an error result:
+   *     Reached maximum budget ($0.50)`. Left alone that lands in the catch below and the pane
+   *     reports a crash: an error banner, no reason, no Continue, and a transcript the user has
+   *     every right to carry on from looking exactly like one that broke.
+   *   • STREAMING INPUT, which is what the pane is: nothing tears down at all. The pump is still
+   *     open, so the query stays alive and answers every further turn with another error result.
+   *     See the `break` in the read loop — that exit is the pane's, not the SDK's.
+   */
+  let ceilingHit: SessionEndReason | null = null;
 
   /** Last-resort key for a CLI too old to send `requestId`. Ascending, so it cannot collide. */
   let askSeq = 0;
@@ -1080,6 +1231,39 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     return opened;
   };
 
+  /**
+   * Tell the pane which model it is on, which effort, and what else it could pick.
+   *
+   * `supportedModels()` is a control request to the running CLI, so it cannot be answered before
+   * the session exists and it can fail on a CLI too old to answer — in which case the selector
+   * simply has nothing to offer and the header still states the model in force. Never throws: a
+   * header control is not worth losing a session over.
+   */
+  const announceSettings = async (model: string | null): Promise<void> => {
+    activeModel = activeModel ?? model;
+    let models: SessionModel[] = [];
+    try {
+      const supported = (await query?.supportedModels()) ?? [];
+      models = supported.map((entry) => ({
+        id: entry.value,
+        label: entry.displayName ?? entry.value,
+        description: entry.description ?? "",
+        // Filtered against the levels this app knows how to send, rather than passed through: the
+        // CLI's list is the authority on what a model accepts, and `SessionEffort` is the authority
+        // on what this wire can carry.
+        effortLevels:
+          entry.supportsEffort === false
+            ? []
+            : ((entry.supportedEffortLevels ?? EFFORT_LEVELS).filter((level) =>
+                (EFFORT_LEVELS as readonly string[]).includes(level)
+              ) as SessionEffort[]),
+      }));
+    } catch {
+      /* a CLI that will not list its models still runs on one — the header says which */
+    }
+    emit({ kind: "settings", effort, model: activeModel, models });
+  };
+
   /** The hook output that routes a call into the prompt instead of answering it. */
   const askHook = (reason: string) => ({
     hookSpecificOutput: {
@@ -1125,13 +1309,31 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     }
   };
 
-  const finish = (error: string | null): void => {
+  /**
+   * End the session once, saying WHY.
+   *
+   * The reason is not derived from `error` and must not be: a ceiling produces an error string (the
+   * SDK throws one, see `ceilingHit`) and is not a failure, while a session closed by a person
+   * produces no string at all. `canContinue` follows the reason rather than the error for the same
+   * reason — a session that broke is not a session that ran out of allowance.
+   */
+  const finish = (error: string | null, reason: SessionEndReason = error ? "error" : "closed"): void => {
     if (!closed) closed = true;
     releasePermissions(TEARDOWN_DENIAL);
     wake?.(null);
     wake = null;
-    emit({ kind: "ended", error });
-    resolveEnded({ error });
+    const ceiling = reason === "budget" || reason === "turns";
+    if (ceiling) spend = exhaust(spend, reason === "budget" ? "budget" : "turns");
+    emit({
+      kind: "ended",
+      error: ceiling ? null : error,
+      reason,
+      spend,
+      // The door, and only for a ceiling: continuing needs a transcript on disk to resume against,
+      // which is exactly what a session that ran out of allowance still has.
+      canContinue: ceiling && cliSessionId !== null,
+    });
+    resolveEnded({ error, reason, spend });
   };
 
   /**
@@ -1216,6 +1418,33 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           additionalDirectories: [...request.additionalDirectories],
           tools: [...PANE_TOOLS],
           disallowedTools: [...SESSION_DISALLOWED_TOOLS],
+          // ── WHAT THIS SESSION MAY SPEND (`024`) ────────────────────────
+          // Three limits, and they are three different mechanisms rather than one written three
+          // ways. `maxBudgetUsd` is the hard stop: the CLI compares its own client-side estimate
+          // against it and ends the query, which is why the pane has to offer a door out of it.
+          // `taskBudget` is the opposite kind of thing — the API tells the MODEL how much room is
+          // left, so it paces and wraps up instead of being cut off mid-write. And `maxTurns` is
+          // the brake for the loop neither of the others catches: cheap per turn, never converging.
+          maxBudgetUsd: policy.maxBudgetUsd,
+          maxTurns: policy.maxTurns,
+          // Omitted entirely rather than zeroed on the reopen: a model that refused one must not be
+          // sent a smaller one, it must be sent none. See `isPacingUnsupported`.
+          ...(request.pacing === false ? {} : { taskBudget: { total: policy.pacingTokens } }),
+          effort,
+          // Null means the CLI's own default, which is what a session that has never touched the
+          // model selector should get — not this app's opinion of which model to use.
+          ...(request.model ? { model: request.model } : {}),
+          // THE TRANSCRIPT HAS TO OUTLIVE THE QUERY, or the ceiling has no door. Passed explicitly
+          // rather than left to the SDK's `true` default, because the whole of Continue rests on it
+          // and a diff that turned it off would break resuming while every test still passed.
+          persistSession: true,
+          // The same conversation, picked up where the last allowance ran out. Absent on a session
+          // the user started themselves.
+          ...(request.resume ? { resume: request.resume } : {}),
+          // A budget can land mid-write. Checkpointing is what makes that recoverable rather than
+          // merely reported — the files the interrupted turn had already touched are tracked, so a
+          // rewind is possible without re-deriving what changed from the transcript.
+          enableFileCheckpointing: true,
           // PREVIEWS ARE OPT-IN, AND THIS IS THE OPT-IN. Without it Claude emits no `preview` on
           // any `AskUserQuestion` option — not a shorter one, none at all — and the choice arrives
           // as a bare list of labels. It is the second of this feature's two mechanical
@@ -1490,8 +1719,32 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
       }
 
       for await (const message of q) {
+        if (message.type === "system" && message.subtype === "init") {
+          // ONE INIT PER TURN, not one per session — measured, and it is why this branch assigns
+          // rather than appends. What it is here for is the session id: it is the handle a Continue
+          // resumes against, and on a resumed query it comes back UNCHANGED, which is the evidence
+          // that continuing is the same conversation rather than a new one wearing its transcript.
+          cliSessionId = message.session_id ?? cliSessionId;
+          if (!announcedSettings) {
+            announcedSettings = true;
+            void announceSettings(message.model ?? null);
+          }
+          continue;
+        }
         if (message.type === "assistant") {
           for (const event of assistantEvents(message.message?.content)) emit(event);
+          // THE PACING BUDGET IS A MODEL PROPERTY AND NOTHING ADVERTISES IT. A model that will not
+          // accept one answers every turn with a 400 and does no work at all, so this is checked on
+          // the way past rather than waited for: the caller reopens the session without the budget,
+          // and the conversation carries on.
+          if (
+            request.pacing !== false &&
+            !pacingRejected &&
+            paneTextOf(message.message?.content).some(isPacingUnsupported)
+          ) {
+            pacingRejected = true;
+            request.onPacingRejected?.();
+          }
           continue;
         }
         if (message.type === "system" && message.subtype === "permission_denied") {
@@ -1519,17 +1772,56 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           if (awaitingTurns > 0) awaitingTurns--;
           else if (spent === 0 || spent === null) continue;
 
+          // THE RUNNING FIGURE IS FED FROM HERE AND NOWHERE ELSE, behind the guard above, because
+          // the guard is the only thing that knows an append cost nothing. `total_cost_usd` is
+          // CUMULATIVE for the query rather than the price of this turn — measured; see
+          // `accrueTurn`, which is why this is not a `+=`.
+          // A CEILING IS NOT A FAILURE, and this is the one place that can tell the difference.
+          const ceiling = ceilingOf(message.subtype);
+          spend = accrueTurn(spend, spent);
           emit({
             kind: "turn",
             ok: message.subtype === "success" && !message.is_error,
-            error: message.subtype === "success" && !message.is_error ? null : `The turn ended as ${message.subtype}.`,
+            error: ceiling
+              ? ceilingTurnNote(ceiling)
+              : message.subtype === "success" && !message.is_error
+                ? null
+                : `The turn ended as ${message.subtype}.`,
             costUsd: spent,
           });
+          emit({ kind: "spend", spend });
+
+          if (ceiling) {
+            ceilingHit = ceiling;
+            // AND IT IS ACTED ON HERE, RATHER THAN WAITED OUT. MEASURED IN A WINDOW, and it is the
+            // difference between a ceiling and a decoration: with a streaming-input pump the query
+            // does NOT tear itself down after the budget result. The pump is still open, so the CLI
+            // takes the next turn, answers it with another error result within milliseconds, and
+            // goes on doing that forever — 12 turns in 1.6 seconds, none of which reached the
+            // model. A latch that only fires where the stream ENDS therefore never fires at all:
+            // the composer stays enabled and every turn after the ceiling is a silent no-op.
+            // Leaving the loop is what makes the ending an ending. (The latch is still read in the
+            // `catch` below, for the shape where the SDK throws instead of yielding a result.)
+            break;
+          }
         }
       }
-      finish(null);
+      // The ceiling's exit leaves the SDK holding the child, where the stream's own end does not.
+      // `finish` first, so the ending is on screen before anything can fail: closing is teardown of
+      // a session that has already ended, not part of ending it.
+      finish(null, ceilingHit ?? "closed");
+      if (ceilingHit) {
+        try {
+          query?.close();
+        } catch {
+          /* already gone — the ending has been reported either way */
+        }
+      }
     } catch (err) {
-      finish(err instanceof Error ? err.message : String(err));
+      // The ceiling's own teardown arrives here as a throw — see `ceilingHit`. Reading the latch
+      // first is what turns "the session crashed" back into "the session reached its ceiling".
+      if (ceilingHit) return finish(null, ceilingHit);
+      finish(err instanceof Error ? err.message : String(err), "error");
     }
   })();
 
@@ -1617,6 +1909,48 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     pendingPermissions(): string[] {
       return permissions.pending();
     },
+    sessionId(): string | null {
+      return cliSessionId;
+    },
+    spend(): SessionSpend {
+      return { ...spend };
+    },
+    async setEffort(level: SessionEffort): Promise<boolean> {
+      // `applyFlagSettings` writes into the flag layer the query's own options populate, so this is
+      // the same setting arriving by a different door rather than a second notion of effort. It
+      // takes effect from the next turn; the transcript is untouched.
+      try {
+        await query?.applyFlagSettings({ effortLevel: level });
+        effort = level;
+        void announceSettings(activeModel);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async setModel(model: string | null): Promise<boolean> {
+      try {
+        // `undefined` — not `null` — is the SDK's "back to the session default".
+        await query?.setModel(model ?? undefined);
+        activeModel = model;
+        void announceSettings(model);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async models(): Promise<SessionModel[]> {
+      try {
+        return ((await query?.supportedModels()) ?? []).map((entry) => ({
+          id: entry.value,
+          label: entry.displayName ?? entry.value,
+          description: entry.description ?? "",
+          effortLevels: entry.supportsEffort === false ? [] : [...EFFORT_LEVELS],
+        }));
+      } catch {
+        return [];
+      }
+    },
     async stop(): Promise<{ stillQueued: string[] }> {
       try {
         // THE RECEIPT IS READ, not discarded. On a CLI advertising `interrupt_receipt_v1` this
@@ -1642,6 +1976,14 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
       query?.close();
     },
   };
+}
+
+/** Just the text blocks of an assistant message — for reading what the API said, not for rendering. */
+function paneTextOf(content: unknown): string[] {
+  if (!Array.isArray(content)) return [];
+  return (content as Array<Record<string, unknown>>)
+    .filter((block) => block?.type === "text" && typeof block.text === "string")
+    .map((block) => String(block.text));
 }
 
 /** Assistant text and tool calls, as separate transcript entries rather than one rendered string. */

@@ -287,6 +287,33 @@ export {
   type PaneVerdict,
 } from "./session-permission.js";
 
+// What a session may SPEND, and what it says when it has spent it. Pure, and a fifth module beside
+// the four scope ones for the same reason they are four: a ceiling that ends the session is a
+// different decision from one that refuses a call, and the door out of it — Continue, resuming the
+// same conversation with a fresh allowance — is the only thing that makes a low ceiling usable.
+export {
+  accrueTurn,
+  ceilingEnding,
+  ceilingOf,
+  exhaust,
+  formatUsd,
+  isEffortLevel,
+  isPacingUnsupported,
+  newSpend,
+  pacingTokens,
+  paneBudget,
+  renewAllowance,
+  spendLabel,
+  spendNote,
+  DEFAULT_CEILING_USD,
+  DEFAULT_EFFORT,
+  DEFAULT_MAX_TURNS,
+  EFFORT_LEVELS,
+  PACING_UNSUPPORTED_NOTICE,
+  type BudgetPolicy,
+  type CeilingEnding,
+} from "./session-budget.js";
+
 // The parked promises behind that ask: idempotent per request id, and resolved — denied — by every
 // teardown path, because permission prompts do not time out and nothing else will. Pure.
 export {

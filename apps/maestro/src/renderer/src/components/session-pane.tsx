@@ -37,6 +37,7 @@ import {
   Terminal,
   Trash2,
   Undo2,
+  Wallet,
   Wrench,
   X,
 } from "lucide-react";
@@ -56,6 +57,20 @@ import type {
 
 /** What to type in a Claude Code session to reach the same help the deleted chat asked for. */
 const HELP_SKILL = "/super-help";
+
+/**
+ * A dollar figure, formatted for a header.
+ *
+ * NOT imported from `src/core/session-budget.ts`, and that is the boundary rather than an oversight:
+ * the renderer may reach `contracts` and `text` under `src/core` and nothing else, which
+ * `test/isolation.test.ts` enforces. Nothing is decided here — the numbers, the ceiling and every
+ * sentence about them are main's — this only renders one.
+ */
+function usd(value: number): string {
+  const n = Math.max(0, value);
+  if (n === 0) return "$0.00";
+  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+}
 
 export default function SessionPane() {
   const session = useSession();
@@ -87,9 +102,15 @@ export default function SessionPane() {
 
   if (!session.open) return null;
 
+  // A session that stopped at its ceiling still has a transcript on screen, and typing into it must
+  // not quietly start a DIFFERENT conversation: `say` would start a fresh session, the pane would
+  // look identical, and the model would have none of what is above the composer. Continue is the
+  // only way on from here, so the composer says so and refuses.
+  const exhausted = Boolean(session.info?.canContinue);
+
   const submit = () => {
     const text = input.trim();
-    if (!text || session.busy || noProject) return;
+    if (!text || session.busy || noProject || exhausted) return;
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     void session.say(text);
@@ -150,6 +171,15 @@ export default function SessionPane() {
           </button>
         </div>
       </header>
+
+      {/*
+        THE THREE LEVERS, ON THE HEADER RATHER THAN BEHIND THE EYE. What a session has spent, how
+        hard it thinks, and which model it runs on are the controls a user reaches for mid-
+        conversation; the scope panel below is a disclosure they open when they want one. Effort and
+        model both change a LIVE session without losing the transcript, which is the only reason
+        they can be controls at all rather than reasons to start again.
+      */}
+      {session.info && !noProject && <SessionControls />}
 
       {/*
         THE SCOPE IS DISCLOSED, NOT IMPLIED, and by the same component the confirmation dialog uses.
@@ -242,6 +272,13 @@ export default function SessionPane() {
         </div>
       )}
 
+      {/*
+        THE DOOR IN THE CEILING, pinned exactly where a pending prompt is and for the same reason:
+        it is the one thing the user can do next, and a transcript scrolls. It replaces nothing —
+        the conversation above it is intact, which is the whole claim this button is making.
+      */}
+      {session.info?.canContinue && <ContinueCard />}
+
       <div className="border-t border-(--line) px-4 py-3 shrink-0">
         <div className="flex items-end gap-2">
           <textarea
@@ -256,8 +293,14 @@ export default function SessionPane() {
                 submit();
               }
             }}
-            disabled={noProject}
-            placeholder={noProject ? "Open a project first…" : "Ask about this project…"}
+            disabled={noProject || exhausted}
+            placeholder={
+              noProject
+                ? "Open a project first…"
+                : exhausted
+                  ? "This session reached its ceiling — press Continue to carry on."
+                  : "Ask about this project…"
+            }
             className="min-h-9 max-h-40 flex-1 resize-none rounded-md border border-(--line) bg-(--bg) px-3 py-2 text-[13px] text-(--ink) placeholder-subtle outline-none transition focus:border-primary disabled:opacity-50"
             style={{ lineHeight: "1.4" }}
           />
@@ -265,7 +308,7 @@ export default function SessionPane() {
             type="button"
             data-testid="session-send"
             onClick={submit}
-            disabled={!input.trim() || session.busy || noProject}
+            disabled={!input.trim() || session.busy || noProject || exhausted}
             aria-label="Send"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary text-white transition hover:brightness-110 disabled:opacity-40 cursor-pointer focus:outline-none border-0"
           >
@@ -278,6 +321,169 @@ export default function SessionPane() {
         </p>
       </div>
     </aside>
+  );
+}
+
+/**
+ * The header's row of levers: what has been spent, how hard it thinks, what it runs on.
+ *
+ * THE SPEND FIGURE IS AN ESTIMATE AND SAYS SO IN THE MARKUP ITSELF — the `≈`, the word "estimate",
+ * and the title text spelling out that it is Claude Code's own client-side figure against a
+ * subscription rather than an invoice. It is the same figure the ceiling is compared against, which
+ * is exactly why it must not be rendered as an accounting number: a user who reconciles it against
+ * a bill will find it does not match, and will trust nothing else on this header either.
+ *
+ * The two selectors change a session in flight. `effort` applies from the next turn, `model` during
+ * the current one, and neither touches the conversation — which is what makes them belong here
+ * rather than in a "start a new session with…" dialog.
+ */
+function SessionControls() {
+  const session = useSession();
+  const info = session.info;
+  if (!info) return null;
+
+  const { spend } = info;
+  const share = spend.ceilingUsd > 0 ? Math.min(1, spend.allowanceUsd / spend.ceilingUsd) : 0;
+  const models = info.models;
+  // What the CURRENT model will actually accept. A level the model refuses is not offered, rather
+  // than offered and silently ignored — see `ModelInfo.supportedEffortLevels`.
+  const levels = models.find((m) => m.id === info.model)?.effortLevels ?? ["low", "medium", "high", "xhigh", "max"];
+
+  return (
+    <div
+      data-testid="session-controls"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-(--line) px-4 py-2 shrink-0"
+    >
+      <span
+        data-testid="session-spend"
+        data-estimate={spend.estimateUsd}
+        data-allowance={spend.allowanceUsd}
+        data-ceiling={spend.ceilingUsd}
+        data-turns={spend.turns}
+        data-allowances={spend.allowances}
+        title={
+          `An estimate, not a bill — Claude Code's own client-side figure, the same one the ceiling is measured ` +
+          `against, and the work draws on your subscription. ${spend.turns} turn${spend.turns === 1 ? "" : "s"}` +
+          `${spend.allowances > 1 ? `, ${usd(spend.estimateUsd)} across ${spend.allowances} allowances` : ""}. ` +
+          `The session stops at the ceiling and offers to continue.`
+        }
+        className="inline-flex items-center gap-1.5 text-[10px] text-(--ink-3) cursor-help"
+      >
+        <span className="font-mono text-(--ink-2)">
+          ≈ {usd(spend.allowanceUsd)} / {usd(spend.ceilingUsd)}
+        </span>
+        <span className="h-1 w-10 overflow-hidden rounded-full bg-(--bg-elev)">
+          <span
+            className={`block h-full ${share > 0.8 ? "bg-amber-500" : "bg-primary"}`}
+            style={{ width: `${Math.round(share * 100)}%` }}
+          />
+        </span>
+        <span>estimate</span>
+      </span>
+
+      <label className="inline-flex items-center gap-1 text-[10px] text-(--ink-3)">
+        Effort
+        <select
+          data-testid="session-effort"
+          value={info.effort}
+          disabled={!session.live}
+          onChange={(e) => void session.setEffort(e.target.value as (typeof levels)[number])}
+          className="rounded-md border border-(--line) bg-(--bg) px-1.5 py-0.5 text-[10px] text-(--ink) outline-none focus:border-primary disabled:opacity-50"
+        >
+          {levels.map((level) => (
+            <option key={level} value={level}>
+              {level}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="inline-flex min-w-0 items-center gap-1 text-[10px] text-(--ink-3)">
+        Model
+        <select
+          data-testid="session-model"
+          data-count={models.length}
+          value={info.model ?? ""}
+          disabled={!session.live || models.length === 0}
+          onChange={(e) => void session.setModel(e.target.value === "" ? null : e.target.value)}
+          className="max-w-[9rem] truncate rounded-md border border-(--line) bg-(--bg) px-1.5 py-0.5 text-[10px] text-(--ink) outline-none focus:border-primary disabled:opacity-50"
+        >
+          {/*
+            The CLI's own default, named as such — this app has no opinion about which model. Only
+            when the CLI's own list does not already carry a `default` row: measured, it does
+            (`default`, `sonnet`, `opus`, `haiku`, …), and two rows meaning the same thing in one
+            selector is a choice the user has to guess at.
+          */}
+          {!models.some((m) => m.id === "default") && <option value="">default</option>}
+          {models.map((model) => (
+            <option key={model.id} value={model.id} title={model.description}>
+              {model.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+/**
+ * The door out of the ceiling.
+ *
+ * A CEILING WITHOUT THIS IS A CEILING PEOPLE RAISE UNTIL IT NEVER FIRES. Ending the query on a
+ * conversation ends the conversation, so the first time a user loses a transcript to a spend limit
+ * they set it high enough never to be hit again — and it stops being a control. This button is what
+ * makes the low default defensible: the transcript above it is intact, the session on the other
+ * side is RESUMED rather than restarted, and the only thing that changes is that the user has
+ * agreed to another allowance.
+ */
+function ContinueCard() {
+  const session = useSession();
+  const info = session.info;
+  if (!info) return null;
+  // Which ceiling stopped it. The two get different words because they mean different things: one
+  // ran out of money, the other ran out of patience with a loop.
+  const turnCeiling = info.endReason === "turns";
+
+  return (
+    <div data-testid="session-continue-card" className="border-t border-(--line) px-4 pt-3 shrink-0">
+      <div className="mb-2 rounded-xl border border-primary/40 bg-(--primary-dim) px-3 py-2.5">
+        <div className="flex items-start gap-2">
+          <Wallet size={14} className="mt-0.5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-[12px] font-semibold text-(--ink)">
+              {turnCeiling
+                ? `Stopped at ${info.spend.maxTurns} turn${info.spend.maxTurns === 1 ? "" : "s"}`
+                : `Stopped at its ceiling of ${usd(info.spend.ceilingUsd)}`}
+            </p>
+            <p className="m-0 mt-0.5 text-[11px] text-(--ink-2)">
+              This conversation used ≈ {usd(info.spend.allowanceUsd)} — an estimate, not a bill. Nothing has been lost:
+              continuing resumes it with a fresh {usd(info.spend.ceilingUsd)} allowance, and nothing is spent until you
+              do.
+              {turnCeiling ? " Read what it was doing first, in case it was going in circles." : ""}
+            </p>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            data-testid="session-continue"
+            disabled={session.continuing}
+            onClick={() => void session.continueSession()}
+            className="inline-flex items-center gap-1 rounded-md border-0 bg-primary px-2.5 py-1 text-[11px] text-white hover:brightness-110 disabled:opacity-40 cursor-pointer focus:outline-none"
+          >
+            <Play size={11} /> {session.continuing ? "Continuing…" : "Continue"}
+          </button>
+          <button
+            type="button"
+            data-testid="session-continue-discard"
+            onClick={() => void session.end()}
+            className="inline-flex items-center gap-1 rounded-md border border-(--line) bg-(--bg) px-2.5 py-1 text-[11px] text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+          >
+            <Trash2 size={11} /> Discard
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -886,10 +1092,24 @@ function Entry({
     );
   }
 
+  // WHY it ended, not just that it did. A ceiling is not a failure and must not read as one: the
+  // transcript is intact and the Continue card is pinned below, so this line says which ceiling and
+  // leaves the alarm for the endings that have earned it.
+  const ENDED: Record<typeof entry.reason, string> = {
+    closed: "Session ended.",
+    error: `Session ended: ${entry.error ?? "no reason given"}`,
+    budget: `Session reached its spend ceiling after ≈ ${usd(entry.spend?.allowanceUsd ?? 0)} (an estimate).`,
+    turns: `Session reached its ceiling of ${entry.spend?.maxTurns ?? 0} turn${entry.spend?.maxTurns === 1 ? "" : "s"}.`,
+  };
   return (
-    <div data-testid="session-ended" className="mb-3 flex items-center gap-1.5 text-[11px] text-(--ink-3)">
+    <div
+      data-testid="session-ended"
+      data-reason={entry.reason}
+      data-continuable={entry.canContinue ? "yes" : "no"}
+      className="mb-3 flex items-center gap-1.5 text-[11px] text-(--ink-3)"
+    >
       <Play size={11} className="shrink-0 rotate-90" />
-      <span>{entry.error ? `Session ended: ${entry.error}` : "Session ended."}</span>
+      <span>{ENDED[entry.reason]}</span>
     </div>
   );
 }

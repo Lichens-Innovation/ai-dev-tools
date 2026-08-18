@@ -631,12 +631,19 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
 - [x] `Bash` is absent from the session and `git init` is deterministic (`016` + `018`)
 - [x] `acceptEdits` exists nowhere in the app (`018`)
 - [x] No orphaned child process survives window close, project switch, or app quit (`018` + `019`)
-- [ ] A per-session budget ceiling is enforced, surfaced, and continuable — `024`
-- [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`
+- [x] A per-session budget ceiling is enforced, surfaced, and continuable (`024`) — three limits,
+      not one: `maxBudgetUsd` stops, `taskBudget` paces (where the model accepts one), `maxTurns`
+      brakes; and the ending leaves the read loop rather than waiting for a stream end that a
+      streaming-input query never delivers
+- [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`;
+      `024` built the resume half (`persistSession`, `resume`, `sessionId()`, one `openSession`
+      builder), so what is left is the picker, the disclosure and `forkSession`
 - [ ] `test/isolation.test.ts` pins the invariant properties above — partially; `019` added the
       **"the session pane"** describe, `020` added three blocks to it, `023` widened one of those
-      and added two more, and `022` replaced the empty-write-scope block with one that pins how the
-      scope grows and added a block for the no-turn seed
+      and added two more, `022` replaced the empty-write-scope block with one that pins how the
+      scope grows and added a block for the no-turn seed, and `024` added two — the ceiling's two
+      exits with the token-only continue wire, and the two header levers choosing from lists main
+      published
 
 ## Drift log — where the build left the plan
 
@@ -801,3 +808,39 @@ else can" is what shipped; four things about how are not on the page above.
   project's `README.md` raising `020`'s prompt with no grant button and leaving the scope at one
   entry when allowed, the headless **Run** path unchanged (`ok` in 26.7s, no session, no scope), and
   a project switch clearing it to `writable: []`.
+
+### `024` — a budget ceiling you can continue past
+
+"Budget is a ceiling with a door" is what shipped, and the door is `session:continue`. The policy and
+every sentence the user reads about it live in one new pure module, `src/core/session-budget.ts`,
+beside the four scope ones. Five things on the page above were wrong or missing.
+
+- **THE CEILING DOES NOT END A STREAMING-INPUT QUERY, and the pane is one.** This page says "hitting
+  it **ends the query**", which is true of a one-shot prompt and false of the pump. Measured: after
+  the `error_max_budget_usd` result the pump is still open, so the CLI takes the next turn and answers
+  it with another error result — 12 turns in 1.6 seconds, none reaching the model, with the pane
+  looking alive and the composer enabled. The read loop therefore **leaves** on a ceiling (`break`,
+  `finish`, `query.close()`); the latch is still read in the `catch` for the one-shot shape, which
+  does throw. A latch alone makes the ceiling decoration.
+- **`maxTurns` counts AGENT turns inside one request, not user messages.** Twelve one-word user turns
+  under `maxTurns: 1` never trip it. Anyone writing a turn-ceiling probe needs this first.
+- **`total_cost_usd` is CUMULATIVE for the query** (0.00196, 0.00351, 0.00529, 0.00726 over four
+  one-word turns), so `accrueTurn` takes the latest with `Math.max` rather than summing, fed from the
+  same outstanding-turn guard `022` added. And a pane turn is not cheap: the first costs ≈ $0.01–$0.10
+  depending on cache state, so the $0.50 default is tens of turns, not hundreds — which is why
+  `sessionBudget()` reads `MAESTRO_SESSION_CEILING_USD` / `MAESTRO_SESSION_MAX_TURNS` from the
+  launching process's environment only, on the `MAESTRO_AGENT_SDK_SMOKE` precedent, so the ceiling can
+  be demonstrated for cents rather than never demonstrated at all.
+- **`taskBudget` is refused outright by some models and nothing advertises which.** Measured on Haiku
+  4.5: every turn returns `API Error: 400 This model does not support user-configurable task budgets`
+  and does no work; `ModelInfo` has `supportsEffort` and no equivalent. `isPacingUnsupported` spots
+  it, `onPacingRejected` fires once, and `reopenWithoutPacing` resumes the conversation with the
+  budget **omitted** rather than zeroed. The hard ceiling is unchanged, so nothing widens.
+- **One builder, and the exhausted entry survives.** `openSession` in `claude-session.ts` serves
+  start, continue and the pacing reopen through a `CarriedSession` (resume id, spend, grants, writes,
+  effort, model, pacing) — every field main's own record — so a resumed session cannot get a different
+  tool set or boundary. The `LiveSession` entry is kept **only** for a ceiling, because it holds the
+  id `session:continue` resumes against; all three teardown paths are unchanged. `025` inherits this:
+  `persistSession: true`, `resume`, `PaneSession.sessionId()` and the builder already exist, and what
+  remains there is listing the user's own sessions and choosing one — plus `forkSession`, which
+  Continue deliberately does not do.

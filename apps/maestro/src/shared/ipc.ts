@@ -61,9 +61,14 @@ import type {
   SessionGrant,
   SessionGrantOption,
   SessionPermissionUpdate,
+  SessionEffort,
+  SessionEndReason,
   SessionEvent,
   SessionInfo,
+  SessionModel,
+  SessionSpend,
   SessionWrite,
+  SpendCeiling,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -134,9 +139,14 @@ export type {
   SessionGrant,
   SessionGrantOption,
   SessionPermissionUpdate,
+  SessionEffort,
+  SessionEndReason,
   SessionEvent,
   SessionInfo,
+  SessionModel,
+  SessionSpend,
   SessionWrite,
+  SpendCeiling,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -292,6 +302,17 @@ export const IPC = {
   // Take back a directory the user granted earlier in this session. Narrows only: it can remove an
   // entry from the grant list and has no shape by which it could add one.
   sessionRevoke: "session:revoke",
+  // THE DOOR IN THE SPEND CEILING (`024`). A session that reached its ceiling ended cleanly and left
+  // its transcript on disk; this resumes THAT conversation with a fresh allowance. It carries the
+  // session id and nothing else — the id to resume against, the figures and the scope all come off
+  // the record main is already holding, so a renderer can no more choose what a continuation
+  // inherits than it can choose a prompt.
+  sessionContinue: "session:continue",
+  // The two levers the header can move on a live session. Both carry a value from a list MAIN
+  // published — an effort level from a closed set, a model id from the CLI's own `supportedModels()`
+  // — and both leave the conversation exactly where it is.
+  sessionEffort: "session:effort",
+  sessionModel: "session:model",
   sessionEnd: "session:end",
   sessionInfo: "session:info",
 
@@ -502,6 +523,33 @@ export interface MaestroApi {
      * False when no grant matches, or when the session is gone. Both are ordinary.
      */
     revoke(id: string, path: string): Promise<boolean>;
+    /**
+     * Continue a session that stopped at its spend or turn ceiling, with a fresh allowance.
+     *
+     * THE ID AND NOTHING ELSE, for the reason `handoff` takes only a token: what the continuation
+     * inherits — the transcript to resume, the lifetime figures, the grants and the write scope —
+     * is main's own record of the conversation that stopped, and there is no argument here by which
+     * a renderer could name a different one or a larger allowance.
+     *
+     * Rejects when the id names no stopped session, and when it names one that ended some other way:
+     * a session that failed is not a session that ran out of allowance.
+     */
+    continue(id: string): Promise<SessionInfo>;
+    /**
+     * Change how hard the model thinks, from the next turn. The transcript is untouched.
+     *
+     * A word from a closed set (`SessionEffort`), checked in main against the same list the session
+     * was configured from. False when the session is gone or the word is not one of them.
+     */
+    setEffort(id: string, effort: SessionEffort): Promise<boolean>;
+    /**
+     * Change the model mid-conversation, from the list `SessionInfo.models` published.
+     *
+     * The id is validated against that list on the main side, so what crosses is a choice from
+     * something this process produced rather than a model name the renderer invented — the same
+     * discipline as a grant's scope word. `null` resets to the CLI's own default.
+     */
+    setModel(id: string, model: string | null): Promise<boolean>;
     /** End the session and reap the CLI's process group. */
     end(): Promise<void>;
     /**

@@ -1036,6 +1036,102 @@ describe("the session pane", () => {
     );
   });
 
+  it("stops a session at a spend ceiling and gives the ending a door", () => {
+    // `024`. THE NAIVE VERSION OF THIS FEATURE DEFEATS ITSELF: reaching the ceiling ends the query,
+    // which on a conversation ends the conversation — so a user who loses a transcript to it raises
+    // the ceiling until it never fires, and the control stops being one. Every assertion here is one
+    // half of the pair that makes a low ceiling survivable, and each of them fails silently: a
+    // ceiling with no reason on the ending reads as a crash, and a crash with no transcript to
+    // resume is a feature nobody will leave switched on.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+
+    // The three limits, and they are three different mechanisms. Dropping `taskBudget` costs the
+    // model its chance to wrap up; dropping `maxTurns` leaves a cheap non-converging loop running
+    // under the dollar ceiling for as long as it likes.
+    expect(pane).toMatch(/maxBudgetUsd: policy\.maxBudgetUsd/);
+    expect(pane).toMatch(/maxTurns: policy\.maxTurns/);
+    expect(pane).toMatch(/taskBudget: \{ total: policy\.pacingTokens \}/);
+    // The transcript has to outlive the query or Continue has nothing to resume. Passed explicitly
+    // rather than left to the SDK default, because a diff that turned it off would break the door
+    // while every test still passed.
+    expect(pane).toMatch(/persistSession: true/);
+    expect(pane).toMatch(/resume: request\.resume/);
+
+    // THE LATCH, and THE EXIT — two assertions because the ceiling arrives in two shapes and only
+    // one of them ends the stream. A one-shot query throws right after the `error_max_budget_usd`
+    // result (the child exits non-zero), so the reason has to be recorded before the catch or a
+    // resumable conversation is rendered as a crash. A STREAMING-INPUT query, which is what the pane
+    // is, does not tear down at all: measured in a window, the pump stays open and the CLI answers
+    // 12 further turns with error results inside 1.6 seconds, none of them reaching the model. So
+    // the read loop must LEAVE on a ceiling rather than wait for an end that never comes — without
+    // the break the composer stays enabled and the ceiling is decoration.
+    expect(pane).toMatch(/const ceiling = ceilingOf\(message\.subtype\);/);
+    expect(pane).toMatch(/ceilingHit = ceiling;\s*break;/);
+    expect(pane).toMatch(/if \(ceilingHit\) return finish\(null, ceilingHit\);/);
+    // And the child is released on the way out, which the stream's own end would have done for us.
+    expect(pane).toMatch(/if \(ceilingHit\) \{\s*try \{\s*query\?\.close\(\);/);
+    // And the door is opened by the REASON, never by the error string.
+    expect(pane).toMatch(/canContinue: ceiling && cliSessionId !== null/);
+
+    // The running figure is fed from the same guard that decides a result was a turn at all — the
+    // `022` lesson, which a second accumulator would quietly undo by counting a zero-cost append.
+    const result = pane.slice(pane.indexOf("const spent = message.total_cost_usd"));
+    expect(result.indexOf("spend = accrueTurn(spend, spent)")).toBeGreaterThan(
+      result.indexOf("else if (spent === 0 || spent === null) continue;")
+    );
+
+    // Main keeps the exhausted entry — it IS what Continue resumes from — and only for a ceiling.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    const cont = session.slice(session.indexOf("export async function continueSession"));
+    // The allowance is the app's own policy — `sessionBudget()` is `paneBudget()` with only the
+    // launching process's environment able to lower it, so no caller can ask for a bigger one.
+    expect(cont).toMatch(/renewAllowance\(entry\.spend, sessionBudget\(\)\)/);
+    expect(cont).toMatch(/resume: entry\.resumeId/);
+    expect(cont, "a session that failed is not one that ran out of allowance").toMatch(/if \(!entry\.endReason/);
+    expect(session).toMatch(/const continuable = \(end\.reason === "budget" \|\| end\.reason === "turns"\)/);
+    expect(session).toMatch(/if \(!continuable\) sessions\.delete\(webContentsId\)/);
+    // One builder for every session there is, so a resumed one cannot end up with a different tool
+    // set, a different boundary or a different ceiling than the one it is continuing.
+    expect((session.match(/startPaneSession\(\{/g) ?? []).length).toBe(1);
+
+    // The wire carries the session id and nothing else — the same discipline as `claude:run`'s
+    // token. An allowance or a transcript id crossing here is the only hole this channel could have.
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.sessionContinue, id\)/);
+    expect(preload, "the renderer picks what a continuation inherits").not.toMatch(/sessionContinue, id,/);
+
+    // The figure is an ESTIMATE wherever it is rendered, and the pane says so in the markup rather
+    // than in a comment: a number the user reconciles against a bill will not match.
+    const paneUi = read("src/renderer/src/components/session-pane.tsx");
+    expect(paneUi).toMatch(/data-testid="session-spend"/);
+    expect(paneUi).toMatch(/estimate, not a bill/);
+    expect(paneUi).toMatch(/data-testid="session-continue"/);
+    // Typing into an exhausted session would silently start a DIFFERENT conversation, which looks
+    // identical and has none of the transcript in front of the model.
+    expect(paneUi).toMatch(/const exhausted = Boolean\(session\.info\?\.canContinue\)/);
+  });
+
+  it("changes effort and model on a live session, from lists main published", () => {
+    // The two header levers, and the reason they are levers at all: both apply to a RUNNING session
+    // without touching the conversation. What is pinned here is the same property the permission
+    // wire has — the renderer chooses from something this process produced and cannot name its own.
+    const session = stripComments(read("src/main/claude-session.ts"));
+    expect(session).toMatch(/isEffortLevel\(effort\)/);
+    expect(session).toMatch(/entry\.models\.some\(\(m\) => m\.id === model\)/);
+
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.sessionEffort, id, effort\)/);
+    expect(preload).toMatch(/invoke\(IPC\.sessionModel, id, model\)/);
+
+    // A model that refuses a pacing budget answers EVERY turn with a 400 and does no work — measured
+    // on Haiku 4.5, and nothing in the model list advertises it. The recovery reopens without the
+    // budget; what it must not do is widen anything, so the hard ceiling is unchanged.
+    expect(session).toMatch(/onPacingRejected: \(\) => void reopenWithoutPacing/);
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/request\.pacing === false \? \{\} : \{ taskBudget/);
+  });
+
   it("ends a session on a project switch and reaps it on quit", () => {
     // A detached process group outlives its parent BY DESIGN — that is how Stop reaches the CLI's
     // own children — so every exit has to kill it. Three exits, and the transcript makes the first

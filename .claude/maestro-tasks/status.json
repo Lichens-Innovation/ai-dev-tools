@@ -129,13 +129,13 @@
     ]
   },
   "024-a-budget-ceiling-you-can-continue-past.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "019-a-live-session-in-the-pane.md"
     ]
   },
   "025-resume-a-session-started-in-the-terminal.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "024-a-budget-ceiling-you-can-continue-past.md"
     ]

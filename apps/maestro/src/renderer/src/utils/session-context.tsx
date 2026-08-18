@@ -21,6 +21,7 @@ import { callMain } from "./call-main";
 import { useProject } from "./project-context";
 import type {
   PermissionChoice,
+  SessionEffort,
   PermissionOutcome,
   PermissionPrompt,
   QuestionChoice,
@@ -109,6 +110,19 @@ interface SessionContextValue {
    * resolves the path from the prompt it asked.
    */
   revoke(path: string): Promise<void>;
+  /**
+   * Carry on a conversation that stopped at its spend or turn ceiling, with a fresh allowance.
+   *
+   * The transcript is kept: the session on the other side is RESUMED rather than restarted, so
+   * clearing it here would throw away the thing the whole ceiling design exists to preserve.
+   */
+  continueSession(): Promise<void>;
+  /** True while that round trip is in flight, so the button cannot be pressed twice. */
+  continuing: boolean;
+  /** Change how hard the model thinks, from the next turn. The conversation is untouched. */
+  setEffort(effort: SessionEffort): Promise<void>;
+  /** Change the model mid-conversation, choosing from `info.models`. Null is the CLI's default. */
+  setModel(model: string | null): Promise<void>;
   /** Interrupt the turn in flight, leaving the session usable. */
   stop(): Promise<void>;
   /** End the session and clear the transcript. */
@@ -131,6 +145,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [info, setInfo] = useState<SessionInfo | null>(null);
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const [starting, setStarting] = useState(false);
+  const [continuing, setContinuing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PermissionPrompt[]>([]);
@@ -159,6 +174,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // outstanding, which is what stops a closed pane leaving a question on screen forever.
         setQuestions((prev) => prev.filter((q) => q.requestId !== event.requestId));
         setOutcomes((prev) => ({ ...prev, [event.requestId]: event.outcome }));
+        return;
+      }
+      if (event.kind === "spend" || event.kind === "settings") {
+        // NOT TRANSCRIPT ENTRIES, for the reason `scope` is not one: they are the header's answer
+        // changing underneath it. A spend line per turn would be a running total nobody reads
+        // pushed between the turns they do; the figure belongs in one place, kept current.
+        setInfo((prev) =>
+          prev
+            ? event.kind === "spend"
+              ? { ...prev, spend: event.spend }
+              : { ...prev, effort: event.effort, model: event.model, models: event.models }
+            : prev
+        );
         return;
       }
       if (event.kind === "scope") {
@@ -197,6 +225,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         sessionId.current = null;
         setLive(false);
         setBusy(false);
+        // THE ENDING'S REASON IS WHAT THE PANE BRANCHES ON. A ceiling is not an error — it produces
+        // no red banner and it leaves the transcript exactly where it is, because the next thing the
+        // user does with it is press Continue. The id is kept in `info` so that button has something
+        // to send; `sessionId.current` is cleared because no turn can go down this session.
+        setInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                spend: event.spend ?? prev.spend,
+                endReason: event.reason,
+                canContinue: event.canContinue,
+              }
+            : prev
+        );
         if (event.error) setError(event.error);
       }
     });
@@ -336,6 +378,49 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) setError(res.error);
   }, []);
 
+  /**
+   * Carry on a conversation that stopped at its ceiling.
+   *
+   * The transcript is deliberately NOT cleared: continuing resumes the same conversation on the
+   * other side, and a pane that wiped what the user was reading would make the ceiling feel like
+   * the loss it exists to avoid. The id sent is the stopped session's, which is the only thing main
+   * needs — everything the continuation inherits is already its own record.
+   */
+  const continueSession = useCallback(async () => {
+    const id = info?.id;
+    if (!id || continuing) return;
+    setContinuing(true);
+    setError(null);
+    try {
+      const res = await callMain(() => window.maestro.session.continue(id));
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setInfo(res.value);
+      sessionId.current = res.value.id;
+      setLive(res.value.id !== null);
+    } finally {
+      setContinuing(false);
+    }
+  }, [continuing, info?.id]);
+
+  /** Effort, from the next turn. Nothing is sent that is not one of the levels main published. */
+  const setEffort = useCallback(async (effort: SessionEffort) => {
+    const id = sessionId.current;
+    if (!id) return;
+    const res = await callMain(() => window.maestro.session.setEffort(id, effort));
+    if (!res.ok) setError(res.error);
+  }, []);
+
+  /** Model, mid-conversation. The id comes from `info.models`, which main resolved from the CLI. */
+  const setModel = useCallback(async (model: string | null) => {
+    const id = sessionId.current;
+    if (!id) return;
+    const res = await callMain(() => window.maestro.session.setModel(id, model));
+    if (!res.ok) setError(res.error);
+  }, []);
+
   const stop = useCallback(async () => {
     const id = sessionId.current;
     if (!id) return;
@@ -369,8 +454,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       waiting: pending.length + questions.length,
       outcomes,
       starting,
+      continuing,
       error,
       start,
+      continueSession,
+      setEffort,
+      setModel,
       handoff,
       say,
       answer,
@@ -383,6 +472,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       answer,
       answerQuestion,
       busy,
+      continuing,
+      continueSession,
       end,
       entries,
       error,
@@ -395,6 +486,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       questions,
       revoke,
       say,
+      setEffort,
+      setModel,
       start,
       starting,
       stop,
@@ -411,4 +504,12 @@ export function useSession(): SessionContextValue {
   return ctx;
 }
 
-export type { PermissionChoice, PermissionPrompt, QuestionChoice, QuestionPrompt, SessionEvent, SessionInfo };
+export type {
+  PermissionChoice,
+  PermissionPrompt,
+  QuestionChoice,
+  QuestionPrompt,
+  SessionEffort,
+  SessionEvent,
+  SessionInfo,
+};

@@ -48,6 +48,7 @@ import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   PermissionChoice,
   QuestionChoice,
+  SessionEffort,
   SessionInfo,
   ClaudePreview,
   ClaudeRequest,
@@ -75,6 +76,7 @@ import { bundledAgentsDir, bundledPluginDir } from "./bundled-assets.js";
 import {
   answerPermission,
   answerQuestion,
+  continueSession,
   disposeSessions,
   endAllSessions,
   endSession,
@@ -82,6 +84,8 @@ import {
   revokeGrant,
   saySession,
   sessionInfo,
+  setSessionEffort,
+  setSessionModel,
   startSession,
   stopSession,
 } from "./claude-session.js";
@@ -458,6 +462,27 @@ export function registerIpc(): void {
   ipcMain.handle(
     IPC.sessionRevoke,
     async (e, id: string, target: string): Promise<boolean> => revokeGrant(e.sender.id, id, target)
+  );
+
+  // The door in the spend ceiling. A session that reached it ended cleanly and kept its record —
+  // the id to resume, what it had spent, what it had been given — so continuing takes the session
+  // id and nothing else, and the allowance it gets is `paneBudget()`'s, never a caller's.
+  ipcMain.handle(IPC.sessionContinue, async (e, id: string): Promise<SessionInfo> => {
+    e.sender.once("destroyed", () => endSession(e.sender.id));
+    return continueSession(e.sender.id, id);
+  });
+
+  // The two header controls that change a LIVE session without ending it. Both values are checked
+  // in main against a list main itself produced — the effort levels the query is configured from,
+  // and the models the CLI reported — so neither can put an arbitrary string into the session.
+  ipcMain.handle(
+    IPC.sessionEffort,
+    async (e, id: string, effort: SessionEffort): Promise<boolean> => setSessionEffort(e.sender.id, id, effort)
+  );
+
+  ipcMain.handle(
+    IPC.sessionModel,
+    async (e, id: string, model: string | null): Promise<boolean> => setSessionModel(e.sender.id, id, model)
   );
 
   ipcMain.handle(IPC.sessionEnd, (e): void => endSession(e.sender.id));
