@@ -84,6 +84,7 @@ second.
 | `write-scope.ts`                        | What a run may **write**, decided per tool call. Pure — no `fs`, no spawn, no SDK      |
 | `session-scope.ts`                      | What a pane session may **read** — the boundary, and what a person may grant. Pure     |
 | `session-permission.ts`                 | Settled, or a question for a PERSON. Composes the two scope modules. Pure              |
+| `session-handoff.ts`                    | What a create-\* handoff says to the session it opens: seed, notice, title. Pure       |
 | `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
@@ -345,7 +346,7 @@ Three rules hold it together, and each exists for a reason that is not obvious f
 The app can run Claude on the user's behalf, and asks first. Three channels:
 
 ```
-claude:preview  → { prompt, argv, cwd, targets, read, available, searched, token }  // spawns nothing
+claude:preview  → { prompt, argv, cwd, targets, read, handoff, available, searched, token }  // spawns nothing
 claude:run      → an Agent SDK session; streams output, resolves with the outcome   // token only
 claude:cancel   → closes the query, then kills the child's process group
 ```
@@ -355,13 +356,17 @@ It was the `claude -p` bridge, and a run **is no longer a `claude -p` spawn**: e
 (`startAgentSession` in `agent-sdk.ts`). Nothing else about the bridge moved: preview still builds
 the prompt and issues the token, and run still accepts a token and nothing else.
 
-The **`session:*` namespace is a separate surface**, not a fifth bridge channel — it carries no
-token because there is no prompt to consent to: the user types every turn. See "The session pane"
-below.
+The **`session:*` namespace is a separate surface**, not a fifth bridge channel — a turn carries no
+token because there is no prompt to consent to: the user types every one. The **one exception is
+`session:handoff`** (`022`), which takes a preview token and nothing else, because it is the only
+call in the app that widens what a session may write — the same discipline as `claude:run`, applied
+to paths instead of prompts. See "The session pane" below.
 
 `ClaudeRunDialog` is the user-facing half: what may be **read**, then full prompt (scrollable,
 selectable — never a summary), the **equivalent** command line, working directory, what may be
-written, then Copy prompt / Cancel / Run, then streamed output with a Stop. The whole body is **one**
+written, then Copy prompt / Cancel / Run — and, when the preview carries a `handoff`, a second
+button **Continue in the pane** (`data-testid="claude-handoff"`) with the directory it would open
+rendered beside it (`data-testid="claude-handoff-scope"`) — then streamed output with a Stop. The whole body is **one**
 scroll region: with four sections, per-section shrink-to-fit squeezed the prompt `<pre>` to a sliver
 and let the read section render over the top of it — invisible to every test that is not a
 screenshot, so a rect-overlap assertion in the window probe pins it. See
@@ -493,12 +498,15 @@ dependency, now a **session skill** rather than a name in a prompt string.
 **One live, multi-turn session per open project**, in a resizable right-hand pane that _shifts_ the
 layout rather than overlaying it. `019` shipped it **read-only**, which is what made it shippable
 before any permission UI existed; `020` replaced that with the UI — the pane now **asks** rather than
-refusing, and a write it was going to refuse is a question instead of a wall.
+refusing, and a write it was going to refuse is a question instead of a wall. Both scopes have since
+become mutable mid-session, by two different routes and on purpose: reads through a grant the user
+answers a prompt with (`023`), writes through a create-\* handoff carrying a preview token (`022`).
 
 ```
 src/core/session-scope.ts                       the read boundary (pure)
 src/core/session-permission.ts                  settled, or ask a person (pure) — composes the two
 src/core/permission-registry.ts                 the parked promises, one per outstanding ask (pure)
+src/core/session-handoff.ts                     what a create-* handoff says: seed, notice, title (pure)
 src/main/claude-session.ts                      one session per webContents.id
 src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope + PermissionCard
 src/renderer/src/utils/session-context.tsx      SessionProvider / useSession — single-owner
@@ -506,6 +514,7 @@ src/renderer/src/utils/session-context.tsx      SessionProvider / useSession —
 
 ```
 session:start      → SessionInfo              no argument; the cwd comes from main's project state
+session:handoff    → (token) → SessionInfo    A PREVIEW TOKEN ONLY; the one call that widens writes
 session:info       → SessionInfo              reads only
 session:say        → (id, text)               USER-TYPED TEXT ONLY
 session:stop       → (id)                     interrupt the turn; the session stays usable
@@ -529,11 +538,48 @@ session:event      ← SessionEvent             the streamed transcript
 - **`session:say` carries user-typed text and nothing else.** The bridge's invariant restated for a
   surface with no per-turn confirmation: the renderer never authors a prompt, the user does. Turns
   are stamped human-authored, so it holds at the SDK boundary and not only in a test.
-- **The write scope is still empty, but a refused write is now a PROMPT rather than the end of the
-  matter.** Nothing can add to the scope yet (`022` is where a submitted form can), so `decideWrite`
-  still produces the refusal and still produces its own reason — and `020` gives the user a button
-  that lets that **one call** through anyway. Nothing accumulates: the scope is `[]` again on the
-  next call, and the next write asks again. One engine, two callers, still.
+- **A session opens with an empty write scope, and exactly one thing can grow it: a create-\* handoff
+  (`022`).** `session:handoff` takes a **preview token and nothing else**, claims it through
+  `claimInvocation(token, "claude")`, refuses any preview whose `handoff` is null (a `maestro-task`'s
+  write target is the whole project), and appends **one** path — `HandoffContext.writeScope`, the
+  artifact's own directory, or the artifact FILE where it has no directory of its own (a
+  project-target subagent shares `.claude/agents/` with every other agent). Every writable path
+  therefore traces to a form the user filled in and a scaffold that already wrote a file there.
+  Ending the session is how it is withdrawn — there is no `session:revoke` for a write and none is
+  owed, because a grant answers a question the session asked and a write scope entry answers a form
+  the user submitted.
+- **A write OUTSIDE the scope is still `020`'s prompt, and the reason names which of two states you
+  are in.** `decidePaneCall`'s write-ask branch says "nothing has given this session write access"
+  only while `writable` is empty; once a form has opened a directory it names the scope that exists
+  instead, because telling a user nothing was granted while the header lists a directory is the kind
+  of wrong that teaches people to stop reading prompts. Allowing still grants nothing further —
+  `grantable` stays false for every write — and the scope is unchanged on the next call.
+- **The accumulator lives in `startPaneSession`, and `writable()` is a FUNCTION for `023`'s reason.**
+  `writes` is the array, `writable()` reads it fresh inside `canUseTool` (it replaced the literal
+  `writable: []`), and `allowWrites(paths)` is its only writer. **Anything writable is also
+  readable**: `readable()` includes the write scope, because a session that may write a file it may
+  not read is asked about the read half of every edit — the prompt this whole path exists to remove.
+- **Telling the CLI about the directory is LAZY, because the SDK has no control request for it.**
+  `updatedPermissions` rides on a permission answer and a handoff has no answer to ride on, so
+  `startPaneSession` keeps an `unannounced` set and carries the `addDirectories`
+  (`destination: "session"`) on the **first allow that lands inside a newly-opened directory**, once.
+- **The seed costs nothing, and both halves of that were learned in a real window.** `seed(text)`
+  appends the `HandoffContext` as a `shouldQuery: false` message with **no `origin` stamp** (it is
+  not a user turn), and main pushes it as a `{ kind: "context", title, text }` `SessionEvent` — a
+  collapsible transcript entry, because the user is entitled to read what was put in front of the
+  model on their behalf. Two things no unit test would have caught: (a) a `shouldQuery: false`
+  append is answered by its **own zero-cost `result` message**, and reporting that as a `turn`
+  claims something ran and clears the renderer's `busy` — `startPaneSession` counts outstanding user
+  turns and drops a zero-cost result that answers none of them; (b) **seed wording that describes a
+  boundary as absolute makes the model refuse to attempt the call at all**, which silently deletes
+  `020`'s "the user can allow this once", so `session-handoff.ts` says plainly that a write elsewhere
+  asks and can be allowed.
+- **The write scope is on screen beside the grants, not in a second panel.** `WriteScope` in
+  `session-pane.tsx` renders `SessionInfo.writes` (`data-testid="session-write-scope"`,
+  `data-count`), each entry naming the form that opened it — and deliberately **without** a Revoke
+  button. `SessionInfo.writable` is the flat `writes[].path`, derived in one place so the two cannot
+  disagree, and the `{ kind: "scope" }` event carries both so the header re-reads them rather than
+  inferring them from a click.
 - **A refused write therefore carries two sentences, not one.** `PermissionPrompt.reason` is written
   for the person reading the dialog; `PermissionPrompt.denyReason` is `decideWrite`'s model-facing
   message verbatim, sent only if the user denies without typing anything. That split is how "a
@@ -593,7 +639,10 @@ session:event      ← SessionEvent             the streamed transcript
   not: `PaneVerdict`'s `grantable` is true only in the read-boundary branch, so a refused **write**
   never grows a grant button.
 - **The readable set is the open project plus EVERY local marketplace**, not "the resolved
-  marketplace" — with no create-form handoff yet there is no single marketplace to name. Main
+  marketplace" — the pane starts before any form is submitted, so there is no single marketplace to
+  name. (`022`'s handoff widens it further only when it has to: `describeSession` lists the
+  handed-off directory in the read scope as `origin: "app"` **only when nothing already in scope
+  contains it**, which for a marketplace-targeted create is usually already true.) Main
   resolves them itself with `listMarketplaces()` (the `source: "directory"` entries of
   `~/.claude/plugins/known_marketplaces.json`); **no name and no path crosses the process boundary**,
   which is `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied
@@ -634,8 +683,9 @@ session:event      ← SessionEvent             the streamed transcript
     prompt exists for is where it is not. A directory that is ≤2 segments deep, or that CONTAINS
     something already in scope, is flagged `broad` and rendered in amber with what it would swallow.
   - **Only a read is grantable.** `PaneVerdict.grantable` is true in the read-boundary branch and
-    nowhere else: a refused write keeps Allow once / Deny / Stop (widening writes is `022`'s), and a
-    `WebFetch` has no path to grant.
+    nowhere else: a refused write keeps Allow once / Deny / Stop, and a `WebFetch` has no path to
+    grant. That did **not** change when `022` shipped — writes widen through `session:handoff` and a
+    claimed preview token, never through an answered prompt.
   - **Visible and revocable, or it is not optional — it is gone.** Grants render in the pane's scope
     panel with a Revoke button, and inside `ReadScope` as `origin: "session"` (the fourth origin,
     dotted amber). `session:revoke` takes a path and can only ever REMOVE an entry main is already
@@ -969,7 +1019,13 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   name a disk destination or a rule, that no such literal exists anywhere under `src/`, and that a
   grant reaches the hook as well as the SDK — and added two of its own: **"lets a grant die with the
   session, and writes it nowhere"** and **"watches the other doors into the read scope, and does not
-  follow any of them"**.
+  follow any of them"**. `022` **replaced** one block and added one: _"gives the pane an empty write
+  scope with no channel that could widen it"_ became **"grows the pane's write scope only from a
+  claimed preview token, and never from the renderer"** (it pins `writable()`, the single
+  `allowWrites` call site, the `claimInvocation` claim, and the token-only wire), and **"seeds a
+  handoff's context without spending a turn, and says so in the transcript"** pins `shouldQuery:
+false`, the absence of an `origin` stamp on the seeded message, the zero-cost-result guard, and one
+  seed string reaching the model and the transcript both.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

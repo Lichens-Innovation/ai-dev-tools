@@ -608,6 +608,15 @@ export interface ClaudePreview {
    * the largest thing it is granting, which is precisely the state this field exists to end.
    */
   read: ClaudeReadScope;
+  /**
+   * What continuing this in the session pane would open, or null when this preview cannot be
+   * handed off at all.
+   *
+   * Present so the confirmation can say what the OTHER button costs before it is pressed: the same
+   * dialog offers a headless run and a conversation, and the conversation is the one that widens
+   * something. Non-null only for the four create-\* forms — see `HandoffContext`.
+   */
+  handoff: HandoffContext | null;
   available: boolean;
   /** Absolute path of the resolved CLI, or null. */
   bin: string | null;
@@ -617,6 +626,52 @@ export interface ClaudePreview {
   unavailable: string | null;
   /** Epoch ms after which the token is refused. */
   expiresAt: number;
+}
+
+/**
+ * What a completed create-\* preview would hand to the session pane, if the user continues there.
+ *
+ * THE HANDOFF CARRIES THIS, AND NOTHING THE RENDERER SUPPLIED. It is built by `claude-preview.ts`
+ * from the same `resolveCreateTarget` that chose the scaffold's path, read off the disk the scaffold
+ * has already written, and it rides on the invocation the token names — so continuing in the pane
+ * takes a token exactly as running headlessly does, and a renderer can no more nominate a writable
+ * directory here than it can nominate a scaffold destination.
+ *
+ * Null on every request kind that is not a create-\* form (`maestro-task` is the other one today):
+ * a task decides for itself what it edits, and its write target is the whole project, which is
+ * precisely the thing the pane's accumulator must never be able to swallow in one click.
+ */
+export interface HandoffContext {
+  /** Which form was submitted, e.g. `create-skill`. */
+  kind: CreateRequest["kind"];
+  /** The kebab-case name the scaffold resolved — not always the one the form held. */
+  name: string;
+  /** The primary artifact: the file for a skill/agent, the directory for a plugin/marketplace. */
+  artifact: string;
+  /**
+   * THE ONE PATH A HANDOFF ADDS TO THE WRITE SCOPE.
+   *
+   * The artifact's own directory wherever the artifact has one — a skill's directory, an agent's
+   * directory, the plugin, the marketplace — because finishing an artifact in conversation means
+   * writing beside it (a reference file, a README) and not only into the one file a headless prompt
+   * named. Where the artifact is a lone file in a directory it SHARES (a project-target subagent
+   * under `.claude/agents/`), it is the file itself: the alternative would hand the session every
+   * other agent in that directory, which no form asked for.
+   */
+  writeScope: string;
+  /** Which of those two `writeScope` is, so the header and the announcement can say it plainly. */
+  scope: GrantScope;
+  /**
+   * What the scaffold left behind, read from disk when the preview was built: the artifact's
+   * frontmatter, or the files inside its directory.
+   *
+   * Seeded into the conversation so the model does not re-ask for a name, a description or a set of
+   * triggers the form already captured — and does not rewrite the `description:` the user approved
+   * in the form's live preview because it never saw it.
+   */
+  state: string;
+  /** Whether the artifact is already inside a git repository — `016`'s answer, so nothing offers `git init` for a repo that exists. */
+  repo: string;
 }
 
 /** One piece of output as it arrives. Streamed; the UI never waits for completion to show output. */
@@ -669,10 +724,11 @@ export interface ClaudeRunResult {
 // SDK boundary, which is what makes "the renderer never authors a prompt" checkable rather than
 // merely intended.
 //
-// What the session may WRITE is nothing, and there is no field here by which it could become
-// anything: `SessionInfo.writable` is reported so the header can say so, and the permission
-// callback reads an empty list off the session itself. `020` builds the prompt UI on that engine;
-// `022` is the first thing allowed to add a directory to it.
+// What the session may WRITE starts as nothing, and exactly one thing in the app can change that:
+// a create-* form the user submitted, handed off with the token its confirmation was built from
+// (`session:handoff`, `HandoffContext`). There is no field on this surface by which a renderer could
+// name a writable path — `020` built the prompt UI over an empty list, and `022` gave that list its
+// only source. Everything else still asks.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -719,7 +775,25 @@ export type SessionEvent =
    * main re-derives the disclosure the moment it widens the boundary, and the pane's header re-reads
    * it from here rather than from what a button click implied.
    */
-  | { kind: "scope"; seq: number; read: ClaudeReadScope; grants: SessionGrant[] }
+  | {
+      kind: "scope";
+      seq: number;
+      read: ClaudeReadScope;
+      grants: SessionGrant[];
+      /** Absolute paths the session may now write. Grows only through a create-\* handoff. */
+      writable: string[];
+      /** The same list with its provenance — which form opened each one, and what it wrote. */
+      writes: SessionWrite[];
+    }
+  /**
+   * Context appended to the conversation WITHOUT a model turn.
+   *
+   * A create-\* handoff seeds what was scaffolded, where it landed, and what is left to write. It
+   * is a transcript entry rather than a notice because the user is entitled to read the whole of
+   * what was put in front of the model on their behalf — and because it is the one entry that costs
+   * nothing: `shouldQuery: false` holds it until the user's first typed turn.
+   */
+  | { kind: "context"; seq: number; title: string; text: string }
   /** Something about the session itself: stderr worth surfacing, a boundary event. */
   | { kind: "notice"; seq: number; text: string }
   /** A turn finished. `ok: false` means the session reported an error rather than an answer. */
@@ -827,6 +901,29 @@ export interface SessionGrant {
   tool: string;
   /** Epoch ms. The header sorts by it, and it is what makes "granted just now" sayable. */
   grantedAt: number;
+}
+
+/**
+ * One directory (or lone file) this session may write, and the form submission it came from.
+ *
+ * THE WHOLE OF THE PANE'S WRITE AUTHORITY IS A LIST OF THESE, and every entry names the artifact
+ * that produced it. That is the property worth reading twice: a session opens with none, and the
+ * only thing in the app that appends one is a create-\* form the user filled in and a deterministic
+ * scaffold that already wrote a file there. Not a dialog they clicked through — an artifact they
+ * made, minutes ago. Like `SessionGrant`, it dies with the session and reaches no file on disk.
+ */
+export interface SessionWrite {
+  /** Absolute path now writable. A directory means everything under it; a file means itself. */
+  path: string;
+  scope: GrantScope;
+  /** The artifact the form created, which is not always `path` — a lone file's directory is not. */
+  artifact: string;
+  /** Which form was submitted, e.g. `create-skill`. The header says what opened this. */
+  kind: string;
+  /** The artifact's resolved name, for the same reason. */
+  name: string;
+  /** Epoch ms, so the header can order additions and say "just now". */
+  addedAt: number;
 }
 
 /**
@@ -959,7 +1056,13 @@ export interface SessionInfo {
   /** Null when no session is running: every other field then describes what one WOULD get. */
   id: string | null;
   projectRoot: string;
-  /** Where the session runs. The open project — a create-\* handoff changing that arrives in `022`. */
+  /**
+   * Where the session runs: the open project, and a create-\* handoff does NOT move it.
+   *
+   * A handoff widens what the session may write and leaves the conversation where it was. Moving
+   * the cwd would move the read boundary's anchor mid-conversation and silently re-point every
+   * relative path in the transcript — the failure `CwdChanged` is registered to notice.
+   */
   cwd: string;
   /**
    * What it can see, in the same shape and rendered by the same component as the confirmation
@@ -967,10 +1070,22 @@ export interface SessionInfo {
    */
   read: ClaudeReadScope;
   /**
-   * What it may write. Empty, and there is no path to add to it in this slice — the header says so
-   * in words, because an empty list on screen says nothing.
+   * What it may write. EMPTY UNTIL A FORM IS SUBMITTED, and the header says so in words, because an
+   * empty list on screen says nothing at all.
+   *
+   * The flat list of `writes[].path`, derived in one place so the two cannot disagree. It grows by
+   * exactly one entry per create-\* handoff and by nothing else in the app.
    */
   writable: string[];
+  /**
+   * The same paths with their provenance: which form opened each, and what it wrote.
+   *
+   * The revocable-looking half of the write scope is deliberately NOT revocable: a grant answers a
+   * question the session asked, and can be taken back because the session can be made to ask again.
+   * A write scope entry answers a form the USER submitted, and the way to stop it is to end the
+   * session — which is also what a project switch does.
+   */
+  writes: SessionWrite[];
   /**
    * Directories a person opened for this session, in force right now.
    *

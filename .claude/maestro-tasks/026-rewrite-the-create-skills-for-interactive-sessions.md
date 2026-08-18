@@ -62,6 +62,45 @@ drift apart with nothing to catch it.
 - **On the terminal entry none of this applies.** No boundary, no pane, no prompt — which is another
   reason the two entries need distinct wording rather than one paragraph hedged to cover both.
 
+### What `022` shipped, and what a skill may now assume on the app path
+
+The handoff this task waited for exists, and it changes what "the app entry" means: the model does
+not arrive at a blank conversation to be told what happened, it arrives already holding the facts.
+
+- **The app entry is a `session:handoff` call carrying a preview TOKEN and nothing else.** The
+  confirmation dialog now has two buttons over the same single-use token — **Run** (the headless
+  finish, unchanged) and **Continue in the pane**. So "the app path" is two paths from this task's
+  point of view, and a skill has to say which one it is describing: on the pane path the user is
+  present and a refusal is a question; on the headless path it is still the end of it.
+- **The session is seeded before the first turn, with a `HandoffContext` that already carries what
+  these skills currently re-derive.** It states which form was submitted, the resolved name, the
+  artifact path, the writable directory, the frontmatter the scaffold wrote (or the directory's
+  listing), the repository state `016` decided, and **the previewed prompt verbatim** as "what is
+  left to write". It is appended with `shouldQuery: false`, so it costs nothing until the user types.
+  Two consequences for the rewrite: an app-path skill must not re-ask for the name, description or
+  triggers (measured — a live session read the seeded frontmatter, rewrote the body and left the
+  approved `description:` byte-identical), and the inlined guidance this task deletes is exactly the
+  text that arrives in the seed's "what is left to write" block, so deleting it from the prompt
+  builder removes it from the seed too. Decide deliberately what replaces it.
+- **The write scope is the artifact's own directory, and only that.** Writes beside the artifact — a
+  reference file, a README in the plugin — happen without asking. A write anywhere else raises
+  `020`'s prompt and can be allowed once; it does not widen the scope. The exception worth knowing:
+  a **project-target subagent** is a lone `.md` in a shared `.claude/agents/`, so the scope is the
+  FILE, and a skill that offers to write a companion file beside it will raise a prompt every time.
+- **Wording that describes a boundary as absolute stops the model attempting the call at all.**
+  Measured, and it cost `022` a probe pass: a seed that said writes outside the scope were "refused,
+  or come back to the user as a question" made the session decline to try, explaining it could not
+  bypass the app's boundary — which silently deletes `020`'s "the user can allow this once". This is
+  a rule about **this task's own prose**, not only about the seed: a rewritten `SKILL.md` that tells
+  the model a path is off limits will produce the same refusal-without-a-prompt, and the user never
+  gets the chance to say yes. Say that a write elsewhere asks and can be allowed, and say to go ahead.
+- **A seeded, no-turn append is answered with its own zero-cost `result` message.** Relevant if this
+  task adds anything else on the `shouldQuery: false` path: `startPaneSession` counts outstanding
+  user turns and drops a zero-cost result that answers none of them, or the transcript claims a turn
+  ran that did not.
+- **`maestro-task` previews carry `handoff: null` and are refused by the channel.** Only the four
+  create-\* forms hand off, which is the set this task rewrites.
+
 **Each skill must handle both entries.** These files are invoked from the terminal too, where no
 scaffold exists:
 

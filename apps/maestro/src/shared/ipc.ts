@@ -38,6 +38,7 @@ import type {
   ClaudeReadScope,
   ClaudeReadDirectory,
   ClaudePermissionRule,
+  HandoffContext,
   ReadScopeOrigin,
   SettingsTier,
   SettingsPermissions,
@@ -57,6 +58,7 @@ import type {
   SessionPermissionUpdate,
   SessionEvent,
   SessionInfo,
+  SessionWrite,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -104,6 +106,7 @@ export type {
   ClaudeReadScope,
   ClaudeReadDirectory,
   ClaudePermissionRule,
+  HandoffContext,
   ReadScopeOrigin,
   SettingsTier,
   SettingsPermissions,
@@ -123,6 +126,7 @@ export type {
   SessionPermissionUpdate,
   SessionEvent,
   SessionInfo,
+  SessionWrite,
   CreateOptions,
   CreateRequest,
   MarketplaceEntry,
@@ -261,6 +265,10 @@ export const IPC = {
   // user typed it. `session:say` therefore carries a user input value and nothing else — that is
   // the invariant, restated, and `test/isolation.test.ts` pins the call site.
   sessionStart: "session:start",
+  // Continue a create-* form's work in the pane. It takes the PREVIEW TOKEN and nothing else — the
+  // same discipline as `claude:run`, applied to the one thing that can widen what a session may
+  // write. See `MaestroApi.session.handoff`.
+  sessionHandoff: "session:handoff",
   sessionSay: "session:say",
   sessionStop: "session:stop",
   // The answer to one parked permission request. A CHOICE, not a permission result — see
@@ -418,6 +426,19 @@ export interface MaestroApi {
      * says so rather than failing on the first send.
      */
     start(): Promise<SessionInfo>;
+    /**
+     * Continue a create-\* form's work here, with the token its confirmation dialog was built from.
+     *
+     * A TOKEN AND NOTHING ELSE — the only call on this surface that widens what the session may
+     * write, and the reason it takes what `claude:run` takes. The invocation the token names carries
+     * the artifact main resolved when it built the preview, so the directory that becomes writable
+     * is the one the confirmation displayed and there is no argument here by which it could be
+     * another. Single-use: a preview is spent headlessly or in the pane, never both.
+     *
+     * Starts a session if the window has none. Rejects on a refused token (forged, replayed,
+     * expired) and on a preview that did not come from a create-\* form.
+     */
+    handoff(token: string): Promise<SessionInfo>;
     /** What a session in this window can see and do right now. Reads only; starts nothing. */
     info(): Promise<SessionInfo>;
     /** One turn, as the user typed it. False when the session is gone. */

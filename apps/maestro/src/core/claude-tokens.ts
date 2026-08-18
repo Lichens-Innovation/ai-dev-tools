@@ -25,6 +25,7 @@
 // a bug, and the user's next move (preview again) has to be obvious.
 
 import { randomUUID } from "node:crypto";
+import type { HandoffContext } from "./contracts.js";
 
 /** How long a preview stays runnable. Long enough to read the prompt, short enough to still mean it. */
 export const TOKEN_TTL_MS = 10 * 60 * 1000;
@@ -63,6 +64,16 @@ export interface ClaudeInvocation {
    * what the user was shown.
    */
   writable: string[];
+  /**
+   * What continuing this preview IN THE PANE would open, or null when it cannot be continued there.
+   *
+   * On the invocation for exactly the reason `writable` and `prompt` are: `session:handoff` takes a
+   * token and nothing else, so there is no argument by which a caller could hand the pane a
+   * directory of its choosing. A renderer that wants the session to be able to write somewhere has
+   * to submit a form and get a preview for it, which is the same friction the run channel imposes on
+   * prompts. Null for a `maestro-task` preview — a task's write target is the whole project.
+   */
+  handoff: HandoffContext | null;
   createdAt: number;
   expiresAt: number;
 }

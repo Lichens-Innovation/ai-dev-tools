@@ -198,7 +198,18 @@ export {
   type ClaudeRunResult,
 } from "./claude-run.js";
 
-export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation, type InvocationPurpose } from "./claude-tokens.js";
+export {
+  claimInvocation,
+  clearInvocations,
+  TOKEN_TTL_MS,
+  type ClaudeInvocation,
+  type InvocationPurpose,
+} from "./claude-tokens.js";
+
+// What a create-* form says to the session it hands off into: the seeded context the model reads
+// and the announcement the user reads. Pure — it phrases a `HandoffContext` the preview resolved,
+// and reads nothing itself. See ./session-handoff.ts.
+export { handoffNotice, handoffSeed, handoffTitle, writeScopeNote } from "./session-handoff.js";
 
 // The Claude Agent SDK — the steerable path to the same CLI, and the ground the session pane is
 // built on. `runAgentSdkSmoke` proves a query runs in a PACKAGED build, which is the only place

@@ -76,6 +76,7 @@ import {
   disposeSessions,
   endAllSessions,
   endSession,
+  handoffToSession,
   revokeGrant,
   saySession,
   sessionInfo,
@@ -389,11 +390,15 @@ export function registerIpc(): void {
 
   // ── the session pane ─────────────────────────────────────────────────
   // The app's second way to reach a model, and the difference from the bridge above is who wrote
-  // the prompt. There is no preview channel here and no token, because there is nothing for main
-  // to have authored: `session:say` forwards TEXT THE USER TYPED and the SDK is told so
+  // the prompt. A turn needs no preview and no token, because there is nothing for main to have
+  // authored: `session:say` forwards TEXT THE USER TYPED and the SDK is told so
   // (`origin: { kind: "human" }`). What the session may do is decided entirely in main — the cwd
-  // comes from the open project, the readable directories from `known_marketplaces.json`, and the
-  // write scope is empty with no channel by which it could become anything else.
+  // comes from the open project and the readable directories from `known_marketplaces.json`.
+  //
+  // The write scope starts empty and ONE channel can append to it: `session:handoff`, which takes a
+  // preview token and continues a create-* form's work here. It borrows the bridge's token for the
+  // bridge's reason — the directory that becomes writable is the one main resolved and the
+  // confirmation displayed, and no argument on this surface can name another.
   //
   // One session per window, ended on a project switch (see `announce`) and reaped on quit.
   ipcMain.handle(IPC.sessionStart, async (e): Promise<SessionInfo> => {
@@ -402,6 +407,16 @@ export function registerIpc(): void {
     // rescue it.
     e.sender.once("destroyed", () => endSession(e.sender.id));
     return startSession(e.sender.id, currentRoot() ?? "");
+  });
+
+  // The one channel that can widen what a session may WRITE, and it takes a preview token exactly
+  // as `claude:run` does. Everything it opens comes off the invocation main recorded when it built
+  // that preview — the artifact's own directory, resolved by the same `resolveCreateTarget` the
+  // scaffold wrote with — so the renderer nominates no directory here any more than it nominates a
+  // prompt above. Claiming the token consumes it: a preview is spent headlessly or in the pane.
+  ipcMain.handle(IPC.sessionHandoff, async (e, token: string): Promise<SessionInfo> => {
+    e.sender.once("destroyed", () => endSession(e.sender.id));
+    return handoffToSession(e.sender.id, currentRoot() ?? "", token);
   });
 
   ipcMain.handle(IPC.sessionInfo, async (e): Promise<SessionInfo> => sessionInfo(e.sender.id, currentRoot() ?? ""));

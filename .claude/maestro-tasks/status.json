@@ -117,7 +117,7 @@
     ]
   },
   "022-hand-off-from-a-create-form-into-the-pane.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "020-permission-prompts-in-the-pane.md"
     ]
@@ -141,7 +141,7 @@
     ]
   },
   "026-rewrite-the-create-skills-for-interactive-sessions.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "022-hand-off-from-a-create-form-into-the-pane.md"
     ]

@@ -58,6 +58,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { cliNotFoundMessage, resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
 import { decideWrite, targetPathOf, READ_ONLY_TOOLS } from "./write-scope.js";
+import { withinDirectory } from "./read-scope.js";
 import { decideBoundary, grantOptionsFor } from "./session-scope.js";
 import { autoRefusal, decidePaneCall, permissionReason, PANE_ASK_TOOLS } from "./session-permission.js";
 import { createPermissionRegistry } from "./permission-registry.js";
@@ -662,8 +663,10 @@ export const PANE_TOOLS = [...SESSION_TOOLS, "Skill"] as const;
 /**
  * The skills a pane session may reach by name.
  *
- * The four create-\* skills so a conversation can finish the work a form started (`022`/`026` build
- * on that), and `super-help` because it is the one thing the pane inherits from the help chat —
+ * The four create-\* skills so a conversation can finish the work a form started — which `022` made
+ * literal: a submitted form can hand its completed preview to this session, seed what it scaffolded
+ * and open the artifact's own directory for writing. `super-help` is here because it is the one
+ * thing the pane inherits from the help chat —
  * now a declared session skill rather than a sentence in a generated prompt.
  */
 /**
@@ -753,6 +756,32 @@ export interface PaneSession {
    */
   answer(requestId: string, answer: PermissionAnswer): boolean;
   /**
+   * Append a turn that does NOT trigger one — context, not a question.
+   *
+   * `shouldQuery: false` holds the message until the next turn that does query, so a create-\*
+   * handoff can tell the session what was scaffolded, where it landed and what is left to write
+   * without spending a model call. The user's first typed message is still the first thing that
+   * costs anything, and it arrives with this in front of it.
+   *
+   * NOT `say`, and the difference is the `origin` stamp: `say` carries text a person typed and is
+   * marked human-authored, which is what makes "the renderer never authors a prompt" checkable.
+   * This is the app's own context and is deliberately not marked as anyone's speech.
+   */
+  seed(text: string): boolean;
+  /**
+   * Add a directory (or a file) to what this session may WRITE, for as long as it lasts.
+   *
+   * THE ONLY WAY THE WRITE SCOPE EVER GROWS, and the caller is `session:handoff` answering a
+   * completed create-\* preview — a form the user filled in and a scaffold that already wrote a
+   * file there. Nothing else in the app calls it, and there is no channel by which a renderer could.
+   *
+   * Returns the paths that were actually new, so an announcement is made once rather than per
+   * submit. Nothing here reaches the disk and nothing survives `close()`.
+   */
+  allowWrites(paths: readonly string[]): string[];
+  /** What this session may write, in force right now. Ordered as added. */
+  writable(): string[];
+  /**
    * Widen what this session may read, for as long as it lasts.
    *
    * THE BOUNDARY'S HALF OF A GRANT, and it is not the same half as `updatedPermissions`. That field
@@ -827,6 +856,32 @@ function humanTurn(text: string): {
 }
 
 /**
+ * Context appended to the transcript WITHOUT starting a turn.
+ *
+ * Two fields carry the whole difference from `humanTurn`:
+ *
+ *   • **`shouldQuery: false`** — the SDK holds the message and merges it into the next user message
+ *     that does query. That is what makes a handoff free: the seeded context is in the model's
+ *     view of the conversation, and no request has been made, so nothing has been spent.
+ *   • **No `origin`** — this text is the app's, not a person's. Stamping it `human` would be the
+ *     one lie that matters here: checks that require a human-typed prompt would accept it, and the
+ *     invariant `session:say` exists to make checkable would quietly stop meaning anything.
+ */
+function contextTurn(text: string): {
+  type: "user";
+  message: { role: "user"; content: string };
+  parent_tool_use_id: null;
+  shouldQuery: false;
+} {
+  return {
+    type: "user",
+    message: { role: "user", content: text },
+    parent_tool_use_id: null,
+    shouldQuery: false,
+  };
+}
+
+/**
  * Start a live session and drive it from a stream of user turns.
  *
  * Returns synchronously for the same reason `startAgentSession` does: the SDK import is dynamic, so
@@ -848,7 +903,44 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
    * carries it into the next session.
    */
   const granted: string[] = [];
-  const readable = (): string[] => [request.cwd, ...request.additionalDirectories, ...granted];
+
+  /**
+   * What a submitted FORM opened — the session's write scope, and the only list here that authors.
+   *
+   * A function for the same reason `readable()` is one, and the lesson is `023`'s: a form submitted
+   * mid-session has to reach the live `canUseTool`, not the list it closed over when the pane
+   * opened. The literal `writable: []` this replaces was the whole of the pane's write authority;
+   * what makes the replacement safe is not this closure but its only caller — `allowWrites` is
+   * reachable exclusively from a claimed create-\* preview token.
+   */
+  const writes: string[] = [];
+  const writable = (): string[] => [...writes];
+
+  /**
+   * Write directories the CLI has not been told about yet.
+   *
+   * THE SDK HAS NO "ADD A DIRECTORY" CONTROL REQUEST. `updatedPermissions` rides on a permission
+   * ANSWER and nowhere else, so a scope that grows between two tool calls can be told to the CLI
+   * only at the next call it decides — which is exactly what this set is for: the first allow that
+   * lands inside a newly-opened directory carries the `addDirectories` update with it, once, and
+   * every allow after that is a plain allow.
+   *
+   * Without it the app's own check and the CLI's own working roots disagree: our callback allows a
+   * write the CLI then refuses because the path is outside the directories it was started with, and
+   * the user watches a granted directory behave as though nothing was granted.
+   */
+  const unannounced = new Set<string>();
+
+  /**
+   * Everything this session may read: the cwd, what the app opened, what a person granted — and
+   * what a form made writable.
+   *
+   * The last one is not a convenience. A session that may write a file it may not read has to be
+   * asked about every read half of every edit, which is the prompt this slice exists to remove; and
+   * a directory the user opened by submitting a form for it is not one they need to be asked about
+   * looking at.
+   */
+  const readable = (): string[] => [request.cwd, ...request.additionalDirectories, ...granted, ...writes];
 
   let seq = 0;
   const emit = (event: SessionEventBody): void => request.emit({ ...event, seq: ++seq } as SessionEvent);
@@ -857,7 +949,7 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
   // A queue and one waiting resolver. `say` pushes; the generator below yields. Closing resolves
   // the waiter with `null`, which ends the generator, which ends the query — that is the only
   // orderly way out of a stream the SDK is iterating.
-  const queue: Array<ReturnType<typeof humanTurn>> = [];
+  const queue: Array<ReturnType<typeof humanTurn> | ReturnType<typeof contextTurn>> = [];
   let wake: ((value: null) => void) | null = null;
   let closed = false;
 
@@ -885,6 +977,17 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
   let askSeq = 0;
 
   /**
+   * User turns that have been sent and not yet answered by a result.
+   *
+   * The pump feeds the SDK two kinds of message and only one of them asks anything: `say` queries,
+   * `seed` does not. Both are answered with a result, so this counter is how the read loop tells a
+   * turn from a receipt for context nobody requested an answer to. Incremented where the message is
+   * queued rather than where it is yielded, because a turn typed before the import resolves is
+   * still a turn that is going to be answered.
+   */
+  let awaitingTurns = 0;
+
+  /**
    * Is this path a directory ON DISK? The one question about a grant that needs the filesystem.
    *
    * It decides the SHAPE of the offer, not just its wording — a file is offered as itself or as its
@@ -897,6 +1000,26 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     } catch {
       return false;
     }
+  };
+
+  /**
+   * Tell the CLI about a write directory, at the first tool call that lands inside it.
+   *
+   * Returns the directories to announce on THIS allow — normally none, exactly once per handoff a
+   * single one. The call has to name a path: a directory can only be announced when there is
+   * something to announce it about, and an unrelated allow must not carry a permission update for a
+   * tree the model was not asking about.
+   */
+  const announceWriteScope = (target: string | null): string[] => {
+    if (unannounced.size === 0 || !target) return [];
+    const resolved = path.resolve(request.cwd, target);
+    const opened: string[] = [];
+    for (const directory of unannounced) {
+      if (!withinDirectory(directory, resolved)) continue;
+      unannounced.delete(directory);
+      opened.push(directory);
+    }
+    return opened;
   };
 
   /** The hook output that routes a call into the prompt instead of answering it. */
@@ -1103,13 +1226,15 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           },
           canUseTool: async (tool: string, input: Record<string, unknown>, options: CanUseToolOptions) => {
             // The SAME engines the form path and the hook use, composed — not a second one.
-            // `writable: []` is still the pane's write scope and `decideWrite` still produces the
-            // refusal; what `decidePaneCall` adds is the branch where that refusal becomes a
-            // question for the user rather than the end of the matter.
+            // `writable()` is the pane's write scope: empty until a create-* form is handed off,
+            // and read fresh on every call so a form submitted mid-session reaches this and not the
+            // list that existed when the pane opened. `decideWrite` still produces the refusal and
+            // still produces its reason; `decidePaneCall` adds the branch where that refusal
+            // becomes a question rather than the end of the matter.
             const verdict = decidePaneCall({
               tool,
               input,
-              writable: [],
+              writable: writable(),
               directories: readable(),
               cwd: request.cwd,
             });
@@ -1124,8 +1249,23 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                   source: "write-scope",
                   decidedBy: null,
                 });
+                return verdict.decision;
               }
-              return verdict.decision;
+              // A silent allow, and possibly the first one inside a directory a form just opened —
+              // in which case it is also the only chance to tell the CLI about that directory. See
+              // `unannounced`: this is a lazy `addDirectories`, not a second grant surface, and
+              // `destination: "session"` is what keeps it off the user's disk.
+              const opened = announceWriteScope(targetPathOf(input));
+              return opened.length === 0
+                ? verdict.decision
+                : {
+                    behavior: "allow" as const,
+                    updatedPermissions: opened.map((directory) => ({
+                      type: "addDirectories" as const,
+                      directories: [directory],
+                      destination: "session" as const,
+                    })),
+                  };
             }
 
             // ── the ask ──────────────────────────────────────────────────────
@@ -1214,11 +1354,22 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
         if (message.type === "result") {
           // A turn ended — NOT the session. A streaming-input query emits one result per turn and
           // keeps running, which is exactly why the pump above stays open.
+          //
+          // EXCEPT WHEN NOTHING RAN. Measured in the window: a `shouldQuery: false` append is
+          // answered with a result of its own — `subtype: "success"`, `total_cost_usd: 0`, no
+          // assistant message anywhere near it. Reporting that as a turn is wrong twice over: the
+          // transcript claims something happened when a handoff seeded context, and the renderer
+          // clears `busy` on it, so a Stop button can vanish while a real turn is still running.
+          // A result with no outstanding user turn behind it and no cost is that receipt.
+          const spent = message.total_cost_usd ?? null;
+          if (awaitingTurns > 0) awaitingTurns--;
+          else if (spent === 0 || spent === null) continue;
+
           emit({
             kind: "turn",
             ok: message.subtype === "success" && !message.is_error,
             error: message.subtype === "success" && !message.is_error ? null : `The turn ended as ${message.subtype}.`,
-            costUsd: message.total_cost_usd ?? null,
+            costUsd: spent,
           });
         }
       }
@@ -1232,13 +1383,37 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     ended,
     say(text: string): boolean {
       if (closed) return false;
+      awaitingTurns++;
       queue.push(humanTurn(text));
+      wake?.(null);
+      wake = null;
+      return true;
+    },
+    seed(text: string): boolean {
+      const context = String(text ?? "").trim();
+      if (closed || context === "") return false;
+      queue.push(contextTurn(context));
       wake?.(null);
       wake = null;
       return true;
     },
     answer(requestId: string, decision: PermissionAnswer): boolean {
       return permissions.answer(requestId, decision);
+    },
+    allowWrites(paths: readonly string[]): string[] {
+      const added: string[] = [];
+      for (const raw of paths) {
+        const resolved = path.resolve(request.cwd, String(raw ?? "").trim());
+        if (resolved === "" || writes.includes(resolved)) continue;
+        writes.push(resolved);
+        // Queued for the CLI, which has no channel to be told right now — see `unannounced`.
+        unannounced.add(resolved);
+        added.push(resolved);
+      }
+      return added;
+    },
+    writable(): string[] {
+      return writable();
     },
     grant(paths: readonly string[]): string[] {
       const added: string[] = [];

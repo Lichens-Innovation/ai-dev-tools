@@ -8,7 +8,11 @@
 //
 // WHAT THIS MODULE MAY NOT DO. It never composes a prompt. `say` forwards the user's text verbatim
 // into the SDK's input stream, stamped `origin: { kind: "human" }` by `startPaneSession`, and
-// there is no other way to add a turn. That is the pane's restatement of the bridge's invariant:
+// there is no other way to add a TURN. `handoffToSession` is the near miss and is not an exception:
+// it appends context the user has already been shown — a preview they confirmed, phrased by
+// `session-handoff.ts` — with `shouldQuery: false`, so it starts no turn, carries no `origin`, and
+// asks the model for nothing. What it can add comes off a claimed token; nothing about it is
+// supplied by the renderer. That is the pane's restatement of the bridge's invariant:
 // `claude:run` guarantees the only executable prompts are ones the user was SHOWN; here the only
 // prompts are ones the user WROTE. It also resolves no path to the CLI itself (`paneSessionTarget`
 // does, inside the SDK module) and imports no `child_process` (`spawnClaudeChild` does) — both so
@@ -17,7 +21,11 @@
 import { BrowserWindow } from "electron";
 import {
   buildReadScope,
+  claimInvocation,
   grantOptionFor,
+  handoffNotice,
+  handoffSeed,
+  handoffTitle,
   listMarketplaces,
   nodeSettings,
   paneSessionTarget,
@@ -25,6 +33,8 @@ import {
   spawnClaudeChild,
   startPaneSession,
   terminateChildGroup,
+  withinDirectory,
+  writeScopeNote,
   PANE_SKILLS,
   PANE_TOOLS,
   type PaneSession,
@@ -39,6 +49,7 @@ import type {
   SessionEvent,
   SessionGrant,
   SessionInfo,
+  SessionWrite,
 } from "../shared/ipc.js";
 
 /**
@@ -69,6 +80,11 @@ interface LiveSession {
   prompts: Map<string, PermissionPrompt>;
   /** What a person has granted, in force. Never written anywhere; dies with the entry. */
   grants: SessionGrant[];
+  /**
+   * What a submitted create-\* form opened for writing, in force. Same lifetime, same absence from
+   * disk — and one more property: it can only ever have been appended by a claimed preview token.
+   */
+  writes: SessionWrite[];
 }
 
 /** Keyed by the webContents that asked for it — one session per window, never one per subscriber. */
@@ -131,7 +147,7 @@ async function readScopeFor(
 /** What a window's session can see and do right now. Starts nothing; `id` is null when none runs. */
 export async function sessionInfo(webContentsId: number, projectRoot: string): Promise<SessionInfo> {
   const entry = sessions.get(webContentsId);
-  return describeSession(projectRoot, entry?.id ?? null, entry?.grants ?? []);
+  return describeSession(projectRoot, entry?.id ?? null, entry?.grants ?? [], entry?.writes ?? []);
 }
 
 /** How one grant reads in the disclosure, next to the app's own directories. */
@@ -140,25 +156,51 @@ function grantNote(grant: SessionGrant): string {
   return `You opened ${what} during this session, answering a ${grant.tool} prompt about ${grant.target}. It lasts until the session ends and nothing was written to disk.`;
 }
 
-/** The header's answer for a given session id — same fields whether or not one is running. */
+/** How a handed-off write scope reads in the disclosure. It is readable BECAUSE it is writable. */
+function writeNote(write: SessionWrite): string {
+  return (
+    `Opened by the ${write.kind} form you submitted, which scaffolded ${write.artifact}. ` +
+    `The session may write ${writeScopeNote(write.scope)} here, and reads it without asking for the same reason. ` +
+    `It lasts until the session ends and nothing was written to your settings.`
+  );
+}
+
+/**
+ * The header's answer for a given session id — same fields whether or not one is running.
+ *
+ * The write scope reaches the disclosure as an `origin: "app"` directory as well as `writes`, and
+ * only when nothing already in scope contains it: a skill written into a marketplace the pane
+ * already opened is not a new place the session can look, and listing it twice would make the one
+ * list that is supposed to answer "what can this see" answer it twice, differently.
+ */
 export async function describeSession(
   projectRoot: string,
   id: string | null,
-  grants: readonly SessionGrant[] = []
+  grants: readonly SessionGrant[] = [],
+  writes: readonly SessionWrite[] = []
 ): Promise<SessionInfo> {
   const cli = paneSessionTarget();
+  const extra = projectRoot ? additionalDirectories() : [];
+  const covered = [projectRoot, ...extra.map((d) => d.path), ...grants.map((g) => g.path)].filter(Boolean);
+  const fromWrites = writes
+    .filter((w) => !covered.some((root) => withinDirectory(root, w.path)))
+    .map((w) => ({ path: w.path, note: writeNote(w) }));
+
   return {
     id,
     projectRoot,
     cwd: projectRoot,
     read: await readScopeFor(
       projectRoot,
-      projectRoot ? additionalDirectories() : [],
+      [...extra, ...fromWrites],
       grants.map((g) => ({ path: g.path, note: grantNote(g) }))
     ),
     grants: [...grants],
-    // Empty, and nothing in this slice can add to it. `022` is the first thing allowed to.
-    writable: [],
+    // Empty until a create-* form hands its completed preview over, then one entry per submit.
+    // Derived from `writes` rather than tracked beside it, so the flat list and the attributed one
+    // cannot come apart.
+    writable: writes.map((w) => w.path),
+    writes: [...writes],
     tools: [...PANE_TOOLS],
     skills: [...PANE_SKILLS],
     available: cli.available,
@@ -198,6 +240,7 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     child: null,
     prompts: new Map(),
     grants: [],
+    writes: [],
   };
 
   entry.session = startPaneSession({
@@ -237,7 +280,96 @@ export async function startSession(webContentsId: number, projectRoot: string): 
     if (entry.child) terminateChildGroup(entry.child);
   });
 
-  return describeSession(projectRoot, id, entry.grants);
+  return describeSession(projectRoot, id, entry.grants, entry.writes);
+}
+
+/**
+ * Continue a create-\* form's work in the pane, with the token its confirmation was built from.
+ *
+ * A TOKEN AND NOTHING ELSE, exactly like `claude:run`, and for the reason the token exists: the
+ * invocation names the artifact this process resolved when it built the preview, so a renderer
+ * cannot describe a directory for the session to write in any more than it can describe a prompt
+ * for the session to run. Claiming consumes it, so a preview is spent either headlessly or here,
+ * never both, and never twice.
+ *
+ * Three things then happen, and they are the same three a grant does — widen the enforcement input,
+ * tell the SDK, re-derive the disclosure — plus one that is this slice's own: the conversation is
+ * seeded with what was scaffolded, WITHOUT a model turn.
+ *
+ *   1. `allowWrites` appends the artifact's own directory to the live write scope. Exactly one
+ *      entry, whatever the form; a second submit appends a second.
+ *   2. `seed` appends the context as a non-querying message. It costs nothing until the user types,
+ *      and it is what stops the model re-asking for the name the form captured.
+ *   3. The addition is announced inline in the transcript and the header re-reads the scope from
+ *      the `scope` event, so what the boundary enforces and what the pane says cannot drift.
+ *
+ * Telling the SDK is the one step that cannot happen here: `updatedPermissions` rides on a
+ * permission answer and there is no answer to ride on, so `startPaneSession` carries it to the
+ * first tool call that lands inside the new directory. See `unannounced` there.
+ */
+export async function handoffToSession(
+  webContentsId: number,
+  projectRoot: string,
+  token: unknown
+): Promise<SessionInfo> {
+  if (!projectRoot) throw new Error("No project is open.");
+  // Throws `TokenRefused` on a forged, replayed, expired or mis-aimed token — the same refusal, with
+  // the same reasons, that the run channel gives.
+  const invocation = claimInvocation(token, "claude");
+  const handoff = invocation.handoff;
+  if (!handoff) {
+    throw new Error(
+      "That preview cannot be continued in the pane: it did not come from a create-* form, so there is no " +
+        "artifact whose directory the session could be given."
+    );
+  }
+
+  // Reuse the conversation the user already has, unless there is none or it belongs to a project
+  // this window has moved off. A handoff is an addition to a session, not a new one — that is what
+  // makes a second submit grow the scope by one rather than replace it.
+  let entry = sessions.get(webContentsId);
+  if (!entry || entry.projectRoot !== projectRoot) {
+    await startSession(webContentsId, projectRoot);
+    entry = sessions.get(webContentsId);
+  }
+  if (!entry) {
+    // No CLI on this machine: `startSession` returned a description rather than a session, and there
+    // is nothing to hand off into. The artifact is still on disk and the dialog still copies the
+    // prompt, which is the documented fallback in exactly this state.
+    return describeSession(projectRoot, null);
+  }
+
+  const added = entry.session.allowWrites([handoff.writeScope]);
+
+  // ONE STRING, TWO DESTINATIONS. What the model is given and what the transcript shows are the
+  // same text, built once — a transcript that paraphrased what was actually seeded would be the
+  // one thing worse than not showing it at all.
+  const seed = handoffSeed(handoff, invocation.prompt);
+  entry.session.seed(seed);
+  send(webContentsId, { kind: "context", seq: --injectedSeq, title: handoffTitle(handoff), text: seed });
+
+  if (added.length > 0) {
+    entry.writes.push({
+      path: handoff.writeScope,
+      scope: handoff.scope,
+      artifact: handoff.artifact,
+      kind: handoff.kind,
+      name: handoff.name,
+      addedAt: Date.now(),
+    });
+    send(webContentsId, { kind: "notice", seq: --injectedSeq, text: handoffNotice(handoff) });
+  } else {
+    // A second submit for the same artifact. Saying so beats a silent no-op: the user pressed a
+    // button that describes itself as opening a directory, and it did not open a second one.
+    send(webContentsId, {
+      kind: "notice",
+      seq: --injectedSeq,
+      text: `${handoff.writeScope} was already writable in this session, so nothing was added to the write scope.`,
+    });
+  }
+
+  await announceScope(webContentsId, entry);
+  return describeSession(projectRoot, entry.id, entry.grants, entry.writes);
 }
 
 /**
@@ -250,10 +382,17 @@ export async function startSession(webContentsId: number, projectRoot: string): 
  * from the same derivation the boundary uses, not from what a button click implied.
  */
 async function announceScope(webContentsId: number, entry: LiveSession): Promise<void> {
-  const info = await describeSession(entry.projectRoot, entry.id, entry.grants);
+  const info = await describeSession(entry.projectRoot, entry.id, entry.grants, entry.writes);
   // The session may have gone away while the settings cascade was being resolved.
   if (sessions.get(webContentsId) !== entry) return;
-  send(webContentsId, { kind: "scope", seq: --injectedSeq, read: info.read, grants: info.grants });
+  send(webContentsId, {
+    kind: "scope",
+    seq: --injectedSeq,
+    read: info.read,
+    grants: info.grants,
+    writable: info.writable,
+    writes: info.writes,
+  });
 }
 
 /**
@@ -444,6 +583,11 @@ export function endSession(webContentsId: number): void {
  * does: silently re-pointing a transcript about repository A at repository B would be worse than
  * losing it, and starting a session implicitly would spend the user's subscription on a project
  * they have only just opened.
+ *
+ * IT IS ALSO WHAT CLEARS THE WRITE SCOPE. The accumulated directories live on the entry and in the
+ * session's own closure, so ending the session is the only way they go — there is no revoke, and
+ * none is owed: each entry answers a form the user submitted, and the way to withdraw that consent
+ * is to end the conversation it was given to. A switch does both at once.
  */
 export function endAllSessions(): void {
   for (const id of [...sessions.keys()]) endSession(id);

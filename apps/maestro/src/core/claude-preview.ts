@@ -32,10 +32,14 @@ import type {
   ClaudeRequest,
   ClaudeWriteTarget,
   CreateRequest,
+  HandoffContext,
   SettingsPort,
 } from "./contracts.js";
 
-export type { ClaudePreview, ClaudeReadScope, ClaudeRequest, ClaudeWriteTarget };
+export type { ClaudePreview, ClaudeReadScope, ClaudeRequest, ClaudeWriteTarget, HandoffContext };
+
+/** The request kinds a session pane can be handed. Every other kind previews with `handoff: null`. */
+const HANDOFF_KINDS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"] as const;
 
 /**
  * What the preview needs beyond the CLI resolution options.
@@ -201,6 +205,72 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
   }
 }
 
+/** How much of the scaffolded state a handoff carries. A seed is context, not a file viewer. */
+const HANDOFF_STATE_CAP = 1200;
+
+/** How many entries of an artifact DIRECTORY are listed before the rest are counted. */
+const HANDOFF_LISTING_CAP = 20;
+
+/**
+ * What the scaffold left on disk, read at preview time — the artifact's frontmatter, or its files.
+ *
+ * Read here rather than taken from `ScaffoldResult`, and that is the whole point: the renderer holds
+ * a `ScaffoldResult`, and a handoff that trusted it would be a renderer describing what a session
+ * may write. This module already resolves the same path the scaffold wrote to, and by the time a
+ * preview is built that file exists — so the seed describes the disk rather than a message.
+ *
+ * Never throws. A missing or unreadable artifact produces a sentence saying so: a preview is still
+ * worth having, and "the app could not read it back" is a more useful thing for the model to be
+ * told than an absent section.
+ */
+function scaffoldedState(target: string): string {
+  try {
+    if (fs.statSync(target).isDirectory()) {
+      const entries = fs.readdirSync(target, { withFileTypes: true });
+      const listed = entries
+        .slice(0, HANDOFF_LISTING_CAP)
+        .map((e) => `${e.name}${e.isDirectory() ? "/" : ""}`)
+        .join("\n");
+      const more = entries.length - Math.min(entries.length, HANDOFF_LISTING_CAP);
+      return more > 0 ? `${listed}\n… and ${more} more` : listed || "(the directory is empty)";
+    }
+    const body = fs.readFileSync(target, "utf8");
+    // The frontmatter alone when there is one: it is the part the user approved in the form's live
+    // preview and the part the finishing prompt forbids touching, and the body below it is the
+    // placeholder the run is being asked to replace.
+    const match = /^---\n([\s\S]*?)\n---/.exec(body);
+    const text = match ? `---\n${match[1]}\n---` : body;
+    return text.length > HANDOFF_STATE_CAP ? `${text.slice(0, HANDOFF_STATE_CAP)}…` : text;
+  } catch (err) {
+    return `(the app could not read ${target} back: ${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
+/**
+ * What continuing this create-\* preview in the pane would open.
+ *
+ * ONE DIRECTORY, RESOLVED HERE. `target.dir` is the directory the scaffold made for this artifact,
+ * or "" when the artifact is a lone file in a directory it shares — see `CreateTarget.dir`. Falling
+ * back to the file is the narrower of the two answers and the right way to be wrong: a handoff that
+ * silently opened `.claude/agents/` would be granting write access to every other agent in the
+ * project on the strength of a form about one of them.
+ */
+function buildHandoff(projectRoot: string, request: CreateRequest, opts: ResolveOptions): HandoffContext {
+  const target = resolveCreateTarget(projectRoot, request, { home: opts.home });
+  const repo = enclosingRepo(target.path);
+  return {
+    kind: request.kind,
+    name: target.name,
+    artifact: target.path,
+    writeScope: target.dir || target.path,
+    scope: target.dir ? "directory" : "file",
+    state: scaffoldedState(target.path),
+    repo: repo
+      ? `already inside the git repository at ${repo}, with the scaffold's work committed or staged there — do not run git init.`
+      : `not inside a git repository, and the app did not make one — do not run git; the user will.`,
+  };
+}
+
 /**
  * The prompt for one request kind, and the paths it may touch.
  *
@@ -311,6 +381,13 @@ export async function previewClaudeRun(
   const args = [...CLAUDE_BASE_FLAGS, prompt];
   const argv = [cli.bin ?? "claude", ...args];
 
+  // What continuing in the pane would open, resolved whether or not a CLI exists — the dialog shows
+  // it beside the prompt, and a machine with no CLI has no session to hand off into but is still
+  // owed an honest account of what the button would have done.
+  const handoff = (HANDOFF_KINDS as readonly string[]).includes(request?.kind)
+    ? buildHandoff(projectRoot, request as CreateRequest, opts)
+    : null;
+
   if (!cli.available) {
     // No token: there is nothing runnable to authorise. The prompt and argv are still returned in
     // full — Copy prompt is the whole fallback, and it must work in exactly this state. The read
@@ -322,6 +399,7 @@ export async function previewClaudeRun(
       cwd,
       targets,
       read,
+      handoff,
       available: false,
       bin: null,
       searched: cli.searched,
@@ -340,6 +418,9 @@ export async function previewClaudeRun(
     cwd,
     prompt,
     writable: targets.map((t) => t.path),
+    // The pane's half of the same authorisation. One token, two ways to spend it — a headless run
+    // or a conversation — and claiming it for either consumes it, so a preview cannot do both.
+    handoff,
   });
   return {
     token: invocation.token,
@@ -348,6 +429,7 @@ export async function previewClaudeRun(
     cwd,
     targets,
     read,
+    handoff,
     available: true,
     bin: cli.bin,
     searched: cli.searched,

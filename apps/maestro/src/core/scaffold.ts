@@ -60,6 +60,20 @@ export interface CreateTarget {
   name: string;
   /** Absolute path of the primary artifact: the file for a skill/agent, the directory otherwise. */
   path: string;
+  /**
+   * The directory this artifact OWNS, or "" when it does not own one.
+   *
+   * Three of the five shapes get a directory of their own from the scaffold — a skill's
+   * `skills/<name>/`, a marketplace subagent's `agents/<name>/`, the plugin or the marketplace
+   * itself — and one does not: a project-target subagent is a single `.md` file inside
+   * `.claude/agents/`, a directory it shares with every other agent in the project.
+   *
+   * The distinction exists because something eventually grants write access to this, and "the
+   * directory the scaffold made for this artifact" and "the directory the artifact happens to sit
+   * in" are the same string right up until the second one is somebody else's work. Empty means the
+   * artifact is its own scope and nothing around it is included.
+   */
+  dir: string;
   /** The marketplace repo this writes into, or "" for a project-local artifact. */
   marketplacePath: string;
 }
@@ -172,7 +186,7 @@ export function resolveCreateTarget(
         request.target === "project"
           ? path.join(projectRoot, ".claude", "skills", name)
           : path.join(mp, "plugins", request.plugin, "skills", name);
-      return { name, path: path.join(dir, "SKILL.md"), marketplacePath: mp };
+      return { name, path: path.join(dir, "SKILL.md"), dir, marketplacePath: mp };
     }
     case "create-subagent": {
       const body = request.mode === "auto" ? request.idea : request.description;
@@ -184,16 +198,24 @@ export function resolveCreateTarget(
         request.target === "project"
           ? path.join(projectRoot, ".claude", "agents", `${name}.md`)
           : path.join(mp, "plugins", request.plugin, "agents", name, "AGENTS.md");
-      return { name, path: file, marketplacePath: mp };
+      // The project shape is the one artifact in the app that owns no directory: `.claude/agents/`
+      // holds every agent the project has, and it is not this one's to be given away.
+      return {
+        name,
+        path: file,
+        dir: request.target === "project" ? "" : path.dirname(file),
+        marketplacePath: mp,
+      };
     }
     case "create-plugin": {
       const name = request.name.trim();
       const mp = marketplacePath(request.marketplace, opts)!;
-      return { name, path: path.join(mp, "plugins", name), marketplacePath: mp };
+      const dir = path.join(mp, "plugins", name);
+      return { name, path: dir, dir, marketplacePath: mp };
     }
     case "create-marketplace": {
       const dir = request.targetDir.trim().replace(/\/+$/, "") || request.targetDir.trim();
-      return { name: request.name.trim(), path: dir, marketplacePath: dir };
+      return { name: request.name.trim(), path: dir, dir, marketplacePath: dir };
     }
   }
 }

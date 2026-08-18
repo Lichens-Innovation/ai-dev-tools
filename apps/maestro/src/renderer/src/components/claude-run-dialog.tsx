@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Copy, FilePen, Play, Square, Terminal } from "lucide-react";
+import { AlertTriangle, Check, Copy, FilePen, MessagesSquare, Play, Square, Terminal } from "lucide-react";
 import CopyableText from "@repo/ui/copyable-text";
 import ReadScope from "./read-scope";
 import { callMain } from "../utils/call-main";
+import { useSession } from "../utils/session-context";
 import type { ClaudePreview, ClaudeRunResult } from "../../../shared/ipc";
 
 /**
@@ -46,8 +47,10 @@ export default function ClaudeRunDialog({
   const [output, setOutput] = useState("");
   const [result, setResult] = useState<ClaudeRunResult | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [handingOff, setHandingOff] = useState(false);
   const outputRef = useRef<HTMLPreElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const session = useSession();
 
   const running = phase === "running";
 
@@ -100,6 +103,31 @@ export default function ClaudeRunDialog({
     if (preview.token) void window.maestro.claude.cancel(preview.token);
   };
 
+  /**
+   * Spend the same authorisation on a conversation instead of a run.
+   *
+   * ONE TOKEN, TWO DOORS, and the token is single-use — so this dialog offers a choice rather than
+   * two things that can both happen. Nothing here names the directory that becomes writable: main
+   * resolves it from the invocation this token points at, which is the one the section above
+   * displayed. The dialog closes on success because the pane is where the work continues, and the
+   * pane opens itself.
+   */
+  const continueInPane = async () => {
+    if (!preview.token || !preview.handoff) return;
+    setHandingOff(true);
+    setRefusal(null);
+    try {
+      const started = await session.handoff(preview.token);
+      // Closed either way: the token is spent, so leaving Run on screen would leave a button that
+      // can only be refused. A machine with no CLI still gets its artifact and its Copy prompt —
+      // the pane says why there is no session, which is the same message this dialog would show.
+      onClose();
+      if (!started) return;
+    } finally {
+      setHandingOff(false);
+    }
+  };
+
   const copyButton = (
     <CopyableText
       text={preview.prompt}
@@ -137,8 +165,14 @@ export default function ClaudeRunDialog({
         </div>
 
         <p className="text-[12px] text-(--ink-2) m-0">
-          This runs the Claude CLI headlessly in your project. Nothing has been started yet — read the prompt below,
-          then press Run.
+          {/*
+            TWO DOORS SINCE `022`, and the intro has to say so or the second button reads as a
+            variant of the first. They spend the same single-use authorisation: one runs it
+            headlessly and ends, the other continues it as a conversation and opens a directory.
+          */}
+          {preview.handoff
+            ? "This runs the Claude CLI headlessly in your project — or hands the same work to the session pane, where you steer it turn by turn. Nothing has been started yet: read the prompt below, then pick one."
+            : "This runs the Claude CLI headlessly in your project. Nothing has been started yet — read the prompt below, then press Run."}
         </p>
 
         {/*
@@ -208,6 +242,40 @@ export default function ClaudeRunDialog({
             </ul>
           </div>
 
+          {/*
+            THE OTHER BUTTON'S DISCLOSURE, and it is here rather than in a tooltip because it is
+            the only thing on this dialog that outlives the dialog. Run writes the files above and
+            ends; continuing in the pane opens a DIRECTORY for the rest of the conversation, which
+            is a larger thing to agree to and is therefore said in the same place, at the same size,
+            as what a run may write.
+          */}
+          {preview.handoff && phase === "confirm" && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-subtle uppercase tracking-wide">
+                <MessagesSquare size={12} /> Or continue in the session pane
+              </div>
+              <p className="m-0 text-[11px] text-(--ink-3)">
+                The same work, as a conversation you steer. The session is told what the scaffold wrote and what is left
+                — appended without starting a turn, so it costs nothing until you type — and this one directory becomes
+                writable for as long as the session lasts:
+              </p>
+              <div
+                data-testid="claude-handoff-scope"
+                data-scope={preview.handoff.scope}
+                className="rounded-md border border-(--line) bg-(--bg-elev) px-2 py-1.5 font-mono text-[11px] text-(--ink) break-all"
+              >
+                {preview.handoff.writeScope}
+              </div>
+              <p className="m-0 text-[11px] text-(--ink-3)">
+                {preview.handoff.scope === "directory"
+                  ? "That folder and everything under it. "
+                  : "That file and nothing else. "}
+                Writes anywhere else still stop and ask you. It ends with the session, and nothing is written to your
+                settings.
+              </p>
+            </div>
+          )}
+
           {/* No CLI: say so, name where we looked, and keep the escape hatch. Run is not rendered. */}
           {!preview.available && (
             <div
@@ -275,6 +343,20 @@ export default function ClaudeRunDialog({
               className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
             >
               {phase === "done" ? "Close" : "Cancel"}
+            </button>
+          )}
+          {/* The second way to spend the token, and the same availability rule as Run: with no CLI
+              there is no session to continue in either. Left of Run because it is the wider choice
+              and the one worth reading the box above before taking. */}
+          {preview.available && preview.handoff && phase === "confirm" && (
+            <button
+              type="button"
+              data-testid="claude-handoff"
+              disabled={running || handingOff}
+              onClick={() => void continueInPane()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-ring bg-(--primary-dim) text-primary cursor-pointer focus:outline-none hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <MessagesSquare size={12} /> {handingOff ? "Opening…" : "Continue in the pane"}
             </button>
           )}
           {/* Hidden outright when the CLI is missing: a disabled Run invites a click that can only

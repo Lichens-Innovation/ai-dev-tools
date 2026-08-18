@@ -24,6 +24,8 @@ import {
   Ban,
   Check,
   Eye,
+  FilePen,
+  FileText,
   FolderOpen,
   Info,
   MessagesSquare,
@@ -47,6 +49,7 @@ import type {
   PermissionOutcome,
   PermissionPrompt,
   SessionGrant,
+  SessionWrite,
 } from "../../../shared/ipc";
 
 /** What to type in a Claude Code session to reach the same help the deleted chat asked for. */
@@ -159,11 +162,7 @@ export default function SessionPane() {
         >
           <ReadScope read={session.info.read} compact />
           <GrantList grants={session.info.grants} onRevoke={(path) => void session.revoke(path)} />
-          <p data-testid="session-write-scope" className="m-0 text-[10px] text-(--ink-3)">
-            This session's write scope is empty — nothing in the app can add a directory to it yet — so every Edit or
-            Write is stopped and asked about instead. Allowing one lets that single call through; it grants nothing
-            beyond it, and the next write asks again.
-          </p>
+          <WriteScope writes={session.info.writes} />
           <p className="m-0 text-[10px] text-(--ink-3)">
             Tools: <span className="font-mono text-(--ink-2)">{session.info.tools.join(", ")}</span>
           </p>
@@ -307,6 +306,58 @@ function GrantList({ grants, onRevoke }: { grants: SessionGrant[]; onRevoke(path
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * What this session may write, and what opened each entry.
+ *
+ * IT SITS BESIDE THE GRANTS, NOT IN A PANEL OF ITS OWN. The read scope, the grants and this are one
+ * question — "what can this conversation reach" — and answering it in two places is how a header
+ * ends up disagreeing with itself. The empty state is a SENTENCE rather than an empty list, because
+ * an empty list on screen says nothing at all; and there is no Revoke here on purpose, unlike the
+ * grants above: a grant answers a question the session asked and can be made to ask again, while
+ * this answers a form the user submitted, and the way back out of it is to end the session.
+ */
+function WriteScope({ writes }: { writes: SessionWrite[] }) {
+  if (writes.length === 0) {
+    return (
+      <p data-testid="session-write-scope" data-count="0" className="m-0 text-[10px] text-(--ink-3)">
+        This session's write scope is empty — only a create-* form handed off from its confirmation can add to it — so
+        every Edit or Write is stopped and asked about instead. Allowing one lets that single call through; it grants
+        nothing beyond it, and the next write asks again.
+      </p>
+    );
+  }
+  return (
+    <div data-testid="session-write-scope" data-count={writes.length} className="flex flex-col gap-1">
+      <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-subtle">
+        Writable, from {writes.length === 1 ? "the form you submitted" : "the forms you submitted"}
+      </p>
+      {writes.map((write) => (
+        <div
+          key={write.path}
+          data-testid="session-write"
+          data-path={write.path}
+          data-scope={write.scope}
+          data-kind={write.kind}
+          className="flex items-start gap-2 rounded-md border border-(--line) bg-(--bg) px-2 py-1.5"
+        >
+          <FilePen size={11} className="mt-0.5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-[10px] text-(--ink-2) break-all">{write.path}</div>
+            <div className="text-[10px] text-(--ink-3)">
+              {write.scope === "file" ? "This file only" : "This folder and everything under it"} · opened by the{" "}
+              {write.kind} form · scaffolded <span className="font-mono break-all">{write.artifact}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+      <p className="m-0 text-[10px] text-(--ink-3)">
+        Writes inside {writes.length === 1 ? "it" : "them"} happen without asking. Anywhere else is still stopped and
+        asked about, and allowing one of those adds nothing to this list. It all ends with the session.
+      </p>
     </div>
   );
 }
@@ -743,6 +794,28 @@ function Entry({
           {outcome ? OUTCOME_LABEL[outcome] : "waiting for you"}
         </span>
       </div>
+    );
+  }
+
+  if (entry.kind === "context") {
+    // COLLAPSED, BUT PRESENT IN FULL. This is the one entry the app wrote into the conversation on
+    // the user's behalf, so it cannot be summarised — but it is also long, and a transcript that
+    // opens with a screen of context nobody asked to read is a transcript people scroll past. The
+    // headline says what it is and what it cost; the body is one click away and is the exact text
+    // the model was given.
+    return (
+      <details data-testid="session-context" className="mb-3 rounded-lg border border-(--line) bg-(--bg-elev) px-2.5">
+        <summary className="cursor-pointer list-none py-1.5 text-[11px] text-(--ink-2) flex items-start gap-1.5">
+          <FileText size={11} className="shrink-0 mt-0.5 text-primary" />
+          <span className="break-words">
+            {entry.title}
+            <span className="text-(--ink-3)"> — added without a turn, so nothing was spent</span>
+          </span>
+        </summary>
+        <pre className="m-0 mb-2 max-h-64 overflow-auto font-mono text-[10px] leading-4 text-(--ink-2) whitespace-pre-wrap break-words select-text">
+          {entry.text}
+        </pre>
+      </details>
     );
   }
 

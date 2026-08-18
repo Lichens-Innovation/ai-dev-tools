@@ -17,9 +17,15 @@
 // WHY A WRITE ASKS RATHER THAN SIMPLY BEING REFUSED. `019` shipped the pane read-only because there
 // was nobody to ask; that is the sentence this module deletes. `decideWrite` still produces the
 // refusal and still produces its reason — the prompt shows exactly that reason as why the call was
-// stopped — but the user may now override it for THAT ONE CALL. Nothing accumulates: the write
-// scope is still `[]` afterwards, still empty on the next call, and `022` remains the only thing
-// that can add a directory to it.
+// stopped — but the user may now override it for THAT ONE CALL. Nothing accumulates: allowing a
+// write leaves `writable` exactly as it was, and the next write outside it asks again.
+//
+// WHAT `022` CHANGED, AND WHAT IT DID NOT. The write scope is no longer always `[]`: a create-*
+// form handed off to the pane appends the artifact's own directory, so a write inside it is
+// `decideWrite`'s ALLOW and never reaches a prompt at all — the user-visible win is the questions
+// that stop being asked, not new ones. Everything below is unchanged by that; this module reads
+// `writable` and has never cared where it came from, which is exactly why the accumulator could be
+// built without a second engine.
 //
 // PURE — string and path arithmetic. No `fs`, no spawn, no SDK, exactly like the two modules it
 // composes, which is what lets the whole decision be tested without a window.
@@ -46,11 +52,20 @@ const BODY_CAP = 600;
 /** How many hunks of a multi-part edit are shown; the rest are counted. */
 const HUNK_CAP = 3;
 
+/** How the write scope reads inside a prompt. Absolute paths, because that is what the user sees. */
+function listWritable(writable: readonly string[]): string {
+  if (writable.length === 1) return writable[0];
+  return `${writable.slice(0, -1).join(", ")} and ${writable[writable.length - 1]}`;
+}
+
 export interface PaneCallInput {
   tool: string;
   /** The tool input as the SDK delivered it. Untrusted shape, not a typed payload. */
   input: Record<string, unknown>;
-  /** What the session may write. Empty until `022`; a person can still allow one call. */
+  /**
+   * What the session may write: empty until a create-\* form is handed off to it, one directory per
+   * submit afterwards. A person can still allow a single call outside it, which adds nothing.
+   */
   writable: readonly string[];
   /** What the session may read — the same list the hook and the disclosure use. */
   directories: readonly string[];
@@ -86,9 +101,9 @@ export type PaneVerdict =
        * The user may be offered more than "allow this one call" — a session grant on `target`.
        *
        * TRUE ONLY FOR A READ THE BOUNDARY STOPPED, and the narrowness is the point. A refused WRITE
-       * is not grantable here: the write scope is `022`'s to grow, and offering a "grant the folder"
-       * button on a write prompt is precisely how widening writes would widen reads by accident —
-       * the mistake `session-scope.ts` was kept able to check write tools in order to make visible.
+       * is not grantable here and did not become so in `022`: the write scope grows from a submitted
+       * form and its completed preview, never from a prompt, so offering a "grant the folder" button
+       * on a write prompt would be a second door onto the one scope this app keeps single-sourced.
        * A network call is not grantable either; there is no path in it to grant.
        *
        * This flag says a grant is IN ORDER, not what it would be: resolving the options needs to
@@ -249,17 +264,29 @@ export function decidePaneCall({ tool, input, writable, directories, cwd }: Pane
   const resolved = target ? path.resolve(cwd, target) : null;
   return {
     outcome: "ask",
+    // TWO SENTENCES, BECAUSE THE SCOPE IS NO LONGER ALWAYS EMPTY. Until `022` there was one state
+    // to describe — a session that had been given nothing — and after it there are two: a session
+    // that has still been given nothing, and one that was handed a directory by a form and is now
+    // reaching outside it. Telling a user "nothing has given this session write access" while the
+    // header lists a directory it may write is the kind of wrong that teaches people to stop
+    // reading prompts.
     reason:
-      `Nothing has given this session write access${resolved ? ` to ${resolved}` : ""} — it was started to answer ` +
-      `questions rather than to author files. Allowing this lets that one write through and grants nothing further; ` +
-      `the next one asks again.`,
+      writable.length === 0
+        ? `Nothing has given this session write access${resolved ? ` to ${resolved}` : ""} — it was started to answer ` +
+          `questions rather than to author files. Allowing this lets that one write through and grants nothing ` +
+          `further; the next one asks again.`
+        : `${resolved ?? "That path"} is outside everything this session may write (${listWritable(writable)}), ` +
+          `each of which was opened by a form you submitted. Allowing this lets that one write through and adds ` +
+          `nothing to the list; the next write outside it asks again.`,
     // The model's sentence stays `decideWrite`'s, unchanged since `018`.
     denyReason: decision.message,
     target: resolved,
     detail: detail(),
-    // A WRITE IS NEVER GRANTABLE HERE. Widening the write scope is `022`'s, and the boundary this
-    // module composes bounds READS — so a "grant this folder" button on a write prompt would either
-    // do nothing the user expects or widen the wrong surface. Both are worse than one more prompt.
+    // A WRITE IS NEVER GRANTABLE HERE, and `022` did not change that. The write scope grows in
+    // exactly one place — a create-\* form handed off with its completed preview — so that every
+    // writable directory traces to an artifact the user made rather than to a button they pressed
+    // while being asked about something else. A "grant this folder" here would be the second door,
+    // and it would open on a prompt whose subject is a write the user has not thought about yet.
     grantable: false,
   };
 }
