@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@tanstack/react-store";
 import Button from "@repo/ui/button";
@@ -37,6 +37,7 @@ type Phase = "idle" | "saving";
 function WorkflowsPage() {
   const loaderData = Route.useLoaderData() as MaestroConfigResult;
   const { bundledAgents, projectSkills } = loaderData;
+  const router = useRouter();
 
   // Seed the store from loader data. Re-renders within a project won't clobber in-memory edits;
   // a project switch replaces the config outright — see seedWorkflowStore.
@@ -107,6 +108,15 @@ function WorkflowsPage() {
         toast(<>Could not save: {res.error}</>, { variant: "error" });
         return;
       }
+
+      // The write succeeded, so `seeded` — computed by the loader from whether maestro.json
+      // existed when the route loaded — is now stale, and the banner would keep telling the user
+      // their workflows are "not saved" after they just saved them. Loader data is only refreshed
+      // by an invalidation, and nothing else triggers one here: a save doesn't navigate, and the
+      // `project:changed` broadcast that ProjectProvider invalidates on doesn't fire either.
+      // Safe for the canvas: seedWorkflowStore keeps the in-memory config when projectRoot is
+      // unchanged, so re-running the loader cannot discard unsaved edits.
+      void router.invalidate();
 
       const result = res.value;
       if (result.warnings.length > 0) {

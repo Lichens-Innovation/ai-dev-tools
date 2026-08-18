@@ -4,12 +4,17 @@ Worked through `review-m1-m2.md`, 2026-07-30. Twelve items: seven fixed, four co
 one recorded as a measured decision.
 
 Item 9 was the last open one and needed a rendered window. Done 2026-07-31 — the canvas was driven
-over CDP in the packaged build, the `mounted` flag was measured and removed, and three defects
+over CDP in the packaged build, the `mounted` flag was measured and removed, and four defects
 turned up that only a running window shows (one of them data loss on a project switch). See
-"Canvas interactions, verified in a running window" and the section after it. One finding is
-recorded rather than fixed, under "Still open".
+"Canvas interactions, verified in a running window" and the section after it. Two findings are
+recorded rather than fixed — one under "Still open", one under `FitViewEffect`.
 
-Suites after both passes: `@repo/maestro-core` **72** (was 58), `maestro` **19** (was 8).
+A **second pass the same day** re-drove every criterion with an automated CDP probe rather than by
+hand. It found one criterion that the first pass had recorded as met without measuring it (the
+seeded banner after a save) and one stale-loader defect behind it, fixed both, and now passes
+23/23. The correction is noted inline where the wrong claim was made.
+
+Suites after all passes: `@repo/maestro-core` **72** (was 58), `maestro` **21** (was 8).
 
 ---
 
@@ -242,8 +247,13 @@ and the whole graph inside the viewport. Workflow switches re-fit in a single tr
 `fitView` does not fire against the workflow being replaced. A dragged node's position reaches
 `maestro.json` to within a rounding step and is still there after save → close → reopen. The
 condition-edge label editor opens, accepts a label, renders it, and the label survives the
-round trip. The seeded banner shows on `/workflows` for a project with no `maestro.json` and
-disappears once saved.
+round trip. The seeded banner shows on `/workflows` for a project with no `maestro.json`.
+
+**Correction, 2026-07-31 (second pass).** The last clause of that paragraph originally also
+claimed the banner "disappears once saved". It did not — that half of the criterion was recorded
+as met without being measured. Re-driven with an automated CDP probe it failed on the first run;
+see "The seeded banner never went away after a save" below. The probe now covers all 23 assertions
+in this section and passes 23/23 against the fix.
 
 ---
 
@@ -302,6 +312,51 @@ updates, via a `MutationObserver` rather than a one-shot read — "auto" resolve
 the toggle can change it while the canvas is mounted. Verified both ways: dark gives
 `rgb(248,248,248)` on `rgb(43,43,43)`, light gives `rgb(28,25,23)` on `rgb(254,254,254)`, and
 flipping the app toggle moves the canvas with it.
+
+---
+
+### The seeded banner never went away after a save
+
+Found on the second pass, by re-driving the canvas with an automated probe instead of by hand.
+Open a project with no `.claude/maestro.json`, press **Save workflows**, watch the save succeed
+and the toast name the file it wrote — and the banner above the canvas keeps saying the workflows
+are *"a starter configuration and are **not saved** — press Save workflows to write them."* It
+stays until the route is left and re-entered.
+
+`seeded` is decided by the loader from whether `maestro.json` existed **when the route loaded**,
+and nothing re-runs a loader after a save: saving doesn't navigate, and the `project:changed`
+broadcast that `ProjectProvider` invalidates on doesn't fire for a save either. So the flag is
+frozen at its load-time value for the life of the route. The banner is the only visible symptom,
+but the staleness is general — every field of loader data is pinned the same way.
+
+`/rules` had it identically, and worse in kind: a rules save *moves rule files on disk*
+(`applyRules` relocates project rules and installs vibe-rules ones), so its `tree` and
+`projectRules` pool describe a layout the save has already invalidated.
+
+Both now call `router.invalidate()` on the success path, after the `!res.ok` bail-out so a
+rejected save doesn't re-run the loader. The invalidation is safe in both places for reasons that
+already exist in the code and were verified in the window rather than assumed: `/workflows` keeps
+its in-memory config because `seedWorkflowStore` bails when `projectRoot` is unchanged, so a
+loader re-run cannot discard unsaved canvas edits; `/rules` is keyed on `projectRoot`, which is
+also unchanged, so its editor doesn't remount and the current assignments survive. Measured across
+the invalidation with a per-frame sampler: one distinct viewport transform, one distinct node
+transform, one distinct node set — no re-fit, no remount, and a node dragged *before* the save is
+still exactly where the user left it after it.
+
+`test/isolation.test.ts` gains two assertions, in that file's existing source-assertion idiom —
+both routes must use `useRouter` and call `router.invalidate()` *after* the `!res.ok` guard.
+Confirmed to fail against the unfixed source by reverting it. There is no render test in this app
+that would have caught this, which is why the guard is at the source level.
+
+### Recorded, not fixed: `FitViewEffect`'s timer is never cleared
+
+`setTimeout(() => fitView(...), 50)` in `workflow-canvas.tsx` has no `clearTimeout` cleanup, so a
+workflow switch followed by navigation away inside 50 ms leaves the timer to fire against a
+torn-down React Flow instance. Left alone deliberately — driven five times in the window
+(switch → navigate away after 10 ms → return), it produces no exception and no console error, and
+no visible effect: React Flow's `fitView` after teardown is a no-op. Adding the cleanup would be
+correct but would change working code on a theoretical argument, which is the opposite of how the
+`mounted` flag above was settled.
 
 ---
 

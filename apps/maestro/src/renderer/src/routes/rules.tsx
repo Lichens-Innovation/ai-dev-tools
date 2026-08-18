@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import Button from "@repo/ui/button";
 import { Sparkles } from "lucide-react";
@@ -47,6 +47,7 @@ function RulesPage() {
 
 function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
   const { projectRoot, tree, availableRules, vibeRules, vibeRulesAvailable } = loaderData;
+  const router = useRouter();
 
   const [config, setConfig] = useState<MaestroConfigV3>(loaderData.config);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -123,6 +124,12 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
         toast(<>Could not save rules: {res.error}</>, { variant: "error" });
         return;
       }
+
+      // Refresh loader data: `seeded` is now stale (see the same note in workflows.tsx), and a
+      // rules save also MOVES rule files on disk, so the tree and the project-rule pool the
+      // loader walked are stale too. The editor is keyed on projectRoot, which is unchanged, so
+      // it does not remount and the current assignments survive the invalidation.
+      void router.invalidate();
 
       const result = res.value;
       const placed = result.rules.moved.length + result.rules.installed.length;

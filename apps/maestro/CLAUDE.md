@@ -94,6 +94,18 @@ The four `create-*` routes are **not** ported yet — they need the `claude -p` 
   on `projectRoot` (and resets `activeWorkflowIdx`, which indexes the outgoing project's list);
   `/rules` remounts its editor with `key={projectRoot}`. Prefer the key — it re-initialises every
   derived piece at once. `test/workflow-store.test.ts` pins the store half; the failure is silent.
+- **A save does not refresh loader data — invalidate after one.** Loaders run on navigation and
+  on invalidation, and a save is neither: it doesn't navigate, and the `project:changed` broadcast
+  above doesn't fire. So everything the loader computed stays pinned at its load-time value, and
+  `seeded` is the visible one — after a successful save the banner kept telling the user their
+  config was "not saved" while it sat on disk. `/rules` was worse, since a rules save *moves rule
+  files*, leaving its tree and rule pool describing a layout that no longer exists. Both routes
+  now call `router.invalidate()` on the success path, after the `!res.ok` bail-out. This is safe
+  only because of the keying in the entry above — `/workflows` keeps its in-memory config
+  (`seedWorkflowStore` bails on an unchanged `projectRoot`) and `/rules` doesn't remount
+  (`key={projectRoot}` is unchanged) — so re-running a loader cannot discard in-flight edits.
+  Verified in the window: no re-fit, no remount, and a node dragged before the save stays put.
+  `test/isolation.test.ts` pins both call sites; no render test here would catch the regression.
 - **The renderer CSP forbids inline script — including the theme bootstrap.** `index.html`
   declares `script-src 'self'`, so the pre-paint theme script lives in
   `src/renderer/public/theme-bootstrap.js` and is loaded as a parser-blocking `<script src>`.
