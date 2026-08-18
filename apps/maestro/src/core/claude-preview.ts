@@ -135,9 +135,7 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
           `Description: ${request.description.trim()}`,
           `Keywords: ${request.keywords.length ? request.keywords.join(", ") : "(none)"}`,
         ].join("\n"),
-        targets: [
-          { path: path.join(target.path, "README.md"), action: "create", note: "The plugin's README." },
-        ],
+        targets: [{ path: path.join(target.path, "README.md"), action: "create", note: "The plugin's README." }],
         cwd,
       };
 

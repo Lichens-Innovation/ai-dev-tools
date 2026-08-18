@@ -116,13 +116,13 @@ function CreateSubagent() {
     void handleSubmit(
       (values) =>
         flow.create({ kind: "create-subagent", ...values }, () =>
-          reset({ ...values, name: "", idea: "", description: "", triggers: [], tools: [] }),
+          reset({ ...values, name: "", idea: "", description: "", triggers: [], tools: [] })
         ),
       (errs) => {
         if (errs.idea) jumpToField(FIELD_IDS, ROW_IDS, 2);
         else if (errs.name) jumpToField(FIELD_IDS, ROW_IDS, 1);
         else if (errs.marketplace) jumpToField(FIELD_IDS, ROW_IDS, 5);
-      },
+      }
     )();
 
   return (
@@ -295,7 +295,12 @@ function CreateSubagent() {
             name="tools"
             control={control}
             render={({ field }) => (
-              <ChipInput id="ca-tools" values={field.value} onChange={field.onChange} placeholder="e.g. Bash, Read, WebSearch" />
+              <ChipInput
+                id="ca-tools"
+                values={field.value}
+                onChange={field.onChange}
+                placeholder="e.g. Bash, Read, WebSearch"
+              />
             )}
           />
         </Field>

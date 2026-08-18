@@ -6,4 +6,3 @@ export type { SessionLogEntry };
 export async function getProjectCwd(): Promise<string> {
   return (await window.maestro.project.get()).current?.root ?? "";
 }
-

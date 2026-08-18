@@ -79,7 +79,7 @@ describe("preload bridge", () => {
 
   it("only invokes channels declared in the shared contract", () => {
     const used = [...preload.matchAll(/ipcRenderer\.(?:invoke|on|removeListener)\(\s*IPC(_EVENTS)?\.(\w+)/g)].map(
-      (m) => `${m[1] ? "IPC_EVENTS" : "IPC"}.${m[2]}`,
+      (m) => `${m[1] ? "IPC_EVENTS" : "IPC"}.${m[2]}`
     );
     const declared = new Set([
       ...Object.keys(IPC).map((k) => `IPC.${k}`),
@@ -91,7 +91,7 @@ describe("preload bridge", () => {
   });
 
   it("does not re-export node or electron internals to the window", () => {
-    expect(preload).not.toContain("exposeInMainWorld(\"require\"");
+    expect(preload).not.toContain('exposeInMainWorld("require"');
     expect(preload).not.toMatch(/exposeInMainWorld\([^)]*\bprocess\b/);
   });
 });
@@ -183,22 +183,21 @@ describe("src/core boundary", () => {
       const specs = specifiersIn(path.join(coreDir, `${mod}.ts`));
       // ./types.js is the model contracts re-exports; it is interfaces only, same as this file.
       const allowed = new Set(["./types.js"]);
-      expect(specs.filter((s) => !allowed.has(s)), `src/core/${mod}.ts imports something new`).toEqual([]);
+      expect(
+        specs.filter((s) => !allowed.has(s)),
+        `src/core/${mod}.ts imports something new`
+      ).toEqual([]);
     }
   });
 
   it("never imports @repo/claude-fs outside the main process", () => {
     // Same hazard, one layer down: claude-fs is the package src/core reads the filesystem with.
-    const offenders = outsideMain.filter((file) =>
-      /["'`]@repo\/claude-fs/.test(fs.readFileSync(file, "utf8")),
-    );
+    const offenders = outsideMain.filter((file) => /["'`]@repo\/claude-fs/.test(fs.readFileSync(file, "utf8")));
     expect(offenders.map((f) => path.relative(appRoot, f))).toEqual([]);
   });
 
   it("imports no node builtins outside the main process", () => {
-    const offenders = outsideMain.filter((file) =>
-      /from\s*["'`]node:/.test(fs.readFileSync(file, "utf8")),
-    );
+    const offenders = outsideMain.filter((file) => /from\s*["'`]node:/.test(fs.readFileSync(file, "utf8")));
     // The preload is a node context, but it deliberately imports nothing but electron — keeping
     // it that way is what makes the bridge auditable at a glance.
     expect(offenders.map((f) => path.relative(appRoot, f))).toEqual([]);
@@ -387,7 +386,10 @@ describe("built main and preload bundles", () => {
 describe("built renderer bundle", () => {
   const outDir = path.join(appRoot, "out", "renderer", "assets");
   const bundles = fs.existsSync(outDir)
-    ? fs.readdirSync(outDir).filter((f) => f.endsWith(".js")).map((f) => path.join(outDir, f))
+    ? fs
+        .readdirSync(outDir)
+        .filter((f) => f.endsWith(".js"))
+        .map((f) => path.join(outDir, f))
     : [];
 
   // stripComments (module scope) matters doubly here: bundled dependencies ship JSDoc containing
@@ -414,7 +416,10 @@ describe("built renderer stylesheets", () => {
   // looks perfectly fine in a browser and breaks only here.
   const outDir = path.join(appRoot, "out", "renderer", "assets");
   const sheets = fs.existsSync(outDir)
-    ? fs.readdirSync(outDir).filter((f) => f.endsWith(".css")).map((f) => path.join(outDir, f))
+    ? fs
+        .readdirSync(outDir)
+        .filter((f) => f.endsWith(".css"))
+        .map((f) => path.join(outDir, f))
     : [];
 
   it.runIf(sheets.length > 0)("reference nothing off-origin", () => {
@@ -432,7 +437,10 @@ describe("built renderer stylesheets", () => {
     const emitted = fs.readdirSync(outDir).filter((f) => f.endsWith(".woff2"));
     expect(emitted.length).toBeGreaterThan(0);
     for (const family of ["inter", "bodoni-moda", "ibm-plex-mono"]) {
-      expect(emitted.some((f) => f.startsWith(family)), `no ${family} woff2 emitted`).toBe(true);
+      expect(
+        emitted.some((f) => f.startsWith(family)),
+        `no ${family} woff2 emitted`
+      ).toBe(true);
     }
   });
 });

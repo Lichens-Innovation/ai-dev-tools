@@ -51,7 +51,7 @@ function readJson<T>(file: string): T | null {
 /** Plugin names a marketplace repo's manifest lists. Empty for a path that isn't one. */
 export function marketplacePlugins(marketplacePath: string): string[] {
   const manifest = readJson<{ plugins?: Array<{ name?: string }> }>(
-    path.join(marketplacePath, ".claude-plugin", "marketplace.json"),
+    path.join(marketplacePath, ".claude-plugin", "marketplace.json")
   );
   return (manifest?.plugins ?? []).map((p) => String(p?.name ?? "")).filter(Boolean);
 }
@@ -66,7 +66,7 @@ export function marketplacePlugins(marketplacePath: string): string[] {
 export function listMarketplaces(opts: MarketplaceOptions = {}): MarketplaceEntry[] {
   const known =
     readJson<Record<string, KnownMarketplace>>(
-      path.join(homeDir(opts), ".claude", "plugins", "known_marketplaces.json"),
+      path.join(homeDir(opts), ".claude", "plugins", "known_marketplaces.json")
     ) ?? {};
 
   return Object.entries(known)
@@ -92,11 +92,9 @@ export function marketplacePath(name: string, opts: MarketplaceOptions = {}): st
 }
 
 /** The `owner` block of a marketplace manifest, so a new plugin can inherit its author. */
-export function marketplaceOwner(
-  marketplacePath: string,
-): { name: string; email: string } | null {
+export function marketplaceOwner(marketplacePath: string): { name: string; email: string } | null {
   const manifest = readJson<{ owner?: { name?: string; email?: string } }>(
-    path.join(marketplacePath, ".claude-plugin", "marketplace.json"),
+    path.join(marketplacePath, ".claude-plugin", "marketplace.json")
   );
   const owner = manifest?.owner;
   return owner?.name ? { name: owner.name, email: owner.email ?? "" } : null;

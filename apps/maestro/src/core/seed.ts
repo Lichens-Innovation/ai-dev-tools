@@ -6,13 +6,7 @@
 // ["backend"] default with repo detection).
 
 import { placeConditionLabels } from "./label-layout.js";
-import type {
-  MaestroConfigV3,
-  MaestroEdgeV3,
-  MaestroInstanceV3,
-  MaestroNodeV3,
-  MaestroWorkflowV3,
-} from "./types.js";
+import type { MaestroConfigV3, MaestroEdgeV3, MaestroInstanceV3, MaestroNodeV3, MaestroWorkflowV3 } from "./types.js";
 
 // The non-implementation agents every seeded workflow shares.
 const CORE_INSTANCES: MaestroInstanceV3[] = [
@@ -56,9 +50,7 @@ function columnNodes(ids: string[], skillCount: SkillCount = () => 0): MaestroNo
   return ids.map((id): MaestroNodeV3 => {
     const position = { x: 0, y };
     const node: MaestroNodeV3 =
-      id === "human_review-1"
-        ? { id, type: "human_review", position }
-        : { id, type: "agent", instance: id, position };
+      id === "human_review-1" ? { id, type: "human_review", position } : { id, type: "agent", instance: id, position };
     const skills = id === "human_review-1" ? 0 : skillCount(id);
     y += BASE_STEP + skills * PER_SKILL_STEP;
     return node;

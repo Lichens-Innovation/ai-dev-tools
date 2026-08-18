@@ -107,7 +107,7 @@ function CreateMarketplace() {
         flow.create({ kind: "create-marketplace", ...values }, () =>
           // Owner and target directory are the user's standing answers; only the marketplace's own
           // identity is cleared.
-          reset({ ...values, name: "", description: "", homepage: "" }),
+          reset({ ...values, name: "", description: "", homepage: "" })
         ),
       (errs) => {
         if (errs.name) jumpToField(FIELD_IDS, ROW_IDS, 1);
@@ -115,7 +115,7 @@ function CreateMarketplace() {
         else if (errs.ownerName) jumpToField(FIELD_IDS, ROW_IDS, 3);
         else if (errs.ownerEmail) jumpToField(FIELD_IDS, ROW_IDS, 4);
         else if (errs.targetDir) jumpToField(FIELD_IDS, ROW_IDS, 6);
-      },
+      }
     )();
 
   return (
@@ -151,7 +151,12 @@ function CreateMarketplace() {
           />
         }
       >
-        <Field id="cm-row-1" label="Marketplace name" hint="kebab-case, e.g. my-tools." error={errors.name?.message ?? null}>
+        <Field
+          id="cm-row-1"
+          label="Marketplace name"
+          hint="kebab-case, e.g. my-tools."
+          error={errors.name?.message ?? null}
+        >
           <Controller
             name="name"
             control={control}

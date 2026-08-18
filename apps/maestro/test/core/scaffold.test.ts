@@ -43,8 +43,8 @@ function makeHome(): void {
         plugins: [{ name: "toolkit", source: "./plugins/toolkit", description: "A toolkit" }],
       },
       null,
-      2,
-    ) + "\n",
+      2
+    ) + "\n"
   );
   fs.mkdirSync(path.join(market, "plugins", "toolkit", "skills"), { recursive: true });
 
@@ -56,7 +56,7 @@ function makeHome(): void {
       "my-tools": { source: { source: "directory" }, installLocation: market, lastUpdated: "now" },
       // A GitHub-sourced marketplace is a plugin CACHE, not a repo the user can commit to.
       remote: { source: { source: "github", repo: "someone/tools" }, installLocation: "/nope", lastUpdated: "now" },
-    }),
+    })
   );
 }
 
@@ -135,7 +135,7 @@ describe("scaffolding a skill", () => {
         `---\n\n` +
         `# Migration Reviewer\n\n` +
         `<!-- The /ai-tools dispatcher (or /create-skill) authors the full body here from the idea. -->\n` +
-        `Describe the workflow, concrete steps, and any reference tables.\n`,
+        `Describe the workflow, concrete steps, and any reference tables.\n`
     );
   });
 
@@ -193,7 +193,7 @@ describe("scaffolding a subagent", () => {
     const res = scaffoldCreate(
       project,
       subagent({ mode: "manual", idea: "IGNORED", description: "Audits dependencies." }),
-      opts(),
+      opts()
     );
     const body = fs.readFileSync(res.path, "utf8");
     expect(body).toContain(`description: "Audits dependencies."`);
@@ -215,7 +215,9 @@ describe("scaffolding a plugin", () => {
     expect(res.scaffolded).toBe(true);
     expect(res.needsModel).toBe(false);
 
-    const manifest = JSON.parse(fs.readFileSync(path.join(market, "plugins", "linting", ".claude-plugin", "plugin.json"), "utf8"));
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(market, "plugins", "linting", ".claude-plugin", "plugin.json"), "utf8")
+    );
     expect(manifest).toEqual({
       name: "linting",
       version: "0.1.0",
@@ -227,7 +229,11 @@ describe("scaffolding a plugin", () => {
     expect(fs.existsSync(path.join(market, "plugins", "linting", "skills"))).toBe(true);
 
     const registry = JSON.parse(fs.readFileSync(path.join(market, ".claude-plugin", "marketplace.json"), "utf8"));
-    expect(registry.plugins).toContainEqual({ name: "linting", source: "./plugins/linting", description: "Lint helpers" });
+    expect(registry.plugins).toContainEqual({
+      name: "linting",
+      source: "./plugins/linting",
+      description: "Lint helpers",
+    });
     // The existing entry is untouched — registration appends, it does not rewrite the catalog.
     expect(registry.plugins[0].name).toBe("toolkit");
   });
@@ -315,11 +321,29 @@ describe("refusing to write", () => {
       [skill({ plugin: "no-such-plugin" }), /has no plugin named/],
       [subagent({ mode: "manual", name: "", description: "x" }), /name is required/],
       [
-        { kind: "create-marketplace", name: "my-tools", description: "d", ownerName: "Ada", ownerEmail: "nope", homepage: "", targetDir: "/tmp/x", privateRepo: false },
+        {
+          kind: "create-marketplace",
+          name: "my-tools",
+          description: "d",
+          ownerName: "Ada",
+          ownerEmail: "nope",
+          homepage: "",
+          targetDir: "/tmp/x",
+          privateRepo: false,
+        },
         /valid owner email/,
       ],
       [
-        { kind: "create-marketplace", name: "my-tools", description: "d", ownerName: "Ada", ownerEmail: "a@b.co", homepage: "", targetDir: "relative/path", privateRepo: false },
+        {
+          kind: "create-marketplace",
+          name: "my-tools",
+          description: "d",
+          ownerName: "Ada",
+          ownerEmail: "a@b.co",
+          homepage: "",
+          targetDir: "relative/path",
+          privateRepo: false,
+        },
         /absolute path/,
       ],
     ];
@@ -334,13 +358,13 @@ describe("refusing to write", () => {
 
   it("refuses a project target with no project open", () => {
     expect(validateCreateRequest("", skill({ target: "project" }), opts())).toContainEqual(
-      expect.stringMatching(/No project is open/),
+      expect.stringMatching(/No project is open/)
     );
   });
 
   it("refuses to resolve a path for an invalid request rather than inventing one", () => {
     expect(() => resolveCreateTarget(project, skill({ marketplace: "invented" }), opts())).toThrow(
-      /No local marketplace/,
+      /No local marketplace/
     );
   });
 });

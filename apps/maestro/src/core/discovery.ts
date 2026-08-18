@@ -72,10 +72,7 @@ export function findUpBundledAgents(start: string): string | null {
  * location, which is exactly the resolution that was wrong; making the caller name the directory
  * puts the decision in the one process that knows where the app was installed.
  */
-export async function discoverAgents(
-  projectRoot: string,
-  bundledDir: string | null,
-): Promise<DiscoveredDefinition[]> {
+export async function discoverAgents(projectRoot: string, bundledDir: string | null): Promise<DiscoveredDefinition[]> {
   const [project, user, bundled, plugins] = await Promise.all([
     projectRoot ? readAgentsFromDir(path.join(projectRoot, ".claude", "agents")) : Promise.resolve([]),
     getUserAgents(),

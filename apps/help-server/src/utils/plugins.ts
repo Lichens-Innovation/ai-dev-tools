@@ -26,9 +26,11 @@ export interface MarketplacePluginInfo {
   installCommand: string
 }
 
-export const getInstalledPlugins = createServerFn({ method: 'GET' }).handler(async (): Promise<InstalledPlugin[]> => {
-  return getInstalledPluginsData()
-})
+export const getInstalledPlugins = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<InstalledPlugin[]> => {
+    return getInstalledPluginsData()
+  },
+)
 
 export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
   async (): Promise<MarketplacePluginInfo[]> => {
@@ -56,8 +58,12 @@ export const getProjectMarketplace = createServerFn({ method: 'GET' }).handler(
 
       // Shared readers: skills from `<plugin>/skills/<id>/SKILL.md`, agents from
       // `<plugin>/agents/` (flat `<name>.md` or `<name>/AGENTS.md`).
-      const skills: SkillInfo[] = await readSkillsFromDir(path.join(pluginDir, 'skills'))
-      const agents: SkillInfo[] = await readAgentsFromDir(path.join(pluginDir, 'agents'))
+      const skills: SkillInfo[] = await readSkillsFromDir(
+        path.join(pluginDir, 'skills'),
+      )
+      const agents: SkillInfo[] = await readAgentsFromDir(
+        path.join(pluginDir, 'agents'),
+      )
 
       const pluginKey = `${pluginEntry.name}@${marketplaceName}`
       results.push({

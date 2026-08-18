@@ -15,4 +15,4 @@
 
 ## Prompt
 
-For the following task, use the /test-maestro-desktop skill for your tests. Do the task from .claude/maestro-tasks/010-fold-maestro-core-into-the-app.md
+For the following task, use the /test-maestro-desktop skill for your tests. Do the task from .claude/maestro-tasks/011-make-prettier-check-pass.md

@@ -32,7 +32,7 @@ export interface SearchListResult {
  */
 export function resolveSearchList(
   cfg: Partial<MaestroConfigV3> | null,
-  session: Partial<MaestroSession> | null,
+  session: Partial<MaestroSession> | null
 ): SearchListResult {
   const workflows = cfg?.workflows ?? [];
   const activeWorkflowName = session?.workflow || null;
@@ -86,7 +86,7 @@ export interface AgentSkills {
 export function collectAgentSkills(
   searchList: MaestroWorkflowV3[] | null | undefined,
   instances: MaestroInstanceV3[] | null | undefined,
-  agentType: string | null | undefined,
+  agentType: string | null | undefined
 ): AgentSkills {
   const instByName = (name: string | undefined) => (instances ?? []).find((i) => i.name === name);
   const wantAgent = bareAgentName(agentType);
@@ -118,7 +118,7 @@ export function collectAgentSkills(
 export function nodeLabel(
   id: string,
   wf: MaestroWorkflowV3,
-  instances: MaestroInstanceV3[] | null | undefined,
+  instances: MaestroInstanceV3[] | null | undefined
 ): string {
   if (id === "main-session") return "";
   const n = (wf.nodes ?? []).find((x) => x.id === id);
@@ -135,10 +135,7 @@ export function nodeLabel(
  * Ordered array of step labels along the success path of a workflow.
  * This is the SOLE source of truth for "what steps the workflow has in order".
  */
-export function successPathSteps(
-  wf: MaestroWorkflowV3,
-  instances: MaestroInstanceV3[] | null | undefined,
-): string[] {
+export function successPathSteps(wf: MaestroWorkflowV3, instances: MaestroInstanceV3[] | null | undefined): string[] {
   const out: string[] = [];
   let cur = "main-session";
   const seen = new Set<string>();
@@ -159,7 +156,7 @@ export function successPathSteps(
  */
 export function workflowNodeLabels(
   wf: MaestroWorkflowV3,
-  instances: MaestroInstanceV3[] | null | undefined,
+  instances: MaestroInstanceV3[] | null | undefined
 ): Set<string> {
   const labels = new Set<string>();
   for (const n of wf.nodes ?? []) {

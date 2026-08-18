@@ -31,7 +31,7 @@ describe("success-path parity", () => {
       it("successPathSteps matches the legacy walk", () => {
         for (const wf of cfg.workflows) {
           expect(successPathSteps(wf, cfg.workflow_instances)).toEqual(
-            legacySession.successPathSteps(wf, cfg.workflow_instances),
+            legacySession.successPathSteps(wf, cfg.workflow_instances)
           );
         }
       });
@@ -41,7 +41,7 @@ describe("success-path parity", () => {
           const ids = [...wf.nodes.map((n) => n.id), "main-session", "does-not-exist"];
           for (const id of ids) {
             expect(nodeLabel(id, wf, cfg.workflow_instances)).toBe(
-              legacySession.nodeLabel(id, wf, cfg.workflow_instances),
+              legacySession.nodeLabel(id, wf, cfg.workflow_instances)
             );
           }
         }
@@ -50,7 +50,7 @@ describe("success-path parity", () => {
       it("workflowNodeLabels matches", () => {
         for (const wf of cfg.workflows) {
           expect([...workflowNodeLabels(wf, cfg.workflow_instances)].sort()).toEqual(
-            [...legacySession.workflowNodeLabels(wf, cfg.workflow_instances)].sort(),
+            [...legacySession.workflowNodeLabels(wf, cfg.workflow_instances)].sort()
           );
         }
       });
@@ -63,7 +63,7 @@ describe("success-path parity", () => {
         ];
         for (const agent of agents) {
           expect(collectAgentSkills(cfg.workflows, cfg.workflow_instances, agent)).toEqual(
-            legacySession.collectAgentSkills(cfg.workflows, cfg.workflow_instances, agent),
+            legacySession.collectAgentSkills(cfg.workflows, cfg.workflow_instances, agent)
           );
         }
       });
@@ -193,7 +193,7 @@ describe("skill-regions parity", () => {
         "replaceRegion",
         "startMarker",
         "syncManagedRegions",
-      ].sort(),
+      ].sort()
     );
     expect(Object.keys(legacySession).sort()).toEqual(
       [
@@ -211,7 +211,7 @@ describe("skill-regions parity", () => {
         "successPathSteps",
         "workflowNodeLabels",
         "writeSession",
-      ].sort(),
+      ].sort()
     );
   });
 });

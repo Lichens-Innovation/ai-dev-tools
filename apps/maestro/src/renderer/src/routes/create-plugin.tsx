@@ -74,13 +74,13 @@ function CreatePlugin() {
     void handleSubmit(
       (values) =>
         flow.create({ kind: "create-plugin", ...values }, () =>
-          reset({ ...values, name: "", description: "", keywords: [] }),
+          reset({ ...values, name: "", description: "", keywords: [] })
         ),
       (errs) => {
         if (errs.name) jumpToField(FIELD_IDS, ROW_IDS, 1);
         else if (errs.description) jumpToField(FIELD_IDS, ROW_IDS, 2);
         else if (errs.marketplace) jumpToField(FIELD_IDS, ROW_IDS, 4);
-      },
+      }
     )();
 
   return (
@@ -116,7 +116,12 @@ function CreatePlugin() {
           />
         }
       >
-        <Field id="cp-row-1" label="Plugin name" hint="kebab-case, e.g. my-plugin." error={errors.name?.message ?? null}>
+        <Field
+          id="cp-row-1"
+          label="Plugin name"
+          hint="kebab-case, e.g. my-plugin."
+          error={errors.name?.message ?? null}
+        >
           <Controller
             name="name"
             control={control}

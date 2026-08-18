@@ -57,7 +57,7 @@ export function useCreateFlow(label: string) {
         setPreviewing(false);
       }
     },
-    [label],
+    [label]
   );
 
   /**
@@ -80,7 +80,7 @@ export function useCreateFlow(label: string) {
             <>
               {label} not created: {res.error}
             </>,
-            { variant: "error" },
+            { variant: "error" }
           );
           return;
         }
@@ -89,7 +89,7 @@ export function useCreateFlow(label: string) {
         toast(
           <>
             {label} written to <span className="font-mono text-(--ink)">{res.value.path}</span>
-          </>,
+          </>
         );
         // Only when something is actually left for a model. A manual skeleton and a plugin manifest
         // are finished as written, so opening a confirmation for them would be asking the user to
@@ -99,7 +99,7 @@ export function useCreateFlow(label: string) {
         setBusy(false);
       }
     },
-    [label, finish],
+    [label, finish]
   );
 
   const dialog = preview ? (

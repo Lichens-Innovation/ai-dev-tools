@@ -76,11 +76,9 @@ function WorkflowsPage() {
 
   const confirmCreateWorkflow = () => {
     if (!config) return;
-    const source =
-      newWorkflowSource !== null ? config.workflows[newWorkflowSource] : null;
+    const source = newWorkflowSource !== null ? config.workflows[newWorkflowSource] : null;
     const name =
-      newWorkflowName.trim() ||
-      (source ? `Copy of ${source.name}` : `Workflow ${config.workflows.length + 1}`);
+      newWorkflowName.trim() || (source ? `Copy of ${source.name}` : `Workflow ${config.workflows.length + 1}`);
     const newWf: MaestroWorkflowV3 = source
       ? { name, nodes: structuredClone(source.nodes), edges: structuredClone(source.edges) }
       : { name, nodes: [], edges: [] };
@@ -131,7 +129,7 @@ function WorkflowsPage() {
               workflows: config.workflows,
             },
           },
-        }),
+        })
       );
 
       if (!res.ok) {
@@ -152,10 +150,9 @@ function WorkflowsPage() {
       if (result.warnings.length > 0) {
         toast(
           <>
-            Saved to <span className="font-mono text-(--ink)">{result.configPath}</span>.{" "}
-            {result.warnings.join(" ")}
+            Saved to <span className="font-mono text-(--ink)">{result.configPath}</span>. {result.warnings.join(" ")}
           </>,
-          { variant: "error" },
+          { variant: "error" }
         );
         return;
       }
@@ -163,7 +160,7 @@ function WorkflowsPage() {
         <>
           Saved to <span className="font-mono text-(--ink)">{result.configPath}</span> and re-rendered{" "}
           {result.render.rows.length} workflow{result.render.rows.length === 1 ? "" : "s"} into the orchestrator.
-        </>,
+        </>
       );
     } finally {
       setPhase("idle");
@@ -178,9 +175,7 @@ function WorkflowsPage() {
 
   // Read the chain back off the config rather than tracking it separately, so the chips can never
   // disagree with the graph on the canvas.
-  const implChain = config.workflow_instances
-    .map((i) => i.name)
-    .filter((name) => !CORE_SEED_AGENTS.includes(name));
+  const implChain = config.workflow_instances.map((i) => i.name).filter((name) => !CORE_SEED_AGENTS.includes(name));
   // Every discovered agent that isn't one of the core four is a candidate — including a project's
   // own. `implChain` is unioned in so an agent the seed used but discovery didn't find still shows.
   const implCandidates = [
@@ -202,8 +197,8 @@ function WorkflowsPage() {
 
       {loaderData.seeded && (
         <SeededBanner>
-          The workflows below are a starter configuration and are{" "}
-          <strong className="text-(--ink)">not saved</strong> — press Save workflows to write them.
+          The workflows below are a starter configuration and are <strong className="text-(--ink)">not saved</strong> —
+          press Save workflows to write them.
         </SeededBanner>
       )}
 
@@ -222,10 +217,7 @@ function WorkflowsPage() {
         />
       )}
 
-      <div
-        className="flex-1 grid overflow-hidden"
-        style={{ gridTemplateColumns: "280px 1fr" }}
-      >
+      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "280px 1fr" }}>
         {/* Left pane */}
         <div className="border-r border-(--line) overflow-y-auto flex flex-col p-4 gap-4">
           {/* Agents */}
@@ -235,15 +227,27 @@ function WorkflowsPage() {
               {allAgents.map((agent) => {
                 const checked = config.agents_available.includes(agent.id);
                 return (
-                  <label key={agent.id} title={agent.description} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer">
+                  <label
+                    key={agent.id}
+                    title={agent.description}
+                    className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => storeSetAgentsAvailable(checked ? config.agents_available.filter((a) => a !== agent.id) : [...config.agents_available, agent.id])}
+                      onChange={() =>
+                        storeSetAgentsAvailable(
+                          checked
+                            ? config.agents_available.filter((a) => a !== agent.id)
+                            : [...config.agents_available, agent.id]
+                        )
+                      }
                       className="w-3.5 h-3.5 accent-primary cursor-pointer"
                     />
                     <span className="font-mono text-[13px] text-(--ink) truncate">{agent.id}</span>
-                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">{agent.source}</span>
+                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">
+                      {agent.source}
+                    </span>
                   </label>
                 );
               })}
@@ -268,15 +272,27 @@ function WorkflowsPage() {
               {allSkills.map((skill) => {
                 const checked = config.skills_available.includes(skill.id);
                 return (
-                  <label key={skill.id} title={skill.description} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer">
+                  <label
+                    key={skill.id}
+                    title={skill.description}
+                    className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
+                  >
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => storeSetSkillsAvailable(checked ? config.skills_available.filter((s) => s !== skill.id) : [...config.skills_available, skill.id])}
+                      onChange={() =>
+                        storeSetSkillsAvailable(
+                          checked
+                            ? config.skills_available.filter((s) => s !== skill.id)
+                            : [...config.skills_available, skill.id]
+                        )
+                      }
                       className="w-3.5 h-3.5 accent-primary cursor-pointer"
                     />
                     <span className="font-mono text-[13px] text-(--ink) truncate">{skill.id}</span>
-                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">{skill.source}</span>
+                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">
+                      {skill.source}
+                    </span>
                   </label>
                 );
               })}
@@ -323,7 +339,9 @@ function WorkflowsPage() {
                     >
                       <option value="">Empty workflow</option>
                       {config.workflows.map((wf, i) => (
-                        <option key={i} value={i}>Copy of {wf.name || `Workflow ${i + 1}`}</option>
+                        <option key={i} value={i}>
+                          Copy of {wf.name || `Workflow ${i + 1}`}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -333,15 +351,26 @@ function WorkflowsPage() {
                   type="text"
                   value={newWorkflowName}
                   onChange={(e) => setNewWorkflowName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") confirmCreateWorkflow(); if (e.key === "Escape") cancelCreateWorkflow(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmCreateWorkflow();
+                    if (e.key === "Escape") cancelCreateWorkflow();
+                  }}
                   placeholder="e.g. Backend update"
                   className="w-full text-[13px] bg-(--bg-elev) border border-(--line) rounded-md px-3 py-2 text-(--ink) focus:outline-none focus:border-primary"
                 />
                 <div className="flex gap-2 justify-end">
-                  <button type="button" onClick={cancelCreateWorkflow} className="px-3 py-1.5 text-[13px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none">
+                  <button
+                    type="button"
+                    onClick={cancelCreateWorkflow}
+                    className="px-3 py-1.5 text-[13px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+                  >
                     Cancel
                   </button>
-                  <button type="button" onClick={confirmCreateWorkflow} className="px-3 py-1.5 text-[13px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90">
+                  <button
+                    type="button"
+                    onClick={confirmCreateWorkflow}
+                    className="px-3 py-1.5 text-[13px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+                  >
                     Create
                   </button>
                 </div>

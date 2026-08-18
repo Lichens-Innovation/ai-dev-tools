@@ -100,26 +100,26 @@ All three hooks append to the same file. All are no-ops when `maestro.json` is a
 
 Renderer paths are relative to `apps/maestro/`.
 
-| Concern | File |
-|---|---|
-| Route, state, 3-pane grid, scroll-sync, empty state | `src/renderer/src/routes/session-log.tsx` |
-| Left step list with status icons (CircleCheck/CircleX/AlertTriangle) | `src/renderer/src/components/session-log-cards.tsx` |
-| Center framed log pane, click-to-select, live indicator, per-section anchors | `src/renderer/src/components/session-log-view.tsx` |
-| Right detail panel: Input/Process/Output sections | `src/renderer/src/components/session-log-detail.tsx` |
-| **The tail itself** — polls the JSONL, pushes `log:init`/`log:entry`/`log:reset` | `src/main/ipc.ts` |
-| The typed channel contract | `src/shared/ipc.ts` (`log:subscribe`, `log:unsubscribe`, and the three push channels) |
-| App-wide subscriber: `SessionLogProvider`, `useSessionLog()` | `src/renderer/src/utils/session-log-context.tsx` |
-| `parseLogLines` + `readSessionLog` | `session-log.ts` in `apps/maestro/src/core/` |
-| The `SessionLogEntry` shape crossing the wire | `contracts.ts` in `apps/maestro/src/core/`, re-exported by `src/shared/ipc.ts` |
-| Pure transforms `buildInstances` + `humanizeLog` + `parseSkillsTriage` + `unaccountedSkills` + `Instance`/`SkillsTriage` types | `src/renderer/src/utils/session-log.ts` |
-| Top bar — nav links incl. `ScrollText` + global `●` live dot | `src/renderer/src/components/top-nav.tsx` |
-| `titleFromName` — origin string → display name | `src/renderer/src/utils/text.ts` (re-export of `src/core/text.ts`) |
-| Yellow color tokens (`--yellow`, `--yellow-dim`) | `packages/styles/scss/abstracts/_tokens.scss` |
-| **Writer — tool-call entries** (PreToolUse, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-session-log.js` |
-| **Writer — dispatch + handoff entries** (SubagentStart/Stop, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-subagent-log.js` |
-| Shared append helper (`appendSessionLog`, `readStdin`) | `plugins/ai-tools-manager/scripts/lib/maestro-session.cjs` |
-| Hook registration (all three hooks registered here) | `plugins/ai-tools-manager/hooks/hooks.json` |
-| Source file (ephemeral, append-only, gitignored) | `<projectRoot>/.claude/maestro_session.log.jsonl` |
+| Concern                                                                                                                        | File                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Route, state, 3-pane grid, scroll-sync, empty state                                                                            | `src/renderer/src/routes/session-log.tsx`                                             |
+| Left step list with status icons (CircleCheck/CircleX/AlertTriangle)                                                           | `src/renderer/src/components/session-log-cards.tsx`                                   |
+| Center framed log pane, click-to-select, live indicator, per-section anchors                                                   | `src/renderer/src/components/session-log-view.tsx`                                    |
+| Right detail panel: Input/Process/Output sections                                                                              | `src/renderer/src/components/session-log-detail.tsx`                                  |
+| **The tail itself** — polls the JSONL, pushes `log:init`/`log:entry`/`log:reset`                                               | `src/main/ipc.ts`                                                                     |
+| The typed channel contract                                                                                                     | `src/shared/ipc.ts` (`log:subscribe`, `log:unsubscribe`, and the three push channels) |
+| App-wide subscriber: `SessionLogProvider`, `useSessionLog()`                                                                   | `src/renderer/src/utils/session-log-context.tsx`                                      |
+| `parseLogLines` + `readSessionLog`                                                                                             | `session-log.ts` in `apps/maestro/src/core/`                                          |
+| The `SessionLogEntry` shape crossing the wire                                                                                  | `contracts.ts` in `apps/maestro/src/core/`, re-exported by `src/shared/ipc.ts`        |
+| Pure transforms `buildInstances` + `humanizeLog` + `parseSkillsTriage` + `unaccountedSkills` + `Instance`/`SkillsTriage` types | `src/renderer/src/utils/session-log.ts`                                               |
+| Top bar — nav links incl. `ScrollText` + global `●` live dot                                                                   | `src/renderer/src/components/top-nav.tsx`                                             |
+| `titleFromName` — origin string → display name                                                                                 | `src/renderer/src/utils/text.ts` (re-export of `src/core/text.ts`)                    |
+| Yellow color tokens (`--yellow`, `--yellow-dim`)                                                                               | `packages/styles/scss/abstracts/_tokens.scss`                                         |
+| **Writer — tool-call entries** (PreToolUse, matcher `.*`)                                                                      | `plugins/ai-tools-manager/scripts/maestro-session-log.js`                             |
+| **Writer — dispatch + handoff entries** (SubagentStart/Stop, matcher `.*`)                                                     | `plugins/ai-tools-manager/scripts/maestro-subagent-log.js`                            |
+| Shared append helper (`appendSessionLog`, `readStdin`)                                                                         | `plugins/ai-tools-manager/scripts/lib/maestro-session.cjs`                            |
+| Hook registration (all three hooks registered here)                                                                            | `plugins/ai-tools-manager/hooks/hooks.json`                                           |
+| Source file (ephemeral, append-only, gitignored)                                                                               | `<projectRoot>/.claude/maestro_session.log.jsonl`                                     |
 
 ## The data model
 
@@ -129,27 +129,27 @@ Every line is a JSON object with at least `{ ts, origin, log }`. Additional fiel
 
 ```ts
 interface SessionLogEntry {
-  ts: string;      // ISO-8601 UTC timestamp
-  origin: string;  // "main_session" | agent_type (e.g. "backend", "Explore")
-  log: string;     // human-readable one-liner: "Read(/path)", "Bash(cmd)", "→ backend", "HANDOFF: success"
+  ts: string; // ISO-8601 UTC timestamp
+  origin: string; // "main_session" | agent_type (e.g. "backend", "Explore")
+  log: string; // human-readable one-liner: "Read(/path)", "Bash(cmd)", "→ backend", "HANDOFF: success"
 
   // Present only on dispatch entries (SubagentStart):
   kind?: "dispatch";
-  agent?: string;      // the subagent's agent_type
-  agent_id?: string;   // unique identifier — links this dispatch to its matching handoff
-  input?: string;      // full spawning message (what the main session said to spawn this agent)
-  offered_skills?: { loaded: string[]; referenced: string[] };  // skills the SubagentStart hook surfaced to this agent
+  agent?: string; // the subagent's agent_type
+  agent_id?: string; // unique identifier — links this dispatch to its matching handoff
+  input?: string; // full spawning message (what the main session said to spawn this agent)
+  offered_skills?: { loaded: string[]; referenced: string[] }; // skills the SubagentStart hook surfaced to this agent
 
   // Present only on handoff entries (SubagentStop with an agent_type):
   kind?: "handoff";
-  agent_id?: string;   // matches the dispatch entry for this run
+  agent_id?: string; // matches the dispatch entry for this run
   status?: "success" | "condition" | "unknown";
-  label?: string | null;  // raw HANDOFF label; null for "success" outcome
-  output?: string;     // full final message (agent's last message, incl. HANDOFF: line + payload)
+  label?: string | null; // raw HANDOFF label; null for "success" outcome
+  output?: string; // full final message (agent's last message, incl. HANDOFF: line + payload)
 
   // Present only on transition entries (SubagentStop with NO agent_type):
   kind?: "transition";
-  output?: string;     // the final message of the non-workflow turn (e.g. "waiting on the user")
+  output?: string; // the final message of the non-workflow turn (e.g. "waiting on the user")
 }
 ```
 
@@ -163,24 +163,24 @@ A missing `kind` = a plain tool-call entry from `maestro-session-log.js`. The sc
 
 ```ts
 interface Instance {
-  id: number;           // position in the ordered list (stable key for all three panes)
-  origin: string;       // raw origin string
-  displayName: string;  // "Main Session" | titleFromName(origin)
-  startIndex: number;   // index of first entry in the flat entries[] array
+  id: number; // position in the ordered list (stable key for all three panes)
+  origin: string; // raw origin string
+  displayName: string; // "Main Session" | titleFromName(origin)
+  startIndex: number; // index of first entry in the flat entries[] array
   entries: SessionLogEntry[];
 
-  status: "success" | "condition" | "unknown" | "transition" | null;  // null = main_session; "transition" = non-workflow boundary
-  label: string | null;   // condition label, e.g. "tests_failed" (null for success)
-  input: string | null;   // spawning message from the matching dispatch entry
-  output: string | null;  // final message from this segment's handoff entry
-  skillsTriage: SkillsTriage | null;  // parsed { loaded[], skipped[{id,reason}] } from the agent's report
-  offeredSkills: { loaded: string[]; referenced: string[] } | null;  // from the dispatch entry's offered_skills
+  status: "success" | "condition" | "unknown" | "transition" | null; // null = main_session; "transition" = non-workflow boundary
+  label: string | null; // condition label, e.g. "tests_failed" (null for success)
+  input: string | null; // spawning message from the matching dispatch entry
+  output: string | null; // final message from this segment's handoff entry
+  skillsTriage: SkillsTriage | null; // parsed { loaded[], skipped[{id,reason}] } from the agent's report
+  offeredSkills: { loaded: string[]; referenced: string[] } | null; // from the dispatch entry's offered_skills
 }
 ```
 
-`skillsTriage` is parsed from `output` by `parseSkillsTriage` (pure, in `session-log.ts`): it grabs the last fenced ```` ```json ```` block, `JSON.parse`s it, and reads the `skillsTriage` field every skill-receiving agent emits in its final report (see `plugins/ai-tools-manager/agents/*.md`). Any parse/shape failure yields `null`, so the section is simply omitted — fully backward compatible with older logs and agents that don't emit it. The triage data is already in `output`; that parse is a pure read-side interpretation.
+`skillsTriage` is parsed from `output` by `parseSkillsTriage` (pure, in `session-log.ts`): it grabs the last fenced ` ```json ` block, `JSON.parse`s it, and reads the `skillsTriage` field every skill-receiving agent emits in its final report (see `plugins/ai-tools-manager/agents/*.md`). Any parse/shape failure yields `null`, so the section is simply omitted — fully backward compatible with older logs and agents that don't emit it. The triage data is already in `output`; that parse is a pure read-side interpretation.
 
-`offeredSkills` is the *other* side of the diff: the skills the `SubagentStart` hook actually surfaced, written onto the **dispatch** entry by `maestro-subagent-log.js` (correlated to the instance by `agent_id`, same as `input`). `unaccountedSkills(inst)` is the diff — skills that were offered but appear in neither `triage.loaded` nor `triage.skipped`, i.e. the agent **silently dropped** them. It returns `[]` unless both sides are present (a diff is only meaningful when we know what was offered *and* what was reported). This is what makes the triage auditable rather than self-reported: a hollow *reason* flags a lazy skip, but an unaccounted skill catches a skill the agent omitted from its report entirely.
+`offeredSkills` is the _other_ side of the diff: the skills the `SubagentStart` hook actually surfaced, written onto the **dispatch** entry by `maestro-subagent-log.js` (correlated to the instance by `agent_id`, same as `input`). `unaccountedSkills(inst)` is the diff — skills that were offered but appear in neither `triage.loaded` nor `triage.skipped`, i.e. the agent **silently dropped** them. It returns `[]` unless both sides are present (a diff is only meaningful when we know what was offered _and_ what was reported). This is what makes the triage auditable rather than self-reported: a hollow _reason_ flags a lazy skip, but an unaccounted skill catches a skill the agent omitted from its report entirely.
 
 ## Left pane — step list (`session-log-cards.tsx`)
 
@@ -213,7 +213,7 @@ Shows the selected instance's data in three sections:
 - **Header:** "Logs: {displayName}"
 - **Input:** the instance's `input` field — the full spawning message sent by the main session. Shows "No input captured" for main_session instances or when no dispatch entry exists.
 - **Process:** the humanized log lines (same content as the center pane section for this step).
-- **Skills Triage:** (only when `instance.skillsTriage` is set) the agent's own account of which injected skills it loaded vs deliberately skipped, audited against what was offered. **Loaded** render as green chips; **Unaccounted** (`unaccountedSkills(instance)` — offered but reported in neither loaded nor skipped) render as red chips; **Skipped** render as `id — reason`, with a hollow reason (`< 8` chars) flagged in `--yellow`. Hollow reasons surface lazy *explicit* skips; the red unaccounted group surfaces skills the agent dropped *silently* — caught by diffing the dispatch entry's `offered_skills` against the report.
+- **Skills Triage:** (only when `instance.skillsTriage` is set) the agent's own account of which injected skills it loaded vs deliberately skipped, audited against what was offered. **Loaded** render as green chips; **Unaccounted** (`unaccountedSkills(instance)` — offered but reported in neither loaded nor skipped) render as red chips; **Skipped** render as `id — reason`, with a hollow reason (`< 8` chars) flagged in `--yellow`. Hollow reasons surface lazy _explicit_ skips; the red unaccounted group surfaces skills the agent dropped _silently_ — caught by diffing the dispatch entry's `offered_skills` against the report.
 - **Output:** the instance's `output` field — the agent's full final message including the HANDOFF line. Shows "No output captured" for main_session or when no handoff entry exists.
 - When no step is selected, shows "Select a step to view details".
 
@@ -244,23 +244,34 @@ This is the relationship between the page and the custom hooks/scripts.
 - **Hook events:** both `SubagentStart` and `SubagentStop`, matcher `.*` — the same script handles both, branching on `hook_event_name`.
 - **On SubagentStart** → writes a `kind:"dispatch"` entry:
   ```json
-  { "ts": "…", "origin": "main_session", "kind": "dispatch",
-    "agent": "<agent_type>", "agent_id": "<agent_id>",
-    "input": "<last_assistant_message>", "log": "→ <agent_type>" }
+  {
+    "ts": "…",
+    "origin": "main_session",
+    "kind": "dispatch",
+    "agent": "<agent_type>",
+    "agent_id": "<agent_id>",
+    "input": "<last_assistant_message>",
+    "log": "→ <agent_type>"
+  }
   ```
   `last_assistant_message` on SubagentStart = the main session's message that triggered the subagent spawn. This is the **Input** shown in the right detail panel.
 - **On SubagentStop with an `agent_type`** → parses `last_assistant_message` for a `HANDOFF:` line (last occurrence, tolerant of surrounding backticks/asterisks), writes a `kind:"handoff"` entry:
   ```json
-  { "ts": "…", "origin": "<agent_type>", "kind": "handoff",
-    "agent_id": "<agent_id>", "status": "success|condition|unknown",
-    "label": "<label|null>", "output": "<last_assistant_message>",
-    "log": "HANDOFF: <label>" }
+  {
+    "ts": "…",
+    "origin": "<agent_type>",
+    "kind": "handoff",
+    "agent_id": "<agent_id>",
+    "status": "success|condition|unknown",
+    "label": "<label|null>",
+    "output": "<last_assistant_message>",
+    "log": "HANDOFF: <label>"
+  }
   ```
   `last_assistant_message` on SubagentStop = the agent's entire final message, including `HANDOFF:` + any `handoff_details` payload. This is the **Output** shown in the right detail panel. `agent_id` is shared across both entries for correlation.
 - **On SubagentStop with NO `agent_type`** → not a real workflow handoff. Writes a `kind:"transition"` entry instead, so it can't masquerade as a failed/unknown agent run:
   ```json
-  { "ts": "…", "origin": "transition", "kind": "transition",
-    "output": "<last_assistant_message>", "log": "transition" }
+  { "ts": "…", "origin": "transition", "kind": "transition", "output": "<last_assistant_message>", "log": "transition" }
   ```
   `buildInstances` segments this as its own neutral card (`status:"transition"`, displayName "Transition" via `titleFromName`); the message is kept as `output` for the detail panel.
 - **`parseHandoff`:** takes the last `HANDOFF:` match; `"success"` (case-insensitive) → `status:"success"`, any other label → `status:"condition"`, no match → `status:"unknown"`.
@@ -298,7 +309,7 @@ The plain tool-call log from `maestro-session-log.js` has **no outcome data** �
 - **The log path comes from the open project, not `process.cwd()`.** Main resolves it from the project store's current root; `currentRoot()` in `main/ipc.ts` is the single place that answers "which project". The app's own cwd is irrelevant and always wrong here.
 - **The tail polls, it does not `fs.watch`.** Main uses `setInterval` + a read + a line-count diff. Watch APIs are unreliable across editors that write via rename and across network/virtualised filesystems, and the hooks append constantly enough that a poll is cheap. The tail lives in main, so exactly one poll loop runs no matter how many routes are mounted.
 - **`reset` event on SessionEnd.** When the JSONL file disappears (deleted by `maestro-session-cleanup.sh`), the server emits `reset: {}` and `lineCount` drops to 0. The provider clears `entries`, the page shows the empty state. A new session's `init` event re-fills it. This is the normal SessionEnd → new session cycle without a page reload.
-- **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id` and stops the old one before starting a new one — so a second subscriber *steals* the tail, and the first unsubscribe then stops it for both. The owner is `SessionLogProvider`; every other consumer reads from it with `useSessionLog()`. A test pins the call site to that one file.
+- **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id` and stops the old one before starting a new one — so a second subscriber _steals_ the tail, and the first unsubscribe then stops it for both. The owner is `SessionLogProvider`; every other consumer reads from it with `useSessionLog()`. A test pins the call site to that one file.
 - **The tail is retargeted on a project switch**, in `main/ipc.ts`. Without that, the window keeps streaming the previously-opened repo's session log while showing the new project everywhere else.
 - **Live stream is app-wide.** `SessionLogProvider` mounts in `__root.tsx`, so the subscription is maintained on every page. Entries accumulate in context even while the user is on `/workflows` or `/rules`; `/session-log` sees the full current state when you navigate to it.
 - **There is no loader; the first paint is empty.** The provider starts with `entries: []` until main's `init` push arrives, so navigating to the route shows a brief empty state — acceptable for a debugging tool, and the alternative is a loader that races the subscription.

@@ -54,13 +54,7 @@ export {
   type ConfigSlice,
 } from "./config.js";
 
-export {
-  orchestratorSkillPath,
-  successPath,
-  handoffTable,
-  renderOrchestrator,
-  type RenderResult,
-} from "./render.js";
+export { orchestratorSkillPath, successPath, handoffTable, renderOrchestrator, type RenderResult } from "./render.js";
 
 export {
   readStdin,
@@ -91,14 +85,7 @@ export {
 
 export { applyRules, targetDirFor, type ApplyRulesSummary } from "./rules.js";
 
-export {
-  listTasks,
-  closeTask,
-  tasksDirFor,
-  parseBlockedBy,
-  type MaestroTask,
-  type TaskStatus,
-} from "./tasks.js";
+export { listTasks, closeTask, tasksDirFor, parseBlockedBy, type MaestroTask, type TaskStatus } from "./tasks.js";
 
 export {
   parseLogLines,
@@ -160,15 +147,7 @@ export {
   type ScaffoldResult,
 } from "./scaffold.js";
 
-export {
-  buildDesc,
-  clip,
-  deriveName,
-  firstSentence,
-  joinOxford,
-  stripNamespace,
-  titleFromName,
-} from "./text.js";
+export { buildDesc, clip, deriveName, firstSentence, joinOxford, stripNamespace, titleFromName } from "./text.js";
 
 // The `claude -p` bridge, in three modules on purpose: preview cannot spawn, run cannot invent.
 // Import `claude-preview.js` directly if you want that guarantee at the import level — pulling
@@ -195,10 +174,4 @@ export {
 
 export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation } from "./claude-tokens.js";
 
-export {
-  defaultV3Config,
-  buildWorkflow,
-  linearWorkflow,
-  buildTestsWorkflow,
-  type SkillMap,
-} from "./seed.js";
+export { defaultV3Config, buildWorkflow, linearWorkflow, buildTestsWorkflow, type SkillMap } from "./seed.js";

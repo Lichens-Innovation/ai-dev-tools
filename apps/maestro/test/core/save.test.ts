@@ -94,7 +94,11 @@ describe("applyRules", () => {
 
     expect(listing(mine)).toBe(listing(theirs));
     expect(summary.moved).toEqual([
-      { id: "sql", from: path.join(".claude", "rules", "sql.md"), to: path.join("src", "backend", ".claude", "rules", "sql.md") },
+      {
+        id: "sql",
+        from: path.join(".claude", "rules", "sql.md"),
+        to: path.join("src", "backend", ".claude", "rules", "sql.md"),
+      },
     ]);
     expect(summary.unchanged).toEqual([{ id: "python", dir: "" }]);
     expect(summary.missing).toEqual(["ghost"]);
@@ -195,7 +199,10 @@ describe("saveConfig", () => {
     const root = path.join(tmp, "p");
     makeProject(root, { withSkill: true });
 
-    await saveConfig(root, { sliceType: "rules", slice: { rules: [{ id: "python", scope: "project", source: "project" }] } });
+    await saveConfig(root, {
+      sliceType: "rules",
+      slice: { rules: [{ id: "python", scope: "project", source: "project" }] },
+    });
     await saveConfig(root, {
       sliceType: "workflows",
       slice: {

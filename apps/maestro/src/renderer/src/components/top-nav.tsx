@@ -1,6 +1,23 @@
 import { Link } from "@tanstack/react-router";
 import ThemeToggle from "@repo/ui/theme-toggle";
-import { Workflow, BookOpenCheck, ScrollText, ListChecks, Plus, X, Pencil, Check, ChevronDown, Trash2, FolderOpen, Download, Sparkles, Bot, Package, Store } from "lucide-react";
+import {
+  Workflow,
+  BookOpenCheck,
+  ScrollText,
+  ListChecks,
+  Plus,
+  X,
+  Pencil,
+  Check,
+  ChevronDown,
+  Trash2,
+  FolderOpen,
+  Download,
+  Sparkles,
+  Bot,
+  Package,
+  Store,
+} from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSessionLog } from "../utils/session-log-context";
 import { useProject } from "../utils/project-context";
@@ -66,11 +83,7 @@ interface WorkflowSelectorProps {
   onRename: (i: number, name: string) => void;
 }
 
-export default function TopNav({
-  workflowSelector,
-}: {
-  workflowSelector?: WorkflowSelectorProps;
-}) {
+export default function TopNav({ workflowSelector }: { workflowSelector?: WorkflowSelectorProps }) {
   const { connected } = useSessionLog();
   const badge = installBadge(useInstall().status);
   const [editing, setEditing] = useState(false);
@@ -82,7 +95,10 @@ export default function TopNav({
   const { current, pick } = useProject();
 
   // Reset editing + close menu when active workflow changes
-  useEffect(() => { setEditing(false); setMenuOpen(false); }, [workflowSelector?.activeIndex]);
+  useEffect(() => {
+    setEditing(false);
+    setMenuOpen(false);
+  }, [workflowSelector?.activeIndex]);
 
   // Close the dropdown on outside click
   useEffect(() => {
@@ -97,7 +113,9 @@ export default function TopNav({
   // Dismiss the delete-confirmation modal on Escape
   useEffect(() => {
     if (pendingDelete === null) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setPendingDelete(null); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPendingDelete(null);
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [pendingDelete]);
@@ -117,7 +135,10 @@ export default function TopNav({
 
   const confirmEdit = () => {
     if (!workflowSelector) return;
-    workflowSelector.onRename(workflowSelector.activeIndex, editValue.trim() || `Workflow ${workflowSelector.activeIndex + 1}`);
+    workflowSelector.onRename(
+      workflowSelector.activeIndex,
+      editValue.trim() || `Workflow ${workflowSelector.activeIndex + 1}`
+    );
     setEditing(false);
   };
 
@@ -172,7 +193,11 @@ export default function TopNav({
         <Download size={13} /> Runtime
         {badge !== "none" && (
           <span
-            title={badge === "missing" ? "Maestro is not installed in this project" : "The app ships a newer runtime than this project has"}
+            title={
+              badge === "missing"
+                ? "Maestro is not installed in this project"
+                : "The app ships a newer runtime than this project has"
+            }
             className="text-[7px] leading-none text-amber-500"
           >
             ●
@@ -197,13 +222,26 @@ export default function TopNav({
                   autoFocus
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") cancelEdit(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmEdit();
+                    if (e.key === "Escape") cancelEdit();
+                  }}
                   className="h-7 px-2.5 rounded-md text-[13px] bg-(--bg-elev) border border-primary text-(--ink) focus:outline-none w-44"
                 />
-                <button type="button" onClick={confirmEdit} title="Confirm" className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-primary hover:bg-(--primary-dim) cursor-pointer focus:outline-none">
+                <button
+                  type="button"
+                  onClick={confirmEdit}
+                  title="Confirm"
+                  className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-primary hover:bg-(--primary-dim) cursor-pointer focus:outline-none"
+                >
                   <Check size={13} />
                 </button>
-                <button type="button" onClick={cancelEdit} title="Cancel" className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  title="Cancel"
+                  className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+                >
                   <X size={13} />
                 </button>
               </>
@@ -219,7 +257,8 @@ export default function TopNav({
                     <span className="truncate">
                       {workflowSelector.workflows.length === 0
                         ? "No workflows"
-                        : workflowSelector.workflows[workflowSelector.activeIndex] || `Workflow ${workflowSelector.activeIndex + 1}`}
+                        : workflowSelector.workflows[workflowSelector.activeIndex] ||
+                          `Workflow ${workflowSelector.activeIndex + 1}`}
                     </span>
                     <ChevronDown size={13} className="text-(--ink-3) shrink-0" />
                   </button>
@@ -233,19 +272,28 @@ export default function TopNav({
                         {workflowSelector.workflows.map((name, i) => (
                           <div
                             key={i}
-                            onClick={() => { workflowSelector.onSelect(i); setMenuOpen(false); }}
+                            onClick={() => {
+                              workflowSelector.onSelect(i);
+                              setMenuOpen(false);
+                            }}
                             className={`group flex items-center justify-between gap-2 pl-3 pr-1.5 py-1.5 cursor-pointer hover:bg-(--bg-elev) ${
                               i === workflowSelector.activeIndex ? "text-(--ink)" : "text-(--ink-2)"
                             }`}
                           >
                             <span className="flex items-center gap-1.5 truncate text-[13px]">
-                              {i === workflowSelector.activeIndex && <Check size={12} className="text-primary shrink-0" />}
+                              {i === workflowSelector.activeIndex && (
+                                <Check size={12} className="text-primary shrink-0" />
+                              )}
                               <span className="truncate">{name || `Workflow ${i + 1}`}</span>
                             </span>
                             <button
                               type="button"
                               title="Delete workflow"
-                              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); setPendingDelete(i); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpen(false);
+                                setPendingDelete(i);
+                              }}
                               className="w-6 h-6 rounded flex items-center justify-center text-(--ink-3) hover:text-red-500 opacity-0 group-hover:opacity-100 cursor-pointer focus:outline-none shrink-0"
                             >
                               <Trash2 size={12} />
@@ -256,7 +304,10 @@ export default function TopNav({
                       <div className="border-t border-(--line) mt-1 pt-1">
                         <button
                           type="button"
-                          onClick={() => { workflowSelector.onAdd(); setMenuOpen(false); }}
+                          onClick={() => {
+                            workflowSelector.onAdd();
+                            setMenuOpen(false);
+                          }}
                           className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink) cursor-pointer focus:outline-none"
                         >
                           <Plus size={13} /> Add workflow
@@ -266,7 +317,12 @@ export default function TopNav({
                   )}
                 </div>
                 {workflowSelector.workflows.length > 0 && (
-                  <button type="button" onClick={startEdit} title="Rename workflow" className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none">
+                  <button
+                    type="button"
+                    onClick={startEdit}
+                    title="Rename workflow"
+                    className="w-7 h-7 rounded-md flex items-center justify-center bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+                  >
                     <Pencil size={12} />
                   </button>
                 )}

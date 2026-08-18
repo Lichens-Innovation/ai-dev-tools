@@ -25,12 +25,15 @@ export interface WalkOptions {
  */
 export function* walkDirs(
   root: string,
-  opts: WalkOptions = {},
+  opts: WalkOptions = {}
 ): Generator<{ absolute: string; relative: string; name: string; depth: number }> {
   const maxDepth = opts.maxDepth ?? MAX_DEPTH;
   const ignore = opts.ignore ?? IGNORE_DIRS;
 
-  function* rec(dir: string, depth: number): Generator<{
+  function* rec(
+    dir: string,
+    depth: number
+  ): Generator<{
     absolute: string;
     relative: string;
     name: string;

@@ -126,7 +126,12 @@ export default function CreateShell({
 
             <div className="mt-6 pt-4 border-t border-(--line) flex items-center gap-3">
               <div className="flex-1" />
-              <Button variant="primary" icon={busy ? undefined : <Sparkles size={14} />} loading={busy} onClick={onSubmit}>
+              <Button
+                variant="primary"
+                icon={busy ? undefined : <Sparkles size={14} />}
+                loading={busy}
+                onClick={onSubmit}
+              >
                 {busy ? "Creating…" : submitLabel}
               </Button>
             </div>

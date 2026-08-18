@@ -5,13 +5,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
-import type {
-  ClaudeOutputChunk,
-  MaestroApi,
-  ProjectState,
-  SaveInput,
-  SessionLogEntry,
-} from "../shared/ipc.js";
+import type { ClaudeOutputChunk, MaestroApi, ProjectState, SaveInput, SessionLogEntry } from "../shared/ipc.js";
 
 const api: MaestroApi = {
   project: {

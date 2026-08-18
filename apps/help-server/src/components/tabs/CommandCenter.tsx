@@ -20,7 +20,9 @@ function ScopeChip({ scope }: { scope: string }) {
   return (
     <span
       className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-        isUser ? 'border-ring bg-(--primary-dim) text-primary' : 'border-(--line) bg-(--bg-3) text-subtle'
+        isUser
+          ? 'border-ring bg-(--primary-dim) text-primary'
+          : 'border-(--line) bg-(--bg-3) text-subtle'
       }`}
     >
       {scope}
@@ -47,12 +49,17 @@ const cmdColumns = [
   }),
   cmdColumnHelper.accessor('description', {
     header: 'Description',
-    cell: ({ getValue }) => <span className="text-[13px] text-(--ink-2)">{getValue()}</span>,
+    cell: ({ getValue }) => (
+      <span className="text-[13px] text-(--ink-2)">{getValue()}</span>
+    ),
     enableGlobalFilter: true,
   }),
 ]
 
-export default function CommandCenter({ installedPlugins, commands }: CommandCenterProps) {
+export default function CommandCenter({
+  installedPlugins,
+  commands,
+}: CommandCenterProps) {
   const [cmdFilter, setCmdFilter] = useState('')
 
   const table = useReactTable({
@@ -70,7 +77,9 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
       <section>
         <div className="mb-4 flex items-center gap-3">
           <span className="section-label">Installed Plugins</span>
-          <span className="text-[10px] text-subtle">{installedPlugins.length}</span>
+          <span className="text-[10px] text-subtle">
+            {installedPlugins.length}
+          </span>
         </div>
         {installedPlugins.length === 0 ? (
           <p className="text-[13px] text-subtle">No plugins installed.</p>
@@ -107,8 +116,12 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
                         {p.pluginName}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-[13px] text-(--ink-2)">{p.marketplace}</td>
-                    <td className="px-4 py-2.5 font-mono text-[12px] text-subtle">{p.version || '—'}</td>
+                    <td className="px-4 py-2.5 text-[13px] text-(--ink-2)">
+                      {p.marketplace}
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-[12px] text-subtle">
+                      {p.version || '—'}
+                    </td>
                     <td className="px-4 py-2.5">
                       <ScopeChip scope={p.scope} />
                     </td>
@@ -145,8 +158,19 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
               aria-hidden="true"
               className="shrink-0 text-subtle"
             >
-              <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle
+                cx="8.5"
+                cy="8.5"
+                r="5.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M13.5 13.5L17 17"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
             <input
               type="search"
@@ -168,7 +192,10 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
                       key={header.id}
                       className="border-b border-(--line) px-4 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-(--ink-2)"
                     >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -177,7 +204,10 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
             <tbody>
               {table.getFilteredRowModel().rows.length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="px-4 py-6 text-center text-[13px] text-subtle">
+                  <td
+                    colSpan={2}
+                    className="px-4 py-6 text-center text-[13px] text-subtle"
+                  >
                     No commands match.
                   </td>
                 </tr>
@@ -189,7 +219,10 @@ export default function CommandCenter({ installedPlugins, commands }: CommandCen
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="px-4 py-2.5 align-top">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </td>
                     ))}
                   </tr>

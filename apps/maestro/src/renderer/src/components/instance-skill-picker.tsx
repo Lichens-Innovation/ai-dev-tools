@@ -91,7 +91,11 @@ export default function InstanceSkillPicker({
                   <button type="button" onClick={() => setMode(s, "loaded")} className={pill(mode === "loaded")}>
                     Loaded
                   </button>
-                  <button type="button" onClick={() => setMode(s, "referenced")} className={pill(mode === "referenced")}>
+                  <button
+                    type="button"
+                    onClick={() => setMode(s, "referenced")}
+                    className={pill(mode === "referenced")}
+                  >
                     Ref
                   </button>
                 </div>

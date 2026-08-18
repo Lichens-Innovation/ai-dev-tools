@@ -25,9 +25,7 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
     );
   }
 
-  const processLines = instance.entries
-    .map((e) => humanizeLog(e, cwd))
-    .filter((line): line is string => line !== null);
+  const processLines = instance.entries.map((e) => humanizeLog(e, cwd)).filter((line): line is string => line !== null);
 
   const unaccounted = unaccountedSkills(instance);
 
@@ -35,18 +33,14 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
     <div className="border-l border-(--line) flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-(--line) shrink-0">
-        <span className="text-[13px] font-medium text-(--ink)">
-          Logs: {instance.displayName}
-        </span>
+        <span className="text-[13px] font-medium text-(--ink)">Logs: {instance.displayName}</span>
       </div>
 
       {/* Scrollable detail body */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <Section title="Input">
           {instance.input ? (
-            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] m-0">
-              {instance.input}
-            </pre>
+            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] m-0">{instance.input}</pre>
           ) : (
             <span className="text-(--ink-3) italic">No input captured</span>
           )}
@@ -56,7 +50,8 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
           {processLines.length > 0 ? (
             processLines.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap break-words font-mono text-[11px]">
-                - {instance.origin === "main_session" || instance.origin === "transition"
+                -{" "}
+                {instance.origin === "main_session" || instance.origin === "transition"
                   ? line
                   : `[${instance.displayName}]: ${line}`}
               </div>
@@ -85,9 +80,7 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
             )}
             {unaccounted.length > 0 && (
               <div className="mb-2">
-                <div className="text-[11px] text-(--red) mb-1">
-                  Unaccounted — offered but not reported
-                </div>
+                <div className="text-[11px] text-(--red) mb-1">Unaccounted — offered but not reported</div>
                 <div className="flex flex-wrap gap-1">
                   {unaccounted.map((id) => (
                     <span
@@ -110,13 +103,8 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
                     const hollow = s.reason.trim().length < 8;
                     return (
                       <li key={s.id} className="font-mono text-[11px]">
-                        <span className={hollow ? "text-(--yellow)" : "text-(--ink-2)"}>
-                          {stripNamespace(s.id)}
-                        </span>
-                        <span className="text-(--ink-3)">
-                          {" "}
-                          — {s.reason.trim() || "no reason given"}
-                        </span>
+                        <span className={hollow ? "text-(--yellow)" : "text-(--ink-2)"}>{stripNamespace(s.id)}</span>
+                        <span className="text-(--ink-3)"> — {s.reason.trim() || "no reason given"}</span>
                       </li>
                     );
                   })}
@@ -128,9 +116,7 @@ export default function SessionLogDetail({ instance, cwd }: SessionLogDetailProp
 
         <Section title="Output">
           {instance.output ? (
-            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] m-0">
-              {instance.output}
-            </pre>
+            <pre className="whitespace-pre-wrap break-words font-mono text-[11px] m-0">{instance.output}</pre>
           ) : (
             <span className="text-(--ink-3) italic">No output captured</span>
           )}

@@ -1,5 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getCachedMarketplacePlugins, getInstalledPlugins } from '@repo/claude-fs'
+import {
+  getCachedMarketplacePlugins,
+  getInstalledPlugins,
+} from '@repo/claude-fs'
 
 export interface CuratedPlugin {
   name: string

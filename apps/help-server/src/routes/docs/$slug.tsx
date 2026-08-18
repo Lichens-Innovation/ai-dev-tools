@@ -28,7 +28,10 @@ function slugify(text: string): string {
     .trim()
 }
 
-function makeHeadingComponent(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', searchWords: string[]) {
+function makeHeadingComponent(
+  tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+  searchWords: string[],
+) {
   const Tag = tag
   return function Heading({ children }: { children?: React.ReactNode }) {
     const text = String(children)
@@ -72,7 +75,11 @@ function DocPage() {
   useEffect(() => {
     if (window.location.hash) {
       const el = document.querySelector(window.location.hash)
-      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+      if (el)
+        setTimeout(
+          () => el.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+          100,
+        )
     }
   }, [content])
 

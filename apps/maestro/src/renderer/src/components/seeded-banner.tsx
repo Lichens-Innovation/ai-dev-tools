@@ -20,8 +20,7 @@ export default function SeededBanner({ children }: { children: React.ReactNode }
     >
       <FileWarning size={14} className="shrink-0 mt-px text-amber-500" />
       <span>
-        This project has no <span className="font-mono text-(--ink)">.claude/maestro.json</span> yet.{" "}
-        {children}
+        This project has no <span className="font-mono text-(--ink)">.claude/maestro.json</span> yet. {children}
       </span>
     </div>
   );

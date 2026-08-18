@@ -7,6 +7,13 @@
       "outputs": ["dist/**", ".output/**"]
     },
     "lint": {},
+    "check": {
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build"],
       "outputs": []

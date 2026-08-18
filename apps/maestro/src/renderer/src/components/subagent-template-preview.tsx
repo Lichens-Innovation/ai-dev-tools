@@ -42,7 +42,7 @@ export default function SubagentTemplatePreview({
       manualFallback: "<short description of what this subagent does>",
       whatFallback: "<what this subagent does>",
     }),
-    140,
+    140
   );
 
   const body =

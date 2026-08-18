@@ -31,11 +31,7 @@ export default function SessionLogView({
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-(--line) shrink-0">
         <span className="text-[13px] font-medium text-(--ink)">Agents Flow</span>
-        <div
-          className={`flex items-center gap-1.5 text-[11px] ${
-            connected ? "text-(--green)" : "text-(--ink-3)"
-          }`}
-        >
+        <div className={`flex items-center gap-1.5 text-[11px] ${connected ? "text-(--green)" : "text-(--ink-3)"}`}>
           <span className="text-[8px]">{connected ? "●" : "○"}</span>
           {connected ? "live" : "reconnecting…"}
         </div>
@@ -45,9 +41,7 @@ export default function SessionLogView({
       <div className="flex-1 overflow-y-auto px-6 py-4 font-mono text-xs leading-[1.7]">
         {instances.map((inst) => {
           const isActive = inst.id === activeId;
-          const lines = inst.entries
-            .map((e) => humanizeLog(e, cwd))
-            .filter((line): line is string => line !== null);
+          const lines = inst.entries.map((e) => humanizeLog(e, cwd)).filter((line): line is string => line !== null);
 
           return (
             <div
@@ -57,9 +51,7 @@ export default function SessionLogView({
               }}
               onClick={() => onSelect(inst.id)}
               className={`scroll-mt-4 mb-4 rounded-lg p-4 cursor-pointer transition-colors ${
-                isActive
-                  ? `border-2 ${borderColor(inst.status)}`
-                  : "border border-(--line) hover:border-(--line-2)"
+                isActive ? `border-2 ${borderColor(inst.status)}` : "border border-(--line) hover:border-(--line-2)"
               }`}
             >
               {/* Section label */}
@@ -69,9 +61,7 @@ export default function SessionLogView({
                 </span>
                 {inst.skillsTriage && (
                   <span className="text-[10px] font-mono">
-                    <span className="text-(--green)">
-                      {inst.skillsTriage.loaded.length} loaded
-                    </span>
+                    <span className="text-(--green)">{inst.skillsTriage.loaded.length} loaded</span>
                     {inst.skillsTriage.skipped.length > 0 && (
                       <span className="text-(--yellow)">
                         {" · "}

@@ -38,7 +38,7 @@ export default function SkillTemplatePreview({
       manualFallback: "<short description of what this skill does>",
       whatFallback: "<what this skill does>",
     }),
-    140,
+    140
   );
   const body =
     mode === "manual"
@@ -67,7 +67,8 @@ export default function SkillTemplatePreview({
     ...body,
   ];
 
-  const root = target === "project" ? projectRoot || "<no project open>" : marketplacePath || `<${marketplace || "marketplace"}>`;
+  const root =
+    target === "project" ? projectRoot || "<no project open>" : marketplacePath || `<${marketplace || "marketplace"}>`;
   const path =
     target === "project"
       ? `${root.replace(/\/+$/, "")}/.claude/skills/${displayName}/`

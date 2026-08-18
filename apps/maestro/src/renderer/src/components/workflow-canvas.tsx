@@ -116,7 +116,13 @@ function rfNodesToMaestroNodes(nodes: Node[]): MaestroNodeV3[] {
     .filter((n) => n.id !== "main-session")
     .map((n) => {
       const maestro = n.data.maestroNode as MaestroNodeV3;
-      return { id: maestro.id, type: maestro.type, instance: maestro.instance, skill: maestro.skill, position: n.position };
+      return {
+        id: maestro.id,
+        type: maestro.type,
+        instance: maestro.instance,
+        skill: maestro.skill,
+        position: n.position,
+      };
     });
 }
 
@@ -553,7 +559,9 @@ function SkillNodeComponent({
           className={`w-44 rounded-lg border-2 shadow-sm bg-violet-50 text-violet-900 ${selected ? "border-violet-500" : "border-violet-300"}`}
         >
           <div className="flex items-center justify-between px-2.5 py-2">
-            <span className="font-mono text-[12px] font-semibold truncate text-violet-800">/{maestro.skill ?? maestro.id}</span>
+            <span className="font-mono text-[12px] font-semibold truncate text-violet-800">
+              /{maestro.skill ?? maestro.id}
+            </span>
             <div className="relative ml-1 shrink-0" ref={menuRef}>
               <button
                 type="button"
@@ -636,7 +644,13 @@ function ConditionEdge({
     targetY,
     targetPosition,
   });
-  const typedData = data as { onEditLabel?: (id: string) => void; onLabelMove?: (id: string, offset: { x: number; y: number }) => void; maestroEdge?: MaestroEdgeV3 } | undefined;
+  const typedData = data as
+    | {
+        onEditLabel?: (id: string) => void;
+        onLabelMove?: (id: string, offset: { x: number; y: number }) => void;
+        maestroEdge?: MaestroEdgeV3;
+      }
+    | undefined;
   const onEditLabel = typedData?.onEditLabel;
   const onLabelMove = typedData?.onLabelMove;
   const storedOffset = typedData?.maestroEdge?.label_offset;
@@ -661,27 +675,33 @@ function ConditionEdge({
     setIsDragging(true);
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStartRef.current) return;
-    const { zoom } = getViewport();
-    const dx = (e.clientX - dragStartRef.current.mx) / zoom;
-    const dy = (e.clientY - dragStartRef.current.my) / zoom;
-    const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
-    localOffsetRef.current = next;
-    setDisplayOffset(next);
-  }, [getViewport]);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragStartRef.current) return;
+      const { zoom } = getViewport();
+      const dx = (e.clientX - dragStartRef.current.mx) / zoom;
+      const dy = (e.clientY - dragStartRef.current.my) / zoom;
+      const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
+      localOffsetRef.current = next;
+      setDisplayOffset(next);
+    },
+    [getViewport]
+  );
 
-  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStartRef.current) return;
-    const { zoom } = getViewport();
-    const dx = (e.clientX - dragStartRef.current.mx) / zoom;
-    const dy = (e.clientY - dragStartRef.current.my) / zoom;
-    const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
-    localOffsetRef.current = next;
-    dragStartRef.current = null;
-    setIsDragging(false);
-    onLabelMove?.(id, next);
-  }, [id, getViewport, onLabelMove]);
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragStartRef.current) return;
+      const { zoom } = getViewport();
+      const dx = (e.clientX - dragStartRef.current.mx) / zoom;
+      const dy = (e.clientY - dragStartRef.current.my) / zoom;
+      const next = { x: dragStartRef.current.ox + dx, y: dragStartRef.current.oy + dy };
+      localOffsetRef.current = next;
+      dragStartRef.current = null;
+      setIsDragging(false);
+      onLabelMove?.(id, next);
+    },
+    [id, getViewport, onLabelMove]
+  );
 
   const hasLabel = typeof label === "string" && label.length > 0;
   const finalX = labelX + displayOffset.x;
@@ -860,7 +880,11 @@ export default function WorkflowCanvas({
   const pushChange = useCallback(
     (nodes: Node[], edges: Edge[]) => {
       if (!workflow) return;
-      const updated: MaestroWorkflowV3 = { ...workflow, nodes: rfNodesToMaestroNodes(nodes), edges: rfEdgesToMaestroEdges(edges) };
+      const updated: MaestroWorkflowV3 = {
+        ...workflow,
+        nodes: rfNodesToMaestroNodes(nodes),
+        edges: rfEdgesToMaestroEdges(edges),
+      };
       lastEmittedRef.current = updated; // mark so the sync effect ignores the echo
       onChange(updated);
     },
@@ -933,7 +957,10 @@ export default function WorkflowCanvas({
       const incoming = edges.find((e) => e.target === nodeId && isSuccessEdge(e));
       const outgoing = edges.find((e) => e.source === nodeId && isSuccessEdge(e));
       if (incoming && outgoing && incoming.source !== outgoing.target) {
-        nextEdges = [...replaceSuccessEdgeFrom(nextEdges, incoming.source), makeSuccessEdge(incoming.source, outgoing.target)];
+        nextEdges = [
+          ...replaceSuccessEdgeFrom(nextEdges, incoming.source),
+          makeSuccessEdge(incoming.source, outgoing.target),
+        ];
       }
       setRfNodes(nextNodes);
       setRfEdges(nextEdges);
@@ -1310,7 +1337,8 @@ export default function WorkflowCanvas({
         }
         const maestroNode = n.data.maestroNode as MaestroNodeV3;
         // Always resolve instanceData fresh from the instances prop so edit-instance updates are reflected immediately
-        const instanceData = maestroNode.type === "agent" ? instances.find((i) => i.name === maestroNode.instance) : undefined;
+        const instanceData =
+          maestroNode.type === "agent" ? instances.find((i) => i.name === maestroNode.instance) : undefined;
         return {
           ...n,
           data: {
@@ -1454,7 +1482,10 @@ export default function WorkflowCanvas({
                 .filter((n) => n.id !== conditionSourceNodeId && n.id !== "main-session")
                 .map((n) => {
                   const maestro = n.data.maestroNode as MaestroNodeV3 | undefined;
-                  const label = maestro?.type === "skill" ? `/${maestro.skill ?? maestro.id}` : (maestro?.instance ?? maestro?.id ?? n.id);
+                  const label =
+                    maestro?.type === "skill"
+                      ? `/${maestro.skill ?? maestro.id}`
+                      : (maestro?.instance ?? maestro?.id ?? n.id);
                   return (
                     <option key={n.id} value={n.id}>
                       {label}
@@ -1726,7 +1757,6 @@ export default function WorkflowCanvas({
           </div>
         </div>
       )}
-
     </div>
   );
 }

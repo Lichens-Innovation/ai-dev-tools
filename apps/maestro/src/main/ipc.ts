@@ -102,7 +102,7 @@ function startTail(webContentsId: number): void {
       init: (entries) => !wc.isDestroyed() && wc.send(IPC_EVENTS.logInit, entries),
       entry: (entry) => !wc.isDestroyed() && wc.send(IPC_EVENTS.logEntry, entry),
       reset: () => !wc.isDestroyed() && wc.send(IPC_EVENTS.logReset),
-    }),
+    })
   );
 }
 
@@ -139,7 +139,10 @@ export function registerIpc(): void {
     if (!projectRoot) {
       return { projectRoot: "", config: blankConfig(), seeded: false, detection: null, agents: [], skills: [] };
     }
-    const [agents, skills] = await Promise.all([discoverAgents(projectRoot, bundledAgentsDir()), discoverSkills(projectRoot)]);
+    const [agents, skills] = await Promise.all([
+      discoverAgents(projectRoot, bundledAgentsDir()),
+      discoverSkills(projectRoot),
+    ]);
     const onDisk = readConfig(projectRoot);
     if (onDisk) return { projectRoot, config: onDisk, seeded: false, detection: null, agents, skills };
 
@@ -162,9 +165,7 @@ export function registerIpc(): void {
   // The user amending the detection. Pure — nothing is written, so the chain can be corrected as
   // many times as it takes and the project stays unconfigured until Save.
   ipcMain.handle(IPC.workflowsReseed, (_e, implAgents: string[]): MaestroConfigV3 => {
-    const clean = (Array.isArray(implAgents) ? implAgents : [])
-      .map((a) => String(a).trim())
-      .filter(Boolean);
+    const clean = (Array.isArray(implAgents) ? implAgents : []).map((a) => String(a).trim()).filter(Boolean);
     return defaultV3Config(clean);
   });
 
@@ -218,10 +219,13 @@ export function registerIpc(): void {
   // open — so main resolves every path it writes to. The one exception is create-marketplace's
   // target directory, which is the whole point of that form and is validated as absolute and shown
   // in the scaffold's report.
-  ipcMain.handle(IPC.createOptions, (): CreateOptions => ({
-    marketplaces: listMarketplaces(),
-    projectRoot: currentRoot() ?? "",
-  }));
+  ipcMain.handle(
+    IPC.createOptions,
+    (): CreateOptions => ({
+      marketplaces: listMarketplaces(),
+      projectRoot: currentRoot() ?? "",
+    })
+  );
 
   // Throws on an invalid request or a failed write, so the caller must go through `callMain` —
   // "the write failed and here is why" has to reach the user, not an unhandled rejection.
@@ -275,14 +279,16 @@ export function registerIpc(): void {
     return previewClaudeRun(root, request);
   });
 
-  ipcMain.handle(IPC.claudeRun, async (e, token: string): Promise<ClaudeRunResult> =>
-    runPreviewedClaude(token, {
-      // Chunk by chunk, as it arrives. The token identifies the run on both sides, so the renderer
-      // can route output from the first byte without waiting for this handler to resolve.
-      output: (chunk) => {
-        if (!e.sender.isDestroyed()) e.sender.send(IPC_EVENTS.claudeOutput, { token, ...chunk });
-      },
-    }),
+  ipcMain.handle(
+    IPC.claudeRun,
+    async (e, token: string): Promise<ClaudeRunResult> =>
+      runPreviewedClaude(token, {
+        // Chunk by chunk, as it arrives. The token identifies the run on both sides, so the renderer
+        // can route output from the first byte without waiting for this handler to resolve.
+        output: (chunk) => {
+          if (!e.sender.isDestroyed()) e.sender.send(IPC_EVENTS.claudeOutput, { token, ...chunk });
+        },
+      })
   );
 
   ipcMain.handle(IPC.claudeCancel, (_e, token: string): void => {

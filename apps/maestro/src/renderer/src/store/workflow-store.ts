@@ -1,9 +1,5 @@
 import { Store } from "@tanstack/store";
-import type {
-  MaestroConfigV3,
-  MaestroWorkflowV3,
-  MaestroInstanceV3,
-} from "../utils/maestro";
+import type { MaestroConfigV3, MaestroWorkflowV3, MaestroInstanceV3 } from "../utils/maestro";
 
 export interface WorkflowEditState {
   config: MaestroConfigV3 | null;

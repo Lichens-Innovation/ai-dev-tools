@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import Highlighter from 'react-highlight-words'
 import ThemeToggle from '@repo/ui/theme-toggle'
 import { toggleSidebar, sidebarStore } from '../store/sidebar-store'
-import { searchStore, setSearchQuery, setSearchFocused, shiftSelectedIndex, clearSearch } from '../store/search-store'
+import {
+  searchStore,
+  setSearchQuery,
+  setSearchFocused,
+  shiftSelectedIndex,
+  clearSearch,
+} from '../store/search-store'
 import { toggleChat, chatStore } from '../store/chat-store'
 import type { DocSection } from '../utils/docs'
 
@@ -19,7 +25,9 @@ function getSnippet(text: string, query: string, maxLen = 120): string {
 
 const DEBOUNCE_MS = 150
 
-function useDebouncedSearch(inputRef: React.RefObject<HTMLInputElement | null>) {
+function useDebouncedSearch(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+) {
   const query = useStore(searchStore, (s) => s.query)
   const results = useStore(searchStore, (s) => s.results)
   const focused = useStore(searchStore, (s) => s.focused)
@@ -44,7 +52,12 @@ function useDebouncedSearch(inputRef: React.RefObject<HTMLInputElement | null>) 
   }, [])
 
   useEffect(() => {
-    setKbdHint(typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl K')
+    setKbdHint(
+      typeof navigator !== 'undefined' &&
+        /Mac|iPod|iPhone|iPad/.test(navigator.userAgent)
+        ? '⌘K'
+        : 'Ctrl K',
+    )
   }, [])
 
   useEffect(() => {
@@ -89,8 +102,17 @@ function useDebouncedSearch(inputRef: React.RefObject<HTMLInputElement | null>) 
 export default function Header() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
-  const { inputValue, query, results, focused, selectedIndex, showResults, updateQuery, clearQuery, kbdHint } =
-    useDebouncedSearch(inputRef)
+  const {
+    inputValue,
+    query,
+    results,
+    focused,
+    selectedIndex,
+    showResults,
+    updateQuery,
+    clearQuery,
+    kbdHint,
+  } = useDebouncedSearch(inputRef)
   const sidebarOpen = useStore(sidebarStore, (s) => s.isOpen)
   const chatOpen = useStore(chatStore, (s) => s.isOpen)
 
@@ -130,17 +152,39 @@ export default function Header() {
           <button
             data-sidebar-toggle
             onClick={toggleSidebar}
-            aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-label={
+              sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'
+            }
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-1.5 text-(--ink-2) hover:bg-(--bg-3) hover:text-(--ink)"
           >
             <span className="flex h-3.5 w-4.5 items-center justify-center">
               {sidebarOpen ? (
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.4" />
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M1 1l12 12M13 1L1 13"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                  />
                 </svg>
               ) : (
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
-                  <path d="M0 1h18M0 7h18M0 13h18" stroke="currentColor" strokeWidth="1.5" />
+                <svg
+                  width="18"
+                  height="14"
+                  viewBox="0 0 18 14"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M0 1h18M0 7h18M0 13h18"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
                 </svg>
               )}
             </span>
@@ -169,8 +213,19 @@ export default function Header() {
               aria-hidden="true"
               className="shrink-0 text-subtle"
             >
-              <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M13.5 13.5L17 17" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle
+                cx="8.5"
+                cy="8.5"
+                r="5.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M13.5 13.5L17 17"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
             <input
               ref={inputRef}
@@ -198,8 +253,19 @@ export default function Header() {
                 aria-label="Clear search"
                 className="shrink-0 text-subtle hover:text-(--ink)"
               >
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 4L4 12M4 4l8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             )}
@@ -208,9 +274,14 @@ export default function Header() {
           {showResults && (
             <div className="absolute left-0 right-0 top-full z-60 mt-1 overflow-hidden rounded-md border border-(--line) bg-(--bg-2) shadow-(--shadow-2)">
               {results.length === 0 ? (
-                <p className="px-4 py-3 text-[12px] text-subtle">No results found.</p>
+                <p className="px-4 py-3 text-[12px] text-subtle">
+                  No results found.
+                </p>
               ) : (
-                <ul className="m-0 max-h-80 list-none overflow-y-auto overflow-x-hidden p-0 py-1" role="listbox">
+                <ul
+                  className="m-0 max-h-80 list-none overflow-y-auto overflow-x-hidden p-0 py-1"
+                  role="listbox"
+                >
                   {results.map((section, i) => (
                     <li
                       key={`${section.slug}-${section.headingId}-${i}`}
@@ -221,7 +292,9 @@ export default function Header() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleSelect(section)}
                         className={`flex w-full flex-col gap-1 rounded-sm px-4 py-2.5 text-left mx-1 my-0.5 ${
-                          i === selectedIndex ? 'bg-(--primary-dim)' : 'hover:bg-(--bg-3)'
+                          i === selectedIndex
+                            ? 'bg-(--primary-dim)'
+                            : 'hover:bg-(--bg-3)'
                         }`}
                       >
                         <div className="flex items-center gap-1.5 text-[12px] text-subtle">
@@ -246,7 +319,10 @@ export default function Header() {
                         <p className="m-0 line-clamp-2 text-[12px] text-(--ink)">
                           <Highlighter
                             searchWords={[query]}
-                            textToHighlight={getSnippet(section.bodyText, query)}
+                            textToHighlight={getSnippet(
+                              section.bodyText,
+                              query,
+                            )}
                             autoEscape
                             highlightClassName="bg-[var(--primary-dim-2)] text-primary rounded-sm px-0.5"
                           />
@@ -272,13 +348,36 @@ export default function Header() {
                 : 'text-(--ink-2) hover:bg-(--bg-3) hover:text-(--ink)'
             }`}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
               {chatOpen ? (
-                <path d="M4 4h16v14H7l-3 3V4z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <path
+                  d="M4 4h16v14H7l-3 3V4z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               ) : (
                 <>
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M8 10h8M8 14h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path
+                    d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M8 10h8M8 14h5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </>
               )}
             </svg>

@@ -315,11 +315,7 @@ export type CreateMarketplaceRequest = {
   privateRepo: boolean;
 };
 
-export type CreateRequest =
-  | CreateSkillRequest
-  | CreateSubagentRequest
-  | CreatePluginRequest
-  | CreateMarketplaceRequest;
+export type CreateRequest = CreateSkillRequest | CreateSubagentRequest | CreatePluginRequest | CreateMarketplaceRequest;
 
 /**
  * What the deterministic scaffold wrote — no model involved in any of it.

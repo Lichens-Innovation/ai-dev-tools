@@ -54,7 +54,11 @@ beforeEach(() => {
   fs.mkdirSync(path.join(market, ".claude-plugin"), { recursive: true });
   fs.writeFileSync(
     path.join(market, ".claude-plugin", "marketplace.json"),
-    JSON.stringify({ name: "my-tools", owner: { name: "Ada", email: "ada@example.com" }, plugins: [{ name: "toolkit" }] }, null, 2) + "\n",
+    JSON.stringify(
+      { name: "my-tools", owner: { name: "Ada", email: "ada@example.com" }, plugins: [{ name: "toolkit" }] },
+      null,
+      2
+    ) + "\n"
   );
   fs.mkdirSync(path.join(market, "plugins", "toolkit", "skills"), { recursive: true });
 
@@ -62,7 +66,7 @@ beforeEach(() => {
   fs.mkdirSync(plugins, { recursive: true });
   fs.writeFileSync(
     path.join(plugins, "known_marketplaces.json"),
-    JSON.stringify({ "my-tools": { source: { source: "directory" }, installLocation: market, lastUpdated: "now" } }),
+    JSON.stringify({ "my-tools": { source: { source: "directory" }, installLocation: market, lastUpdated: "now" } })
   );
 
   binDir = fs.mkdtempSync(path.join(tmp, "bin-"));
@@ -153,7 +157,7 @@ describe("where the run happens", () => {
 describe("a request the app will not run", () => {
   it("is refused at preview, so no token is ever issued for it", () => {
     expect(() => previewClaudeRun(project, { ...skill, marketplace: "invented" }, opts())).toThrow(
-      /No local marketplace/,
+      /No local marketplace/
     );
     expect(() => previewClaudeRun(project, { ...skill, name: "Not Kebab" }, opts())).toThrow(/kebab-case/);
   });
@@ -200,7 +204,13 @@ function allFour(): CreateRequest[] {
       marketplace: "my-tools",
       plugin: "toolkit",
     },
-    { kind: "create-plugin", name: "linting", description: "Lint helpers", keywords: ["lint"], marketplace: "my-tools" },
+    {
+      kind: "create-plugin",
+      name: "linting",
+      description: "Lint helpers",
+      keywords: ["lint"],
+      marketplace: "my-tools",
+    },
     marketplaceRequest(path.join(tmp, "brand-new")),
   ];
 }

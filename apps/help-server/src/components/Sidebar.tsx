@@ -12,7 +12,12 @@ export default function Sidebar({ docs }: SidebarProps) {
   const isOpen = useStore(sidebarStore, (s) => s.isOpen)
 
   return (
-    <SlidePanel isOpen={isOpen} onClose={closeSidebar} side="left" toggleDataAttr={['data-sidebar-toggle', 'data-chat-toggle']}>
+    <SlidePanel
+      isOpen={isOpen}
+      onClose={closeSidebar}
+      side="left"
+      toggleDataAttr={['data-sidebar-toggle', 'data-chat-toggle']}
+    >
       <div className="flex items-center border-b border-(--line) px-5 py-3">
         <span className="section-label">Docs</span>
       </div>

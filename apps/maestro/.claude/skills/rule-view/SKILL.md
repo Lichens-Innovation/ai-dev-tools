@@ -70,19 +70,19 @@ Step 3 is the part that used to be a separate host-side `maestro-apply-rules.js`
 
 Paths are relative to `apps/maestro/` unless stated otherwise.
 
-| Concern | File |
-|---|---|
-| Route, both rule selectors, save, assign/unassign handlers | `src/renderer/src/routes/rules.tsx` |
-| The directory tree + per-row chips + add-rule picker | `src/renderer/src/components/rule-tree.tsx` |
-| Rule chip multi-select (used by both left-pane sections) | `src/renderer/src/components/chip-multi-select.tsx` |
-| Top bar — nav links (no workflow selector here) | `src/renderer/src/components/top-nav.tsx` |
-| Renderer-side loader + save wrappers over the IPC bridge | `src/renderer/src/utils/maestro.ts` |
-| The typed channel contract | `src/shared/ipc.ts` (`data:rules`, `config:save`) |
-| Main-process handler — the only side that touches `fs` or spawns `vibe-rules` | `src/main/ipc.ts` |
-| Directory walk, project-rule scan, `vibe-rules list` | `discovery.ts` in `apps/maestro/src/core/` |
-| **The apply step** (move project files / `vibe-rules load`) | `rules.ts` in `apps/maestro/src/core/`, called by `saveConfig()` |
-| Terminal-path equivalent of that step | `plugins/ai-tools-manager/scripts/maestro-apply-rules.js` |
-| Source of project rules | `<projectRoot>/**/.claude/rules/*.md` |
+| Concern                                                                       | File                                                             |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Route, both rule selectors, save, assign/unassign handlers                    | `src/renderer/src/routes/rules.tsx`                              |
+| The directory tree + per-row chips + add-rule picker                          | `src/renderer/src/components/rule-tree.tsx`                      |
+| Rule chip multi-select (used by both left-pane sections)                      | `src/renderer/src/components/chip-multi-select.tsx`              |
+| Top bar — nav links (no workflow selector here)                               | `src/renderer/src/components/top-nav.tsx`                        |
+| Renderer-side loader + save wrappers over the IPC bridge                      | `src/renderer/src/utils/maestro.ts`                              |
+| The typed channel contract                                                    | `src/shared/ipc.ts` (`data:rules`, `config:save`)                |
+| Main-process handler — the only side that touches `fs` or spawns `vibe-rules` | `src/main/ipc.ts`                                                |
+| Directory walk, project-rule scan, `vibe-rules list`                          | `discovery.ts` in `apps/maestro/src/core/`                       |
+| **The apply step** (move project files / `vibe-rules load`)                   | `rules.ts` in `apps/maestro/src/core/`, called by `saveConfig()` |
+| Terminal-path equivalent of that step                                         | `plugins/ai-tools-manager/scripts/maestro-apply-rules.js`        |
+| Source of project rules                                                       | `<projectRoot>/**/.claude/rules/*.md`                            |
 
 ## The data model (the `rules` slice)
 
@@ -95,6 +95,7 @@ MaestroRuleV3 { id, scope?: "project", paths?: string[], source?: "project" | "v
 ```
 
 An `MaestroRuleV3` is **one assignment of a rule to one location** — not a rule definition, and (post this feature) at most one per rule id:
+
 - **Project-root assignment** → `{ id, scope: "project" }` (no `paths`).
 - **Directory assignment** → `{ id, paths: ["<dirPath>/**"] }` (no `scope`).
 - **`source`** records where the rule comes from, so the apply step knows what to do:
@@ -117,6 +118,7 @@ Two `ChipMultiSelect` sections feed one shared `selectedRuleIds` pool:
 - **Installable rules (vibe-rules)** — ids from `getVibeRules()` (`vibe-rules list`). Tagged `source: "vibe-rules"`. These don't exist in the project yet; assigning one installs it on save.
 
 Source bookkeeping:
+
 - `ruleSource: Record<id, "project"|"vibe-rules">` is derived: project ids first, then vibe ids **not already** a project id (a project rule wins a name collision, since it's a real file). The vibe section only lists `vibeOnlyIds` (resolving to `"vibe-rules"`) so a shared name never appears in both sections.
 - `setGroupSelection(groupIds, next)` toggles selection within one section while leaving the other's intact, and **prunes `config.rules`** to the still-selected ids — so de-selecting a chip unassigns that rule everywhere.
 - `selectedRuleIds` is **seeded** on mount from `config.rules.map(r => r.id)`.
@@ -128,6 +130,7 @@ Source bookkeeping:
 `RuleTree` renders a flat, indented list: a synthetic **`(project root)`** row (`dirPath = ""`, `⊟`), then one `TreeRow` per `TreeNode` from the loader's `tree` (`▸`, indented by `depth * 16 + 8`px). `discoverProjectTree` (`discovery.ts` in `src/core`) walks from `projectRoot`, **maxDepth 4**, skipping `node_modules`/`.git`/`dist`/`build`/`.next`/`.turbo`/`.output`.
 
 Each `TreeRow`:
+
 - **Computes its own assignment** by filtering `ruleAssignments` (= `config.rules`): root matches `scope === "project" && no paths`; a dir matches `paths` containing `"<dirPath>/**"` or the bare `dirPath`.
 - Renders one chip per assignment, tinted by source — **project rules** in the primary color, **vibe-rules** in amber with a tiny `vibe` badge (from `a.source ?? ruleSource[a.id]`). The `×` calls `onUnassign(id)`.
 - Shows a hover-revealed `+` that opens an inline `<select>` of selected rules not already on this path; **Add** calls `onAssign`.
@@ -161,4 +164,4 @@ The plugin's `maestro-apply-rules.js` is the same algorithm as a standalone scri
 - **The project-rule scan walks the whole tree (maxDepth 4).** A rule nested deeper than 4 levels, or under an ignored dir, won't appear in the picker even though its assignment may persist in `maestro.json`. Same depth/ignore list as the tree walk — keep them consistent.
 - **A rule assigned in maestro.json but missing from disk is stranded.** `selectedRuleIds` is seeded from `config.rules`, but the chips only render ids the loaders return. If the file was deleted (project) or removed from the store (vibe-rules), the chip can't render, yet the assignment persists until something prunes it — and the apply step reports it under `missing`/`errors`.
 - **Name collisions resolve to project.** If the same id exists both on disk and in `vibe-rules list`, `ruleSource` calls it `"project"` and the vibe section hides it. The on-disk file is moved; the vibe-rules version is ignored.
-- **Re-assigning a vibe-rule leaves the old install behind.** Project rules are *moved* (single file follows the assignment); vibe-rules are *installed* at the assigned path. The config holds one location per rule, but since the apply step never deletes, moving a vibe-rule to a new directory installs a fresh copy there and leaves the previous `.claude/rules/<id>.md` in place — by design (cleanup is the user's call).
+- **Re-assigning a vibe-rule leaves the old install behind.** Project rules are _moved_ (single file follows the assignment); vibe-rules are _installed_ at the assigned path. The config holds one location per rule, but since the apply step never deletes, moving a vibe-rule to a new directory installs a fresh copy there and leaves the previous `.claude/rules/<id>.md` in place — by design (cleanup is the user's call).

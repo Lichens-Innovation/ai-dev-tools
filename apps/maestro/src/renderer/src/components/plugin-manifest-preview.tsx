@@ -36,9 +36,7 @@ export default function PluginManifestPreview({
     `  "name": "${displayName}",`,
     `  "version": "0.1.0",`,
     `  "description": "${desc}",`,
-    ...(owner
-      ? ['  "author": {', `    "name": "${owner.name}",`, `    "email": "${owner.email}"`, "  },"]
-      : []),
+    ...(owner ? ['  "author": {', `    "name": "${owner.name}",`, `    "email": "${owner.email}"`, "  },"] : []),
     ...keywordLines,
     "}",
   ];

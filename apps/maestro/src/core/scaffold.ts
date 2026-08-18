@@ -56,7 +56,7 @@ const KEBAB = /^[a-z][a-z0-9-]*$/;
 export function validateCreateRequest(
   projectRoot: string,
   request: CreateRequest,
-  opts: MarketplaceOptions = {},
+  opts: MarketplaceOptions = {}
 ): string[] {
   const errors: string[] = [];
   const named = (name: string, required: boolean) => {
@@ -72,7 +72,12 @@ export function validateCreateRequest(
     if (!marketplace) errors.push("Pick a marketplace, or switch the target to Project.");
     else if (!found) errors.push(`No local marketplace named "${marketplace}" is registered with Claude Code.`);
     if (!plugin) errors.push("Pick a plugin to file this under.");
-    else if (found && !listMarketplaces(opts).find((m) => m.name === marketplace)?.plugins.includes(plugin)) {
+    else if (
+      found &&
+      !listMarketplaces(opts)
+        .find((m) => m.name === marketplace)
+        ?.plugins.includes(plugin)
+    ) {
       errors.push(`"${marketplace}" has no plugin named "${plugin}".`);
     }
   };
@@ -114,7 +119,8 @@ export function validateCreateRequest(
       // Absolute only: a relative path would resolve against whatever directory the app happens to
       // have been launched from, which is not a place a user ever meant to create a marketplace.
       if (!request.targetDir.trim()) errors.push("Choose where to create the marketplace.");
-      else if (!path.isAbsolute(request.targetDir.trim())) errors.push("The target directory must be an absolute path.");
+      else if (!path.isAbsolute(request.targetDir.trim()))
+        errors.push("The target directory must be an absolute path.");
       break;
     }
     default:
@@ -133,7 +139,7 @@ export function validateCreateRequest(
 export function resolveCreateTarget(
   projectRoot: string,
   request: CreateRequest,
-  opts: MarketplaceOptions = {},
+  opts: MarketplaceOptions = {}
 ): CreateTarget {
   const errors = validateCreateRequest(projectRoot, request, opts);
   if (errors.length) throw new Error(errors.join(" "));
@@ -309,13 +315,13 @@ function description(mode: "auto" | "manual", idea: string, triggers: string[], 
       manualFallback: `<short description of what this ${what} does>`,
       whatFallback: `<what this ${what} does>`,
     }),
-    140,
+    140
   );
 }
 
 function stepsFor(
   target: CreateTarget,
-  request: CreateRequest,
+  request: CreateRequest
 ): { steps: Step[]; remaining: string; needsModel: boolean } {
   switch (request.kind) {
     case "create-skill": {
@@ -338,7 +344,8 @@ function stepsFor(
       const body = request.mode === "auto" ? request.idea : request.description;
       const desc = description(request.mode, body, request.triggers, "subagent");
       const toolsLine = request.tools.length ? `\ntools: ${request.tools.join(", ")}` : "";
-      const skeleton = request.mode === "manual" ? manualAgentBody(target.name, request.triggers) : AUTO_BODY_PLACEHOLDER;
+      const skeleton =
+        request.mode === "manual" ? manualAgentBody(target.name, request.triggers) : AUTO_BODY_PLACEHOLDER;
       const contents =
         `---\nname: ${target.name}\ndescription: "${quoteYaml(desc)}"${toolsLine}\n---\n\n` +
         `# ${titleFromName(target.name)}\n\n${skeleton}\n`;
@@ -367,7 +374,11 @@ function stepsFor(
       };
       return {
         steps: [
-          { kind: "file", file: path.join(target.path, ".claude-plugin", "plugin.json"), contents: JSON.stringify(manifest, null, 2) + "\n" },
+          {
+            kind: "file",
+            file: path.join(target.path, ".claude-plugin", "plugin.json"),
+            contents: JSON.stringify(manifest, null, 2) + "\n",
+          },
           { kind: "dir", dir: path.join(target.path, "skills") },
           // Registration is a step like any other, so a marketplace.json that cannot be rewritten
           // rolls the plugin back instead of leaving one no marketplace lists.
@@ -403,8 +414,16 @@ function stepsFor(
       };
       return {
         steps: [
-          { kind: "file", file: path.join(target.path, ".claude-plugin", "marketplace.json"), contents: JSON.stringify(manifest, null, 2) + "\n" },
-          { kind: "file", file: path.join(target.path, "README.md"), contents: `# ${target.name}\n\n${request.description.trim()}\n` },
+          {
+            kind: "file",
+            file: path.join(target.path, ".claude-plugin", "marketplace.json"),
+            contents: JSON.stringify(manifest, null, 2) + "\n",
+          },
+          {
+            kind: "file",
+            file: path.join(target.path, "README.md"),
+            contents: `# ${target.name}\n\n${request.description.trim()}\n`,
+          },
           { kind: "dir", dir: path.join(target.path, "plugins") },
         ],
         remaining:
@@ -426,11 +445,19 @@ function stepsFor(
 export function scaffoldCreate(
   projectRoot: string,
   request: CreateRequest,
-  opts: MarketplaceOptions = {},
+  opts: MarketplaceOptions = {}
 ): ScaffoldResult {
   const errors = validateCreateRequest(projectRoot, request, opts);
   if (errors.length) {
-    return { scaffolded: false, name: "", path: "", written: [], remaining: "", needsModel: false, reason: errors.join(" ") };
+    return {
+      scaffolded: false,
+      name: "",
+      path: "",
+      written: [],
+      remaining: "",
+      needsModel: false,
+      reason: errors.join(" "),
+    };
   }
 
   const target = resolveCreateTarget(projectRoot, request, opts);
