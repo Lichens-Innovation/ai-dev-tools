@@ -3,4 +3,9 @@ packages:
   - "packages/*"
 allowBuilds:
   "@parcel/watcher": true
+  # The Maestro desktop app; electron's postinstall downloads the platform binary.
+  electron: true
+  # maestro-core bundles its two pure modules down to CJS for the plugin's standalone
+  # hook scripts; esbuild's postinstall fetches the platform binary that needs.
+  esbuild: true
   unrs-resolver: true
