@@ -25,6 +25,30 @@ a graph.
 | `config.ts` | Read / merge-slice / write of `maestro.json` |
 | `render.ts` | Rewrites the `Maestro:HANDOFFS` table from `maestro.json` |
 | `session-runtime.ts` | Ephemeral session file + append-only log helpers |
+| `install.ts` | Installs/updates the runtime into a project, and reports whether it is stale |
+
+### `install.ts` — the project owns its runtime
+
+The plugin's `hooks/hooks.json` registers the session hooks from `${CLAUDE_PLUGIN_ROOT}`, which
+resolves into the **marketplace cache** — a copy keyed by `plugin.json`'s version. Any edit to
+`hooks/` or `scripts/` that ships without a version bump is therefore invisible to every installed
+project. `installRuntime()` copies the hook scripts into `<project>/.claude/scripts/` and registers
+them in the **project's own** `.claude/settings.json` against `$CLAUDE_PROJECT_DIR`, which retires
+that failure mode and makes "update this project's runtime" a file copy.
+
+Three invariants, each with tests in `test/install.test.ts`:
+
+- **Project-local, never global.** Every write is under `projectRoot`. `~/.claude` is read (to
+  notice the plugin is installed too, which would double-fire every hook) and never written.
+- **Merge, never clobber.** `settings.json` is hand-edited by users. Unknown keys and other
+  people's hooks survive; an unparseable file **aborts the install** rather than being replaced
+  with `{}` — which is what the legacy script did.
+- **Idempotent.** Presence is keyed on the script's basename inside the command string, so a
+  re-quoted command doesn't produce a second entry that fires the hook twice.
+
+Staleness is content-addressed (`installedRuntimeId` vs `shippedRuntimeId`, sha-256 over the
+manifest) and never mtime-based — a `git clone` rewrites every mtime, and two checkouts of one
+commit must agree.
 
 `success_path` is **derived**, never stored — `successPathSteps()` is the sole source of truth for
 "what steps this workflow has, in order".
@@ -59,6 +83,10 @@ Two kinds:
   implementations, snapshotted under `test/fixtures/legacy/`. They are deliberately **not**
   imported from `plugins/…/scripts/lib/`: `build:plugin-libs` overwrites those with bundles
   generated from this package, which would make the comparison tautological.
+- **Differential install** (`test/install.test.ts`) — runs the snapshotted `maestro-install.js`
+  from a symlinked plugin root and asserts its whole output tree is a byte-identical subset of
+  ours, then covers what the port adds: hook registration, idempotency over five runs, settings
+  preservation, the refusal path, and executing the copied hook scripts with a synthetic payload.
 - **Byte-identity** (`test/render.test.ts`) — runs the snapshotted legacy renderer as a
   subprocess against a temp project and asserts the rendered `SKILL.md` matches ours byte for
   byte, plus that `maestro.json` keeps its canonical format (2-space indent, **no trailing

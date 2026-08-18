@@ -26,6 +26,8 @@ import type {
   MaestroTask,
   SessionLogEntry,
   SaveResult,
+  InstallStatus,
+  InstallReport,
 } from "@repo/maestro-core/contracts";
 
 export type {
@@ -43,6 +45,8 @@ export type {
   MaestroTask,
   SessionLogEntry,
   SaveResult,
+  InstallStatus,
+  InstallReport,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -87,13 +91,6 @@ export type SaveInput =
   | { sliceType: "workflows"; slice: MaestroWorkflowsSlice }
   | { sliceType: "rules"; slice: MaestroRulesSlice };
 
-/** Whether Maestro's runtime half is wired into the open project. */
-export interface InstallStatus {
-  orchestratorSkill: boolean;
-  scriptsDir: boolean;
-  configFile: boolean;
-}
-
 export const IPC = {
   projectGet: "project:get",
   projectPick: "project:pick",
@@ -108,6 +105,7 @@ export const IPC = {
   tasksClose: "tasks:close",
 
   installStatus: "install:status",
+  installRun: "install:run",
 
   logSubscribe: "log:subscribe",
   logUnsubscribe: "log:unsubscribe",
@@ -146,6 +144,11 @@ export interface MaestroApi {
   };
   install: {
     status(): Promise<InstallStatus>;
+    /**
+     * Install or update Maestro's runtime in the open project. Idempotent, and rejects (rather
+     * than half-writing) when it cannot proceed — so the caller must go through `callMain`.
+     */
+    run(): Promise<InstallReport>;
   };
   log: {
     /**

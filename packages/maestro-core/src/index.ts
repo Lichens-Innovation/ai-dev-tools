@@ -107,6 +107,23 @@ export {
 export { saveConfig, type SaveResult } from "./save.js";
 
 export {
+  installRuntime,
+  installStatus,
+  installOrchestratorSkill,
+  runtimeAssets,
+  findRepoRoot,
+  findUpPluginRoot,
+  defaultPluginRoot,
+  HOOK_REGISTRATIONS,
+  type InstallReport,
+  type InstallStatus,
+  type OrchestratorSkillAction,
+  type RuntimeAsset,
+  type HookRegistration,
+  type HookEvent,
+} from "./install.js";
+
+export {
   defaultV3Config,
   buildWorkflow,
   linearWorkflow,
