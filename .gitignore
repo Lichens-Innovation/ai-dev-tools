@@ -125,6 +125,11 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
+# Turborepo — local task cache and daemon state. The cache is content-addressed tarballs of the
+# very build output ignored above (dist/, out/, .output/), keyed by a hash of the lockfile, env
+# and platform, so it is worthless on any other machine and CI keeps its own.
+.turbo
+
 # pnpm
 .pnpm-store/
 .pnpm-debug.log*

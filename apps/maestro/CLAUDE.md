@@ -110,9 +110,11 @@ The four `create-*` routes are **not** ported yet — they need the `claude -p` 
   declares `script-src 'self'`, so the pre-paint theme script lives in
   `src/renderer/public/theme-bootstrap.js` and is loaded as a parser-blocking `<script src>`.
   Inlining it back "because it's four lines" silently reintroduces a theme flash: the browser
-  blocks it, and the theme is then applied only when `ThemeToggle`'s effect runs. Same policy
-  blocks `@repo/styles`' Google Fonts `@import` — known, recorded in
-  `docs/plans/review-m1-m2-outcome.md`, cosmetic.
+  blocks it, and the theme is then applied only when `ThemeToggle`'s effect runs. The same policy
+  blocked `@repo/styles`' Google Fonts `@import` on every load, which is why the fonts are now
+  vendored into that package and served same-origin — do not restore the CDN `@import`, and see
+  `packages/styles/README.md` before changing a weight. `test/isolation.test.ts` asserts the built
+  renderer CSS references nothing off-origin.
 - **React Flow does not inherit the app's theme.** It picks between its own `--xy-*` palettes from
   its `colorMode` prop. Unset, its Controls render a near-white icon on a near-white button in
   dark mode — invisible, and invisible to every test that isn't a screenshot. `workflow-canvas.tsx`
