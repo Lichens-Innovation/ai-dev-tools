@@ -23,6 +23,7 @@
 
 import path from "node:path";
 import { withinDirectory } from "./read-scope.js";
+import type { PermissionAnswer } from "./contracts.js";
 
 /**
  * Tools whose whole purpose is to modify the filesystem. Every one of them is checked against the
@@ -55,8 +56,17 @@ export const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "TodoWrite", "WebSearch"
 /** The keys a tool input uses for the file it is about, in the order they are looked for. */
 const PATH_KEYS = ["file_path", "notebook_path", "path", "filePath"] as const;
 
-/** The SDK's `PermissionResult`, narrowed to the two shapes this app ever returns. */
-export type WriteDecision = { behavior: "allow" } | { behavior: "deny"; message: string };
+/**
+ * The SDK's `PermissionResult`, narrowed to the two shapes this app ever returns.
+ *
+ * ONE UNION, TWO PRODUCERS. `PermissionAnswer` in `contracts.ts` is the same type under the name
+ * the renderer knows it by — a person answering a prompt produces exactly what this function does,
+ * which is what makes "one engine, two callers" a fact about the types rather than a claim. It
+ * gained an optional `interrupt` on the deny arm when the pane's prompts arrived (Deny and Stop are
+ * two controls); `decideWrite` has no reason to set it and never does. The fall-through is still a
+ * deny, so `undefined` remains unrepresentable.
+ */
+export type WriteDecision = PermissionAnswer;
 
 /** Pull the path a write tool is aimed at out of its input, or null when it names none. */
 export function targetPathOf(input: Record<string, unknown>): string | null {

@@ -47,10 +47,12 @@ the ceiling. `sessionId` is also what **Continue** resumes against, and what `02
 - **The surfaces to render on already exist.** `SessionInfo` and `session:info` are there to carry
   spend-to-date, `session:event` is the stream to push it on, and the pane header is where `019` put
   the read-scope disclosure — that is where an effort level and a model selector belong.
-- **`interrupt()`'s receipt is discarded.** `stop()` awaits `query.interrupt()` and drops the result,
-  so `SESSION-PANE-PLAN.md`'s verification item 12 — a `still_queued` reflected in the UI rather than
-  dropped — is outstanding. It belongs to this slice unless `020` picked it up first; check before
-  assuming either.
+- **`interrupt()`'s receipt is no longer discarded — `020` picked it up, and this slice does not own
+  it.** `stop()` in `src/core/agent-sdk.ts` returns `{ stillQueued }` off the `query.interrupt()`
+  receipt, and `stopSession` in `src/main/claude-session.ts` emits a `notice` when the interrupt left
+  messages queued. `SESSION-PANE-PLAN.md`'s verification item 12 is **delivered**. Nothing to build
+  here; the reason it is still written down is that the budget path ends a session for a reason of its
+  own, and `stop()`'s receipt is the shape to follow rather than a second one to invent.
 
 Surface spend as it accrues rather than only at the end, and put an effort level and a model
 selector in the header — both can change on a live session without losing the conversation, and

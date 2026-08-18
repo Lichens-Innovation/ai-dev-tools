@@ -20,6 +20,7 @@ import {
   listMarketplaces,
   nodeSettings,
   paneSessionTarget,
+  permissionReason,
   spawnClaudeChild,
   startPaneSession,
   terminateChildGroup,
@@ -29,7 +30,7 @@ import {
 } from "../core/index.js";
 import { bundledPluginDir } from "./bundled-assets.js";
 import { IPC_EVENTS } from "../shared/ipc.js";
-import type { ClaudeReadScope, SessionEvent, SessionInfo } from "../shared/ipc.js";
+import type { ClaudeReadScope, PermissionAnswer, PermissionChoice, SessionEvent, SessionInfo } from "../shared/ipc.js";
 
 /**
  * The child `spawnClaudeChild` produced.
@@ -207,8 +208,60 @@ export function saySession(webContentsId: number, id: string, text: string): boo
 export async function stopSession(webContentsId: number, id: string): Promise<boolean> {
   const entry = sessions.get(webContentsId);
   if (!entry || entry.id !== id) return false;
-  await entry.session.stop();
+  const { stillQueued } = await entry.session.stop();
+  // A Stop that left messages queued is not the Stop the user pressed the button for: each one runs
+  // as its own turn the moment the interrupt lands. Saying so beats a pane that goes quiet and then
+  // starts talking again for no visible reason.
+  if (stillQueued.length > 0) {
+    send(webContentsId, {
+      kind: "notice",
+      seq: --injectedSeq,
+      text: `Stopped the turn in flight. ${stillQueued.length} queued message${
+        stillQueued.length === 1 ? "" : "s"
+      } survived the interrupt and will still run.`,
+    });
+  }
   return true;
+}
+
+/**
+ * The main process authors the answer; the renderer sends a choice.
+ *
+ * The narrow wire shape (`PermissionChoice`) is what keeps `updatedPermissions` — blanket allow
+ * rules, `bypassPermissions`, a permanently widened read scope, written to the user's own settings
+ * files — unreachable from the renderer. What crosses is one of three words plus a sentence, and
+ * this function is the only place a `PermissionAnswer` is built from it.
+ *
+ * The reason is never empty. The UI is written not to send one, and this is the second half of that
+ * promise rather than a restatement of it: a deny whose message is `""` reaches the model as a bare
+ * refusal, and the model reads denial messages to decide what to do instead.
+ */
+export function answerPermission(
+  webContentsId: number,
+  id: string,
+  requestId: string,
+  choice: PermissionChoice
+): boolean {
+  const entry = sessions.get(webContentsId);
+  if (!entry || entry.id !== id) return false;
+
+  const answer: PermissionAnswer =
+    choice?.choice === "allow"
+      ? { behavior: "allow" }
+      : {
+          behavior: "deny",
+          message: permissionReason(
+            choice?.reason,
+            choice?.choice === "stop"
+              ? "The user stopped this turn rather than allowing that call."
+              : "The user declined this call. Do not retry it; say what you needed it for instead."
+          ),
+          // Deny and Stop are two controls: a plain deny lets the model adapt and finish the job,
+          // and this one ends the turn. Only a person ever sets it.
+          interrupt: choice?.choice === "stop",
+        };
+
+  return entry.session.answer(String(requestId ?? ""), answer);
 }
 
 /**

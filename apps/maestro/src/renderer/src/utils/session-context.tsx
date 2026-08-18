@@ -19,7 +19,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { callMain } from "./call-main";
 import { useProject } from "./project-context";
-import type { SessionEvent, SessionInfo } from "../../../shared/ipc";
+import type {
+  PermissionChoice,
+  PermissionOutcome,
+  PermissionPrompt,
+  SessionEvent,
+  SessionInfo,
+} from "../../../shared/ipc";
 
 /** One entry in the transcript. User turns are local; everything else arrives as a `SessionEvent`. */
 export type TranscriptEntry =
@@ -27,6 +33,7 @@ export type TranscriptEntry =
   | Extract<SessionEvent, { kind: "assistant" }>
   | Extract<SessionEvent, { kind: "tool" }>
   | Extract<SessionEvent, { kind: "refusal" }>
+  | Extract<SessionEvent, { kind: "permission" }>
   | Extract<SessionEvent, { kind: "notice" }>
   | Extract<SessionEvent, { kind: "turn" }>
   | Extract<SessionEvent, { kind: "ended" }>;
@@ -44,12 +51,24 @@ interface SessionContextValue {
   live: boolean;
   /** A turn is in flight: Stop is available, Send is not. */
   busy: boolean;
+  /**
+   * Tool calls waiting on an answer, oldest first.
+   *
+   * Held here rather than in the pane for the reason the transcript is: this provider is mounted in
+   * `__root.tsx`, so a prompt survives navigation and is answerable from whatever route the user
+   * happens to be on. A prompt held in a route would be a wedged session the moment they moved.
+   */
+  pending: PermissionPrompt[];
+  /** How each answered request ended, so the transcript entry can say which way it went. */
+  outcomes: Record<string, PermissionOutcome>;
   starting: boolean;
   error: string | null;
   /** Start a session against the open project. Nothing starts implicitly — the user asks. */
   start(): Promise<void>;
   /** Send one turn, exactly as typed. Starts a session first if there is none. */
   say(text: string): Promise<void>;
+  /** Answer one parked request. A choice crosses the wire; main builds the permission result. */
+  answer(requestId: string, choice: PermissionChoice): Promise<void>;
   /** Interrupt the turn in flight, leaving the session usable. */
   stop(): Promise<void>;
   /** End the session and clear the transcript. */
@@ -74,6 +93,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [starting, setStarting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PermissionPrompt[]>([]);
+  const [outcomes, setOutcomes] = useState<Record<string, PermissionOutcome>>({});
 
   /** The live session id. A ref as well as state because `say` must not close over a stale one. */
   const sessionId = useRef<string | null>(null);
@@ -87,7 +108,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // THE SINGLE SUBSCRIPTION. Mounted once, for the life of the window.
   useEffect(() => {
     return window.maestro.session.subscribe((event) => {
+      if (event.kind === "permission-resolved") {
+        // Not a transcript entry: it is the state of one that is already there. The prompt card
+        // renders its outcome from this rather than from what the user clicked, so a request the
+        // session resolved on its own — a window closing, a project switch — stops asking too.
+        setPending((prev) => prev.filter((p) => p.requestId !== event.requestId));
+        setOutcomes((prev) => ({ ...prev, [event.requestId]: event.outcome }));
+        return;
+      }
       append(event);
+      if (event.kind === "permission") {
+        // IMPOSSIBLE TO MISS. A prompt can arrive while the user is reading the docs three routes
+        // away, and a tool call parked behind a closed pane waits forever — there is no timeout
+        // anywhere below this. Opening the pane is the whole of "answerable from wherever they are".
+        setPending((prev) =>
+          prev.some((p) => p.requestId === event.request.requestId) ? prev : [...prev, event.request]
+        );
+        setOpen(true);
+      }
       if (event.kind === "turn") setBusy(false);
       if (event.kind === "ended") {
         sessionId.current = null;
@@ -111,6 +149,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setEntries([]);
     setError(null);
     setInfo(null);
+    setPending([]);
+    setOutcomes({});
     if (!projectRoot) return;
     // What a session WOULD be able to see, so the header can disclose it before one exists.
     void callMain(() => window.maestro.session.info()).then((res) => {
@@ -163,6 +203,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [append, busy, start]
   );
 
+  /**
+   * Answer one parked request.
+   *
+   * The optimistic removal is deliberate and is not the source of truth: main emits
+   * `permission-resolved` for every request it settles, including the ones nobody clicked, and the
+   * subscriber above is what records the outcome. This just stops the buttons being clickable twice
+   * while the round trip is in flight.
+   */
+  const answer = useCallback(async (requestId: string, choice: PermissionChoice) => {
+    const id = sessionId.current;
+    if (!id) return;
+    setPending((prev) => prev.filter((p) => p.requestId !== requestId));
+    const res = await callMain(() => window.maestro.session.answer(id, requestId, choice));
+    if (!res.ok) setError(res.error);
+  }, []);
+
   const stop = useCallback(async () => {
     const id = sessionId.current;
     if (!id) return;
@@ -176,6 +232,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setLive(false);
     setBusy(false);
     setEntries([]);
+    setPending([]);
+    setOutcomes({});
   }, []);
 
   const value = useMemo<SessionContextValue>(
@@ -188,14 +246,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       entries,
       live,
       busy,
+      pending,
+      outcomes,
       starting,
       error,
       start,
       say,
+      answer,
       stop,
       end,
     }),
-    [busy, end, entries, error, info, live, open, say, start, starting, stop, width]
+    [answer, busy, end, entries, error, info, live, open, outcomes, pending, say, start, starting, stop, width]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
@@ -207,4 +268,4 @@ export function useSession(): SessionContextValue {
   return ctx;
 }
 
-export type { SessionEvent, SessionInfo };
+export type { PermissionChoice, PermissionPrompt, SessionEvent, SessionInfo };

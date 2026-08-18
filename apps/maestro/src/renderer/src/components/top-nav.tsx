@@ -383,11 +383,33 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
         type="button"
         data-session-toggle
         onClick={() => session.setOpen(!session.open)}
-        title={session.busy ? "Session — a turn is in progress" : "Session"}
+        title={
+          session.pending.length > 0
+            ? "Session — a tool call is waiting on your answer"
+            : session.busy
+              ? "Session — a turn is in progress"
+              : "Session"
+        }
         className="relative flex items-center justify-center w-7 h-7 rounded-md border bg-(--bg-elev) border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
       >
         <MessagesSquare size={13} />
-        {session.busy && <span className="absolute -top-0.5 -right-0.5 text-[7px] leading-none text-(--green)">●</span>}
+        {/*
+          A parked permission request outranks a running turn on this badge, and is a different
+          colour, because they mean opposite things: one is Claude working and the other is Claude
+          waiting on the user. The pane opens itself when a prompt arrives, so this is the backstop
+          for a pane the user then closed — the tool call is still parked, and prompts do not time
+          out.
+        */}
+        {session.pending.length > 0 ? (
+          <span
+            data-testid="session-toggle-pending"
+            className="absolute -top-0.5 -right-0.5 text-[7px] leading-none text-amber-500"
+          >
+            ●
+          </span>
+        ) : (
+          session.busy && <span className="absolute -top-0.5 -right-0.5 text-[7px] leading-none text-(--green)">●</span>
+        )}
       </button>
 
       <button

@@ -105,25 +105,25 @@
     ]
   },
   "020-permission-prompts-in-the-pane.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "019-a-live-session-in-the-pane.md"
     ]
   },
   "021-structured-questions-from-the-agent.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "020-permission-prompts-in-the-pane.md"
     ]
   },
   "022-hand-off-from-a-create-form-into-the-pane.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "020-permission-prompts-in-the-pane.md"
     ]
   },
   "023-authorise-a-directory-for-the-session.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "020-permission-prompts-in-the-pane.md"
     ]

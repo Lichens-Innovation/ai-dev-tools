@@ -46,6 +46,7 @@ import {
 } from "../core/index.js";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
+  PermissionChoice,
   SessionInfo,
   ClaudePreview,
   ClaudeRequest,
@@ -71,6 +72,7 @@ import type {
 } from "../shared/ipc.js";
 import { bundledAgentsDir } from "./bundled-assets.js";
 import {
+  answerPermission,
   disposeSessions,
   endAllSessions,
   endSession,
@@ -406,6 +408,13 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.sessionSay, (e, id: string, text: string): boolean => saySession(e.sender.id, id, text));
 
   ipcMain.handle(IPC.sessionStop, async (e, id: string): Promise<boolean> => stopSession(e.sender.id, id));
+
+  // A parked permission request, answered. The renderer sends a CHOICE — allow, deny or stop, plus
+  // the reason the model is told — and `answerPermission` builds the SDK-shaped result from it, so
+  // no permission RULE, mode or directory can be authored on this side of the wire.
+  ipcMain.handle(IPC.sessionPermission, (e, id: string, requestId: string, choice: PermissionChoice): boolean =>
+    answerPermission(e.sender.id, id, requestId, choice)
+  );
 
   ipcMain.handle(IPC.sessionEnd, (e): void => endSession(e.sender.id));
 
