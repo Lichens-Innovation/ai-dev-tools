@@ -856,6 +856,87 @@ describe("the session pane", () => {
     );
   });
 
+  it("lets the renderer send a question SELECTION and never the answer payload", () => {
+    // THE ONE CARVE-OUT IN "A DECISION CROSSES, NEVER A PAYLOAD". A question's answer IS a payload:
+    // it rides back on `updatedInput`, the tool's own input with the user's choices written into it,
+    // which is the field every other surface in this app refuses to expose. `021` made the carve-out
+    // checkable instead of trusted, and these are the hops of it.
+
+    // 1. THE WIRE CARRIES A SELECTION. Its own channel, not a fifth arm of `PermissionChoice`: the
+    //    two asks share a registry and nothing else.
+    const preload = stripComments(read("src/preload/index.ts"));
+    expect(preload).toMatch(/invoke\(IPC\.sessionQuestion,\s*id,\s*requestId,\s*choice\)/);
+
+    // 2. `QuestionChoice` CANNOT EXPRESS AN ANSWER. Both arms are pinned rather than the absence of
+    //    a third: an arm carrying a map keyed by question text would be the payload arriving whole.
+    const contracts = read("src/core/contracts.ts");
+    const wire = contracts.slice(contracts.indexOf("export type QuestionChoice"));
+    const arms = wire.slice(0, wire.indexOf(";\n"));
+    expect(arms).toMatch(/choice:\s*"answer";\s*selections:\s*QuestionSelection\[\]/);
+    expect(arms).toMatch(/choice:\s*"reply";\s*text:\s*string/);
+    expect(arms, "the renderer can send the answer payload itself").not.toMatch(/answers|updatedInput|Record</);
+    // …and a selection names its question by INDEX and its options by the labels it was shown,
+    // exactly as a grant names a scope word and not a path.
+    const selection = contracts.slice(contracts.indexOf("export interface QuestionSelection"));
+    expect(selection.slice(0, selection.indexOf("}"))).toMatch(/question:\s*number;[\s\S]*labels:\s*string\[\]/);
+
+    // 3. NOTHING IN THE RENDERER AUTHORS ONE. Same assertion the permission block makes about
+    //    `updatedPermissions`, for the field that is this slice's equivalent.
+    const renderer = sourcesUnder("src/renderer")
+      .map((f) => stripComments(fs.readFileSync(f, "utf8")))
+      .join("\n");
+    expect(renderer, "the renderer can author the tool input a question is answered with").not.toMatch(
+      /updatedInput|answers:/
+    );
+
+    // 4. THE PAYLOAD IS BUILT IN EXACTLY ONE PLACE, and it is the one holding the call the SDK
+    //    delivered. Validating in main instead would check the labels against a copy that had
+    //    already crossed two process boundaries.
+    const authors = sourcesUnder("src")
+      .filter((f) => /updatedInput/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    // Two files may name the field at all: `contracts.ts` declares the shape, `agent-sdk.ts` fills
+    // it in. Nothing between them — and nothing above them — gets to touch it.
+    expect(authors).toEqual(["src/core/agent-sdk.ts", "src/core/contracts.ts"]);
+    const mainSession = stripComments(read("src/main/claude-session.ts"));
+    expect(mainSession, "main rebuilds the answer instead of forwarding the selection").not.toMatch(
+      /answers|updatedInput/
+    );
+    expect(mainSession).toMatch(/entry\.session\.answerQuestion\(String\(requestId \?\? ""\), choice\)/);
+
+    // 5. AND IT VALIDATES BEFORE IT ANSWERS. `answerQuestions` refuses a label that was not among
+    //    the options offered — asserted directly in `test/core/session-question.test.ts` — so the
+    //    order here is the whole guarantee: nothing is resolved until the check has run.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    // `lastIndexOf`: the same signature appears on the `PaneSession` interface above, and an
+    // interface has no body to check the order of.
+    const answerFn = sdk.slice(sdk.lastIndexOf("answerQuestion(requestId: string"));
+    const body = answerFn.slice(0, answerFn.indexOf("allowWrites"));
+    expect(body).toMatch(/answerQuestions\(parked\.questions,\s*choice\)/);
+    expect(body.indexOf("answerQuestions("), "the answer is sent before the labels are checked").toBeLessThan(
+      body.indexOf("permissions.answer(")
+    );
+    expect(body, "a rejected selection is answered anyway").toMatch(/if \(!resolution\.ok\) return/);
+
+    // 6. THE TWO MECHANICAL PRECONDITIONS, neither of which existed before `021`: the tool has to be
+    //    offered, and previews have to be asked for. Without the second, Claude emits no preview on
+    //    any option and the list arrives bare — which looks like a rendering bug and is not one.
+    expect(sdk).toMatch(/export const PANE_TOOLS = \[\.\.\.SESSION_TOOLS, "Skill", QUESTION_TOOL\]/);
+    expect(sdk).toMatch(/toolConfig:\s*\{\s*askUserQuestion:\s*\{\s*previewFormat:\s*QUESTION_PREVIEW_FORMAT\s*\}/);
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    // `allowedTools` would auto-approve the tool, and the SDK would then answer the question itself.
+    expect(pane, "a question routed through allowedTools is answered by the SDK, not by the user").not.toMatch(
+      // Not `disallowedTools`, which contains it and is the option that IS passed.
+      /(?<!dis)allowedTools:/
+    );
+
+    // 7. ONE REGISTRY, so teardown drains a question exactly as it drains a permission request. A
+    //    second one beside it is a second thing to remember to drain, and the forgotten one wedges
+    //    the session just as hard — which is the "dismissing the pane resolves it" criterion.
+    expect(pane.match(/createPermissionRegistry\(\)/g) ?? []).toHaveLength(1);
+    expect(pane).toMatch(/if \(tool === QUESTION_TOOL\) return askQuestion\(input, options\)/);
+  });
+
   it("lets a grant die with the session, and writes it nowhere", () => {
     // THE THIRD PROPERTY, inherited from the chat's confirmation opt-out: it defaults to asking, it
     // DIES WITH THE SESSION, and it is visible and revocable from the header. The first is the

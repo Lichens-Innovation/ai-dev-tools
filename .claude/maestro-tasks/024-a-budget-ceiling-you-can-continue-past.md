@@ -46,13 +46,18 @@ the ceiling. `sessionId` is also what **Continue** resumes against, and what `02
   difference between a door and a crash.
 - **The surfaces to render on already exist.** `SessionInfo` and `session:info` are there to carry
   spend-to-date, `session:event` is the stream to push it on, and the pane header is where `019` put
-  the read-scope disclosure — that is where an effort level and a model selector belong. Both grew twice.
-  `023`: `SessionInfo` also carries `grants: SessionGrant[]`, `SessionEvent` has a
-  `{ kind: "scope" }` member, and the header's scope panel lists session grants with a Revoke button
-  each. `022`: `SessionInfo` also carries `writes: SessionWrite[]` (with `writable` derived from it),
-  the `scope` event carries both, the same panel now holds a `WriteScope` list beside the grants, and
-  `SessionEvent` gained `{ kind: "context" }`. Extend those; a spend figure and an effort control are
-  two more fields on the same info object, not a second header.
+  the read-scope disclosure — that is where an effort level and a model selector belong. `SessionInfo`
+  grew twice and the `SessionEvent` union grew three times. `023`: `SessionInfo` also carries
+  `grants: SessionGrant[]`, `SessionEvent` has a `{ kind: "scope" }` member, and the header's scope
+  panel lists session grants with a Revoke button each. `022`: `SessionInfo` also carries
+  `writes: SessionWrite[]` (with `writable` derived from it), the `scope` event carries both, the same
+  panel now holds a `WriteScope` list beside the grants, and `SessionEvent` gained
+  `{ kind: "context" }`. `021`: `SessionEvent` gained a third member, `{ kind: "question" }`, resolved
+  by the same `{ kind: "permission-resolved" }` event a permission prompt already used
+  (`PermissionOutcome` gained `answered`) — nothing was added to `SessionInfo` for it, since a
+  question is parked in the registry and rendered from its own `questions` list rather than folded
+  into the info object. Extend those; a spend figure and an effort control are two more fields on the
+  same info object, not a second header.
 - **A zero-cost `result` message is deliberately NOT reported as a turn**, which matters the moment
   spend accrues per turn rather than only at the end. `022` seeds a handoff's context with
   `shouldQuery: false`, and the SDK answers that append with its own `result` message carrying

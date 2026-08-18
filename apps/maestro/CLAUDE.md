@@ -86,6 +86,7 @@ second.
 | `session-permission.ts`                 | Settled, or a question for a PERSON. Composes the two scope modules. Pure              |
 | `session-handoff.ts`                    | What a create-\* handoff says to the session it opens: seed, notice, title. Pure       |
 | `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
+| `session-question.ts`                   | A structured question, read out of the tool call and answered back into it. Pure       |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
@@ -464,13 +465,14 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   Withholding `Bash` is what makes the path check meaningful at all: it is the one tool whose
   filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `016`
   moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` and
-  `Skill` are deliberately **not** in the set: this path is still headless, so a question has nobody
-  to answer it. The pane extends the constant rather than declaring a second list —
-  `PANE_TOOLS = [...SESSION_TOOLS, "Skill"]`. **`AskUserQuestion` is still offered nowhere in the
-  app**: `019` left it out on purpose, because nothing yet renders a structured question and an
-  offered-then-refused tool costs turns to argue with while an unoffered one costs nothing. It
-  arrives with `021`, together with `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`,
-  which is not passed anywhere today.
+  `Skill` are deliberately **not** in the set for a HEADLESS run: that path has nobody to answer a
+  question. The pane extends the constant rather than declaring a second list —
+  `PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL]`, where the third arrived with `021`
+  together with its two mechanical preconditions. The second is
+  `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on the pane query and
+  nowhere else: **without it Claude emits no `preview` on any option and the list arrives bare**,
+  which looks like a rendering bug and is not one. If a question never arrives at all, check those
+  two before anything else.
 - **`systemPrompt: { type: "preset", preset: "claude_code" }` is passed explicitly.** The SDK's
   default is a minimal prompt, not Claude Code's, and a create-\* run that lost it would author
   against different defaults than every prompt in this app was written for.
@@ -506,9 +508,11 @@ answers a prompt with (`023`), writes through a create-\* handoff carrying a pre
 src/core/session-scope.ts                       the read boundary (pure)
 src/core/session-permission.ts                  settled, or ask a person (pure) — composes the two
 src/core/permission-registry.ts                 the parked promises, one per outstanding ask (pure)
+src/core/session-question.ts                    the OTHER kind of ask: read a question, build its answer (pure)
 src/core/session-handoff.ts                     what a create-* handoff says: seed, notice, title (pure)
 src/main/claude-session.ts                      one session per webContents.id
 src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope + PermissionCard
+src/renderer/src/components/agent-question.tsx  the question card — options, previews, freeform reply
 src/renderer/src/utils/session-context.tsx      SessionProvider / useSession — single-owner
 ```
 
@@ -519,6 +523,7 @@ session:info       → SessionInfo              reads only
 session:say        → (id, text)               USER-TYPED TEXT ONLY
 session:stop       → (id)                     interrupt the turn; the session stays usable
 session:permission → (id, requestId, choice)  A PermissionChoice, never a PermissionAnswer
+session:question   → (id, requestId, choice)  A QuestionChoice — a SELECTION, never the answer payload
 session:revoke     → (id, path)               take back a grant; NARROWS ONLY
 session:end        → ()                       end, and reap the process group
 session:event      ← SessionEvent             the streamed transcript
@@ -607,14 +612,17 @@ session:event      ← SessionEvent             the streamed transcript
   path — so without a route into the prompt they are auto-approved, and a `WebFetch` is how the
   contents of the project the session can read leave the machine. The prompt shows the **complete**
   URL, query string included.
-- **Four refusal routes exist, and the transcript says which one fired.** `SessionEvent`'s `refusal`
-  carries `source: "write-scope" | "read-boundary" | "user" | "auto"` plus `decidedBy` (the SDK's
+- **Five refusal routes exist, and the transcript says which one fired.** `SessionEvent`'s `refusal`
+  carries `source: "write-scope" | "read-boundary" | "user" | "auto" | "question"` plus `decidedBy` (the SDK's
   own `decision_reason_type`: `rule`, `mode`, `classifier`, `asyncAgent`). They share no code, which
   is why the discriminator is a field and not a comment. `autoRefusal` is pure and lives in
   `session-permission.ts` rather than inline in the read loop precisely because the `rule`/`mode`
   branch **cannot be provoked from a window**: with `settingSources: []` only the machine-wide
   `/etc/claude-code/managed-settings.json` tier survives, and writing one needs root. It is covered
   by unit tests over the pure function plus an isolation pin, and that is the honest extent of it.
+  The fifth is `021`'s and is the narrowest: an `AskUserQuestion` call carrying nothing the pane can
+  render as a choice is refused outright rather than parked, because an unanswerable card is a
+  promise only teardown will ever resolve.
 - **The parked promises are their own module.** `createPermissionRegistry()` in
   `src/core/permission-registry.ts` → `{ request, answer, pending, denyAll }`, idempotent per
   `requestId` (a redelivered request re-attaches to the parked promise, or replays the answer it
@@ -632,6 +640,44 @@ session:event      ← SessionEvent             the streamed transcript
   no path** — main holds the prompt being answered and resolves the path from the
   `SessionGrantOption` it published with it, which is `scaffold.ts`'s "a renderer describes an
   artifact and never nominates a directory" applied to the permission wire.
+- **A QUESTION IS THE OTHER KIND OF ASK — same wire, same registry, nothing else in common** (`021`).
+  `AskUserQuestion` reaches `canUseTool` like everything else, and `startPaneSession` branches on the
+  tool name **before** `decidePaneCall`: "Claude wants to use a tool — Allow / Deny" is the wrong
+  sentence for "which of these three frontmatter shapes do you want". What it hands to is
+  `src/core/session-question.ts` (pure) and, on screen, `agent-question.tsx` — a choice per question
+  with each option's description and its preview in a monospace block, single- vs multi-select said
+  in the card, and a freeform textarea for a user who disagrees with every option.
+  - **The answer travels back through `updatedInput`, which is the field this app otherwise refuses
+    to expose, and the carve-out is made CHECKABLE rather than trusted.** The renderer sends a
+    `QuestionChoice` — `{ choice: "answer", selections: [{ question, labels }] }` or
+    `{ choice: "reply", text }` — and neither arm can express an answers map. `answerQuestions`
+    rebuilds the payload from the questions THE MODEL ASKED and **refuses any label that was not
+    among the options it offered**; a rejected selection answers nothing and main writes a notice
+    saying which label it was. Dropping the unknown label instead would send the model an answer to a
+    question nobody asked, which is why it is an error and not a filter.
+  - **The validation lives in `startPaneSession`, not in main** — the one place holding the tool
+    input as the SDK delivered it. Main is a forwarder here (it keeps no copy of the question),
+    which is the opposite of a grant and deliberately so: a grant needs main's own copy of the prompt
+    to resolve a path the renderer never sent, while a question needs the labels checked against the
+    options as received rather than against a copy that crossed two process boundaries. That is why
+    `test/isolation.test.ts` pins `updatedInput` to exactly two files — `contracts.ts` declares it,
+    `agent-sdk.ts` fills it in.
+  - **One registry, so teardown drains a question too.** `PermissionAnswer` was widened to
+    `ParkedAnswer` (`| { behavior: "allow"; updatedInput }`) rather than a second registry being
+    added beside it: a second one is a second thing to remember to drain on exit, and the forgotten
+    one wedges the session exactly as hard. `PermissionOutcome` gained `answered` — a question is
+    never allowed or denied — and the pane's badge counts asks of either kind.
+  - **The refusal comes back from the pure module fully formed** (`QUESTION_REFUSAL`), because
+    `startPaneSession` authors no decision of its own. The isolation test that pins that property
+    caught the first draft doing it.
+  - **Measured in the window, on the packaged build**: previews arrive on every option (so the
+    `toolConfig` opt-in is doing its job), a single-select question replaces its pick on a second
+    click while a multi-select accumulates, Send stays disabled until every question is answered, and
+    the model reads back exactly the labels picked — `Full`, `Overview + Traps`. **The freeform arm
+    works too, and that was the open question**: `response` on `updatedInput` is honoured by the CLI,
+    verified by a reply the model could only have produced from the typed text. Closing the pane
+    leaves the question parked and the badge lit; ending the session or switching projects resolves
+    it — the card and badge clear, no error, and the next session answers a turn.
 - **The boundary hook runs only on the read-only tools**, by design. Letting it answer for
   `Write`/`Edit` too would have replaced `decideWrite`'s reason with a new one, and the requirement
   is that a refused write still carries the original. `session-scope.ts` knows how to check write
@@ -1025,7 +1071,14 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   `allowWrites` call site, the `claimInvocation` claim, and the token-only wire), and **"seeds a
   handoff's context without spending a turn, and says so in the transcript"** pins `shouldQuery:
 false`, the absence of an `origin` stamp on the seeded message, the zero-cost-result guard, and one
-  seed string reaching the model and the transcript both.
+  seed string reaching the model and the transcript both. `021` added a SIBLING of the CHOICE block
+  rather than widening it — **"lets the renderer send a question SELECTION and never the answer
+  payload"** — because the field it defends is a different one: it pins the `session:question` call
+  shape, that `QuestionChoice`'s two arms cannot express an answers map, that `updatedInput` appears
+  in exactly two files (`contracts.ts` declares it, `agent-sdk.ts` fills it in) and in nothing under
+  `src/renderer` or `src/main`, that the labels are validated **before** anything is answered, that
+  `AskUserQuestion` is in `PANE_TOOLS` with the `toolConfig` opt-in and never in `allowedTools`, and
+  that there is still exactly one registry behind both kinds of ask.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

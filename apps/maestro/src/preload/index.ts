@@ -97,6 +97,11 @@ const api: MaestroApi = {
     // the answer from this choice, exactly as it builds a prompt from a request above. A `grant`
     // carries `file` or `directory` and NO PATH: main resolves it against the prompt being answered.
     answer: (id, requestId, choice) => ipcRenderer.invoke(IPC.sessionPermission, id, requestId, choice),
+    // The request id and a SELECTION: which question, and which of the labels it offered. Never the
+    // `answers` map the tool reads — that is built at the far end from the questions the model
+    // asked, so a label this side invented is refused rather than delivered. The `reply` arm carries
+    // typed text, which is what `say` already carries.
+    answerQuestion: (id, requestId, choice) => ipcRenderer.invoke(IPC.sessionQuestion, id, requestId, choice),
     // Narrowing only — see MaestroApi.session.revoke. Main matches the path against the grants it
     // already holds, so nothing here can open a directory that was not opened by an answered prompt.
     revoke: (id, path) => ipcRenderer.invoke(IPC.sessionRevoke, id, path),

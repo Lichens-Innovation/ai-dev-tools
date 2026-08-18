@@ -762,8 +762,24 @@ export type SessionEvent =
   /** A tool call waiting on a person. Answer it with `session:permission`, or it waits forever. */
   | { kind: "permission"; seq: number; request: PermissionPrompt }
   /**
+   * A STRUCTURED QUESTION, waiting on a person — the pane's headline feature.
+   *
+   * It arrives on the same channel as a permission request and is nothing like one: the model is
+   * not asking to do something, it is asking the user to decide something, with real options and a
+   * description and a preview per option. Rendering it as "Claude wants to use a tool — Allow /
+   * Deny" would be absurd, so it is its own member and its own card. Answer it with
+   * `session:question`, or it waits exactly as long as a permission prompt does.
+   */
+  | { kind: "question"; seq: number; request: QuestionPrompt }
+  /**
    * A pending request is no longer pending — because the user answered it, or because the session
    * went away and every outstanding ask was denied on its behalf.
+   *
+   * ONE EVENT FOR BOTH KINDS OF ASK, because there is one registry behind them. A question and a
+   * permission request are parked by the same `createPermissionRegistry()` and drained by the same
+   * `denyAll` on every exit; a second resolution event would mean a second thing to remember to
+   * emit, and the one that gets forgotten leaves a card on screen that nobody can answer. The
+   * renderer clears whichever list holds `requestId`.
    */
   | { kind: "permission-resolved"; seq: number; requestId: string; outcome: PermissionOutcome }
   /**
@@ -809,11 +825,21 @@ export type SessionEvent =
  * prompt; and `auto` is the SDK's `permission_denied` stream event, which reports deny RULES and
  * MODE denials — and which explicitly does **not** report hook denials, so a `read-boundary` entry
  * has to be written by the hook layer itself or it never appears at all.
+ *
+ * `question` is the fifth and the narrowest: an `AskUserQuestion` call that carried nothing the
+ * pane could render as a choice. It is refused rather than parked, because a card nobody can answer
+ * is a promise only teardown will ever resolve.
  */
-export type RefusalSource = "write-scope" | "read-boundary" | "user" | "auto";
+export type RefusalSource = "write-scope" | "read-boundary" | "user" | "auto" | "question";
 
-/** How a pending permission request ended. `cancelled` is the session going away underneath it. */
-export type PermissionOutcome = "allow" | "deny" | "stop" | "cancelled";
+/**
+ * How a pending ask ended. `cancelled` is the session going away underneath it.
+ *
+ * `answered` belongs to a QUESTION and to nothing else: a question is never allowed or denied — it
+ * is answered, or it is cancelled with the session. It shares this union rather than getting one of
+ * its own because both kinds of ask are parked in one registry and resolved by one event.
+ */
+export type PermissionOutcome = "allow" | "deny" | "stop" | "cancelled" | "answered";
 
 /**
  * The answer to a permission request — the SDK's `PermissionResult`, narrowed to what this app
@@ -846,6 +872,32 @@ export type PermissionAnswer =
       updatedPermissions?: SessionPermissionUpdate[];
     }
   | { behavior: "deny"; message: string; interrupt?: boolean };
+
+/**
+ * What an ANSWERED QUESTION resolves to — the one place this app puts a value in `updatedInput`.
+ *
+ * `PermissionAnswer` above is a decision and carries no payload, which is the property every other
+ * surface in this app is built to keep. A question cannot be answered that way: the answer IS the
+ * tool's input, written back with the user's choices in it. So it is a second type rather than a
+ * fifth field on the first one — the two are never interchangeable, and a diff that widened the
+ * permission answer instead would have made every write prompt able to rewrite its own tool call.
+ *
+ * The payload is built in `agent-sdk.ts` from the input the SDK delivered and the labels
+ * `answerQuestions` validated against it. Nothing here crosses a process boundary.
+ */
+export type QuestionAnswer = {
+  behavior: "allow";
+  /** The call as it arrived, plus `answers` (and `response` on a freeform reply). */
+  updatedInput: Record<string, unknown>;
+};
+
+/**
+ * What a parked ask resolves to — either kind, because one registry holds both.
+ *
+ * The deny arm is common to both members and is what teardown produces: a question nobody was left
+ * to answer is refused exactly like a permission request, with a sentence the model can read.
+ */
+export type ParkedAnswer = PermissionAnswer | QuestionAnswer;
 
 /**
  * A session-scoped directory grant, in the SDK's own `PermissionUpdate` shape — narrowed to the
@@ -1040,6 +1092,86 @@ export interface PermissionPrompt {
    */
   grants: SessionGrantOption[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The structured question — the reason the pane exists, and the one carve-out in "a decision
+// crosses the boundary, never a payload".
+//
+// When Claude needs a decision it asks a real question with real options instead of guessing, and
+// the answer has to reach the tool as a payload — `updatedInput`, the field nothing else in this
+// app is allowed to author. The carve-out is made provable rather than trusted, in three parts:
+// the renderer sends a SELECTION (which question, which labels) and nothing else; the main process
+// rebuilds the payload from the questions the MODEL asked; and every label is checked against the
+// options it offered, with anything else rejected rather than forwarded. Same shape as `023`'s
+// grant, which crosses as a scope word and is resolved against the options main published with the
+// prompt — one layer up, and with a bigger payload on the far side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One choice on offer. `preview` is null unless the session declared a preview format. */
+export interface AgentQuestionOption {
+  /** The button's words — and the token an answer names it by. Never invented on this side. */
+  label: string;
+  /** What picking it means, rendered under the label. */
+  description: string;
+  /**
+   * A mockup, a snippet, a config sample: what this option would actually look like.
+   *
+   * Null when the session did not opt into previews (`toolConfig.askUserQuestion.previewFormat` is
+   * unset, and the model then emits none at all) or when the model had nothing to show.
+   */
+  preview: string | null;
+}
+
+/** One question, with its options. A question with fewer than two of them is not a choice. */
+export interface AgentQuestion {
+  /** The question in full. It is also the KEY the answer is recorded under, per the tool's shape. */
+  question: string;
+  /** A short chip label (≤12 chars) — what the card is titled while the question is the body. */
+  header: string;
+  /** Several answers are accepted. The card says so, and a single-select one refuses a second. */
+  multiSelect: boolean;
+  options: AgentQuestionOption[];
+}
+
+/**
+ * A question parked in the main process, waiting for a person.
+ *
+ * `requestId` is the same idempotency key a `PermissionPrompt` carries, from the same registry —
+ * see that type for why a redelivery must re-attach rather than park a second promise.
+ */
+export interface QuestionPrompt {
+  requestId: string;
+  toolUseId: string | null;
+  /** The subagent that asked, or null for the session itself. */
+  agentId: string | null;
+  /** One to four of them, in the order asked. Every one has to be answered, or none. */
+  questions: AgentQuestion[];
+}
+
+/**
+ * Which option was picked, for one question — the whole of what the renderer sends per question.
+ *
+ * The question is named by INDEX into the prompt's own list and the options by their labels, so
+ * everything on the wire is either an offset or a string the model itself wrote. Main resolves both
+ * against the call it received; a label that was not offered is an error, not a filtered entry.
+ */
+export interface QuestionSelection {
+  /** Index into `QuestionPrompt.questions`. */
+  question: number;
+  /** Labels picked, exactly as offered. One, unless the question is `multiSelect`. */
+  labels: string[];
+}
+
+/**
+ * What the RENDERER is allowed to send in answer to a question — a selection, never a payload.
+ *
+ * Two arms, because a user who disagrees with every option must be able to say so: `answer` picks
+ * from what was offered, `reply` is typed text that reaches the model IN PLACE OF a structured
+ * answer (the tool's own `response` field, which makes Claude read "The user responded: …" instead
+ * of an answer list). Neither arm can express an `answers` map, a question's text, or an option
+ * that was not on screen.
+ */
+export type QuestionChoice = { choice: "answer"; selections: QuestionSelection[] } | { choice: "reply"; text: string };
 
 /**
  * One session event before the sequence number is stamped on it.

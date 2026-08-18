@@ -5,6 +5,61 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — structured questions from the agent
+
+- **The pane's headline feature: a real choice, not a paragraph to answer in prose.** When
+  `AskUserQuestion` arrives, `canUseTool` in `startPaneSession` branches on the tool name **before**
+  `decidePaneCall` runs — "Claude wants to use a tool — Allow / Deny" is the wrong sentence for
+  "which of these three frontmatter shapes do you want" — and hands it to a card of its own
+  (`agent-question.tsx`): per-option description and a monospace preview, single- vs multi-select
+  stated on screen, Send disabled until every question is answered, and a freeform reply textarea for
+  a user who disagrees with every option.
+- **`AskUserQuestion` and its previews are both new to the tool set.** `PANE_TOOLS` gained
+  `QUESTION_TOOL` (`[...SESSION_TOOLS, "Skill", QUESTION_TOOL]`) and the pane query now passes
+  `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }` — without that second piece Claude
+  emits no `preview` on any option and the list arrives bare. Neither was passed anywhere before this.
+- **The answer travels back through `updatedInput`, the one field this app otherwise refuses to
+  expose, and the carve-out is checkable rather than trusted.** The renderer sends only a *selection*
+  — which question, which option labels, via `session:question` and a `QuestionChoice` — and
+  `answerQuestions` (`src/core/session-question.ts`, pure) rebuilds the payload from the questions the
+  model asked, **rejecting any label that was not among the options it offered** rather than filtering
+  it out. `describeQuestions` reads the tool input defensively, dropping unlabelled options and
+  questions with no text or fewer than two options.
+- **The validation runs in `startPaneSession` (`agent-sdk.ts`), not in the main process — one step
+  stronger than planned.** The task called for main to construct and validate the payload; as built,
+  the check runs against the tool input exactly as the SDK delivered it, rather than against a copy
+  that crossed two process boundaries. `src/main/claude-session.ts` stays a pure forwarder and keeps
+  no copy of the question at all — the opposite of how a grant works, deliberately.
+- **One registry, two kinds of ask.** `PermissionAnswer` was widened to a union, `ParkedAnswer`
+  (`PermissionAnswer | QuestionAnswer`), rather than a second registry being added beside
+  `createPermissionRegistry()` — a second one is a second thing to remember to drain on teardown, and
+  the forgotten one wedges the session exactly as hard. `PermissionOutcome` gained `answered` (a
+  question is never allowed or denied) and `RefusalSource` gained `question` — the fifth and
+  narrowest refusal route: an `AskUserQuestion` call carrying nothing renderable is refused outright
+  with `QUESTION_REFUSAL`, fully formed by the pure module, rather than parked.
+- **A new IPC channel, `session:question`, rather than a fifth arm of `PermissionChoice`** — the
+  task's own instruction not to widen an existing wire to mean two things. `SessionEvent` gained
+  `{ kind: "question" }`.
+- **The renderer keeps `questions` as its own list beside `pending`**, with a derived `waiting`
+  count, rather than folding questions into `pending` — the two render and answer too differently for
+  one array re-discriminated by every consumer; what they share is `outcomes` and the badge/status
+  count. `top-nav.tsx`'s pending badge counts asks of either kind.
+- New core module `session-question.ts` (pure: `describeQuestions`, `answerQuestions`, plus
+  `QUESTION_TOOL`, `QUESTION_PREVIEW_FORMAT`, `QUESTION_UNRENDERABLE`, `QUESTION_REFUSAL`). New
+  contracts `AgentQuestionOption`, `AgentQuestion`, `QuestionPrompt`, `QuestionSelection`,
+  `QuestionChoice`, `QuestionAnswer`, `ParkedAnswer`. New component `agent-question.tsx`. New IPC
+  `session:question` / `MaestroApi.session.answerQuestion(id, requestId, choice)`.
+- Tests: 13 new in `test/core/session-question.test.ts`, including a direct assertion that an
+  unoffered label is rejected; a new isolation block, "lets the renderer send a question SELECTION
+  and never the answer payload" — **458 tests, 25 files**. Verified in a real Electron window over
+  CDP against the packaged build across three probes, fixtures under `~/gits` only and since deleted:
+  a two-question call rendered with per-option descriptions and previews, single-select replacing its
+  pick and multi-select accumulating, Send staying disabled until both were answered, and the model
+  reading back exactly the labels picked; a freeform reply reached the model (`response` on
+  `updatedInput` **is** honoured by the CLI — the one open question the plan left); and both closing
+  the pane and switching projects with a question outstanding resolved it rather than wedging the
+  session, with the next session answering a turn normally afterward.
+
 ### maestro — finish a create-\* artifact in the pane instead of watching a run
 
 - **The confirmation now offers two buttons over one single-use token.** **Run** is the headless

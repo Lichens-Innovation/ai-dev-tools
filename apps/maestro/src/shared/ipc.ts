@@ -51,6 +51,11 @@ import type {
   PermissionDiff,
   PermissionOutcome,
   PermissionPrompt,
+  AgentQuestion,
+  AgentQuestionOption,
+  QuestionChoice,
+  QuestionPrompt,
+  QuestionSelection,
   RefusalSource,
   GrantScope,
   SessionGrant,
@@ -119,6 +124,11 @@ export type {
   PermissionDiff,
   PermissionOutcome,
   PermissionPrompt,
+  AgentQuestion,
+  AgentQuestionOption,
+  QuestionChoice,
+  QuestionPrompt,
+  QuestionSelection,
   RefusalSource,
   GrantScope,
   SessionGrant,
@@ -274,6 +284,11 @@ export const IPC = {
   // The answer to one parked permission request. A CHOICE, not a permission result — see
   // `PermissionChoice`, and `MaestroApi.session.answer` below.
   sessionPermission: "session:permission",
+  // The answer to one parked QUESTION. Its own channel rather than a fifth arm of `PermissionChoice`
+  // — the two asks share a registry and nothing else, and a channel that meant "allow this write"
+  // and "I pick option B" would be one field pulling in two directions. What crosses is a SELECTION
+  // (which question, which labels), never an answers payload — see `MaestroApi.session.answerQuestion`.
+  sessionQuestion: "session:question",
   // Take back a directory the user granted earlier in this session. Narrows only: it can remove an
   // entry from the grant list and has no shape by which it could add one.
   sessionRevoke: "session:revoke",
@@ -458,6 +473,24 @@ export interface MaestroApi {
      * it, both of which are ordinary rather than errors.
      */
     answer(id: string, requestId: string, choice: PermissionChoice): Promise<boolean>;
+    /**
+     * Answer a parked structured question.
+     *
+     * A SELECTION crosses — which question, which option labels — and never the payload the tool
+     * reads. That payload is the one this app authors, and it is authored at the far end, inside
+     * `startPaneSession`, out of the questions the SDK actually delivered: every label is checked
+     * against the options the model offered and an unoffered one is refused rather than forwarded.
+     * So the renderer picks from a list; it cannot write into it. Same shape as a grant carrying a
+     * scope word and no path.
+     *
+     * The freeform arm (`{ choice: "reply", text }`) carries typed text, which this surface is
+     * already allowed to carry — it is the same thing `say` carries, routed into the answer instead
+     * of into a new turn.
+     *
+     * False when the question is no longer pending, and also when the selection was REJECTED; the
+     * two are distinguished in the transcript, where a rejection arrives as a notice saying why.
+     */
+    answerQuestion(id: string, requestId: string, choice: QuestionChoice): Promise<boolean>;
     /**
      * Revoke a directory this session granted, naming it by path.
      *

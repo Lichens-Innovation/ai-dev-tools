@@ -384,8 +384,8 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
         data-session-toggle
         onClick={() => session.setOpen(!session.open)}
         title={
-          session.pending.length > 0
-            ? "Session — a tool call is waiting on your answer"
+          session.waiting > 0
+            ? "Session — something is waiting on your answer"
             : session.busy
               ? "Session — a turn is in progress"
               : "Session"
@@ -394,13 +394,14 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
       >
         <MessagesSquare size={13} />
         {/*
-          A parked permission request outranks a running turn on this badge, and is a different
-          colour, because they mean opposite things: one is Claude working and the other is Claude
-          waiting on the user. The pane opens itself when a prompt arrives, so this is the backstop
-          for a pane the user then closed — the tool call is still parked, and prompts do not time
-          out.
+          A parked ask outranks a running turn on this badge, and is a different colour, because they
+          mean opposite things: one is Claude working and the other is Claude waiting on the user.
+          EITHER KIND of ask counts — a permission request and a structured question are answered in
+          different cards and are the same thing from here. The pane opens itself when one arrives,
+          so this is the backstop for a pane the user then closed: the tool call is still parked, and
+          nothing below it times out.
         */}
-        {session.pending.length > 0 ? (
+        {session.waiting > 0 ? (
           <span
             data-testid="session-toggle-pending"
             className="absolute -top-0.5 -right-0.5 text-[7px] leading-none text-amber-500"

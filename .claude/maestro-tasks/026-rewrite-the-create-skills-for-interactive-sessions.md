@@ -41,9 +41,13 @@ drift apart with nothing to catch it.
 - **A session loads no filesystem settings (`settingSources: []`), so `CLAUDE.md` files are not
   auto-loaded** — into a headless run or into the pane. A skill that assumed the model had already
   absorbed a project's conventions has to say so and let the model `Read` them.
-- **"Ask rather than guess" depends on `021`, not on `019`.** `019` added only `Skill`;
-  `AskUserQuestion` is in no tool set in the app, so the facility these skills are meant to be the
-  first real consumer of arrives one slice later. Do not write a skill that assumes it before then.
+- **"Ask rather than guess" depended on `021`, and `021` is now done.** `019` added only `Skill`;
+  `AskUserQuestion` reached `PANE_TOOLS` in `021` (`PANE_TOOLS = [...SESSION_TOOLS, "Skill",
+  QUESTION_TOOL]`), together with `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`
+  on the pane query — without that second precondition Claude emits no `preview` on any option and
+  the list arrives bare, which looks like a rendering bug in the skill's own wording and is not one.
+  The facility these skills are meant to be the first real consumer of now exists: see "What `021`
+  shipped" below for what a skill may assume about it.
 
 ### What `020` and `023` changed about being refused, and what a skill may now say
 
@@ -100,6 +104,40 @@ not arrive at a blank conversation to be told what happened, it arrives already 
   ran that did not.
 - **`maestro-task` previews carry `handoff: null` and are refused by the channel.** Only the four
   create-\* forms hand off, which is the set this task rewrites.
+
+### What `021` shipped, and what a skill may now assume about asking
+
+`021` is done, and it is exactly the tool this task's central instruction depends on: "rewrite them
+to ask rather than guess" means `AskUserQuestion`, and it now reaches the pane.
+
+- **A question is a real choice, not a permission prompt and not prose.** It arrives at `canUseTool`
+  in `startPaneSession` like every other tool call, but is branched to `src/core/session-question.ts`
+  **before** `decidePaneCall` runs, and rendered on its own card (`agent-question.tsx`): per-option
+  description and preview, single- vs multi-select stated on screen, and a freeform reply textarea for
+  a user who disagrees with every option on offer. A skill only has to call the tool with real
+  `label`/`description`/`preview` per option and a `multiSelect` flag that matches what it means —
+  none of the rendering is the skill's concern.
+- **A question reaches the person even when a rule would auto-approve it, because `AskUserQuestion`
+  is never routed through `allowedTools`.** Had it been, the SDK would answer its own question instead
+  of the user ever seeing it. This is why the tool is safe for a skill to reach for whenever a real
+  decision is needed, not only when nothing else would auto-approve.
+- **A malformed call is refused, not silently dropped or guessed at.** A question with no text, or
+  with fewer than two labelled options, is rejected outright with a message telling the model to ask
+  in prose instead and offer the choices in text — so a skill whose options might legitimately number
+  fewer than two (a yes/no phrased as one option, say) should phrase it as at least two options or
+  fall back to prose itself, rather than relying on the tool to degrade gracefully.
+- **Previews are opt-in, and they are on for the pane.** `toolConfig.askUserQuestion.previewFormat`
+  is `"markdown"`, rendered in a monospace block beside each option's description — the shape for a
+  mockup, a config sample, or a snippet to compare against its neighbour. A skill that wants that
+  comparison on screen should fill `preview` in; the option still renders correctly without one.
+- **On the terminal entry there is no pane, no `session:question` channel, and no card.**
+  `AskUserQuestion` there is answered however the CLI's own terminal UI answers it — this app's
+  machinery is entirely absent from that path, and a skill's wording should say which entry it is
+  describing rather than writing one paragraph that assumes the card exists everywhere.
+- **An outstanding question cannot wedge the session.** The same parked-promise registry and
+  `denyAll()` that already resolved a permission prompt on pane-close or project-switch resolves a
+  question the same way. A skill never has to hedge against a question going unanswered forever — the
+  worst case is a refusal the model can read and adapt to, exactly like a refused write.
 
 **Each skill must handle both entries.** These files are invoked from the terminal too, where no
 scaffold exists:

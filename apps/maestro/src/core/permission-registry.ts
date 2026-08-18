@@ -1,9 +1,18 @@
-// The parked promises — a permission request that is waiting on a person, and every way it ends.
+// The parked promises — an ask that is waiting on a person, and every way it ends.
 //
 // `canUseTool` returns a `Promise`. When the answer has to come from a user, the host parks that
 // promise, pushes the question to the renderer, and resolves it when the answer comes back. That is
 // three lines of intent and four requirements that are individually easy to miss, so they live here
-// with tests rather than inline in the session:
+// with tests rather than inline in the session.
+//
+// ONE REGISTRY, TWO KINDS OF ASK. `021` added the structured question, which is nothing like a
+// permission request on screen and identical to one here: it parks the same promise, it is
+// idempotent on the same `requestId`, and above all it is drained by the same `denyAll` on every
+// exit. A second registry beside this one would be a second thing to remember to drain on teardown,
+// and the one that gets forgotten wedges the session exactly as hard. What differs is only what the
+// promise resolves TO — see `ParkedAnswer`.
+//
+// The four requirements:
 //
 //   • **IDEMPOTENT PER REQUEST ID.** A request whose response was lost across a transport gap IS
 //     DISPATCHED AGAIN — by `reinitialize()`, and by any `initialize` to a running session, whose
@@ -16,14 +25,14 @@
 //   • **EVERY EXIT RESOLVES EVERYTHING OUTSTANDING, AS A DENY.** Window close, project switch,
 //     quit. There is no backstop anywhere below this: permission prompts do not time out, and an
 //     unresolved ask is a permanently wedged session holding a detached child process.
-//   • **NOTHING RESOLVES TO `undefined`.** `PermissionAnswer` is a two-shape union whose fall-through
-//     is a deny, and this module never widens it — the SDK reads a missing answer as "the host
-//     replied out of band" and then writes no `control_response` at all.
+//   • **NOTHING RESOLVES TO `undefined`.** Every arm of `ParkedAnswer` is a real SDK result and the
+//     fall-through is a deny; this module never widens it — the SDK reads a missing answer as "the
+//     host replied out of band" and then writes no `control_response` at all.
 //
 // PURE — a map and some promises. No `fs`, no SDK, no Electron, so the leak cases can be provoked
 // in a unit test instead of hoped about.
 
-import type { PermissionAnswer } from "./contracts.js";
+import type { ParkedAnswer } from "./contracts.js";
 
 /**
  * How many answered requests are remembered for replay.
@@ -41,14 +50,14 @@ export interface PermissionRequestHandle {
    * second prompt for it; the promise below is the original one, or the answer it already got.
    */
   fresh: boolean;
-  answer: Promise<PermissionAnswer>;
+  answer: Promise<ParkedAnswer>;
 }
 
 export interface PermissionRegistry {
   /** Park a request, or re-attach to one already parked or already answered. */
   request(requestId: string): PermissionRequestHandle;
   /** Resolve a parked request. False when the id names nothing pending — a late or duplicate click. */
-  answer(requestId: string, answer: PermissionAnswer): boolean;
+  answer(requestId: string, answer: ParkedAnswer): boolean;
   /** The ids still waiting on a person, in the order they arrived. */
   pending(): string[];
   /**
@@ -61,10 +70,10 @@ export interface PermissionRegistry {
 }
 
 export function createPermissionRegistry(): PermissionRegistry {
-  const pending = new Map<string, { answer: Promise<PermissionAnswer>; resolve: (a: PermissionAnswer) => void }>();
-  const settled = new Map<string, PermissionAnswer>();
+  const pending = new Map<string, { answer: Promise<ParkedAnswer>; resolve: (a: ParkedAnswer) => void }>();
+  const settled = new Map<string, ParkedAnswer>();
 
-  const remember = (requestId: string, answer: PermissionAnswer): void => {
+  const remember = (requestId: string, answer: ParkedAnswer): void => {
     settled.set(requestId, answer);
     // Insertion-ordered, so the first key is the oldest.
     while (settled.size > SETTLED_CAP) settled.delete(settled.keys().next().value as string);
@@ -78,15 +87,15 @@ export function createPermissionRegistry(): PermissionRegistry {
       const recorded = settled.get(requestId);
       if (recorded) return { fresh: false, answer: Promise.resolve(recorded) };
 
-      let resolve!: (a: PermissionAnswer) => void;
-      const answer = new Promise<PermissionAnswer>((r) => {
+      let resolve!: (a: ParkedAnswer) => void;
+      const answer = new Promise<ParkedAnswer>((r) => {
         resolve = r;
       });
       pending.set(requestId, { answer, resolve });
       return { fresh: true, answer };
     },
 
-    answer(requestId: string, answer: PermissionAnswer): boolean {
+    answer(requestId: string, answer: ParkedAnswer): boolean {
       const entry = pending.get(requestId);
       if (!entry) return false;
       pending.delete(requestId);
@@ -104,7 +113,7 @@ export function createPermissionRegistry(): PermissionRegistry {
       for (const id of ids) {
         const entry = pending.get(id)!;
         pending.delete(id);
-        const answer: PermissionAnswer = { behavior: "deny", message };
+        const answer: ParkedAnswer = { behavior: "deny", message };
         remember(id, answer);
         entry.resolve(answer);
       }

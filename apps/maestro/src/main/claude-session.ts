@@ -46,6 +46,7 @@ import type {
   PermissionAnswer,
   PermissionChoice,
   PermissionPrompt,
+  QuestionChoice,
   SessionEvent,
   SessionGrant,
   SessionInfo,
@@ -470,6 +471,43 @@ export async function answerPermission(
         };
 
   return entry.session.answer(String(requestId ?? ""), answer);
+}
+
+/**
+ * Forward a selection to the session, which is the only thing that can turn it into an answer.
+ *
+ * NOTE WHAT THIS FUNCTION DOES NOT DO, because it is the whole design: it does not build the
+ * `answers` map, it does not touch `updatedInput`, and it keeps no copy of the question. A grant
+ * needs main's own copy of the prompt to resolve a path the renderer never sent; a question needs
+ * the opposite — validation against the tool input **as the SDK delivered it**, which only
+ * `startPaneSession` is holding. Rebuilding the payload here would mean checking the labels against
+ * a copy that had already crossed two process boundaries, so the check lives one layer deeper and
+ * this hop stays a forwarder.
+ *
+ * A REJECTION IS SAID OUT LOUD. `answerQuestions` refuses a selection that names an unoffered label,
+ * answers a question twice, or leaves one blank — and the promise stays parked, so without a word in
+ * the transcript the card would simply appear not to work. The notice names the reason the pure
+ * module wrote, which is written for whoever has to fix the thing that sent it.
+ */
+export async function answerQuestion(
+  webContentsId: number,
+  id: string,
+  requestId: string,
+  choice: QuestionChoice
+): Promise<boolean> {
+  const entry = sessions.get(webContentsId);
+  if (!entry || entry.id !== id) return false;
+
+  const result = entry.session.answerQuestion(String(requestId ?? ""), choice);
+  // A null error is the ordinary miss — a late click, or a question the session ended under.
+  if (!result.ok && result.error) {
+    send(webContentsId, {
+      kind: "notice",
+      seq: --injectedSeq,
+      text: `That answer was not sent: ${result.error}`,
+    });
+  }
+  return result.ok;
 }
 
 /**

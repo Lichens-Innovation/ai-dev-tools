@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Ban,
   Check,
+  CircleHelp,
   Eye,
   FilePen,
   FileText,
@@ -39,6 +40,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import QuestionCard from "./agent-question";
 import ReadScope from "./read-scope";
 import { humanizeLog } from "../utils/session-log";
 import { useProject } from "../utils/project-context";
@@ -109,8 +111,8 @@ export default function SessionPane() {
             <p data-testid="session-status" className="text-[10px] text-subtle m-0 truncate">
               {noProject
                 ? "No project open"
-                : session.pending.length > 0
-                  ? `Waiting on you · ${session.pending.length} request${session.pending.length === 1 ? "" : "s"}`
+                : session.waiting > 0
+                  ? `Waiting on you · ${session.waiting} ${session.waiting === 1 ? "ask" : "asks"}`
                   : session.live
                     ? `Live in ${current.name} · asks before it acts`
                     : `Ready · ${current.name}`}
@@ -217,6 +219,24 @@ export default function SessionPane() {
               key={request.requestId}
               request={request}
               onAnswer={(choice) => void session.answer(request.requestId, choice)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/*
+        Pinned for the same reason and in its own block. A question parks the same promise a
+        permission request does — nothing below this times out — but it is a different thing to
+        answer, so it renders as a choice rather than as an Allow/Deny, and the two never share a
+        card. See `agent-question.tsx`.
+      */}
+      {session.questions.length > 0 && (
+        <div data-testid="session-questions" className="border-t border-(--line) px-4 pt-3 shrink-0">
+          {session.questions.map((request) => (
+            <QuestionCard
+              key={request.requestId}
+              request={request}
+              onAnswer={(choice) => void session.answerQuestion(request.requestId, choice)}
             />
           ))}
         </div>
@@ -693,6 +713,9 @@ const REFUSED_BY: Record<TranscriptRefusal["source"], (decidedBy: string | null)
   "read-boundary": () => "refused by this session's read boundary",
   user: () => "you refused it",
   auto: (decidedBy) => `auto-denied${decidedBy ? ` by a ${decidedBy}` : " by the permission system"}`,
+  // The fifth route, and the narrowest: a question that carried nothing the pane could render as a
+  // choice. Refusing it says so to the model, which can ask the same thing in prose instead.
+  question: () => "refused because it was not a question this pane could show",
 };
 
 const OUTCOME_LABEL: Record<PermissionOutcome, string> = {
@@ -700,6 +723,8 @@ const OUTCOME_LABEL: Record<PermissionOutcome, string> = {
   deny: "you refused it",
   stop: "you stopped the turn",
   cancelled: "the session ended before it was answered, so it was refused",
+  // A question is never allowed or denied — the answer IS the outcome.
+  answered: "you answered it",
 };
 
 type TranscriptRefusal = Extract<TranscriptEntry, { kind: "refusal" }>;
@@ -792,6 +817,29 @@ function Entry({
           Asked about <span className="font-semibold text-(--ink-2)">{entry.request.tool}</span>
           {entry.request.target && <span className="font-mono"> {entry.request.target}</span>} —{" "}
           {outcome ? OUTCOME_LABEL[outcome] : "waiting for you"}
+        </span>
+      </div>
+    );
+  }
+
+  if (entry.kind === "question") {
+    // Same shape as the permission entry above, and for the same reason: the card is pinned over the
+    // composer, and this is the transcript's record that the question was put and how it ended.
+    const outcome = outcomes[entry.request.requestId];
+    return (
+      <div
+        data-testid="session-question-entry"
+        data-request={entry.request.requestId}
+        data-outcome={outcome ?? "pending"}
+        className="mb-3 flex items-start gap-1.5 text-[11px] text-(--ink-3)"
+      >
+        <CircleHelp size={11} className="shrink-0 mt-0.5" />
+        <span className="break-words">
+          Asked you to decide:{" "}
+          <span className="font-semibold text-(--ink-2)">
+            {entry.request.questions.map((q) => q.header).join(", ")}
+          </span>{" "}
+          — {outcome ? OUTCOME_LABEL[outcome] : "waiting for you"}
         </span>
       </div>
     );

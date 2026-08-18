@@ -47,6 +47,7 @@ import {
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   PermissionChoice,
+  QuestionChoice,
   SessionInfo,
   ClaudePreview,
   ClaudeRequest,
@@ -73,6 +74,7 @@ import type {
 import { bundledAgentsDir } from "./bundled-assets.js";
 import {
   answerPermission,
+  answerQuestion,
   disposeSessions,
   endAllSessions,
   endSession,
@@ -434,6 +436,16 @@ export function registerIpc(): void {
     IPC.sessionPermission,
     async (e, id: string, requestId: string, choice: PermissionChoice): Promise<boolean> =>
       answerPermission(e.sender.id, id, requestId, choice)
+  );
+
+  // A parked question, answered. The renderer sends a SELECTION — which question, which of the
+  // labels it offered, or a freeform reply — and nothing on this path builds the payload the tool
+  // reads: `answerQuestion` forwards, and the session validates every label against the options the
+  // model actually sent before writing them into the call.
+  ipcMain.handle(
+    IPC.sessionQuestion,
+    async (e, id: string, requestId: string, choice: QuestionChoice): Promise<boolean> =>
+      answerQuestion(e.sender.id, id, requestId, choice)
   );
 
   // A grant taken back. It removes an entry main is already holding and can only ever NARROW what

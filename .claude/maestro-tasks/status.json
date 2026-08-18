@@ -111,7 +111,7 @@
     ]
   },
   "021-structured-questions-from-the-agent.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "020-permission-prompts-in-the-pane.md"
     ]

@@ -295,6 +295,20 @@ export {
   type PermissionRequestHandle,
 } from "./permission-registry.js";
 
+// The other kind of ask, on the same wire and nothing like it on screen: a structured question read
+// out of an `AskUserQuestion` call, and answered back into it. The one place in the app that
+// authors a tool-input payload — which is why `answerQuestions` rebuilds it from the questions the
+// MODEL asked and refuses any label that was not offered. Pure.
+export {
+  answerQuestions,
+  describeQuestions,
+  QUESTION_PREVIEW_FORMAT,
+  QUESTION_REFUSAL,
+  QUESTION_TOOL,
+  QUESTION_UNRENDERABLE,
+  type QuestionResolution,
+} from "./session-question.js";
+
 // Usage stats. The same preview-then-run shape and the same token store as the bridge above,
 // because the thing being confirmed is the same kind of thing: a command about to run on the
 // user's machine — and, when no local copy exists, one FETCHED FROM THE NETWORK first. The

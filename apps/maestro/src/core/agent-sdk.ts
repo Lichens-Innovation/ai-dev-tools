@@ -61,11 +61,22 @@ import { decideWrite, targetPathOf, READ_ONLY_TOOLS } from "./write-scope.js";
 import { withinDirectory } from "./read-scope.js";
 import { decideBoundary, grantOptionsFor } from "./session-scope.js";
 import { autoRefusal, decidePaneCall, permissionReason, PANE_ASK_TOOLS } from "./session-permission.js";
+import {
+  answerQuestions,
+  describeQuestions,
+  QUESTION_PREVIEW_FORMAT,
+  QUESTION_REFUSAL,
+  QUESTION_TOOL,
+  QUESTION_UNRENDERABLE,
+} from "./session-question.js";
 import { createPermissionRegistry } from "./permission-registry.js";
 import type {
+  AgentQuestion,
   ClaudeOutputChunk,
   EffectiveSettingsSnapshot,
+  ParkedAnswer,
   PermissionAnswer,
+  QuestionChoice,
   SessionEvent,
   SessionEventBody,
   SettingsPermissions,
@@ -653,12 +664,14 @@ export function startAgentSession(request: AgentSessionRequest): AgentSession {
  * chat is replaced by — that chat asked for `super-help` by pasting its name into a prompt string;
  * the pane declares it as a session skill and lets the model reach it as a tool.
  *
- * `AskUserQuestion` is in SESSION-PANE-PLAN.md's set and is deliberately still absent: nothing in
- * this slice can render a structured question, and a tool that is offered and then refused costs
- * turns to argue with, where one that was never offered costs nothing. It arrives with the
- * question UI in `021`.
+ * `AskUserQuestion` arrives with `021`, and it is the pane's headline feature rather than one more
+ * tool: it is how the model asks a real question with real options instead of guessing. It has TWO
+ * mechanical preconditions and neither is inferable from this list — the tool has to be here, AND
+ * `toolConfig.askUserQuestion.previewFormat` has to be passed at the query, without which Claude
+ * emits no previews at all and every option list arrives bare. If a question never arrives, check
+ * those two before anything else.
  */
-export const PANE_TOOLS = [...SESSION_TOOLS, "Skill"] as const;
+export const PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL] as const;
 
 /**
  * The skills a pane session may reach by name.
@@ -755,6 +768,20 @@ export interface PaneSession {
    * second click on a prompt already answered. Both are ordinary, and neither may park anything.
    */
   answer(requestId: string, answer: PermissionAnswer): boolean;
+  /**
+   * Answer a parked QUESTION with a selection, and let this module build the payload.
+   *
+   * THE CARVE-OUT LIVES HERE, and this signature is what makes it checkable. A question's answer
+   * cannot be a decision — it is the tool's own input, written back with the user's choices in it —
+   * so the caller hands over which question and which labels, and the payload is rebuilt from the
+   * call the SDK actually delivered. Every label is checked against the options that call offered;
+   * one that was not offered is refused and NOTHING is answered, because forwarding it would send
+   * the model an answer to a question it never asked.
+   *
+   * False when the id names nothing pending, and when the selection was rejected — the two are
+   * distinguishable to the caller only by the reason it gets back, which is why it gets one.
+   */
+  answerQuestion(requestId: string, choice: QuestionChoice): { ok: boolean; error: string | null };
   /**
    * Append a turn that does NOT trigger one — context, not a question.
    *
@@ -1032,9 +1059,23 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
   });
 
   // ── the permission registry ───────────────────────────────────────────────
-  // Parked promises, one per outstanding ask. See ./permission-registry.ts for the four things that
-  // make it fiddly; the one that matters HERE is that every exit below resolves what it holds.
+  // Parked promises, one per outstanding ask — a permission request or a structured QUESTION, both
+  // in the one registry so both are drained by the one teardown. See ./permission-registry.ts for
+  // the four things that make it fiddly; the one that matters HERE is that every exit below
+  // resolves what it holds.
   const permissions = createPermissionRegistry();
+
+  /**
+   * The questions parked right now — the call AS THE SDK DELIVERED IT, per request id.
+   *
+   * THIS IS WHAT AN ANSWER IS VALIDATED AGAINST, and holding it here rather than in main is the
+   * whole of the carve-out. The renderer sends labels; main forwards them; and they are checked
+   * against the options in the actual tool call, on the same side of the boundary as the payload
+   * that gets built from them. Nothing that crossed a process boundary describes what was offered.
+   *
+   * Emptied as each question is answered, so it is bounded by what is on screen.
+   */
+  const asked = new Map<string, { input: Record<string, unknown>; questions: AgentQuestion[] }>();
 
   /**
    * Deny everything outstanding, and tell the UI so it can stop showing questions nobody can answer.
@@ -1045,6 +1086,10 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
    */
   const releasePermissions = (message: string): void => {
     for (const requestId of permissions.denyAll(message)) {
+      // A question goes the same way, and that is the criterion "dismissing the pane or switching
+      // projects with a question outstanding resolves it rather than wedging the session" — already
+      // solved, by not building a second registry to forget to drain.
+      asked.delete(requestId);
       emit({ kind: "permission-resolved", requestId, outcome: "cancelled" });
     }
   };
@@ -1056,6 +1101,70 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     wake = null;
     emit({ kind: "ended", error });
     resolveEnded({ error });
+  };
+
+  /**
+   * The idempotency key for one ask.
+   *
+   * `requestId` is the SDK's own envelope id: the same request redelivered after a transport gap
+   * carries the same one, and the registry then resolves the entry that already exists instead of
+   * parking a second. The two fallbacks are for CLIs too old to send it.
+   */
+  const askKey = (tool: string, options: CanUseToolOptions): string =>
+    options?.requestId || options?.toolUseID || `${tool}-${++askSeq}`;
+
+  /**
+   * Park a structured question and wait for a person to answer it.
+   *
+   * The shape is the permission ask's — same registry, same idempotency key, same drain on every
+   * exit — and everything that differs is in what comes back. A permission request resolves to a
+   * DECISION; this resolves to the tool's own input with the user's choices written into it, which
+   * is the one payload this app ever authors and the reason `answerQuestion` below validates rather
+   * than forwards.
+   */
+  const askQuestion = async (input: Record<string, unknown>, options: CanUseToolOptions): Promise<ParkedAnswer> => {
+    const questions = describeQuestions(input);
+    if (questions.length === 0) {
+      // NOT PARKED. A question with nothing to pick between is a card that cannot be answered, and
+      // an unanswerable card is a promise only teardown will ever resolve. Refusing says so, in a
+      // sentence the model can act on — it can ask the same thing in prose instead.
+      emit({
+        kind: "refusal",
+        tool: QUESTION_TOOL,
+        target: null,
+        reason: QUESTION_UNRENDERABLE,
+        source: "question",
+        decidedBy: null,
+      });
+      // The refusal comes back from the pure module fully formed, decision included. This callback
+      // authors none of its own — the property `020` established and `test/isolation.test.ts` pins.
+      return QUESTION_REFUSAL;
+    }
+
+    const requestId = askKey(QUESTION_TOOL, options);
+    const { fresh, answer } = permissions.request(requestId);
+    if (fresh) {
+      asked.set(requestId, { input, questions });
+      emit({
+        kind: "question",
+        request: {
+          requestId,
+          toolUseId: options?.toolUseID ?? null,
+          agentId: options?.agentID ?? null,
+          questions,
+        },
+      });
+    }
+
+    const decision = await answer;
+    asked.delete(requestId);
+    emit({
+      kind: "permission-resolved",
+      requestId,
+      // A question is answered or it is cancelled with the session; it is never allowed or denied.
+      outcome: decision.behavior === "allow" ? "answered" : "cancelled",
+    });
+    return decision;
   };
 
   void (async () => {
@@ -1076,6 +1185,11 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           additionalDirectories: [...request.additionalDirectories],
           tools: [...PANE_TOOLS],
           disallowedTools: [...SESSION_DISALLOWED_TOOLS],
+          // PREVIEWS ARE OPT-IN, AND THIS IS THE OPT-IN. Without it Claude emits no `preview` on
+          // any `AskUserQuestion` option — not a shorter one, none at all — and the choice arrives
+          // as a bare list of labels. It is the second of this feature's two mechanical
+          // preconditions; the first is `AskUserQuestion` being in `PANE_TOOLS` above.
+          toolConfig: { askUserQuestion: { previewFormat: QUESTION_PREVIEW_FORMAT } },
           // The skills the pane may reach, and the plugin they live in. Both, or neither works —
           // see `PaneSessionRequest.pluginDir`.
           skills: [...PANE_SKILLS],
@@ -1225,6 +1339,16 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
             ],
           },
           canUseTool: async (tool: string, input: Record<string, unknown>, options: CanUseToolOptions) => {
+            // ── A QUESTION IS NOT A PERMISSION REQUEST ───────────────────────
+            // Branched on the TOOL NAME first, the way the hook checks `PANE_ASK_TOOLS` first, and
+            // for a sharper reason: `decidePaneCall` would refuse this as a tool the session does
+            // not offer, and even if it did not, "Claude wants to use a tool — Allow / Deny" is the
+            // wrong sentence for "which of these three shapes do you want". A question reaches here
+            // even when a rule would auto-approve it — by definition it needs a human, so it cannot
+            // be configured away — and the decision still is not authored in this file: the branch
+            // routes to `session-question.ts` exactly as the rest routes to `session-permission.ts`.
+            if (tool === QUESTION_TOOL) return askQuestion(input, options);
+
             // The SAME engines the form path and the hook use, composed — not a second one.
             // `writable()` is the pane's write scope: empty until a create-* form is handed off,
             // and read fresh on every call so a form submitted mid-session reaches this and not the
@@ -1269,10 +1393,9 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
             }
 
             // ── the ask ──────────────────────────────────────────────────────
-            // `requestId` is the SDK's own envelope id and therefore the idempotency key: the same
-            // request redelivered after a transport gap carries the same one, and the registry
-            // resolves the entry that already exists instead of parking a second.
-            const requestId = options?.requestId || options?.toolUseID || `${tool}-${++askSeq}`;
+            // Keyed on the SDK's own envelope id — see `askKey`, which the question branch above
+            // shares, because both kinds of ask are parked in the one registry.
+            const requestId = askKey(tool, options);
             const { fresh, answer } = permissions.request(requestId);
             if (fresh) {
               emit({
@@ -1399,6 +1522,31 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     },
     answer(requestId: string, decision: PermissionAnswer): boolean {
       return permissions.answer(requestId, decision);
+    },
+    answerQuestion(requestId: string, choice: QuestionChoice): { ok: boolean; error: string | null } {
+      const parked = asked.get(requestId);
+      // Ordinary, not an error: a click that arrived after the session ended, or a second click on
+      // a question already answered.
+      if (!parked) return { ok: false, error: null };
+
+      // THE VALIDATION, AGAINST THE CALL ITSELF. `parked.questions` was read out of the tool input
+      // the SDK delivered, so a label that was not among the options offered is rejected here and
+      // nothing is answered — the payload below is built entirely from strings the MODEL wrote,
+      // plus which of them the user picked.
+      const resolution = answerQuestions(parked.questions, choice);
+      if (!resolution.ok) return { ok: false, error: resolution.error };
+
+      // The call as it arrived, plus the answer. Merged rather than rebuilt: the tool reads its own
+      // `questions` back out of the input, and reconstructing that array here would mean this app
+      // deciding what the model asked.
+      const updatedInput: Record<string, unknown> = { ...parked.input, answers: resolution.answers };
+      // A FREEFORM REPLY IS AN ANSWER TOO, and it goes in `response` rather than in `answers`:
+      // the tool then tells the model "The user responded: …" instead of a per-question list, which
+      // is exactly right for a user who disagreed with every option on offer.
+      if (resolution.response !== null) updatedInput.response = resolution.response;
+
+      const answered = permissions.answer(requestId, { behavior: "allow", updatedInput });
+      return { ok: answered, error: null };
     },
     allowWrites(paths: readonly string[]): string[] {
       const added: string[] = [];

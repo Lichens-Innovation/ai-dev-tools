@@ -23,6 +23,8 @@ import type {
   PermissionChoice,
   PermissionOutcome,
   PermissionPrompt,
+  QuestionChoice,
+  QuestionPrompt,
   SessionEvent,
   SessionInfo,
 } from "../../../shared/ipc";
@@ -34,6 +36,7 @@ export type TranscriptEntry =
   | Extract<SessionEvent, { kind: "tool" }>
   | Extract<SessionEvent, { kind: "refusal" }>
   | Extract<SessionEvent, { kind: "permission" }>
+  | Extract<SessionEvent, { kind: "question" }>
   | Extract<SessionEvent, { kind: "context" }>
   | Extract<SessionEvent, { kind: "notice" }>
   | Extract<SessionEvent, { kind: "turn" }>
@@ -60,6 +63,17 @@ interface SessionContextValue {
    * happens to be on. A prompt held in a route would be a wedged session the moment they moved.
    */
   pending: PermissionPrompt[];
+  /**
+   * Questions waiting on a person, oldest first — the OTHER kind of ask, kept in its own list.
+   *
+   * Not folded into `pending`: the two render as different things (a choice with options, versus
+   * allow/deny/stop) and answer down different channels, so one array holding both would be a list
+   * every consumer has to re-discriminate. What they share is `outcomes` below and `waiting`, which
+   * is what the badge and the header actually ask about.
+   */
+  questions: QuestionPrompt[];
+  /** Asks of either kind still on screen. What "the user has something to answer" means. */
+  waiting: number;
   /** How each answered request ended, so the transcript entry can say which way it went. */
   outcomes: Record<string, PermissionOutcome>;
   starting: boolean;
@@ -79,6 +93,14 @@ interface SessionContextValue {
   say(text: string): Promise<void>;
   /** Answer one parked request. A choice crosses the wire; main builds the permission result. */
   answer(requestId: string, choice: PermissionChoice): Promise<void>;
+  /**
+   * Answer one parked question with a SELECTION — which question, which labels — or a typed reply.
+   *
+   * Never the payload the tool reads. This module cannot express one: `QuestionChoice` has no arm
+   * carrying an answers map, and the labels it does carry are checked against the options the model
+   * offered before anything is written into the call.
+   */
+  answerQuestion(requestId: string, choice: QuestionChoice): Promise<void>;
   /**
    * Take back a directory granted earlier in this session.
    *
@@ -112,6 +134,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PermissionPrompt[]>([]);
+  const [questions, setQuestions] = useState<QuestionPrompt[]>([]);
   const [outcomes, setOutcomes] = useState<Record<string, PermissionOutcome>>({});
 
   /** The live session id. A ref as well as state because `say` must not close over a stale one. */
@@ -131,6 +154,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // renders its outcome from this rather than from what the user clicked, so a request the
         // session resolved on its own — a window closing, a project switch — stops asking too.
         setPending((prev) => prev.filter((p) => p.requestId !== event.requestId));
+        // ONE EVENT, BOTH LISTS. There is one registry behind the two kinds of ask, so a question is
+        // resolved by exactly the same message — including by the teardown that denies everything
+        // outstanding, which is what stops a closed pane leaving a question on screen forever.
+        setQuestions((prev) => prev.filter((q) => q.requestId !== event.requestId));
         setOutcomes((prev) => ({ ...prev, [event.requestId]: event.outcome }));
         return;
       }
@@ -153,6 +180,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // anywhere below this. Opening the pane is the whole of "answerable from wherever they are".
         setPending((prev) =>
           prev.some((p) => p.requestId === event.request.requestId) ? prev : [...prev, event.request]
+        );
+        setOpen(true);
+      }
+      if (event.kind === "question") {
+        // Same reasoning as a prompt, and one degree stronger: a permission request can at least be
+        // guessed at from the transcript, while a question the model is blocked on says nothing at
+        // all until it is on screen with its options.
+        setQuestions((prev) =>
+          prev.some((q) => q.requestId === event.request.requestId) ? prev : [...prev, event.request]
         );
         setOpen(true);
       }
@@ -180,6 +216,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setInfo(null);
     setPending([]);
+    setQuestions([]);
     setOutcomes({});
     if (!projectRoot) return;
     // What a session WOULD be able to see, so the header can disclose it before one exists.
@@ -272,6 +309,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) setError(res.error);
   }, []);
 
+  /**
+   * Answer one parked question.
+   *
+   * The card is removed optimistically, like a prompt's buttons — but a question can also be
+   * REFUSED at the far end (a label nobody offered, a question answered twice), and a refusal leaves
+   * the promise parked with the card gone. That is why the false return is treated as an error here
+   * and why main writes a notice into the transcript saying which label it was: the two together are
+   * how a rejected answer is visible rather than silent.
+   */
+  const answerQuestion = useCallback(async (requestId: string, choice: QuestionChoice) => {
+    const id = sessionId.current;
+    if (!id) return;
+    setQuestions((prev) => prev.filter((q) => q.requestId !== requestId));
+    const res = await callMain(() => window.maestro.session.answerQuestion(id, requestId, choice));
+    if (!res.ok) setError(res.error);
+  }, []);
+
   const revoke = useCallback(async (target: string) => {
     const id = sessionId.current;
     if (!id) return;
@@ -296,6 +350,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setBusy(false);
     setEntries([]);
     setPending([]);
+    setQuestions([]);
     setOutcomes({});
   }, []);
 
@@ -310,6 +365,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       live,
       busy,
       pending,
+      questions,
+      waiting: pending.length + questions.length,
       outcomes,
       starting,
       error,
@@ -317,12 +374,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       handoff,
       say,
       answer,
+      answerQuestion,
       revoke,
       stop,
       end,
     }),
     [
       answer,
+      answerQuestion,
       busy,
       end,
       entries,
@@ -333,6 +392,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       open,
       outcomes,
       pending,
+      questions,
       revoke,
       say,
       start,
@@ -351,4 +411,4 @@ export function useSession(): SessionContextValue {
   return ctx;
 }
 
-export type { PermissionChoice, PermissionPrompt, SessionEvent, SessionInfo };
+export type { PermissionChoice, PermissionPrompt, QuestionChoice, QuestionPrompt, SessionEvent, SessionInfo };
