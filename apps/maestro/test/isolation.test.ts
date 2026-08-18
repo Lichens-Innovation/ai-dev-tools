@@ -269,6 +269,55 @@ describe("the claude bridge across the process boundary", () => {
     }
   });
 
+  it("has exactly one path from the app to the `claude` binary, and it cannot spawn", () => {
+    // THE ACCEPTANCE CRITERION FOR THE WHOLE MERGE, asserted where it regresses silently.
+    //
+    // help-server shipped a second spawn path — `execFile("claude", ["-p", prompt, …])` in a
+    // server function, per chat message, with no preview and no confirmation. Nothing failed when
+    // it existed; the app simply ran prompts the user had not seen. The defence is structural:
+    // `resolveClaudeCli` is the only thing in the app that produces a path to the CLI, so as long
+    // as exactly one module calls it, and that module provably cannot start a process
+    // (test/core/claude.test.ts walks its import graph), there is no second way to reach `claude`.
+    // `(?<!function\s)` so the module that DECLARES it isn't counted as a caller of itself.
+    const callers = sourcesUnder("src/core")
+      .concat(sourcesUnder("src/main"))
+      .filter((f) => /(?<!function\s)\bresolveClaudeCli\s*\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(callers, "something other than preview resolves the claude CLI").toEqual(["src/core/claude-preview.ts"]);
+  });
+
+  it("spawns only from modules that claim a preview token, one purpose each", () => {
+    // The other half: a module that can spawn but takes its command from a caller would be the
+    // same hole with a different shape. Two modules run a PREVIEWED command, and each pins the
+    // purpose its tokens must carry — so a usage-stats token cannot be spent as a Claude run, or
+    // the reverse. The shared store makes that mix-up a one-line mistake without the check.
+    const claimers = sourcesUnder("src/core")
+      .filter((f) => /(?<!function\s)\bclaimInvocation\s*\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f))
+      .sort();
+    expect(claimers).toEqual(["src/core/ccusage.ts", "src/core/claude-run.ts"]);
+    expect(stripComments(read("src/core/claude-run.ts"))).toMatch(/claimInvocation\([^)]*,\s*"claude"\s*\)/);
+    expect(stripComments(read("src/core/ccusage.ts"))).toMatch(/claimInvocation\([^)]*,\s*"usage-stats"\s*\)/);
+  });
+
+  it("keeps the set of modules that can start a process to a reviewed list", () => {
+    // Not a rule against subprocesses — the app legitimately runs `vibe-rules` and `git`. It is a
+    // rule that the list is short enough to read, so that a new one arrives as a diff to this line
+    // rather than as a `child_process` import nobody looked at.
+    const spawners = sourcesUnder("src/core")
+      .concat(sourcesUnder("src/main"))
+      .filter((f) => /["'`](?:node:)?child_process["'`]/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f))
+      .sort();
+    expect(spawners).toEqual([
+      "src/core/ccusage.ts", //     usage stats — token-gated, previewed, version-pinned
+      "src/core/claude-run.ts", //  the bridge — token-gated
+      "src/core/discovery.ts", //   `vibe-rules list`
+      "src/core/install.ts", //     `git` during an install
+      "src/core/rules.ts", //       `vibe-rules load`
+    ]);
+  });
+
   it("kills runs in flight when the app quits", () => {
     // The child is spawned detached so its process group can be signalled; the flip side is that
     // it outlives the app unless something kills it.
@@ -351,17 +400,94 @@ describe("the surface folded in from help-server", () => {
     expect(menu).toContain('badge !== "none"');
   });
 
-  it("does not let the chat panel spawn anything", () => {
+  it("runs the chat through the bridge, from one place", () => {
     // The acceptance criterion, asserted where it can regress. help-server's chat spawned the
-    // `claude` CLI directly with no preview — the second, independently-grown spawn path the
-    // bridge exists to replace. Until it is rebuilt on claude:preview/claude:run, the panel must
-    // reach neither the bridge nor anything that could stand in for one.
-    // Comments stripped: the file's own header names the thing it must not do, and prose about a
-    // forbidden call matches a check for one exactly as well as a real call does.
+    // `claude` CLI directly, per message, with no preview — the second independently-grown spawn
+    // path the bridge exists to replace. `chat-context.tsx` is the one module that may reach the
+    // bridge, and it previews before it runs; the panel is a view of it.
+    //
+    // Comments stripped throughout: both files' headers name the calls they must not make, and
+    // prose about a forbidden call matches a check for one exactly as well as a real call does.
+    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
+    expect(ctx).toContain('window.maestro.claude.preview({ kind: "help-chat"');
+    expect(ctx).toContain("window.maestro.claude.run(");
+    // Preview first: a run is only ever started from an object the preview channel produced.
+    expect(ctx.indexOf("window.maestro.claude.preview")).toBeGreaterThan(-1);
+
     const panel = stripComments(read("src/renderer/src/components/chat-panel.tsx"));
-    expect(panel).not.toMatch(/window\.maestro\.claude/);
+    expect(panel, "the chat panel talks to the bridge directly").not.toMatch(/window\.maestro\.claude/);
     expect(panel).not.toMatch(/claude\s+-p\b|--permission-mode|child_process|spawn\(/);
     expect(panel).toContain("SlidePanel");
+
+    // And nowhere else in the renderer, so there is no second chat path to review.
+    const callSites = sourcesUnder("src/renderer")
+      .filter((f) => /kind:\s*["']help-chat["']/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(callSites).toEqual(["src/renderer/src/utils/chat-context.tsx"]);
+  });
+
+  it("shows the prompt before the chat runs, and lets declining run nothing", () => {
+    // The confirmation is inline in the transcript rather than a modal (the answer belongs in the
+    // conversation), so `ClaudeRunDialog`'s own guarantees do not cover it. What it must render is
+    // the same list: the full prompt verbatim, the exact argv, and the working directory.
+    const panel = read("src/renderer/src/components/chat-panel.tsx");
+    expect(panel).toContain("{preview.prompt}");
+    expect(panel).toContain("preview.argv");
+    expect(panel).toContain("{preview.cwd}");
+
+    // Declining drops the preview. Nothing was spawned to produce it — `claude:preview` cannot —
+    // so `decline` has nothing to stop and must not reach the run channel.
+    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
+    const decline = ctx.slice(ctx.indexOf("const decline ="), ctx.indexOf("const stop ="));
+    expect(decline).toContain("setPending(null)");
+    expect(decline).not.toMatch(/window\.maestro\.claude\.run|runPreview/);
+  });
+
+  it("defaults the chat's confirmation to ASKING, and scopes the opt-out to the session", () => {
+    // A chat makes per-message confirmation feel heavy, so there is an opt-out. Three properties
+    // are what make it an opt-out rather than the removal of the confirmation, and all three are
+    // one-character changes away from being lost.
+    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
+
+    // 1. It defaults to asking.
+    expect(ctx).toMatch(/const \[askBeforeRun, setAskBeforeRun\] = useState\(true\)/);
+
+    // 2. It is scoped no wider than the session: nothing persists it, so a restart asks again.
+    expect(ctx).not.toMatch(/localStorage|sessionStorage|indexedDB/);
+    expect(ctx).not.toMatch(/askBeforeRun[^\n]*(?:invoke|maestro\.config|writeFile)/);
+    // And a project switch resets it, like the transcript and the outstanding tokens.
+    expect(ctx).toMatch(/setAskBeforeRun\(true\)[\s\S]{0,200}\[projectRoot\]/);
+
+    // 3. It is visible and revocable in the UI, in both states — a checkbox bound to the setter,
+    //    rendered unconditionally rather than only while it is on.
+    const panel = read("src/renderer/src/components/chat-panel.tsx");
+    expect(panel).toContain("checked={chat.askBeforeRun}");
+    expect(panel).toContain("chat.setAskBeforeRun(e.target.checked)");
+    // Even with it off the prompt is kept on the answer: not being interrupted is not the same as
+    // not being told what ran.
+    expect(panel).toContain("msg.prompt");
+  });
+
+  it("previews the usage-stats command before running it, and pins any network fetch", () => {
+    // The other spawn help-server grew: `npx --yes ccusage@latest` on every view of its Stats tab,
+    // downloading and executing a package from the network unannounced. The core half is covered
+    // by test/core/ccusage.test.ts; this is the wiring the renderer can undo.
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.statsPreview,\s*view\s*\)/);
+    // The run channel takes the TOKEN. `view` rides along only to file the result — a preload
+    // that forwarded an argv would let the renderer choose the binary.
+    expect(preload).toMatch(/invoke\(IPC\.statsRun,\s*token,\s*view\s*\)/);
+    expect(preload).not.toMatch(/statsRun,\s*(argv|bin|cmd)/);
+
+    const tab = read("src/renderer/src/components/tabs/usage-stats.tsx");
+    // The command is on screen next to the button that runs it, and a network fetch says so.
+    expect(tab).toContain("preview.argv");
+    expect(tab).toMatch(/preview\.pinnedVersion/);
+    expect(tab).toMatch(/downloads ccusage/);
+    // Nothing runs on mount: the effect previews, and only `run` reaches the run channel.
+    const effect = tab.slice(tab.indexOf("useEffect(() => {"), tab.indexOf("const run ="));
+    expect(effect).toContain("refreshPreview");
+    expect(effect).not.toContain("runUsageStats");
   });
 
   it("reads the open project rather than a Docker mount or a precompute file", () => {

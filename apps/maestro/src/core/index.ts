@@ -182,6 +182,27 @@ export {
   type ClaudeRunResult,
 } from "./claude-run.js";
 
-export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation } from "./claude-tokens.js";
+export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation, type InvocationPurpose } from "./claude-tokens.js";
+
+// Usage stats. The same preview-then-run shape and the same token store as the bridge above,
+// because the thing being confirmed is the same kind of thing: a command about to run on the
+// user's machine — and, when no local copy exists, one FETCHED FROM THE NETWORK first. The
+// decision behind that, and why the version is pinned, is written at the top of ./ccusage.ts.
+export {
+  previewUsageStats,
+  runUsageStats,
+  resolveCcusage,
+  ccusageArgv,
+  ccusageNotFoundMessage,
+  reduceUsage,
+  emptyUsageStats,
+  PINNED_CCUSAGE_VERSION,
+  type CcusageCli,
+  type CcusageSource,
+  type UsageStats,
+  type UsageStatsPreview,
+  type UsageStatsResult,
+  type UsageStatsView,
+} from "./ccusage.js";
 
 export { defaultV3Config, buildWorkflow, linearWorkflow, buildTestsWorkflow, type SkillMap } from "./seed.js";

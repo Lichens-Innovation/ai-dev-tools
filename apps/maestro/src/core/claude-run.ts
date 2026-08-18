@@ -87,7 +87,9 @@ export async function runPreviewedClaude(token: unknown, events: ClaudeRunEvents
   // `async`, but the claim is still the first thing that happens and still happens before any
   // spawn — a refused token rejects the returned promise rather than throwing at the call site,
   // which is what an `await` in an IPC handler can actually catch.
-  const inv = claimInvocation(token);
+  // "claude": a token issued by the usage-stats preview names an `npx`/`ccusage` invocation, and
+  // claiming it here would spawn that while every message on screen said Claude.
+  const inv = claimInvocation(token, "claude");
   const startedAt = Date.now();
   const argv = [inv.bin, ...inv.args];
 

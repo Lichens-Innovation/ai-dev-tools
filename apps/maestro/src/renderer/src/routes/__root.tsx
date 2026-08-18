@@ -3,6 +3,7 @@ import { Toaster } from "@repo/ui/toast";
 import { SessionLogProvider } from "../utils/session-log-context";
 import { ProjectProvider } from "../utils/project-context";
 import { InstallProvider } from "../utils/install-context";
+import { ChatProvider } from "../utils/chat-context";
 
 // No `shellComponent` here, unlike the web app: TanStack Start rendered the whole <html>
 // document server-side, so the root route owned <head>/<body>/<Scripts> and injected the theme
@@ -17,8 +18,16 @@ function RootLayout() {
     <ProjectProvider>
       <InstallProvider>
         <SessionLogProvider>
-          <Outlet />
-          <Toaster />
+          {/*
+            Inside ProjectProvider, because a project switch ends the chat session — and above the
+            Outlet, because TopNav (which renders the panel) is mounted per ROUTE. Holding the
+            transcript in the panel would drop it on every navigation, along with the only handle
+            on a run still streaming.
+          */}
+          <ChatProvider>
+            <Outlet />
+            <Toaster />
+          </ChatProvider>
         </SessionLogProvider>
       </InstallProvider>
     </ProjectProvider>

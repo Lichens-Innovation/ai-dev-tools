@@ -29,15 +29,29 @@ import { randomUUID } from "node:crypto";
 /** How long a preview stays runnable. Long enough to read the prompt, short enough to still mean it. */
 export const TOKEN_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * What a token authorises, and therefore which run channel will accept it.
+ *
+ * Two things in this app spawn a previewed command: the `claude -p` bridge and the usage-stats
+ * reader (`ccusage.ts`). They share this store — one expiry, one single-use rule, one place to
+ * clear on a project switch — but they must not share TOKENS. Without this field a stats preview
+ * would hand the renderer a token that `claude:run` would happily claim, and `runPreviewedClaude`
+ * would spawn `npx` while every message on screen said Claude. The purpose is checked on claim, so
+ * a token can only ever run the thing it was previewed for.
+ */
+export type InvocationPurpose = "claude" | "usage-stats";
+
 /** Exactly what will be spawned. Built by preview, never by a caller. */
 export interface ClaudeInvocation {
   token: string;
+  /** Which run path may claim this token. */
+  purpose: InvocationPurpose;
   /** Absolute path of the resolved CLI — argv[0]. */
   bin: string;
   /** Arguments after the binary, including the prompt. */
   args: string[];
   cwd: string;
-  /** The prompt as shown to the user; also present inside `args`. */
+  /** The prompt as shown to the user; also present inside `args`. For a non-prompt run, "". */
   prompt: string;
   createdAt: number;
   expiresAt: number;
@@ -74,11 +88,11 @@ export function issueInvocation(inv: Omit<ClaudeInvocation, "token" | "createdAt
 /**
  * Take the invocation a token names, consuming it.
  *
- * Throws `TokenRefused` for anything that isn't a live, unused token from this process. The four
- * cases are distinguished because they mean different things to the user: a forged token is a bug
- * worth reporting, an expired one just needs previewing again.
+ * Throws `TokenRefused` for anything that isn't a live, unused token issued by this process FOR
+ * THIS PURPOSE. The cases are distinguished because they mean different things to the user: a
+ * forged token is a bug worth reporting, an expired one just needs previewing again.
  */
-export function claimInvocation(token: unknown): ClaudeInvocation {
+export function claimInvocation(token: unknown, purpose: InvocationPurpose): ClaudeInvocation {
   if (typeof token !== "string" || token.length === 0) {
     throw new TokenRefused(
       "Refused: this run carried no preview token. Every run must come from a preview the user confirmed."
@@ -90,9 +104,17 @@ export function claimInvocation(token: unknown): ClaudeInvocation {
       "Refused: no preview matches this token. It was never issued, or it has already run — preview again and confirm the prompt."
     );
   }
-  // Consumed either way: a token that reaches this point is spent, expired or not, so no path
-  // leaves a claimable token behind.
+  // Consumed either way: a token that reaches this point is spent, expired or mis-aimed, so no
+  // path leaves a claimable token behind.
   invocations.delete(token);
+  if (inv.purpose !== purpose) {
+    // The command this token describes is not the kind of command this channel runs. Refused
+    // rather than coerced: the user confirmed one thing, and running the other under its
+    // authorisation is exactly what the token exists to prevent.
+    throw new TokenRefused(
+      `Refused: this preview authorises a ${inv.purpose} run, not a ${purpose} one. Preview again from the surface you meant to run from.`
+    );
+  }
   if (inv.expiresAt <= Date.now()) {
     throw new TokenRefused(
       "This preview expired. The project may have changed since it was built — preview again and confirm the prompt."
