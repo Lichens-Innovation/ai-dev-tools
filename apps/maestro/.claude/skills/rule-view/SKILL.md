@@ -54,7 +54,7 @@ RuleTree renders the project-root row + one row per tree dir; each row shows the
         │   onAssign / onUnassign → setConfig (mutates config.rules only)
         ▼ (Save rules)
 submitMaestroConfig({ sliceType: "rules", slice: { rules: config.rules } })
-  → window.maestro.config.save(...)  = IPC `config:save` → saveConfig() in @repo/maestro-core
+  → window.maestro.config.save(...)  = IPC `config:save` → saveConfig() in src/core
       1. merge the rules slice into maestro.json (preserves workflows/instances) and write it
       2. re-render the orchestrator's handoff table
       3. APPLY the placements — move project rule files, `vibe-rules load` installable ones
@@ -64,7 +64,7 @@ submitMaestroConfig({ sliceType: "rules", slice: { rules: config.rules } })
                                   was rendering now describe a layout that no longer exists
 ```
 
-Step 3 is the part that used to be a separate host-side `maestro-apply-rules.js` run, driven by a `SKILL.md` after the container wrote its result file. `rules.ts` in `@repo/maestro-core` is that same logic, called in-process: the app can reach the project's paths directly and can shell out to `vibe-rules` itself, neither of which a container could do. The plugin still ships `maestro-apply-rules.js` for the terminal path.
+Step 3 is the part that used to be a separate host-side `maestro-apply-rules.js` run, driven by a `SKILL.md` after the container wrote its result file. `rules.ts` in `src/core` is that same logic, called in-process: the app can reach the project's paths directly and can shell out to `vibe-rules` itself, neither of which a container could do. The plugin still ships `maestro-apply-rules.js` for the terminal path.
 
 ## File-by-file map
 
@@ -79,14 +79,14 @@ Paths are relative to `apps/maestro/` unless stated otherwise.
 | Renderer-side loader + save wrappers over the IPC bridge | `src/renderer/src/utils/maestro.ts` |
 | The typed channel contract | `src/shared/ipc.ts` (`data:rules`, `config:save`) |
 | Main-process handler — the only side that touches `fs` or spawns `vibe-rules` | `src/main/ipc.ts` |
-| Directory walk, project-rule scan, `vibe-rules list` | `discovery.ts` in `packages/maestro-core/` |
-| **The apply step** (move project files / `vibe-rules load`) | `rules.ts` in `packages/maestro-core/`, called by `saveConfig()` |
+| Directory walk, project-rule scan, `vibe-rules list` | `discovery.ts` in `apps/maestro/src/core/` |
+| **The apply step** (move project files / `vibe-rules load`) | `rules.ts` in `apps/maestro/src/core/`, called by `saveConfig()` |
 | Terminal-path equivalent of that step | `plugins/ai-tools-manager/scripts/maestro-apply-rules.js` |
 | Source of project rules | `<projectRoot>/**/.claude/rules/*.md` |
 
 ## The data model (the `rules` slice)
 
-The view edits exactly one field of the shared `MaestroConfigV3` (types from `@repo/maestro-core/contracts` — the **subpath**, never the barrel, which re-exports `fs`):
+The view edits exactly one field of the shared `MaestroConfigV3` (types from `src/core/contracts.ts` — that **module**, never `src/core/index.ts`, which re-exports `fs`):
 
 ```ts
 MaestroConfigV3 { version: 3, …workflow fields…, rules: MaestroRuleV3[] }   // only `rules` here
@@ -125,7 +125,7 @@ Source bookkeeping:
 
 ## Center — directory tree (rule-tree.tsx)
 
-`RuleTree` renders a flat, indented list: a synthetic **`(project root)`** row (`dirPath = ""`, `⊟`), then one `TreeRow` per `TreeNode` from the loader's `tree` (`▸`, indented by `depth * 16 + 8`px). `discoverProjectTree` (`discovery.ts` in `@repo/maestro-core`) walks from `projectRoot`, **maxDepth 4**, skipping `node_modules`/`.git`/`dist`/`build`/`.next`/`.turbo`/`.output`.
+`RuleTree` renders a flat, indented list: a synthetic **`(project root)`** row (`dirPath = ""`, `⊟`), then one `TreeRow` per `TreeNode` from the loader's `tree` (`▸`, indented by `depth * 16 + 8`px). `discoverProjectTree` (`discovery.ts` in `src/core`) walks from `projectRoot`, **maxDepth 4**, skipping `node_modules`/`.git`/`dist`/`build`/`.next`/`.turbo`/`.output`.
 
 Each `TreeRow`:
 - **Computes its own assignment** by filtering `ruleAssignments` (= `config.rules`): root matches `scope === "project" && no paths`; a dir matches `paths` containing `"<dirPath>/**"` or the bare `dirPath`.
@@ -140,7 +140,7 @@ Saving sends only the **rules slice** (`{ rules }`) with `sliceType: "rules"`, o
 
 ## Applying placements (`rules.ts`)
 
-`applyRules` in `@repo/maestro-core` runs inside `saveConfig()`, right after `maestro.json` is written. It reads the `rules` slice and, per assignment:
+`applyRules` in `src/core` runs inside `saveConfig()`, right after `maestro.json` is written. It reads the `rules` slice and, per assignment:
 
 - **`source: "project"`** → finds the rule's `.claude/rules/<file>.md` by scanning the tree (matching the frontmatter `name`/basename to the id), then **moves** it into `<assignedDir>/.claude/rules/`. If it's already there (e.g. assigned to the root where it lives), it's a no-op (`unchanged`).
 - **`source: "vibe-rules"`** → runs `vibe-rules load <id> claude-code -t <assignedDir>/.claude/rules/<id>.md` (creating the parent dir first). vibe-rules **appends** a `<id>…</id>` block, so the script first checks for that tag and **skips** if already present — re-runs don't duplicate.

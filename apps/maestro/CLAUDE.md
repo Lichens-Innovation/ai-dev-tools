@@ -1,8 +1,8 @@
 # maestro (desktop)
 
-The Maestro desktop app — an Electron shell over `@repo/maestro-core`. It opens a project folder,
-edits and saves the full Maestro config with **no Claude session in the loop**, and live-tails the
-session log the Claude Code hooks write.
+The Maestro desktop app — an Electron shell over the node-side Maestro logic in `src/core/`. It
+opens a project folder, edits and saves the full Maestro config with **no Claude session in the
+loop**, and live-tails the session log the Claude Code hooks write.
 
 It **replaced** `apps/ai-tools-manager`, which was deleted in M5 along with its image, its
 per-project container and port, its `/tmp` channel files, and the ~470 lines of bash whose only job
@@ -37,11 +37,83 @@ is the short one.
 ## Process layout
 
 ```
-src/main/      node. Owns the filesystem, the project state, the log watcher.
+src/core/      ALL node-side Maestro logic, framework-free. No React, no Electron.
+src/main/      electron. Owns the project state, the log watcher, the IPC handlers.
 src/preload/   the contextBridge. The ONLY path from renderer to node.
 src/renderer/  a TanStack Router SPA. No node imports at all.
 src/shared/    ipc.ts — the typed channel contract, imported by all three.
 ```
+
+`src/main/ipc.ts` is a list of thin adapters over `src/core/`; the logic is tested under
+`test/core/` with no Electron runtime, which is what keeps a 200-test suite running in about a
+second.
+
+## `src/core/` — the node side
+
+| Module | What it owns |
+|---|---|
+| `types.ts` | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json` |
+| `contracts.ts` | Every type that crosses a process boundary. **Renderer-safe** — interfaces only |
+| `text.ts` | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it |
+| `success-path.ts` | Success-path derivation, node labels, agent→skill resolution (pure) |
+| `skill-regions.ts` | Managed/rendered region markers in the orchestrator `SKILL.md` (pure) |
+| `config.ts` | Read / merge-slice / write of `maestro.json` |
+| `render.ts` | Rewrites the `Maestro:HANDOFFS` table from `maestro.json` |
+| `save.ts` | The three-step save the `config:save` channel is a wrapper around |
+| `seed.ts` / `label-layout.ts` | The starter workflows an unconfigured project opens with (pure) |
+| `detect.ts` | Which implementation agent(s) the repo needs, and the evidence for it |
+| `discovery.ts` / `fs-scan.ts` | The agents, skills, rules and directory tree a project can pick from |
+| `install.ts` / `uninstall.ts` | Installs the runtime into a project, reports staleness, removes it |
+| `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail |
+| `claude-cli.ts` | Where the `claude` CLI is, decided with `fs` and not with PATH alone |
+| `claude-preview.ts` | Builds the prompt and issues a token. **Cannot spawn** |
+| `claude-tokens.ts` | The single-use, expiring authorisation between preview and run |
+| `claude-run.ts` | The only module that spawns Claude, and only for a token preview issued |
+| `marketplaces.ts` | The user's local plugin marketplaces, read from `~/.claude/` at call time |
+| `scaffold.ts` | The deterministic half of the four create-* flows, all-or-nothing |
+| `tasks.ts` | The `/maestro-tasks` queue |
+| `plugin-entries/` | esbuild entry points for the plugin's generated CJS libs — see below |
+
+It was `packages/maestro-core` until it was folded in here (`docs/plans/core-absorption.md`).
+The package existed so "the same code could serve two
+consumers that cannot share a runtime", and that reason expired: the plugin's hook scripts are not
+a runtime consumer — they get **generated bundles**, not imports — so the coupling is at build
+time, and esbuild does not care which directory its entry point sits in. What was left was one
+importing workspace plus a `package.json`, a `tsconfig.json`, a `vitest.config.ts`, a dependency
+edge, an export surface, and a `pnpm install` on every change.
+
+### Generated plugin libs — **do not hand-edit**
+
+```bash
+pnpm --filter maestro build:plugin-libs
+```
+
+Bundles `src/core/plugin-entries/*.ts` to CJS and writes them over:
+
+- `plugins/ai-tools-manager/scripts/lib/maestro-session.cjs`
+- `plugins/ai-tools-manager/scripts/lib/maestro-skill-regions.cjs`
+- `plugins/ai-tools-manager/scripts/lib/maestro-seed.cjs`
+
+**Those three files are generated. Do not hand-edit them** — edit the TypeScript source and re-run
+the build. They are committed because a project installs them by file copy, so they must exist in
+the repo rather than being produced at install time. (`lib/maestro-tasks.cjs` in the same directory
+is *not* generated; it is hand-written and has no banner.)
+
+This script is load-bearing and **fails quietly**: if it stops producing correct output, the
+committed `.cjs` files keep working and every test keeps passing — the symptom is that an edit to
+`success-path.ts` stops reaching the plugin and the hooks go on running the old behaviour. So after
+touching it, read `git diff plugins/ai-tools-manager/scripts/lib/` rather than trusting a green
+suite. Two of its settings exist for exactly that reason and are not incidental:
+
+- **`absWorkingDir`** — esbuild stamps a `// <path>` comment above each bundled module, relative
+  to its working directory, so the output depends on where the build was launched from.
+- **`tsconfig`** — esbuild walks up from the entry point to find one, and `strict` there is what
+  makes it emit `"use strict";` at the top of a CJS bundle. During the move out of `packages/`
+  that walk started finding `apps/maestro/tsconfig.json` (a solution file: `files: []`, references
+  only) and the bundles silently came out non-strict.
+
+The export surface of each bundle must stay identical to what the hook scripts `require()`;
+`test/core/parity.test.ts` asserts the name lists.
 
 `src/shared/ipc.ts` is the seam that replaces `createServerFn`. Where the web app relied on a
 build step stripping handler bodies out of the client bundle — and on a convention about which
@@ -49,13 +121,20 @@ helpers could be exported (see the old app's "Server-only code and the client bu
 the boundary is now the process split. That whole hazard class is gone: an accidental node import
 in the renderer fails the build instead of blanking a route at runtime.
 
-Types that cross the boundary come from `@repo/maestro-core/contracts`, **not** the package
-barrel. The barrel re-exports `fs`, `child_process`, and `import.meta.dirname`; importing a type
-from it pulls all of that into the renderer's type graph. `/contracts` is interfaces only.
+Types that cross the boundary come from `src/core/contracts.ts`, **not** `src/core/index.ts`. The
+barrel re-exports `fs` and `child_process`; importing a type from it pulls all of that into the
+renderer's type graph. `contracts.ts` is interfaces only.
+
+That used to be enforced by a package export — `src/core` was `packages/maestro-core`, and the
+renderer imported `@repo/maestro-core/contracts`, so reaching for the barrel looked different
+enough to catch in review. Both are relative paths now and differ by one word, so the enforcement
+is a test: the **src/core boundary** block in `test/isolation.test.ts` resolves every specifier
+under `src/{shared,preload,renderer}` on the filesystem and fails on anything that lands in
+`src/core` other than `contracts` or `text`. It names the file and the module it found.
 
 ## The save path
 
-`config:save` → `saveConfig()` in `@repo/maestro-core`:
+`config:save` → `saveConfig()` in `src/core/save.ts`:
 
 1. merge the edited slice into `maestro.json` and write it (2-space indent, **no trailing
    newline** — preserved so existing repos show no spurious diff);
@@ -91,7 +170,7 @@ All four follow one pattern, inherited from the web app and still accurate:
 1. Create `src/renderer/src/routes/<name>.tsx` mirroring `create-plugin.tsx` (no mode) or
    `create-skill.tsx` (auto/manual + target). Define the zod schema, wire `useForm` + `Controller`,
    render with `Field`/`Input`/`Select`/`ChipInput` from `@repo/ui`, and wrap it in `create-shell`.
-2. Add a `scaffold<X>` function to `scaffold.ts` in `@repo/maestro-core` and a prompt builder to
+2. Add a `scaffold<X>` function to `src/core/scaffold.ts` and a prompt builder to
    `claude-preview.ts`. Both must resolve the path through `resolveCreateTarget`.
 3. Create the preview component under `src/renderer/src/components/`.
 4. Add the channel to `src/shared/ipc.ts` and the handler to `src/main/ipc.ts` — the renderer must
@@ -112,10 +191,9 @@ The **runtime** half — hook scripts that fire inside a session: `maestro-injec
 
 They still need a session to *run*, but no longer to be **installed**: `/install` copies them into
 `<project>/.claude/scripts/` and registers them in the project's own `.claude/settings.json`
-(`installRuntime()` in `@repo/maestro-core`). See that package's README for why project-local
-registration exists at all — the plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a
-version-keyed marketplace cache, so runtime fixes shipped without a `plugin.json` bump never
-reached an installed project.
+(`installRuntime()` in `src/core/install.ts`). Why project-local registration exists at all: the
+plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a version-keyed marketplace cache, so runtime
+fixes shipped without a `plugin.json` bump never reached an installed project.
 
 The split is the one the `maestro-architecture` skill already draws, at `maestro.json`.
 
@@ -139,7 +217,7 @@ system prompt. So each submit is two operations, in this order:
 
 1. `create:scaffold` writes everything deterministic — directory, frontmatter, plugin manifest,
    marketplace registration — and returns what it wrote. No model, and none reachable: the module
-   behind it (`scaffold.ts` in `@repo/maestro-core`) calls nothing.
+   behind it (`src/core/scaffold.ts`) calls nothing.
 2. Whatever is left goes out as a `ClaudeRequest` through `claude:preview` and `ClaudeRunDialog`.
 
 **The ordering is the design.** The artifact is on disk before Claude is mentioned, so cancelling
@@ -168,8 +246,8 @@ claude:cancel   → kills the child's process group
 
 `ClaudeRunDialog` is the user-facing half: full prompt (scrollable, selectable — never a summary),
 exact argv, working directory, what may be written, then Copy prompt / Cancel / Run, then streamed
-output with a Stop. See `@repo/maestro-core`'s README for why preview and run are two operations and
-what breaks if they become one. Everything a route needs is `window.maestro.claude.preview(request)`
+output with a Stop. See `src/core/claude-preview.ts` and `src/core/claude-run.ts` for why preview
+and run are two operations and what breaks if they become one. Everything a route needs is `window.maestro.claude.preview(request)`
 plus rendering `<ClaudeRunDialog>` with the result — a route that shells out on its own has opted
 out of the confirmation, which is the whole point.
 
@@ -180,9 +258,11 @@ out of the confirmation, which is the whole point.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.
-- **`@repo/maestro-core` must be bundled into main, not externalized.** It's a workspace *source*
+- **`@repo/claude-fs` must be bundled into main, not externalized.** It's a workspace *source*
   package with no build artifact, so `require` can't resolve it at runtime — hence the
-  `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`.
+  `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`. The node-side Maestro
+  logic used to be a second such package; it is `src/core/` now, ordinary app source that gets
+  bundled without anyone having to ask.
 - **Project switches invalidate the router.** Every route loader reads the *current* project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.
@@ -240,12 +320,12 @@ out of the confirmation, which is the whole point.
   through the confirmation dialog, which lists the exact files first. The `purge` flag is explicit
   at every hop — `uninstall(purge: boolean)` in the context takes no default, and the IPC handler
   reads `opts?.purge === true` — so no malformed or missing argument can escalate a call into a
-  purge. `packages/maestro-core/test/uninstall.test.ts` asserts what each level *leaves*.
+  purge. `test/core/uninstall.test.ts` asserts what each level *leaves*.
 - **Staleness is content, never mtime.** `installedRuntimeId`/`shippedRuntimeId` are sha-256 over
   the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
   fresh checkout as stale and make the badge noise the user learns to ignore.
 - **The seeded chain is detected, and only proposed while nothing is on disk.** `data:workflows`
-  calls `detectImplAgents()` (in `@repo/maestro-core`) instead of the old hardcoded
+  calls `detectImplAgents()` (in `src/core/detect.ts`) instead of the old hardcoded
   `defaultV3Config(["backend"])`, and returns the `RepoDetection` on the same payload as the seed —
   one round trip, so the evidence cannot describe a different chain than the canvas is showing.
   `DetectedChain` renders only when `seeded`: once `maestro.json` exists the chain is the user's
@@ -257,7 +337,7 @@ out of the confirmation, which is the whole point.
   re-seed in flight across a project switch would otherwise land project A's starter graph on B's
   canvas, the same failure `seedWorkflowStore`'s guard exists for.
 - **The create routes' preview and their scaffold must resolve the same path.** Both go through
-  `resolveCreateTarget` in `@repo/maestro-core`, and the confirmation dialog names the file it
+  `resolveCreateTarget` in `src/core/scaffold.ts`, and the confirmation dialog names the file it
   returns. A second resolution anywhere — a path computed in the renderer, a `path.join` inlined
   into a prompt builder — makes the modal describe a file other than the one on disk, and the
   user is being asked to consent to the wrong thing. `test/create-preview.test.ts` and
@@ -266,7 +346,7 @@ out of the confirmation, which is the whole point.
   `description:` frontmatter, and the form's live preview shows it *before* the file exists while
   the node-side scaffold writes it after. Two implementations means a preview that can silently
   stop matching the file — and it looks fine right up until someone edits one of them.
-  `@repo/maestro-core/text` is the one home; note the **subpath**, since the barrel re-exports
+  `src/core/text.ts` is the one home; note that module rather than the barrel, which re-exports
   `fs`. `test/isolation.test.ts` fails on a re-implementation anywhere under `src/renderer`.
 - **A create-* run's working directory is not always the open project.** A skill written into a
   marketplace repo, or a brand-new marketplace, lives outside it — and a headless run whose edits
@@ -283,7 +363,7 @@ out of the confirmation, which is the whole point.
   bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
   run channel having no argument that could describe a different run. A preload that "helpfully"
   forwarded the prompt or argv alongside the token would reopen that in a diff that reads as a
-  convenience, and every test in `@repo/maestro-core` would still pass, because none of them can
+  convenience, and every test under `test/core/` would still pass, because none of them can
   see this side of the wire. `test/isolation.test.ts` pins the call to `invoke(IPC.claudeRun,
   token)` for that reason. The same applies to `claude:preview`, which takes a **request** —
   main builds the prompt; the renderer never supplies one.
@@ -299,7 +379,7 @@ out of the confirmation, which is the whole point.
   app gets a PATH that does not include `~/.local/bin`, which is where the CLI installs — so the
   app reported "not installed" on machines where `which claude` answers instantly. This does not
   reproduce from a terminal, and no unit test in this app can see it. Verified by launching from a
-  desktop entry; see `@repo/maestro-core`'s `claude-cli.ts`.
+  desktop entry; see `src/core/claude-cli.ts`.
 - **The log tail is retargeted on a project switch**, in `main/ipc.ts`. Otherwise a window keeps
   streaming the previously-opened repo's session log.
 - **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id`
@@ -318,7 +398,7 @@ out of the confirmation, which is the whole point.
 - **`test/isolation.test.ts` guards the process boundary.** `nodeIntegration: false`,
   `contextIsolation: true`, one exposed namespace, no generic `invoke(channel, …)` escape hatch,
   no node builtins in the built renderer bundle, and — outside `src/main/` — no import of the
-  `@repo/maestro-core` barrel, `@repo/claude-fs`, or any `node:` builtin. These are configuration
+  `src/core/index.ts` barrel, `@repo/claude-fs`, or any `node:` builtin. These are configuration
   and convention properties: they'd all regress silently without assertions.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
@@ -350,8 +430,15 @@ npm layout.)
 pnpm --filter maestro dev        # electron-vite dev, HMR on the renderer
 pnpm --filter maestro build
 pnpm --filter maestro typecheck  # both tsconfig projects
-pnpm --filter maestro test
+pnpm --filter maestro test       # test/ and test/core/ as one suite
+pnpm --filter maestro build:plugin-libs   # after ANY edit under src/core/plugin-entries' graph
 ```
+
+`test/core/` is the former `packages/maestro-core/test/`, and it is where the differential tests
+live: parity against the last hand-written `.cjs` implementations (snapshotted under
+`test/core/fixtures/legacy/`, deliberately *not* read from `plugins/…/scripts/lib/`, which
+`build:plugin-libs` overwrites — that comparison would be tautological), a byte-identity check on
+the rendered `SKILL.md`, and the import-graph walk that proves `claude-preview.ts` cannot spawn.
 
 ### Driving the window (canvas interactions, screenshots)
 

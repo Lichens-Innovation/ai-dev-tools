@@ -1,13 +1,13 @@
 ---
 name: create-skills-architecture
-description: "Explains how the four create-* flows (create-skill, create-subagent, create-plugin, create-marketplace) work end-to-end: the desktop app's form routes, the deterministic scaffold in @repo/maestro-core, the claude -p confirmation dialog, and the consuming SKILL.md prompts. Use when the user is working inside apps/maestro or plugins/ai-tools-manager and asks how a create flow works, where to add a new field, why a form change isn't reaching the prompt, why the confirmation dialog did or didn't open, or how target=project differs from target=marketplace."
+description: "Explains how the four create-* flows (create-skill, create-subagent, create-plugin, create-marketplace) work end-to-end: the desktop app's form routes, the deterministic scaffold in src/core, the claude -p confirmation dialog, and the consuming SKILL.md prompts. Use when the user is working inside apps/maestro or plugins/ai-tools-manager and asks how a create flow works, where to add a new field, why a form change isn't reaching the prompt, why the confirmation dialog did or didn't open, or how target=project differs from target=marketplace."
 ---
 
 # Create-Skills Architecture
 
 Four creation flows share one pipeline: `create-skill`, `create-subagent`, `create-plugin`,
 `create-marketplace`. Each is a route in the Maestro desktop app, a scaffold function in
-`@repo/maestro-core`, and a `SKILL.md` prompt the app hands to `claude -p`.
+`src/core`, and a `SKILL.md` prompt the app hands to `claude -p`.
 
 ## End-to-end pipeline
 
@@ -18,14 +18,14 @@ User opens the Maestro desktop app → top bar Create ▾ → Skill
 src/renderer/src/routes/create-skill.tsx
   • react-hook-form + zod govern state and validation (schema at the top of the route)
   • split pane: form left, live FilePreview right — the file that WILL be generated
-  • the preview's description comes from @repo/maestro-core/text's buildDesc, the same
+  • the preview's description comes from src/core/text.ts's buildDesc, the same
     implementation the scaffold uses, so preview and file cannot disagree
         │ submit
         ▼
 utils/create-flow.tsx  — the submit path all four routes share
         │
         ├─1─▶ window.maestro.create.scaffold(request)     IPC `create:scaffold`
-        │       → scaffoldSkill/Subagent/Plugin/Marketplace in @repo/maestro-core
+        │       → scaffoldSkill/Subagent/Plugin/Marketplace in src/core
         │         writes the directory, the frontmatter, the plugin manifest, the
         │         marketplace registration — everything deterministic
         │       ← { path, name, needsModel, ... }
@@ -69,11 +69,11 @@ Renderer paths are relative to `apps/maestro/`.
 | Live file preview components | `src/renderer/src/components/{skill,subagent}-template-preview.tsx`, `{plugin,marketplace}-manifest-preview.tsx` |
 | The typed channel contract | `src/shared/ipc.ts` (`create:options`, `create:scaffold`, `claude:preview`, `claude:run`, `claude:cancel`) |
 | Main-process handlers | `src/main/ipc.ts` |
-| **Deterministic scaffold** + `resolveCreateTarget` | `scaffold.ts` in `packages/maestro-core/` |
-| Prompt + argv + cwd construction, and the token | `claude-preview.ts`, `claude-tokens.ts` in `packages/maestro-core/` |
-| Spawn, stream, cancel, dispose | `claude-run.ts`, `claude-cli.ts` in `packages/maestro-core/` |
-| Marketplace discovery for the selectors | `marketplaces.ts` in `packages/maestro-core/` |
-| `buildDesc` and friends — ONE implementation | `text.ts` in `packages/maestro-core/` |
+| **Deterministic scaffold** + `resolveCreateTarget` | `scaffold.ts` in `apps/maestro/src/core/` |
+| Prompt + argv + cwd construction, and the token | `claude-preview.ts`, `claude-tokens.ts` in `apps/maestro/src/core/` |
+| Spawn, stream, cancel, dispose | `claude-run.ts`, `claude-cli.ts` in `apps/maestro/src/core/` |
+| Marketplace discovery for the selectors | `marketplaces.ts` in `apps/maestro/src/core/` |
+| `buildDesc` and friends — ONE implementation | `text.ts` in `apps/maestro/src/core/` |
 | Shared UI primitives | `packages/ui/src/` |
 | Consuming prompt | `plugins/ai-tools-manager/skills/create-<name>/SKILL.md` |
 | Shared prompt contract the four SKILL.md link to | `docs/ai-tools-create-shared.md` |
@@ -120,7 +120,7 @@ app can see but cannot reach.
 | Add a field to a form | the route's zod schema **and** `scaffold.ts` **and** the prompt builder in `claude-preview.ts` **and** the matching `SKILL.md` — all four must agree on the payload shape |
 | Change validation rules | the zod schema at the top of the route |
 | Change the live preview | the `<name>-preview.tsx` component |
-| Change the description algorithm | `text.ts` in `@repo/maestro-core` — affects skill & subagent, preview and file, at once |
+| Change the description algorithm | `text.ts` in `src/core` — affects skill & subagent, preview and file, at once |
 | Change keyboard shortcuts | the route's `SHORTCUT_SECTIONS` and `create-shell.tsx` |
 | Add a new shared UI primitive | new file in `packages/ui/src/`, then an export in `packages/ui/package.json` |
 | Add a new create-* flow | new route + a `scaffold*` function + a preview builder + a `SKILL.md`; wire it into the Create menu in `top-nav.tsx` |
@@ -130,7 +130,7 @@ app can see but cannot reach.
 - **Don't change the payload in just one place.** A field rename must hit the form schema, the
   scaffold, the prompt builder, *and* the consuming `SKILL.md` — otherwise data silently drops.
 - **Preview and scaffold must resolve the same path.** Both go through `resolveCreateTarget` in
-  `@repo/maestro-core`, and the confirmation dialog names the file it returns. A second resolution
+  `src/core`, and the confirmation dialog names the file it returns. A second resolution
   anywhere — a path computed in the renderer, a `path.join` inlined into a prompt builder — makes the
   modal describe a file other than the one on disk, and the user is consenting to the wrong thing.
   `test/create-preview.test.ts` and `test/scaffold.test.ts` in that package compare the two.
@@ -138,7 +138,7 @@ app can see but cannot reach.
   `description:` frontmatter; the form's preview shows it before the file exists and the node-side
   scaffold writes it after. Two implementations means a preview that silently stops matching the
   file, and it looks fine right up until someone edits one of them. Import the **subpath**
-  (`@repo/maestro-core/text`) — the barrel re-exports `fs`. `test/isolation.test.ts` fails on a
+  (`src/core/text.ts`) — that module, never the `src/core/index.ts` barrel, which re-exports `fs`. `test/isolation.test.ts` fails on a
   re-implementation anywhere under `src/renderer`.
 - **The prompt is prose, never `/create-skill`.** A slash command in a headless run would re-enter
   the skill from the top instead of finishing the scaffold — and historically it fired the plugin's
@@ -148,7 +148,7 @@ app can see but cannot reach.
 - **`claude:run` takes a token and nothing else.** The bridge's guarantee — the only executable
   prompts are ones the user was shown — comes from the run channel having no argument that could
   describe a different run. A preload that "helpfully" forwarded the prompt or argv alongside the
-  token reopens that in a diff that reads as a convenience, and every test in `@repo/maestro-core`
+  token reopens that in a diff that reads as a convenience, and every test in `src/core`
   still passes, because none of them can see that side of the wire. `test/isolation.test.ts` pins
   the call to `invoke(IPC.claudeRun, token)`.
 - **A create-\* run's working directory is not always the open project.** A skill written into a

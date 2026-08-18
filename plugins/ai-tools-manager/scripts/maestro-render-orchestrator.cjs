@@ -6,7 +6,7 @@
 //   node maestro-render-orchestrator.cjs [projectDir]
 //
 // Invoked by the /maestro-install and /maestro-update skills. The desktop app does the same job
-// in-process via render.ts in @repo/maestro-core, so a save there needs no shell-out.
+// in-process via render.ts in apps/maestro/src/core, so a save there needs no shell-out.
 
 const fs = require("fs");
 const path = require("path");

@@ -6,7 +6,7 @@ import { buildDesc, clip, titleFromName } from "../utils/text";
  * The SKILL.md as it will be written, updating on every keystroke.
  *
  * `buildDesc` and `clip` are the SAME functions the node-side scaffold writes the frontmatter with
- * (`@repo/maestro-core/text`, re-exported by ../utils/text). That is not a tidiness point: this
+ * (`src/core/text.ts`, re-exported by ../utils/text). That is not a tidiness point: this
  * pane is the user's only sight of the `description:` before it lands, and a second implementation
  * of it here would be a preview that can drift from the file.
  */

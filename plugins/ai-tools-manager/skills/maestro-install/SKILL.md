@@ -111,7 +111,7 @@ Known limitation: if two instances of the same agent appear in one workflow, the
 
 ## Notes
 
-- **The seed is deterministic node, not prose.** `maestro-install.js` requires `lib/maestro-seed.cjs`, generated from `defaultV3Config` in `@repo/maestro-core` — the same function the desktop app seeds a fresh canvas with. Don't reproduce the graph in this prompt; a hand-written copy would drift from the app's the first time either changes.
+- **The seed is deterministic node, not prose.** `maestro-install.js` requires `lib/maestro-seed.cjs`, generated from `defaultV3Config` in `apps/maestro/src/core` — the same function the desktop app seeds a fresh canvas with. Don't reproduce the graph in this prompt; a hand-written copy would drift from the app's the first time either changes.
 - Re-running `/maestro-install` is safe: scaffolding is idempotent, a present `maestro.md` is never overwritten, and a present `maestro.json` is never re-seeded. To pick up plugin script updates on an installed project, prefer `/maestro-update`.
 - **This is not an editor.** It produces a starting graph, not the user's graph. Anything beyond the seed — adding a workflow, moving a node, promoting a skill to auto-loaded, assigning rules — is the desktop app's canvas or a hand-edit followed by `/maestro-update`.
 - Instances are project-scoped and may appear in multiple workflows; the hook uses the active workflow from `maestro_session.json`. An unplaced instance is harmless.

@@ -8,9 +8,10 @@
 //
 // Type-only: no runtime imports, so the renderer can use these types without pulling node in.
 
-// Imported from the `/contracts` subpath, NOT the package barrel. The barrel re-exports fs,
-// child_process, and import.meta.dirname; pulling a type from it would drag all of that into
-// the renderer's type graph. `/contracts` is interfaces only.
+// Imported from `../core/contracts.js`, NOT `../core/index.js`. The barrel re-exports fs and
+// child_process; pulling a type from it would drag all of that into the renderer's type graph.
+// `contracts.ts` is interfaces only. One word apart in an import line, so test/isolation.test.ts
+// asserts nothing under src/{shared,preload,renderer} reaches past the renderer-safe modules.
 import type {
   MaestroConfigV3,
   MaestroInstanceV3,
@@ -40,7 +41,7 @@ import type {
   CreateRequest,
   MarketplaceEntry,
   ScaffoldResult,
-} from "@repo/maestro-core/contracts";
+} from "../core/contracts.js";
 
 export type {
   MaestroConfigV3,
@@ -241,7 +242,7 @@ export interface MaestroApi {
    * `preview` builds the prompt from a REQUEST — never from prompt text the renderer supplies —
    * and hands back the exact argv, the working directory, what may be written, whether the CLI
    * was found, and a single-use token. It cannot spawn: the main-process module behind it imports
-   * no child_process, and a test in `@repo/maestro-core` walks its import graph to keep it that way.
+   * no child_process, and `test/core/claude.test.ts` walks its import graph to keep it that way.
    *
    * `run` takes that token and NOTHING ELSE, so there is no argument by which a caller could make
    * the run differ from the preview the user confirmed. The property this buys is that the only

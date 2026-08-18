@@ -21,8 +21,8 @@ import {
   runtimeAssets,
   findUpPluginRoot,
   HOOK_REGISTRATIONS,
-} from "../src/install.js";
-import { writeConfig } from "../src/config.js";
+} from "../../src/core/install.js";
+import { writeConfig } from "../../src/core/config.js";
 import { defaultish } from "./fixtures/configs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));

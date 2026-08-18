@@ -26,9 +26,11 @@ const ELECTRON_EXTERNAL = ["electron"];
 
 export default defineConfig({
   main: {
-    // @repo/maestro-core is a workspace source package, so it must be BUNDLED rather than
-    // externalized — there is no built artifact for `require` to resolve at runtime.
-    plugins: [externalizeDepsPlugin({ exclude: ["@repo/maestro-core", "@repo/claude-fs"] })],
+    // @repo/claude-fs is a workspace source package, so it must be BUNDLED rather than
+    // externalized — there is no built artifact for `require` to resolve at runtime. (The node-side
+    // Maestro logic it serves used to be a second such package; it is `src/main/../core` now, which
+    // is ordinary app source and bundled without asking.)
+    plugins: [externalizeDepsPlugin({ exclude: ["@repo/claude-fs"] })],
     build: {
       rollupOptions: {
         external: ELECTRON_EXTERNAL,

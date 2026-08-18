@@ -5,7 +5,7 @@ Scaffolds a new plugin marketplace: creates the directory structure, `marketplac
 ## How it works
 
 1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Marketplace** from the top bar and fills the form (name, description, owner name/email, optional homepage, target directory, private-repo flag).
-2. On submit the route calls `scaffoldMarketplace` in `@repo/maestro-core`, writing the `marketplace.json` manifest and a starter `README.md` under `targetDir`.
+2. On submit the route calls `scaffoldMarketplace` in `apps/maestro/src/core`, writing the `marketplace.json` manifest and a starter `README.md` under `targetDir`.
 3. A new marketplace still needs docs, so the route builds a prose prompt carrying the payload and the scaffold result, shows it in full for confirmation, and runs it through `claude -p`. This file (`SKILL.md`) is what that prompt asks Claude to follow.
 4. Invoked directly in a session instead (`/create-marketplace`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 

@@ -18,9 +18,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { scaffoldCreate, resolveCreateTarget, validateCreateRequest } from "../src/scaffold.js";
-import { listMarketplaces, marketplacePath } from "../src/marketplaces.js";
-import type { CreateRequest } from "../src/contracts.js";
+import { scaffoldCreate, resolveCreateTarget, validateCreateRequest } from "../../src/core/scaffold.js";
+import { listMarketplaces, marketplacePath } from "../../src/core/marketplaces.js";
+import type { CreateRequest } from "../../src/core/contracts.js";
 
 let tmp: string;
 let home: string;

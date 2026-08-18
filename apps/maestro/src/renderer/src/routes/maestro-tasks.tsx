@@ -19,7 +19,7 @@ export const Route = createFileRoute("/maestro-tasks")({
 /**
  * The paste-into-your-own-session prompt.
  *
- * The bridge builds the same sentence in `@repo/maestro-core`'s `claude-preview.ts` for the
+ * The bridge builds the same sentence in `src/core/claude-preview.ts` for the
  * executable path, deliberately not shared from here: the renderer must not be the source of a
  * prompt the main process will run. Copying it and running it must produce the same session, so
  * the two stay in step — change one, change the other.

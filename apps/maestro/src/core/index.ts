@@ -1,8 +1,12 @@
-// @repo/maestro-core — all node-side Maestro logic, framework-free.
+// The barrel for src/core — all node-side Maestro logic, framework-free.
 //
-// Consumed by the Maestro desktop app's main process (over IPC) and, for the two pure modules,
-// re-bundled to CJS for the plugin's standalone Claude Code hook scripts. Nothing here imports
-// React, TanStack, or Electron.
+// Imported by the app's main process (which exposes it over IPC) and, for the pure modules,
+// re-bundled to CJS for the plugin's standalone Claude Code hook scripts by
+// scripts/build-plugin-libs.mjs. Nothing here imports React, TanStack, or Electron.
+//
+// This barrel is MAIN-PROCESS ONLY: it re-exports modules that import fs and child_process. The
+// renderer-safe surface is ./contracts.js (types) and ./text.js (pure string helpers), and
+// test/isolation.test.ts fails if anything under src/{shared,preload,renderer} reaches past them.
 
 export type {
   MaestroConfigV3,
@@ -78,7 +82,8 @@ export {
   discoverVibeRules,
   hasVibeRules,
   parseVibeList,
-  defaultBundledAgentsDir,
+  findUpBundledAgents,
+  BUNDLED_AGENTS_REL,
   type DiscoveredDefinition,
   type ProjectRule,
   type TreeNode,
@@ -143,7 +148,7 @@ export {
   type MarketplaceOptions,
 } from "./marketplaces.js";
 
-// The deterministic half of the create-* flows. `@repo/maestro-core/text` is the renderer's half —
+// The deterministic half of the create-* flows. `./text.js` is the renderer's half —
 // the same `buildDesc`/`clip` the scaffold writes with, so a form's live preview and the file that
 // lands cannot disagree.
 export {

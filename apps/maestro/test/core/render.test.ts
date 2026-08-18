@@ -12,10 +12,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { renderOrchestrator, handoffTable, successPath } from "../src/render.js";
-import { writeConfig, readConfig, serializeConfig, mergeSlice, blankConfig } from "../src/config.js";
+import { renderOrchestrator, handoffTable, successPath } from "../../src/core/render.js";
+import { writeConfig, readConfig, serializeConfig, mergeSlice, blankConfig } from "../../src/core/config.js";
 import { allConfigs, defaultish } from "./fixtures/configs.js";
-import type { MaestroConfigV3 } from "../src/types.js";
+import type { MaestroConfigV3 } from "../../src/core/types.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const LEGACY_DIR = path.join(here, "fixtures", "legacy");

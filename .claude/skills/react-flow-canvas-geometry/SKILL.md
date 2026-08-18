@@ -24,7 +24,7 @@ import { getBezierPath, getBezierEdgeCenter, getSmoothStepPath, getStraightPath,
 ```
 
 Reimplement **only** when the code cannot depend on React Flow — a framework-free package that
-decides geometry ahead of render, like `packages/maestro-core` computing seeded `label_offset`
+decides geometry ahead of render, like `apps/maestro/src/core` computing seeded `label_offset`
 values. If you are in that position, go to *Checking a reimplementation* below before you trust it.
 
 ## Where the label goes
@@ -73,7 +73,7 @@ the library in 51.6% of cases**. In the real graph that produced this skill, a b
 span, enough to put a label inside a node.
 
 **This is why spot-checking two labels in a rendered window proves nothing.** It is a real bug that
-cost a debugging cycle in `packages/maestro-core/src/label-layout.ts`.
+cost a debugging cycle in `apps/maestro/src/core/label-layout.ts`.
 
 ### Checking a reimplementation
 
@@ -138,7 +138,7 @@ the open space past the last one — and centre the element in one. Clearance th
 the exact quantity, never on the guessed one. Let the height model decide only *which* free slot
 in the lane, where being 20px out is cosmetic.
 
-`packages/maestro-core/src/label-layout.ts` is the worked example; its test runs every case against
+`apps/maestro/src/core/label-layout.ts` is the worked example; its test runs every case against
 four different height models precisely because the placement's claim is that height cannot matter.
 
 ## Moving a label, and bending the edge to follow

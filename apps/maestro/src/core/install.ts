@@ -46,7 +46,7 @@ const PLUGIN_REL = path.join("plugins", "ai-tools-manager");
  * Walk up from `start` looking for the plugin directory that holds the runtime files.
  *
  * Same reasoning as `findUpBundledAgents` in ./discovery.ts: this module runs from
- * `packages/maestro-core/src/` under vitest and from `apps/maestro/out/main/index.js` once
+ * `apps/maestro/src/core/` under vitest and from `apps/maestro/out/main/index.js` once
  * electron-vite has bundled it, which are different depths — a fixed `../../..` silently resolves
  * to the wrong place. Exported so a test can drive it from an arbitrary depth.
  */
@@ -65,7 +65,7 @@ export function findUpPluginRoot(start: string): string | null {
  * The runtime files the app installs. Found by walking up to the monorepo root when running from
  * source or from a dev/build bundle; a packaged build ships the plugin inside its resources
  * directory, outside any such tree, and sets MAESTRO_PLUGIN_ROOT instead. Env-driven rather than
- * reading Electron's `process.resourcesPath`, so this package stays free of Electron.
+ * reading Electron's `process.resourcesPath`, so src/core stays free of Electron.
  */
 export function defaultPluginRoot(): string | null {
   const fromEnv = process.env.MAESTRO_PLUGIN_ROOT;

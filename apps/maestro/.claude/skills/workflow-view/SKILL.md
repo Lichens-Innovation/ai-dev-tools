@@ -7,7 +7,7 @@ description: "Explains how the /workflows view in the Maestro desktop app is bui
 
 The `/workflows` route (`src/renderer/src/routes/workflows.tsx`) is a visual editor for a project's agent workflows. The user picks which bundled subagents and project skills to make available (left pane), then wires reusable **workflow instances** (agent + skills) into an editable graph (center canvas). On save it persists the workflow slice of `.claude/maestro.json` (v3).
 
-It is the workflow half of the desktop app's config editor — the `/rules` route owns the other half, and the two share one `maestro.json`. Saving is a single IPC call with **no Claude session in the loop**: `config:save` → `saveConfig()` in `@repo/maestro-core` merges the slice, writes the file, re-renders the orchestrator's handoff table, and applies rule placements. See the `maestro-architecture` skill for what then reads that config at runtime.
+It is the workflow half of the desktop app's config editor — the `/rules` route owns the other half, and the two share one `maestro.json`. Saving is a single IPC call with **no Claude session in the loop**: `config:save` → `saveConfig()` in `src/core` merges the slice, writes the file, re-renders the orchestrator's handoff table, and applies rule placements. See the `maestro-architecture` skill for what then reads that config at runtime.
 
 ## Layout
 
@@ -55,7 +55,7 @@ WorkflowCanvas mirrors the active workflow into React Flow state (rfNodes/rfEdge
         │   instance edits go via onInstancesChange
         ▼ (Save workflows)
 submitMaestroConfig({ sliceType: "workflows", slice })
-  → window.maestro.config.save(...)  = IPC `config:save` → saveConfig() in @repo/maestro-core
+  → window.maestro.config.save(...)  = IPC `config:save` → saveConfig() in src/core
       1. merge the workflow slice into maestro.json (preserves `rules`) and write it
          (2-space indent, NO trailing newline — preserved so existing repos show no diff)
       2. re-render the orchestrator's Maestro:HANDOFFS table from it
@@ -67,7 +67,7 @@ submitMaestroConfig({ sliceType: "workflows", slice })
 
 Steps 2 and 3 are the ones that used to be Steps 3 and 4 of a `SKILL.md`: pure node, no model, but stranded on the host because the editor was in a container. There is no result file, no `aiToolsAction`, and no session between the canvas and the disk.
 
-**First-install seed.** When no `maestro.json` exists yet, the canvas does **not** open empty — main returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` plus six ready-made workflows (`default`, `tdd`, `Refactor`, `Documentation`, `Review`, `Tests`) with positioned nodes. `implAgents` is the **repo-detected** implementation chain (`detectImplAgents()` in `@repo/maestro-core`) — `["backend"]`, `["frontend"]`, `["backend","frontend"]`, and so on. It sets the happy-path implementation step and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent. The evidence behind the detection rides on the same payload and renders as `DetectedChain`, with chips to correct it (`data:reseed` rebuilds the seed around the corrected chain, in main, using the same `defaultV3Config`). `DetectedChain` renders **only while `seeded`** — once `maestro.json` exists, the chain is the user's saved answer and re-proposing one would be offering to overwrite their graph. A corrupt or wrong-version file falls back to the empty `blankV3Config()`.
+**First-install seed.** When no `maestro.json` exists yet, the canvas does **not** open empty — main returns `defaultV3Config(implAgents)`, which seeds the bundled agents as `workflow_instances` plus six ready-made workflows (`default`, `tdd`, `Refactor`, `Documentation`, `Review`, `Tests`) with positioned nodes. `implAgents` is the **repo-detected** implementation chain (`detectImplAgents()` in `src/core`) — `["backend"]`, `["frontend"]`, `["backend","frontend"]`, and so on. It sets the happy-path implementation step and, for fullstack, splits the reviewer/refactor code-FAIL conditions per agent. The evidence behind the detection rides on the same payload and renders as `DetectedChain`, with chips to correct it (`data:reseed` rebuilds the seed around the corrected chain, in main, using the same `defaultV3Config`). `DetectedChain` renders **only while `seeded`** — once `maestro.json` exists, the chain is the user's saved answer and re-proposing one would be offering to overwrite their graph. A corrupt or wrong-version file falls back to the empty `blankV3Config()`.
 
 The terminal path (`/maestro-install`) seeds the identical config from the identical function, via the generated `lib/maestro-seed.cjs` bundle — so a project seeded in a session and one seeded in the app are byte-for-byte the same.
 
@@ -86,13 +86,13 @@ Paths are relative to `apps/maestro/`.
 | Renderer-side loader + save wrappers over the IPC bridge                 | `src/renderer/src/utils/maestro.ts`                                        |
 | The typed channel contract                                               | `src/shared/ipc.ts` (`data:workflows`, `data:reseed`, `config:save`)       |
 | Main-process handlers (the only side that touches `fs`)                  | `src/main/ipc.ts`                                                          |
-| Read/merge/write, render, apply — all of it                              | `saveConfig()`, `seed.ts`, `render.ts`, `rules.ts` in `packages/maestro-core/` |
+| Read/merge/write, render, apply — all of it                              | `saveConfig()`, `seed.ts`, `render.ts`, `rules.ts` in `apps/maestro/src/core/` |
 | Bundled subagents (source of the Agents list)                            | `plugins/ai-tools-manager/agents/*.md`                                     |
 | Project skills (source of the Skills list)                               | `<projectRoot>/.claude/skills/*/SKILL.md`                                  |
 
 ## The data model (MaestroConfigV3)
 
-The whole view edits one object. The types are re-exported by `src/renderer/src/utils/maestro.ts` from `@repo/maestro-core/contracts` — the **subpath**, never the package barrel, which re-exports `fs` and `child_process`:
+The whole view edits one object. The types are re-exported by `src/renderer/src/utils/maestro.ts` from `src/core/contracts.ts` — that **module**, never the `src/core/index.ts` barrel, which re-exports `fs` and `child_process`:
 
 ```ts
 MaestroConfigV3 {
@@ -118,7 +118,7 @@ Key points:
 
 ## Left pane (workflows.tsx)
 
-- **Agents** checkboxes come from `bundledAgents` — read from `plugins/ai-tools-manager/agents/*.md` frontmatter by `discoverAgents()` in `@repo/maestro-core`, in the main process. Toggling edits `config.agents_available`. `＋ Agent` `window.prompt`s for a manual id (for agents not bundled).
+- **Agents** checkboxes come from `bundledAgents` — read from `plugins/ai-tools-manager/agents/*.md` frontmatter by `discoverAgents()` in `src/core`, in the main process. Toggling edits `config.agents_available`. `＋ Agent` `window.prompt`s for a manual id (for agents not bundled).
 - **Skills** checkboxes come from `projectSkills` — read from `<projectRoot>/.claude/skills/*/SKILL.md` by `discoverSkills()`, likewise in main. Toggling edits `config.skills_available` (a plain `string[]` of skill ids). `＋ Skill` prompts for a manual id.
 - `skills_available` is the menu of skills the canvas can attach to instances — only a skill checked here can be attached.
 - **Save workflows** → `handleSubmit` → `submitMaestroConfig` → `router.invalidate()`. On success the page fires a `toast` (`@repo/ui/toast`) naming what changed on disk and **stays on the canvas** — the window is long-lived and the user saves repeatedly, so there is no terminal success view.
@@ -182,7 +182,7 @@ The centered control drives `config.workflows` through a custom dropdown (hand-r
 
 ## Persistence (submitMaestroConfig)
 
-Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`, over `config:save`. Main hands it to `saveConfig()` in `@repo/maestro-core`, which reads the existing `maestro.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `<projectRoot>/.claude/maestro.json`, re-renders the orchestrator's `Maestro:HANDOFFS` table, and applies the rule placements. The `SaveResult` comes back with the rendered success paths and the rule summary, which is what the toast reports.
+Saving sends only the **workflow slice** (`agents_available`, `skills_available`, `workflow_instances`, `workflows`) with `sliceType: "workflows"`, over `config:save`. Main hands it to `saveConfig()` in `src/core`, which reads the existing `maestro.json`, overwrites just those fields (so `/rules`' `rules` survive), writes `<projectRoot>/.claude/maestro.json`, re-renders the orchestrator's `Maestro:HANDOFFS` table, and applies the rule placements. The `SaveResult` comes back with the rendered success paths and the rule summary, which is what the toast reports.
 
 The route then calls `router.invalidate()` on the success path, after the `!res.ok` bail-out. A save is neither a navigation nor a project switch, so without it the loader data stays pinned at its load-time value and the `seeded` banner keeps telling the user their config is unsaved while it sits on disk. This is safe only because `seedWorkflowStore` bails on an unchanged `projectRoot` — re-running the loader cannot discard in-flight edits.
 

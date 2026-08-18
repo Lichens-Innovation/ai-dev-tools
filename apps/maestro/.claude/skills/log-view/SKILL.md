@@ -109,11 +109,11 @@ Renderer paths are relative to `apps/maestro/`.
 | **The tail itself** — polls the JSONL, pushes `log:init`/`log:entry`/`log:reset` | `src/main/ipc.ts` |
 | The typed channel contract | `src/shared/ipc.ts` (`log:subscribe`, `log:unsubscribe`, and the three push channels) |
 | App-wide subscriber: `SessionLogProvider`, `useSessionLog()` | `src/renderer/src/utils/session-log-context.tsx` |
-| `parseLogLines` + `readSessionLog` | `session-log.ts` in `packages/maestro-core/` |
-| The `SessionLogEntry` shape crossing the wire | `contracts.ts` in `packages/maestro-core/`, re-exported by `src/shared/ipc.ts` |
+| `parseLogLines` + `readSessionLog` | `session-log.ts` in `apps/maestro/src/core/` |
+| The `SessionLogEntry` shape crossing the wire | `contracts.ts` in `apps/maestro/src/core/`, re-exported by `src/shared/ipc.ts` |
 | Pure transforms `buildInstances` + `humanizeLog` + `parseSkillsTriage` + `unaccountedSkills` + `Instance`/`SkillsTriage` types | `src/renderer/src/utils/session-log.ts` |
 | Top bar — nav links incl. `ScrollText` + global `●` live dot | `src/renderer/src/components/top-nav.tsx` |
-| `titleFromName` — origin string → display name | `src/renderer/src/utils/text.ts` (re-export of `@repo/maestro-core/text`) |
+| `titleFromName` — origin string → display name | `src/renderer/src/utils/text.ts` (re-export of `src/core/text.ts`) |
 | Yellow color tokens (`--yellow`, `--yellow-dim`) | `packages/styles/scss/abstracts/_tokens.scss` |
 | **Writer — tool-call entries** (PreToolUse, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-session-log.js` |
 | **Writer — dispatch + handoff entries** (SubagentStart/Stop, matcher `.*`) | `plugins/ai-tools-manager/scripts/maestro-subagent-log.js` |
@@ -304,7 +304,7 @@ The plain tool-call log from `maestro-session-log.js` has **no outcome data** �
 - **There is no loader; the first paint is empty.** The provider starts with `entries: []` until main's `init` push arrives, so navigating to the route shows a brief empty state — acceptable for a debugging tool, and the alternative is a loader that races the subscription.
 - **Instances segment by origin change.** The same agent appearing twice in the log produces two steps — that's intentional (second run = second step). Parallel subagents would interleave their tool-call lines, fragmenting into many steps. Maestro runs subagents sequentially, so this is normally not an issue in practice. `agent_id` correlation keeps input↔output paired correctly even in edge-case interleaving.
 - **`humanizeLog` returns `null` for bare `Agent`/`Task(...)` lines.** These PreToolUse entries capture the tool dispatch from the main session, but the richer `kind:"dispatch"` entry from `maestro-subagent-log.js` covers the same event more informatively. The nulls are intentionally filtered in `session-log-view.tsx`. Do not "fix" them.
-- **`session-log.ts` must remain node-free.** It is renderer code. All `fs`/`path` work belongs in `src/main/`; `test/isolation.test.ts` fails the build on a `node:` builtin, a `@repo/claude-fs` import, or a `@repo/maestro-core` **barrel** import anywhere outside `src/main/` — the barrel re-exports `fs` and `child_process`, so type-only imports must use a subpath like `@repo/maestro-core/contracts`.
+- **`session-log.ts` must remain node-free.** It is renderer code. All `fs`/`path` work belongs in `src/main/`; `test/isolation.test.ts` fails the build on a `node:` builtin, a `@repo/claude-fs` import, or an import of the `src/core/index.ts` **barrel** anywhere outside `src/main/` — the barrel re-exports `fs` and `child_process`, so type-only imports must name `src/core/contracts.ts` instead.
 - **`maestro-subagent-log.js` runs from the plugin dir, not the project copy.** Unlike `maestro-set-session-workflow.cjs` and `maestro-render-orchestrator.cjs` (which are copied into `.claude/scripts/` at install time), the SubagentStart/Stop scripts run directly from `${CLAUDE_PLUGIN_ROOT}/scripts/`. Editing `maestro-subagent-log.js` takes effect immediately for all projects. Adding or removing the hook registration in `hooks.json` requires a new Claude session to pick up.
 - **Large messages in `input`/`output`.** A spawning message that includes injected skills + handoff templates can be several kilobytes. The right detail panel sections are scrollable. The JSONL file stores the full messages; that's intentional for debugging fidelity.
 - **`--yellow` color token.** Added in `packages/styles/scss/abstracts/_tokens.scss` alongside `--green`/`--red`. Used for "unknown" status (subagent with no parseable HANDOFF line). Both light and dark mode variants exist.
