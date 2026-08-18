@@ -85,6 +85,32 @@ one on screen rather than silently replacing one list with another.
   The literal `writable: []` to replace is in `startPaneSession`'s `canUseTool` in
   `src/core/agent-sdk.ts`, where it is passed to `decidePaneCall`.
 
+### What `023` shipped, and why the write half of this slice is untouched by it
+
+`023` made the **read** scope mutable mid-session and deliberately stopped there, so the premise
+above survives verbatim — but four things underneath it moved, and building the accumulator on the
+old shapes will produce a header and a boundary that disagree.
+
+- **A grant is not a write scope, and cannot become one by accident.** `PaneVerdict`'s new
+  `grantable` flag is true **only** in the read-boundary branch: a refused write keeps Allow once /
+  Deny / Stop and never grows a grant button, because widening writes is this slice's job and nobody
+  else's. The `writable: []` literal is still there, still the only thing to replace.
+- **`readable` is a FUNCTION now (`readable()`), not an array captured at session start.** A grant
+  has to reach the hook and the disclosure both, so nothing may hold a snapshot. The write
+  accumulator needs the same property for the same reason — a form submitted mid-session must reach
+  the live `canUseTool`, not the list it closed over when the pane opened.
+- **`ReadScopeOrigin` has a fourth value, `"session"`**, and `SessionInfo` carries `grants:
+  SessionGrant[]`. So the header already renders a growing, per-origin list with per-entry controls;
+  the write scope should join that surface rather than opening a second panel beside it. `023`'s
+  three-step discipline is the one to copy: widen the enforcement input, tell the SDK, and re-derive
+  the disclosure — pushed as the new `{ kind: "scope" }` `SessionEvent`, which is also where an
+  announced write-scope addition belongs if it is not a transcript entry.
+- **`session:revoke` exists, and it is the shape a revocable write scope would take.** It carries a
+  path and is safe only because it can exclusively **remove** an entry main already holds. A channel
+  that could add one would hand the renderer the directory nomination `scaffold.ts` spent this whole
+  app forbidding — which is why the handoff must still pass a completed preview token, never a
+  resolved path.
+
 The existing headless finish stays available. The two paths differ in who is driving, not in what
 they are allowed to do — and since `018` that is literally true rather than aspirational: the
 headless finish is itself an SDK session running the same `decideWrite` over the same `writable`

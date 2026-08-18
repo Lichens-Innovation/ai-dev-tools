@@ -197,3 +197,56 @@ describe("a call the permission system auto-denied", () => {
     expect(bare.kind === "refusal" && bare.decidedBy).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHICH PROMPTS MAY OFFER A SESSION GRANT — and, more importantly, which may not.
+//
+// `grantable` is one boolean and it decides whether a prompt grows a button that permanently (for
+// the session) widens what the model can see. The dangerous direction is not "we forgot to offer
+// one": it is offering one on a WRITE prompt, where the user reads "allow this folder", presses it,
+// and widens the read scope from a question about writing. That is the accident `session-scope.ts`
+// was deliberately kept able to check write tools in order to make visible, so it is pinned here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("which prompts may offer a session grant", () => {
+  const outside = "/home/dev/.claude/skills/mine/SKILL.md";
+
+  it("offers one for a read the boundary stopped — the case it exists for", () => {
+    const verdict = decide("Read", { file_path: outside });
+    expect(verdict.outcome).toBe("ask");
+    if (verdict.outcome !== "ask") throw new Error("unreachable");
+    expect(verdict.grantable).toBe(true);
+    expect(verdict.target).toBe(outside);
+  });
+
+  it("offers one for an out-of-scope search too", () => {
+    const verdict = decide("Grep", { path: "/home/dev/.claude/skills", pattern: "*.md" });
+    expect(verdict.outcome === "ask" && verdict.grantable).toBe(true);
+  });
+
+  it("NEVER offers one on a write, however far outside the scope it is", () => {
+    // Widening writes is `022`'s. A grant button here would widen READS from a write prompt, which
+    // is both the wrong surface and the one the user did not think they were answering about.
+    for (const tool of ["Write", "Edit", "MultiEdit"]) {
+      const verdict = decide(tool, { file_path: outside, content: "x", new_string: "x" });
+      expect(verdict.outcome).toBe("ask");
+      expect(verdict.outcome === "ask" && verdict.grantable, `${tool} offered a grant`).toBe(false);
+    }
+  });
+
+  it("never offers one on a network call, which has no path to grant", () => {
+    for (const tool of PANE_ASK_TOOLS) {
+      const verdict = decide(tool, { url: "https://example.com/x", query: "x" });
+      expect(verdict.outcome === "ask" && verdict.grantable).toBe(false);
+    }
+  });
+
+  it("offers nothing for the call the boundary cannot check at all", () => {
+    // A bounded tool that named no path. The hook denies it outright rather than prompting, and if
+    // it ever did prompt there would be nothing named for a person to authorise.
+    const verdict = decidePaneCall({ tool: "Read", input: {}, writable: [], directories, cwd: project });
+    expect(verdict.outcome).toBe("ask");
+    expect(verdict.outcome === "ask" && verdict.grantable).toBe(false);
+    expect(verdict.outcome === "ask" && verdict.target).toBeNull();
+  });
+});

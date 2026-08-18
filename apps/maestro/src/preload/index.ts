@@ -84,11 +84,16 @@ const api: MaestroApi = {
     // this app's whole Claude surface is built to prevent.
     say: (id, text) => ipcRenderer.invoke(IPC.sessionSay, id, text),
     stop: (id) => ipcRenderer.invoke(IPC.sessionStop, id),
-    // The request id and one of three words. NOT a `PermissionResult`: its allow arm carries
+    // The request id and one of four words (with a grant's scope). NOT a `PermissionResult`: its
+    // allow arm carries
     // `updatedPermissions`, which can add allow rules, flip the permission mode or widen the read
     // scope permanently — and write any of that into the user's own settings files. Main builds
-    // the answer from this choice, exactly as it builds a prompt from a request above.
+    // the answer from this choice, exactly as it builds a prompt from a request above. A `grant`
+    // carries `file` or `directory` and NO PATH: main resolves it against the prompt being answered.
     answer: (id, requestId, choice) => ipcRenderer.invoke(IPC.sessionPermission, id, requestId, choice),
+    // Narrowing only — see MaestroApi.session.revoke. Main matches the path against the grants it
+    // already holds, so nothing here can open a directory that was not opened by an answered prompt.
+    revoke: (id, path) => ipcRenderer.invoke(IPC.sessionRevoke, id, path),
     end: () => ipcRenderer.invoke(IPC.sessionEnd),
     subscribe: (onEvent) => {
       const listener = (_e: unknown, event: SessionEvent) => onEvent(event);

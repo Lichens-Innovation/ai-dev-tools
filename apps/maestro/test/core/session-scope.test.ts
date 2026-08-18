@@ -14,7 +14,14 @@
 
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import { boundaryTargetOf, decideBoundary, BOUNDED_TOOLS, UNBOUNDED_TOOLS } from "../../src/core/session-scope.js";
+import {
+  boundaryTargetOf,
+  decideBoundary,
+  grantOptionFor,
+  grantOptionsFor,
+  BOUNDED_TOOLS,
+  UNBOUNDED_TOOLS,
+} from "../../src/core/session-scope.js";
 
 const project = "/home/dev/project";
 const marketplace = "/home/dev/marketplaces/mine";
@@ -142,5 +149,90 @@ describe("an empty scope", () => {
     expect(verdict.decision).toBe("out-of-scope");
     if (verdict.decision !== "out-of-scope") throw new Error("unreachable");
     expect(verdict.reason).toContain("nothing");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// "unless authorised" — what a PERSON could open in answer to one of those refusals.
+//
+// The boundary above is only half a boundary. A user authoring a skill will reasonably say "make it
+// like my existing one", and their own global skills live outside the project and outside every
+// marketplace; denying that outright is wrong and granting it silently is worse. What is tested
+// here is the offer, not the answer: which options exist, what each of them actually costs, and the
+// cases where offering anything at all would be wrong.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("what a person could grant", () => {
+  const skill = "/home/dev/.claude/skills/mine/SKILL.md";
+
+  it("offers the file and its directory, and they are different things", () => {
+    const options = grantOptionsFor(skill, false, directories);
+    expect(options.map((o) => o.scope)).toEqual(["file", "directory"]);
+    expect(options[0].path).toBe(skill);
+    expect(options[1].path).toBe("/home/dev/.claude/skills/mine");
+  });
+
+  it("names the path in each option, because the two are the same sentence otherwise", () => {
+    // The whole point of two buttons is that the user can see which one says the containing folder.
+    for (const option of grantOptionsFor(skill, false, directories)) {
+      expect(option.note).toContain(option.scope === "file" ? "SKILL.md" : "/home/dev/.claude/skills/mine");
+    }
+  });
+
+  it("offers a directory only as itself — never its parent", () => {
+    // Climbing to the parent of a directory the model asked about answers a question nobody asked,
+    // and the parent of `~/.claude/skills` is every piece of Claude configuration the user has.
+    const options = grantOptionsFor("/home/dev/.claude/skills", true, directories);
+    expect(options.map((o) => o.scope)).toEqual(["directory"]);
+    expect(options[0].path).toBe("/home/dev/.claude/skills");
+  });
+
+  it("offers nothing for a path already in scope", () => {
+    // A button that changes nothing is worse than no button: it reads as consent to something.
+    expect(grantOptionsFor(`${project}/src/index.ts`, false, directories)).toEqual([]);
+    expect(grantOptionsFor(project, true, directories)).toEqual([]);
+  });
+
+  it("offers nothing when there is no path to grant", () => {
+    // The call the hook still denies outright. There is nothing here for a person to authorise.
+    expect(grantOptionsFor("", false, directories)).toEqual([]);
+    expect(grantOptionsFor("relative/path.md", false, directories)).toEqual([]);
+  });
+
+  it("flags a shallow directory as broad rather than quietly offering it", () => {
+    // A home directory and a filesystem root are still offerable — the user may genuinely mean it —
+    // but never in the same visual weight as one more skill folder.
+    expect(grantOptionsFor("/home/dev/notes.md", false, directories)[1]).toMatchObject({
+      path: "/home/dev",
+      broad: true,
+    });
+    expect(grantOptionsFor("/home/dev", true, directories)[0].broad).toBe(true);
+    expect(grantOptionsFor("/home/dev/.claude/skills/mine", true, directories)[0].broad).toBe(false);
+  });
+
+  it("flags a directory that would swallow something already in scope, and names what", () => {
+    // `/home/dev/marketplaces` is three segments deep and looks ordinary; granting it opens the
+    // marketplace the session was already reading AND every other one beside it.
+    const option = grantOptionsFor("/home/dev/marketplaces/README.md", false, directories)[1];
+    expect(option).toMatchObject({ path: "/home/dev/marketplaces", broad: true });
+    expect(option.note).toContain(marketplace);
+  });
+
+  it("does not offer a directory that is already in scope beside a file that is not", () => {
+    // A file the boundary stopped inside a readable tree cannot happen today, but a `..`-shaped
+    // target can resolve to one — and the directory arm would then be a no-op button.
+    const options = grantOptionsFor("/home/dev/project/../project/x", false, directories);
+    expect(options).toEqual([]);
+  });
+
+  it("resolves an answer against the options that were published, and nothing else", () => {
+    const options = grantOptionsFor(skill, false, directories);
+    expect(grantOptionFor(options, "directory")?.path).toBe("/home/dev/.claude/skills/mine");
+    expect(grantOptionFor(options, "file")?.path).toBe(skill);
+    // A scope the prompt never offered grants nothing — which is what makes the wire's missing path
+    // safe rather than merely tidy.
+    expect(grantOptionFor([], "directory")).toBeNull();
+    expect(grantOptionFor(options, "everything")).toBeNull();
+    expect(grantOptionFor(options, undefined)).toBeNull();
   });
 });

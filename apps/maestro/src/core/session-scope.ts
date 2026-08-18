@@ -23,6 +23,7 @@
 
 import path from "node:path";
 import { withinDirectory } from "./read-scope.js";
+import type { SessionGrantOption } from "./contracts.js";
 
 /**
  * Tools whose reach is a filesystem path this module can check by inspecting `tool_input`.
@@ -156,4 +157,112 @@ export function decideBoundary({ tool, input, directories, cwd }: BoundaryInput)
         `Work with what is in scope, or ask the user to open the directory you need.`,
     };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE OTHER HALF OF THE BOUNDARY — "unless authorised".
+//
+// A refusal that cannot be overridden is not a boundary, it is a wall, and the case it gets wrong
+// is the ordinary one: a user authoring a skill says "make it like my existing one", and their own
+// global skills live outside the project and outside every marketplace. Denying that outright is
+// wrong; granting it silently is worse. So the boundary above gains a way to be widened BY A
+// PERSON, with three properties inherited from the decision this app already made once, for the
+// chat's confirmation opt-out: it defaults to asking, it dies with the session, and it is visible
+// and revocable from the header.
+//
+// This half is still pure. It decides WHAT COULD BE GRANTED — never whether anything is, which is
+// the user's answer, and never whether the path exists, which needs `fs` and belongs to the caller.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * How shallow a directory has to be before granting it is worth a second look.
+ *
+ * Two segments covers `/`, `/home`, `/home/alice`, `/Users/alice` and `C:\Users` — the filesystem
+ * root, the container of every user, and a whole home directory. Lexical on purpose: no `os`, no
+ * `fs`, nothing that makes this function answer differently on the machine it happens to run on.
+ */
+const BROAD_DEPTH = 2;
+
+/** Path segments, ignoring the leading separator and any trailing one. */
+function depthOf(dir: string): number {
+  return path
+    .resolve(dir)
+    .split(/[\\/]/)
+    .filter((s) => s !== "" && s !== ".").length;
+}
+
+/**
+ * What a person could grant in answer to one out-of-scope read.
+ *
+ * `isDirectory` is the caller's answer, because it is the one thing here that needs the disk. It
+ * decides the shape of the offer rather than merely its wording:
+ *
+ *   • **A file** gets two options — the file itself, and the directory containing it. That is the
+ *     difference the prompt has to make obvious: one of them is `~/.claude/skills/foo/SKILL.md` and
+ *     the other is every skill the user has ever written.
+ *   • **A directory** gets one. "Just this file" is not a thing to offer about a directory, and
+ *     climbing to its parent instead would answer a question nobody asked.
+ *
+ * Returns EMPTY when there is nothing to grant: no path (the uncheckable call the hook still
+ * denies), or a path already inside the scope, which would be a button that changes nothing.
+ */
+export function grantOptionsFor(
+  target: string,
+  isDirectory: boolean,
+  directories: readonly string[]
+): SessionGrantOption[] {
+  const resolved = String(target ?? "").trim();
+  if (resolved === "" || !path.isAbsolute(resolved)) return [];
+  if (directories.some((dir) => withinDirectory(dir, resolved))) return [];
+
+  const options: SessionGrantOption[] = [];
+
+  if (isDirectory) {
+    options.push(directoryOption(resolved, directories));
+  } else {
+    options.push({
+      scope: "file",
+      path: resolved,
+      label: "Allow this file",
+      note: `Only ${path.basename(resolved)}, and only until this session ends. Nothing else in ${path.dirname(resolved)} becomes readable.`,
+      broad: false,
+    });
+    const parent = path.dirname(resolved);
+    // At the filesystem root the two options would name the same tree, and a second button that
+    // does the same thing as the first is how a prompt stops being read.
+    if (parent !== resolved && !directories.some((dir) => withinDirectory(dir, parent))) {
+      options.push(directoryOption(parent, directories));
+    }
+  }
+
+  return options;
+}
+
+/** The directory arm of the offer, with the sentence that says how much of the disk it is. */
+function directoryOption(dir: string, directories: readonly string[]): SessionGrantOption {
+  const shallow = depthOf(dir) <= BROAD_DEPTH;
+  // A directory that CONTAINS something already in scope is not "one more directory": granting it
+  // swallows the project (or a marketplace) and everything beside it on the way.
+  const swallows = directories.filter((existing) => existing !== "" && withinDirectory(dir, existing));
+  const broad = shallow || swallows.length > 0;
+
+  return {
+    scope: "directory",
+    path: dir,
+    label: "Allow this folder",
+    note: broad
+      ? `EVERYTHING under ${dir} becomes readable for the rest of this session` +
+        (swallows.length > 0 ? `, including ${swallows.join(", ")} and whatever else sits beside it.` : ".") +
+        " That is a lot more than the file that was asked about."
+      : `Everything under ${dir} becomes readable, until this session ends.`,
+    broad,
+  };
+}
+
+/** Pick the option a `{ choice: "grant", scope }` answer names. Null when the prompt offered none. */
+export function grantOptionFor(
+  options: readonly SessionGrantOption[],
+  scope: string | null | undefined
+): SessionGrantOption | null {
+  return options.find((option) => option.scope === scope) ?? null;
 }

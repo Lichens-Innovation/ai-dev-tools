@@ -34,6 +34,21 @@ is the run, the smoke query and the settings resolution alike), and a resume tha
 recorded session's sources would reopen both doors `[]` closes — a permissions widening, and an
 `ANTHROPIC_API_KEY` in a settings file redirecting the bill off the subscription.
 
+**`023` settled half of that probe in advance, and the half it settled is the reassuring one.** The
+`PreToolUse` boundary hook runs *before* the CLI's permission system, so whatever a resume restores
+into the permission system, the hook is still the authority over what the session may read — that is
+the same property that makes `session:revoke` work at all, since the SDK has no API for withdrawing a
+`PermissionUpdate`. What still has to be probed is `settingSources`, and whether a resumed session's
+recorded `cwd` displaces the pane's. The boundary is anchored to `request.cwd`, and `023` pinned that
+it does not follow a working directory that moves.
+
+**A resumed session starts with no grants, and that is correct rather than an omission.** Session
+grants live on main's per-window `LiveSession` entry, die with it on every teardown path, and are
+written nowhere — so there is nothing on disk for a resume to restore, and a path the terminal
+session read freely raises a prompt on the first turn in the pane. That belongs in the disclosure
+this task already requires: what the imported transcript already read is exactly the set the pane
+will now start asking about.
+
 A long transcript is replayed as context on the first turn, so resuming is not free. Show the user
 what they are picking up before they pick it up.
 

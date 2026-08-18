@@ -82,6 +82,20 @@ export type PaneVerdict =
       denyReason: string;
       target: string | null;
       detail: PermissionDetail;
+      /**
+       * The user may be offered more than "allow this one call" — a session grant on `target`.
+       *
+       * TRUE ONLY FOR A READ THE BOUNDARY STOPPED, and the narrowness is the point. A refused WRITE
+       * is not grantable here: the write scope is `022`'s to grow, and offering a "grant the folder"
+       * button on a write prompt is precisely how widening writes would widen reads by accident —
+       * the mistake `session-scope.ts` was kept able to check write tools in order to make visible.
+       * A network call is not grantable either; there is no path in it to grant.
+       *
+       * This flag says a grant is IN ORDER, not what it would be: resolving the options needs to
+       * know whether `target` is a file or a directory, which needs the disk, which this module does
+       * not touch. `grantOptionsFor` in `session-scope.ts` does that half.
+       */
+      grantable: boolean;
     };
 
 /** A reason that is never empty. An unexplained refusal is a bare "denied", which steers nothing. */
@@ -203,6 +217,9 @@ export function decidePaneCall({ tool, input, writable, directories, cwd }: Pane
         `and say what you would have looked up if it matters.`,
       target: target.kind === "fetch" ? target.url : null,
       detail: target,
+      // Nothing to grant: the "path" here is a URL, and a session-scoped directory has no bearing
+      // on whether the project's contents may leave the machine.
+      grantable: false,
     };
   }
 
@@ -217,6 +234,10 @@ export function decidePaneCall({ tool, input, writable, directories, cwd }: Pane
       denyReason: verdict.reason,
       target: verdict.path || null,
       detail: detail(),
+      // THE ONE BRANCH THAT CAN BE GRANTED. A read stopped by the boundary names a path the user
+      // can meaningfully open, and `verdict.path` is empty only for the call the hook denies
+      // outright — where there is nothing to authorise in the first place.
+      grantable: verdict.path !== "",
     };
   }
 
@@ -236,6 +257,10 @@ export function decidePaneCall({ tool, input, writable, directories, cwd }: Pane
     denyReason: decision.message,
     target: resolved,
     detail: detail(),
+    // A WRITE IS NEVER GRANTABLE HERE. Widening the write scope is `022`'s, and the boundary this
+    // module composes bounds READS — so a "grant this folder" button on a write prompt would either
+    // do nothing the user expects or widen the wrong surface. Both are worse than one more prompt.
+    grantable: false,
   };
 }
 

@@ -58,7 +58,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { cliNotFoundMessage, resolveClaudeCli, claudeChildPath, type ResolveOptions } from "./claude-cli.js";
 import { decideWrite, targetPathOf, READ_ONLY_TOOLS } from "./write-scope.js";
-import { decideBoundary } from "./session-scope.js";
+import { decideBoundary, grantOptionsFor } from "./session-scope.js";
 import { autoRefusal, decidePaneCall, permissionReason, PANE_ASK_TOOLS } from "./session-permission.js";
 import { createPermissionRegistry } from "./permission-registry.js";
 import type {
@@ -752,6 +752,30 @@ export interface PaneSession {
    * second click on a prompt already answered. Both are ordinary, and neither may park anything.
    */
   answer(requestId: string, answer: PermissionAnswer): boolean;
+  /**
+   * Widen what this session may read, for as long as it lasts.
+   *
+   * THE BOUNDARY'S HALF OF A GRANT, and it is not the same half as `updatedPermissions`. That field
+   * tells the CLI's own permission system to stop prompting; this tells the `PreToolUse` hook to
+   * stop routing the path into a prompt in the first place. Both are needed and neither substitutes
+   * for the other: the hook runs first and would otherwise ask again forever, and the permission
+   * system runs after and would otherwise refuse what the hook waved through.
+   *
+   * Returns the paths that were actually new. Nothing here reaches the disk, and nothing survives
+   * `close()` — the list lives in this closure.
+   */
+  grant(paths: readonly string[]): string[];
+  /**
+   * Take a grant back.
+   *
+   * The hook is the authority, which is what makes this work at all: the SDK has no API for
+   * withdrawing a `PermissionUpdate`, but a path the hook no longer recognises is routed into a
+   * prompt again on the next call, and the permission system never gets to answer for it. So
+   * revoking narrows the boundary even though the session-scoped update stays where it was.
+   */
+  revoke(path: string): boolean;
+  /** Everything a person has granted, in force right now. Ordered as granted. */
+  granted(): string[];
   /** Request ids still waiting on a person, so a reconnecting UI can re-render them. */
   pendingPermissions(): string[];
   /**
@@ -813,7 +837,18 @@ function humanTurn(text: string): {
  */
 export function startPaneSession(request: PaneSessionRequest): PaneSession {
   const { env } = agentChildEnv(request.envOptions);
-  const readable = [request.cwd, ...request.additionalDirectories];
+
+  /**
+   * What a PERSON opened, mid-session, by answering a prompt.
+   *
+   * `020` resolved the readable set once and handed the same array to the hook and the disclosure.
+   * This is the first thing in the app that makes it move, so it stopped being an array and became
+   * a function: every check reads `readable()`, and there is no captured copy anywhere that could
+   * go on answering the old question. It dies with this closure — no file is written, and nothing
+   * carries it into the next session.
+   */
+  const granted: string[] = [];
+  const readable = (): string[] => [request.cwd, ...request.additionalDirectories, ...granted];
 
   let seq = 0;
   const emit = (event: SessionEventBody): void => request.emit({ ...event, seq: ++seq } as SessionEvent);
@@ -848,6 +883,21 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
 
   /** Last-resort key for a CLI too old to send `requestId`. Ascending, so it cannot collide. */
   let askSeq = 0;
+
+  /**
+   * Is this path a directory ON DISK? The one question about a grant that needs the filesystem.
+   *
+   * It decides the SHAPE of the offer, not just its wording — a file is offered as itself or as its
+   * containing directory, a directory only as itself. Anything unreadable or absent answers `false`
+   * and is treated as a file, which is the narrower of the two and the right way to be wrong.
+   */
+  const isDirectory = (target: string): boolean => {
+    try {
+      return fs.statSync(target).isDirectory();
+    } catch {
+      return false;
+    }
+  };
 
   /** The hook output that routes a call into the prompt instead of answering it. */
   const askHook = (reason: string) => ({
@@ -941,7 +991,10 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                     const verdict = decideBoundary({
                       tool,
                       input: toolInput,
-                      directories: readable,
+                      // Read fresh on EVERY call. A session grant widens this between one tool call
+                      // and the next, and a list captured when the session started would go on
+                      // stopping a path the user has already opened.
+                      directories: readable(),
                       cwd: request.cwd,
                     });
                     if (verdict.decision === "allow") return {};
@@ -985,6 +1038,68 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                 ],
               },
             ],
+            // ── THE OTHER DOORS ────────────────────────────────────────────
+            // A permission prompt is not the only way the read scope can move, and the other ways
+            // do not go through `canUseTool` at all: a directory added to the CLI's own working
+            // roots, and the working directory moving underneath the whole session. Neither reaches
+            // this app's boundary — `readable()` is ours and only a grant adds to it — so the
+            // failure they cause is not an open door, it is a SILENT DISAGREEMENT: the CLI thinks a
+            // tree is in scope, the hook goes on asking about it, and nothing says why. These two
+            // handlers are the "and is surfaced" half. They are boundary events, not log lines.
+            //
+            // MEASURED IN THE WINDOW, and narrower than it looks: `/add-dir` typed into the
+            // composer answers `/add-dir isn't available in this environment.` in an SDK session —
+            // for a directory inside the cwd and outside it alike — so that door is closed by the
+            // CLI and its refusal is already visible in the transcript as an assistant turn. What
+            // remains is `source: "register_repo_root"`, the SDK control request, which nothing in
+            // this app issues today. So `DirectoryAdded` is currently unreachable from the pane;
+            // it is registered because the alternative to a handler that never fires is a silent
+            // widening the first time one of those two things changes.
+            DirectoryAdded: [
+              {
+                hooks: [
+                  async (input: unknown) => {
+                    const hook = input as { directory?: string; source?: string };
+                    const directory = String(hook.directory ?? "").trim();
+                    // Our own grant comes back through here. Saying "something widened the scope"
+                    // about the thing the user just pressed a button for would teach them to ignore
+                    // the notice that matters.
+                    if (directory !== "" && granted.includes(directory)) return {};
+                    emit({
+                      kind: "notice",
+                      text:
+                        `${directory || "A directory"} was added to Claude Code's own working directories` +
+                        `${hook.source === "slash_command" ? " by a command typed into the composer" : " by a request from outside this app"}. ` +
+                        `This app's read boundary did not move: reads there are still stopped and asked about. ` +
+                        `Answer one of those prompts with "Allow this folder" to open it for the session.`,
+                    });
+                    return {};
+                  },
+                ],
+              },
+            ],
+            CwdChanged: [
+              {
+                hooks: [
+                  async (input: unknown) => {
+                    const hook = input as { old_cwd?: string; new_cwd?: string };
+                    // The boundary is anchored to `request.cwd` and STAYS there. A relative path
+                    // resolved against a moved working directory would quietly point somewhere else,
+                    // and a boundary that follows the thing it is bounding is not one. Like
+                    // `DirectoryAdded` above, this has no route from the pane today — the pane
+                    // offers no way to move the cwd — so it is registered rather than demonstrated.
+                    emit({
+                      kind: "notice",
+                      text:
+                        `The session's working directory moved to ${hook.new_cwd ?? "somewhere else"}` +
+                        `${hook.old_cwd ? ` (from ${hook.old_cwd})` : ""}. ` +
+                        `What this session may read is still anchored to ${request.cwd} and did not move with it.`,
+                    });
+                    return {};
+                  },
+                ],
+              },
+            ],
           },
           canUseTool: async (tool: string, input: Record<string, unknown>, options: CanUseToolOptions) => {
             // The SAME engines the form path and the hook use, composed — not a second one.
@@ -995,7 +1110,7 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
               tool,
               input,
               writable: [],
-              directories: readable,
+              directories: readable(),
               cwd: request.cwd,
             });
 
@@ -1038,6 +1153,14 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
                   decisionReason: options?.decisionReason ?? null,
                   title: options?.title ?? null,
                   detail: verdict.detail,
+                  // WHAT COULD BE GRANTED, resolved here and published with the question. The
+                  // renderer sends back a scope WORD; it never names a path, so this is also the
+                  // only list a grant can be resolved against. `grantable` is false for writes and
+                  // for the network tools, which is what keeps this from widening the wrong surface.
+                  grants:
+                    verdict.grantable && verdict.target
+                      ? grantOptionsFor(verdict.target, isDirectory(verdict.target), readable())
+                      : [],
                 },
               });
             }
@@ -1116,6 +1239,26 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
     },
     answer(requestId: string, decision: PermissionAnswer): boolean {
       return permissions.answer(requestId, decision);
+    },
+    grant(paths: readonly string[]): string[] {
+      const added: string[] = [];
+      for (const raw of paths) {
+        const resolved = path.resolve(request.cwd, String(raw ?? "").trim());
+        if (resolved === "" || granted.includes(resolved)) continue;
+        granted.push(resolved);
+        added.push(resolved);
+      }
+      return added;
+    },
+    revoke(target: string): boolean {
+      const resolved = path.resolve(request.cwd, String(target ?? "").trim());
+      const at = granted.indexOf(resolved);
+      if (at < 0) return false;
+      granted.splice(at, 1);
+      return true;
+    },
+    granted(): string[] {
+      return [...granted];
     },
     pendingPermissions(): string[] {
       return permissions.pending();

@@ -76,6 +76,7 @@ import {
   disposeSessions,
   endAllSessions,
   endSession,
+  revokeGrant,
   saySession,
   sessionInfo,
   startSession,
@@ -409,11 +410,23 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC.sessionStop, async (e, id: string): Promise<boolean> => stopSession(e.sender.id, id));
 
-  // A parked permission request, answered. The renderer sends a CHOICE — allow, deny or stop, plus
-  // the reason the model is told — and `answerPermission` builds the SDK-shaped result from it, so
-  // no permission RULE, mode or directory can be authored on this side of the wire.
-  ipcMain.handle(IPC.sessionPermission, (e, id: string, requestId: string, choice: PermissionChoice): boolean =>
-    answerPermission(e.sender.id, id, requestId, choice)
+  // A parked permission request, answered. The renderer sends a CHOICE — allow, deny, stop, or a
+  // grant's scope word, plus the reason the model is told — and `answerPermission` builds the
+  // SDK-shaped result from it, so no permission RULE, mode or destination can be authored on this
+  // side of the wire. A grant's one permitted update is `addDirectories` with
+  // `destination: "session"`, which never reaches disk.
+  ipcMain.handle(
+    IPC.sessionPermission,
+    async (e, id: string, requestId: string, choice: PermissionChoice): Promise<boolean> =>
+      answerPermission(e.sender.id, id, requestId, choice)
+  );
+
+  // A grant taken back. It removes an entry main is already holding and can only ever NARROW what
+  // the session may read — which is why a path is allowed to cross here while granting sends a
+  // scope word and lets main resolve the path from the prompt it asked.
+  ipcMain.handle(
+    IPC.sessionRevoke,
+    async (e, id: string, target: string): Promise<boolean> => revokeGrant(e.sender.id, id, target)
   );
 
   ipcMain.handle(IPC.sessionEnd, (e): void => endSession(e.sender.id));

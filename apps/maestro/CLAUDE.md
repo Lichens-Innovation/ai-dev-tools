@@ -82,7 +82,7 @@ second.
 | `claude-run.ts`                         | The only module that starts Claude, and only for a token preview issued                |
 | `read-scope.ts`                         | What a run can **read**, derived from a settings snapshot. Pure — no `fs`, no spawn    |
 | `write-scope.ts`                        | What a run may **write**, decided per tool call. Pure — no `fs`, no spawn, no SDK      |
-| `session-scope.ts`                      | What a pane session may **read**, decided per tool call by a hook. Pure, no `fs`       |
+| `session-scope.ts`                      | What a pane session may **read** — the boundary, and what a person may grant. Pure     |
 | `session-permission.ts`                 | Settled, or a question for a PERSON. Composes the two scope modules. Pure              |
 | `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
@@ -510,6 +510,7 @@ session:info       → SessionInfo              reads only
 session:say        → (id, text)               USER-TYPED TEXT ONLY
 session:stop       → (id)                     interrupt the turn; the session stays usable
 session:permission → (id, requestId, choice)  A PermissionChoice, never a PermissionAnswer
+session:revoke     → (id, path)               take back a grant; NARROWS ONLY
 session:end        → ()                       end, and reap the process group
 session:event      ← SessionEvent             the streamed transcript
 ```
@@ -580,12 +581,17 @@ session:event      ← SessionEvent             the streamed transcript
   SDK-shaped answer. Deny and Stop are two controls because they are two intents: a plain denial
   refuses the call and lets the model adapt, `interrupt` ends the turn. The wire shape exists
   because `PermissionAnswer`'s allow arm carries `updatedPermissions`, which can add blanket allow
-  rules or flip the session to `bypassPermissions`; `023` extends `PermissionChoice` rather than
-  replacing it when it adds the grant.
+  rules or flip the session to `bypassPermissions`. `023` EXTENDED that union rather than replacing
+  it: a fourth arm, `{ choice: "grant", scope: "file" | "directory" }`, carrying a scope word **and
+  no path** — main holds the prompt being answered and resolves the path from the
+  `SessionGrantOption` it published with it, which is `scaffold.ts`'s "a renderer describes an
+  artifact and never nominates a directory" applied to the permission wire.
 - **The boundary hook runs only on the read-only tools**, by design. Letting it answer for
   `Write`/`Edit` too would have replaced `decideWrite`'s reason with a new one, and the requirement
   is that a refused write still carries the original. `session-scope.ts` knows how to check write
-  tools all the same, so `023` cannot widen reads by accident when it widens writes.
+  tools all the same, so `023` could not widen reads by accident when it widens writes — and did
+  not: `PaneVerdict`'s `grantable` is true only in the read-boundary branch, so a refused **write**
+  never grows a grant button.
 - **The readable set is the open project plus EVERY local marketplace**, not "the resolved
   marketplace" — with no create-form handoff yet there is no single marketplace to name. Main
   resolves them itself with `listMarketplaces()` (the `source: "directory"` entries of
@@ -605,6 +611,44 @@ session:event      ← SessionEvent             the streamed transcript
   file inside a fixture project _with_ a `maestro.json` wrote no `maestro_session.log.jsonl`. So the
   `/session-log` pollution that loading project `settingSources` would cause does not arrive with
   `plugins`, and the pane's tool calls stay out of a view built for orchestrator runs.
+- **A session grant is the first thing that makes the read scope MUTABLE mid-session** (`023`).
+  `020` resolved `readable` once at session start and handed the same array to the hook and the
+  disclosure; it is a function now (`readable()`), read fresh on every call, because a grant has to
+  reach **both** or the header and the boundary start disagreeing with nothing failing.
+  - **Three things happen on a grant, and dropping any one is invisible.** `session.grant([path])`
+    widens the hook's own list (it runs FIRST and would otherwise re-prompt forever);
+    `updatedPermissions: [{ type: "addDirectories", directories: [path], destination: "session" }]`
+    rides on the allow so the CLI's permission system stops prompting; and main re-derives the
+    disclosure and pushes it as a `{ kind: "scope" }` `SessionEvent`.
+  - **`destination: "session"` is the whole guarantee about disk, and it is enforced by the TYPE.**
+    `SessionPermissionUpdate` in `contracts.ts` cannot express `addRules`, `setMode`, or the three
+    destinations that write — `localSettings` (the user's repository), `projectSettings` (a file
+    they would commit), `userSettings` (their whole machine). `test/isolation.test.ts` also fails on
+    any of those literals anywhere under `src/`. Verified in the window: after granting, every
+    settings file is byte-identical and `~/.claude.json` gains no permission-shaped key and never
+    names the granted path.
+  - **File or directory, and the difference is on screen.** `grantOptionsFor` (pure, in
+    `session-scope.ts`) offers a file as itself **and** as its containing directory, and a directory
+    as itself only. Each option renders as its own button with its own path and its own sentence,
+    because "Allow this folder" is a promise that the folder is the obvious one and the case this
+    prompt exists for is where it is not. A directory that is ≤2 segments deep, or that CONTAINS
+    something already in scope, is flagged `broad` and rendered in amber with what it would swallow.
+  - **Only a read is grantable.** `PaneVerdict.grantable` is true in the read-boundary branch and
+    nowhere else: a refused write keeps Allow once / Deny / Stop (widening writes is `022`'s), and a
+    `WebFetch` has no path to grant.
+  - **Visible and revocable, or it is not optional — it is gone.** Grants render in the pane's scope
+    panel with a Revoke button, and inside `ReadScope` as `origin: "session"` (the fourth origin,
+    dotted amber). `session:revoke` takes a path and can only ever REMOVE an entry main is already
+    holding, which is why a path may cross there while a grant crosses as a scope word. The SDK has
+    no API for withdrawing a `PermissionUpdate` — revoking works because the **hook** is the
+    authority and runs before the permission system ever sees the call. Verified live: revoke, and
+    the same directory raises a prompt again.
+  - **The other two doors are closed by the CLI, not by us — measured.** `/add-dir` typed into the
+    composer answers `/add-dir isn't available in this environment.` in an SDK session, inside the
+    cwd and outside it alike, and that refusal is already visible in the transcript. The
+    `DirectoryAdded` and `CwdChanged` hooks are registered anyway and are currently unreachable from
+    the pane; the boundary stays anchored to `request.cwd` and does not follow a working directory
+    that moves. `test/isolation.test.ts` pins both handlers and the anchoring.
 - **Nothing budget-related is passed.** No `maxBudgetUsd`, `taskBudget`, `effort`,
   `enableFileCheckpointing` or `persistSession`; `startPaneSession` simply ends the session when the
   SDK stream ends. All of that is `024`.
@@ -920,7 +964,12 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   every exit"**, **"lets the renderer send a permission CHOICE and never a permission result"**, and
   **"writes down a refusal whichever of the four routes it arrived by"**. The last one is the only
   coverage the `rule`/`mode` auto-denial has outside a unit test, since provoking it live needs a
-  machine-wide managed-settings file.
+  machine-wide managed-settings file. `023` **widened** the CHOICE block rather than writing a
+  second one — it now also pins that a grant carries no path, that `SessionPermissionUpdate` cannot
+  name a disk destination or a rule, that no such literal exists anywhere under `src/`, and that a
+  grant reaches the hook as well as the SDK — and added two of its own: **"lets a grant die with the
+  session, and writes it nowhere"** and **"watches the other doors into the read scope, and does not
+  follow any of them"**.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the
