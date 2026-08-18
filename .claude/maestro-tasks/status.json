@@ -75,5 +75,75 @@
     "blockedBy": [
       "013-put-chat-and-stats-behind-the-bridge.md"
     ]
+  },
+  "015-externalize-the-agent-sdk.md": {
+    "status": "done",
+    "blockedBy": []
+  },
+  "016-git-init-a-new-marketplace-without-a-shell.md": {
+    "status": "ready",
+    "blockedBy": []
+  },
+  "017-disclose-what-a-run-can-read.md": {
+    "status": "ready",
+    "blockedBy": [
+      "015-externalize-the-agent-sdk.md"
+    ]
+  },
+  "018-run-create-authoring-on-the-agent-sdk.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "015-externalize-the-agent-sdk.md",
+      "016-git-init-a-new-marketplace-without-a-shell.md",
+      "017-disclose-what-a-run-can-read.md"
+    ]
+  },
+  "019-a-live-session-in-the-pane.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "018-run-create-authoring-on-the-agent-sdk.md"
+    ]
+  },
+  "020-permission-prompts-in-the-pane.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "019-a-live-session-in-the-pane.md"
+    ]
+  },
+  "021-structured-questions-from-the-agent.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "020-permission-prompts-in-the-pane.md"
+    ]
+  },
+  "022-hand-off-from-a-create-form-into-the-pane.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "020-permission-prompts-in-the-pane.md"
+    ]
+  },
+  "023-authorise-a-directory-for-the-session.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "020-permission-prompts-in-the-pane.md"
+    ]
+  },
+  "024-a-budget-ceiling-you-can-continue-past.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "019-a-live-session-in-the-pane.md"
+    ]
+  },
+  "025-resume-a-session-started-in-the-terminal.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "024-a-budget-ceiling-you-can-continue-past.md"
+    ]
+  },
+  "026-rewrite-the-create-skills-for-interactive-sessions.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "022-hand-off-from-a-create-form-into-the-pane.md"
+    ]
   }
 }

@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerIpc, disposeIpc } from "./ipc.js";
+import { maybeRunAgentSdkSmoke } from "./agent-sdk-smoke.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +46,10 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   registerIpc();
   createWindow();
+
+  // Off unless MAESTRO_AGENT_SDK_SMOKE is set, and never awaited: the window must paint whether or
+  // not a diagnostic query is in flight behind it.
+  void maybeRunAgentSdkSmoke();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

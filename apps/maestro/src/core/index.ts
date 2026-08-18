@@ -184,6 +184,23 @@ export {
 
 export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation, type InvocationPurpose } from "./claude-tokens.js";
 
+// The Claude Agent SDK — the steerable path to the same CLI, and the ground the session pane is
+// built on. Nothing user-facing consumes it yet; `runAgentSdkSmoke` proves a query runs in a
+// PACKAGED build, which is the only place this slice's failure modes appear. See ./agent-sdk.ts.
+export {
+  runAgentSdkSmoke,
+  writeSmokeReceipt,
+  agentChildEnv,
+  billingFrom,
+  AGENT_SDK_PACKAGE,
+  BILLING_ENV_VARS,
+  SMOKE_PROMPT,
+  type AgentBilling,
+  type AgentChildEnv,
+  type AgentSdkSmokeResult,
+  type SmokeOptions,
+} from "./agent-sdk.js";
+
 // Usage stats. The same preview-then-run shape and the same token store as the bridge above,
 // because the thing being confirmed is the same kind of thing: a command about to run on the
 // user's machine — and, when no local copy exists, one FETCHED FROM THE NETWORK first. The
