@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 // The barrel, deliberately: this is a node-side test, and the point of the prompt-drift check
 // below is to compare the renderer's literal against what the MAIN process actually builds.
-import { previewClaudeRun } from "../src/core/index.js";
+import { previewClaudeRun, SESSION_TOOLS, SESSION_DISALLOWED_TOOLS } from "../src/core/index.js";
 import { IPC, IPC_EVENTS } from "../src/shared/ipc.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -313,9 +313,11 @@ describe("the claude bridge across the process boundary", () => {
     // It was one module until the Agent SDK arrived, and the second entry is a real widening rather
     // than a formality: `agent-sdk.ts` hands that path to a library that spawns it, where
     // `claude-preview.ts` provably cannot spawn at all (test/core/claude.test.ts walks its import
-    // graph). What holds the guarantee up for now is that nothing user-facing calls into the SDK —
-    // its one entry point is an env-gated startup diagnostic. Task 018 moves `claude-run.ts` onto
-    // the SDK behind the same preview token, at which point this list should NARROW again, not grow.
+    // graph). `018` moved every run onto the SDK, and this list is the same two modules afterwards —
+    // deliberately. `claude-run.ts` does NOT appear: it takes the binary off the invocation the
+    // token names, so the run path resolves nothing and cannot resolve anything else. There is one
+    // resolution per surface (preview reports availability; the SDK is handed a path), which is the
+    // narrow state this list was asking for, not a third entry.
     const callers = sourcesUnder("src/core")
       .concat(sourcesUnder("src/main"))
       .filter((f) => /(?<!function\s)\bresolveClaudeCli\s*\(/.test(stripComments(fs.readFileSync(f, "utf8"))))
@@ -339,6 +341,60 @@ describe("the claude bridge across the process boundary", () => {
     expect(claimers).toEqual(["src/core/ccusage.ts", "src/core/claude-run.ts"]);
     expect(stripComments(read("src/core/claude-run.ts"))).toMatch(/claimInvocation\([^)]*,\s*"claude"\s*\)/);
     expect(stripComments(read("src/core/ccusage.ts"))).toMatch(/claimInvocation\([^)]*,\s*"usage-stats"\s*\)/);
+  });
+
+  it("pre-accepts edits nowhere in the app", () => {
+    // The acceptance criterion of `018`, asserted where it would come back. `--permission-mode
+    // acceptEdits` was in the authoring flags because a headless `claude -p` run had nobody to ask;
+    // it granted writes to anything anywhere under the working directory, which for a marketplace
+    // target is an entire repository. The replacement is `write-scope.ts` plus the session's
+    // `canUseTool`. Re-adding the flag would look like a fix for a run that "cannot write its file"
+    // and would silently undo the whole slice, so it is a diff to this line instead.
+    const offenders = sourcesUnder("src")
+      .filter((f) =>
+        /acceptEdits|bypassPermissions|dangerouslySkipPermissions/.test(stripComments(fs.readFileSync(f, "utf8")))
+      )
+      .map((f) => path.relative(appRoot, f));
+    expect(offenders, "an escalating permission mode is back in the app").toEqual([]);
+  });
+
+  it("bounds a session's writes by what the preview displayed, and offers it no shell", () => {
+    // The three halves of the permission model, each of which fails silently on its own:
+    //   • no `canUseTool` → the SDK falls back to the CLI's prompting, which in a headless run has
+    //     nobody to answer it: every write simply does not happen and the run reports success.
+    //   • a write scope derived anywhere but the invocation → the callback could be wider than the
+    //     paths the user consented to, and nothing on screen would say so.
+    //   • `Bash` back in the tool set → the one tool whose filesystem reach cannot be bounded by
+    //     inspecting `tool_input`, which makes the path check above decorative.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/canUseTool:/);
+    expect(sdk).toMatch(/decideWrite\(/);
+    expect(sdk).toMatch(/permissionMode:\s*"default"/);
+    expect(sdk).toMatch(/spawnClaudeCodeProcess:\s*request\.spawn/);
+    // Named as forbidden as well as omitted from the offered set — `tools` sets the base list,
+    // `disallowedTools` removes them from the model's context whatever else would put them back.
+    for (const tool of ["Bash", "Agent", "NotebookEdit"]) {
+      expect(SESSION_DISALLOWED_TOOLS, `${tool} is no longer disallowed`).toContain(tool);
+    }
+    expect(SESSION_TOOLS, "the session offers a shell").not.toContain("Bash");
+    expect(SESSION_TOOLS, "the session offers subagents").not.toContain("Agent");
+
+    // And the scope comes off the invocation the token names, so a caller cannot widen it.
+    const run = stripComments(read("src/core/claude-run.ts"));
+    expect(run).toMatch(/writable:\s*inv\.writable/);
+  });
+
+  it("loads no filesystem settings for a run, and discloses the same resolution", () => {
+    // The trap `017` left standing. The session is configured entirely by this app, so nothing on
+    // disk can widen it and no key in a settings file can redirect billing — and `resolveEffectiveSettings`,
+    // which backs the read disclosure, must resolve the SAME cascade. Configure the run one way and
+    // resolve the other and the dialog keeps describing a session that no longer exists, with
+    // nothing failing.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    // Three: the startup smoke, the session a run is, and the resolution the disclosure is built on.
+    const sessions = sdk.match(/settingSources:\s*\[\]/g) ?? [];
+    expect(sessions.length, "a query or a resolution stopped passing an empty settingSources").toBe(3);
+    expect(sdk).toMatch(/resolveSettings\(\{\s*cwd,\s*settingSources:\s*\[\]\s*\}\)/);
   });
 
   it("keeps the set of modules that can start a process to a reviewed list", () => {

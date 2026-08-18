@@ -449,9 +449,10 @@ export interface ClaudeWriteTarget {
 // ─────────────────────────────────────────────────────────────────────────────
 // What a run can READ — the larger half of the disclosure, and the quieter one.
 //
-// Writes announce themselves: a create-* prompt names its file, and `--permission-mode acceptEdits`
-// is on screen in the argv. Reads announce nothing. File reads and searches are auto-approved by
-// the permission system and never raise a prompt, so the directory list a session is started with
+// Writes announce themselves: a create-* prompt names its file, the list below is on screen, and
+// the session's permission callback allows nothing outside it. Reads announce nothing: file reads
+// and searches are auto-approved by the permission system and never raise a prompt, so the
+// directory list a session is started with
 // IS the bound on what the model can see — and it is fully known before anything spawns.
 //
 // The types below exist so the confirmation can state that bound *truthfully*. The effective
@@ -594,7 +595,11 @@ export interface ClaudePreview {
   token: string | null;
   /** The full prompt text, shown verbatim and scrollable. Never a summary. */
   prompt: string;
-  /** argv[0] is the resolved binary. This is exactly what is spawned — the modal shows it as-is. */
+  /**
+   * The EQUIVALENT command line, with argv[0] the resolved binary — what to run to reproduce this
+   * yourself, which is what Copy prompt is for. The app runs it as an Agent SDK session, which adds
+   * its own stream-protocol flags; the exact argv that was spawned comes back on `ClaudeRunResult`.
+   */
   argv: string[];
   cwd: string;
   targets: ClaudeWriteTarget[];
@@ -625,17 +630,21 @@ export interface ClaudeOutputChunk {
 /**
  * How a run ended.
  *
- * The four outcomes are distinguishable on purpose. "Non-zero exit" means the CLI ran and disagreed
- * with the request — its stderr is the explanation and is worth reading. "Crashed" means it never
- * ran, or died on a signal — the message is about the machine, not the prompt. Collapsing them into
- * `ok: false` throws away which of those two the user is looking at.
+ * The four outcomes are distinguishable on purpose. "Failed" means the session ran and ended badly —
+ * `error` says how, and the output is worth reading. "Crashed" means it never ran, or died on a
+ * signal — the message is about the machine, not the prompt. Collapsing them into `ok: false` throws
+ * away which of those two the user is looking at.
  */
 export interface ClaudeRunResult {
   outcome: "ok" | "failed" | "crashed" | "cancelled";
-  /** Exit status, null when the process died on a signal or never started. */
+  /**
+   * 0 on success, null otherwise. A session is not a process exit: the CLI is a child the SDK owns,
+   * and "why it ended" arrives as a result message rather than as a status. `error` carries that,
+   * and is the field to render — a code here would be invented.
+   */
   code: number | null;
   signal: string | null;
-  /** Spawn-level failure ("crashed"), with the path that could not be executed. */
+  /** Why it is not `ok`: a spawn-level failure, or the reason the session ended. */
   error: string | null;
   /** Everything the run wrote, also delivered as it arrived. Both are surfaced on every outcome. */
   stdout: string;
@@ -643,7 +652,10 @@ export interface ClaudeRunResult {
   /** Output exceeded the retained cap; the tail is kept and the head dropped. */
   truncated: boolean;
   durationMs: number;
-  /** What actually ran — diffable against the argv the modal displayed. */
+  /**
+   * What was ACTUALLY spawned, captured from the SDK's own spawn options — so it carries the
+   * protocol flags the SDK adds and will not match the equivalent argv the modal displayed.
+   */
   argv: string[];
   cwd: string;
 }

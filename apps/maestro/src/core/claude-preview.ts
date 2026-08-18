@@ -52,31 +52,24 @@ export interface PreviewOptions extends ResolveOptions {
 }
 
 /**
- * Flags an authoring invocation carries, before the prompt.
+ * The equivalent command line, before the prompt — one flag, and no permission mode at all.
  *
  * `-p` is headless print mode: one prompt, output to stdout, no interactive session.
  *
- * `--permission-mode acceptEdits` is deliberate and is the reason the modal shows argv verbatim.
- * A run whose whole job is to author a file cannot stop to ask about writing it — in print mode
- * there is no one to ask, so the default mode turns every useful run into a refusal. Auto-accepting
- * *edits* (and nothing else — Bash and the rest still fall through to the default) is the narrowest
- * setting that lets the run do what the user just confirmed. It is in `argv`, on screen, above the
- * Run button; a user who does not want it can copy the prompt and run it their own way.
- */
-export const CLAUDE_BASE_FLAGS = ["-p", "--permission-mode", "acceptEdits"] as const;
-
-/**
- * Flags for a run that only has to ANSWER — the help chat.
+ * There used to be a second pair here, `--permission-mode acceptEdits`, because a run whose job was
+ * to author a file could not stop to ask about writing it and print mode had nobody to ask. It is
+ * gone: a run is an Agent SDK session now, the host process **is** somebody to ask, and the app
+ * answers for exactly the paths this preview listed in `targets` (see `write-scope.ts`). That is
+ * strictly narrower than the flag it replaces, which permitted writing anything anywhere under the
+ * working directory. There is no longer a difference between an authoring invocation and an asking
+ * one at this level — the difference is the write scope, and it is on screen as a list of paths
+ * rather than as a flag the reader has to know the meaning of.
  *
- * `acceptEdits` is left off, and that is the point rather than an omission. The flag exists so a
- * create-\* run can finish the file it was started for; a question is not an authoring job, and
- * pre-accepting edits for one would hand a chat message the same write authority as a form submit
- * the user filled in on purpose. Without it the run falls back to the default permission mode,
- * where an edit in print mode has nobody to ask and simply does not happen. The chat therefore
- * reads and answers; if it decides something should be written, it says so and the user goes and
- * does it from a surface that asks about writes.
+ * What `argv` therefore is: the **equivalent** invocation, and the thing Copy prompt exists for. The
+ * app runs it through the SDK, which adds its own stream-protocol flags; the exact argv it spawned
+ * comes back on `ClaudeRunResult.argv`.
  */
-export const CLAUDE_ASK_FLAGS = ["-p"] as const;
+export const CLAUDE_BASE_FLAGS = ["-p"] as const;
 
 /** Turns of chat history that ride along in the prompt. Older ones are dropped. */
 const CHAT_HISTORY_TURNS = 10;
@@ -88,17 +81,13 @@ const CHAT_TURN_MAX = 1500;
 interface BuiltRequest {
   prompt: string;
   targets: ClaudeWriteTarget[];
-  /** Flags before the prompt. Defaults to `CLAUDE_BASE_FLAGS` — the authoring set. */
-  flags?: readonly string[];
   /**
    * Where to run, when that is not the open project.
    *
    * A create-* flow can write into a marketplace repo or a brand-new marketplace directory, both of
-   * which sit outside the project the window has open. Running there anyway would put every edit
-   * outside the CLI's working directory, where `--permission-mode acceptEdits` does not reach and a
-   * headless run has no one to ask — so the run would stall or refuse rather than finish the file
-   * it was started for. The cwd is derived here, from the same resolution that chose the path, and
-   * the modal shows it; it is never taken from the caller.
+   * which sit outside the project the window has open. The cwd is derived here, from the same
+   * resolution that chose the path, and the modal shows it; it is never taken from the caller. It
+   * is also what the run can READ, so the choice is a disclosure and not only a convenience.
    */
   cwd?: string;
 }
@@ -261,10 +250,11 @@ function buildChat(message: unknown, history: unknown): BuiltRequest {
 
   return {
     prompt,
-    // Nothing. The chat runs without `--permission-mode acceptEdits` (see CLAUDE_ASK_FLAGS), so
-    // this is a claim about the invocation rather than a hope about the model's behaviour.
+    // Nothing, and it is enforced rather than hoped for: an empty write scope rides on the token,
+    // and the session's permission callback denies every write with a reason (`write-scope.ts`).
+    // A question is not an authoring job, and a chat message must not have the write authority of a
+    // form the user filled in on purpose.
     targets: [],
-    flags: CLAUDE_ASK_FLAGS,
   };
 }
 
@@ -377,7 +367,7 @@ export async function previewClaudeRun(
 
   // argv[0] is the resolved path rather than the bare name, so what the modal shows is the exact
   // executable that will run — "claude" would be a claim about PATH resolution the user cannot check.
-  const args = [...(built.flags ?? CLAUDE_BASE_FLAGS), prompt];
+  const args = [...CLAUDE_BASE_FLAGS, prompt];
   const argv = [cli.bin ?? "claude", ...args];
 
   if (!cli.available) {
@@ -399,7 +389,17 @@ export async function previewClaudeRun(
     };
   }
 
-  const invocation = issueInvocation({ purpose: "claude", bin: cli.bin!, args, cwd, prompt });
+  // `writable` is the same list the dialog renders under "What it may write" — not a second
+  // derivation of it. The permission callback the run installs reads it off the invocation, so what
+  // the user was shown and what the session will allow are one value that travels together.
+  const invocation = issueInvocation({
+    purpose: "claude",
+    bin: cli.bin!,
+    args,
+    cwd,
+    prompt,
+    writable: targets.map((t) => t.path),
+  });
   return {
     token: invocation.token,
     prompt,

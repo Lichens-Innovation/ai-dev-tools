@@ -8,6 +8,18 @@ criterion below is met.
 The pane asks before it acts. Read the "The permission model" section of `SESSION-PANE-PLAN.md`;
 the requirements there are precise and several of them are easy to miss.
 
+**This slice is the UI, not the engine.** `018` built the engine where it needed no interface:
+`decideWrite` in `src/core/write-scope.ts` is the decision — pure, no `fs`, exhaustively tested —
+and `startAgentSession()` already wires it to the SDK as `canUseTool`. What is missing is the branch
+where the answer comes from a person instead of from the path list. Extend that callback and the
+`WriteDecision` union; **do not stand up a second permission engine beside it**, or the form path and
+the pane path will end up with different authority, which is the one thing
+`SESSION-PANE-PLAN.md`'s "two write paths" section rules out.
+
+Two of the requirements below are therefore already met on the form path and must survive here:
+`WriteDecision` is a two-shape union whose fall-through is a **deny**, so returning `undefined`/`null`
+is already unrepresentable; and every deny already carries a reason the model reads and adapts to.
+
 A permission request parks a promise in the main process and resolves it when the user answers.
 That registry is the fiddly part:
 
@@ -17,7 +29,8 @@ That registry is the fiddly part:
   no backstop, and an unresolved ask is a permanently wedged session holding a child process.
 - **A fall-through must be impossible.** Returning nothing from the callback is a real value meaning
   "I answered out of band", and it blocks the tool call forever. Type the resolution so it cannot
-  happen by accident.
+  happen by accident — `WriteDecision` in `src/core/write-scope.ts` already is that type, and
+  widening it for the pane must not open the hole back up.
 
 **Deny and Stop are two controls, not one.** A plain denial refuses the call and lets the model
 adapt — measured behaviour, not hope: it will try something else and finish the job. Stopping the
@@ -56,6 +69,7 @@ header and the confirmation are showing.
 - [ ] A boundary-hook-denied call also appears in the transcript — asserted separately, since it arrives by a different route
 - [ ] A pending prompt is visible and answerable from any route
 - [ ] Prompts render per tool rather than as a payload dump
+- [ ] The form path still runs unprompted and unchanged — one engine, two callers, and `018`'s isolation pins still hold
 
 ## Blocked by
 

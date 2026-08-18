@@ -53,6 +53,16 @@ export interface ClaudeInvocation {
   cwd: string;
   /** The prompt as shown to the user; also present inside `args`. For a non-prompt run, "". */
   prompt: string;
+  /**
+   * Absolute paths the run may write, exactly as the confirmation listed them. A directory means
+   * anything under it; empty means the run has no write authority at all.
+   *
+   * On the invocation rather than passed to the run for the same reason the prompt is: the run
+   * takes a token and nothing else, so there is no argument by which a caller could widen what a
+   * previewed run may write. The permission callback reads this and cannot be more generous than
+   * what the user was shown.
+   */
+  writable: string[];
   createdAt: number;
   expiresAt: number;
 }

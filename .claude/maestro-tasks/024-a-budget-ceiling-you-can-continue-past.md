@@ -28,6 +28,11 @@ accuracy limits, so present it as an approximation rather than an accounting fig
 limit is worth setting alongside it as a cruder brake on a loop that is cheap per turn but does not
 converge.
 
+Some of the plumbing is already there and should not be re-derived: `018`'s `AgentSessionResult`
+already carries `costUsd`, `numTurns` and `sessionId` off the SDK's own result message, and `billing`
+off its init message. That is the end-of-session figure; what this slice adds is the running one and
+the ceiling. `sessionId` is also what **Continue** resumes against, and what `025` lists.
+
 Surface spend as it accrues rather than only at the end, and put an effort level and a model
 selector in the header — both can change on a live session without losing the conversation, and
 effort is a larger lever than model choice for a session that mostly reads.

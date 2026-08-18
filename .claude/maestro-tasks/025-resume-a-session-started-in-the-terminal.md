@@ -28,7 +28,11 @@ while a hole sits underneath it. Show what that session read, and let the user d
 
 **Probe whether resuming honours the pane's directories or restores the recorded ones.** The
 reference does not say, and the answer is load-bearing for the boundary. Settle it by testing the
-running CLI, not by reading source, and record the answer where the next person will find it.
+running CLI, not by reading source, and record the answer where the next person will find it. Probe
+the same question for `settingSources`: every session this app starts passes `[]` (since `018`, that
+is the run, the smoke query and the settings resolution alike), and a resume that restored the
+recorded session's sources would reopen both doors `[]` closes — a permissions widening, and an
+`ANTHROPIC_API_KEY` in a settings file redirecting the bill off the subscription.
 
 A long transcript is replayed as context on the first turn, so resuming is not free. Show the user
 what they are picking up before they pick it up.

@@ -91,7 +91,7 @@
     ]
   },
   "018-run-create-authoring-on-the-agent-sdk.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "015-externalize-the-agent-sdk.md",
       "016-git-init-a-new-marketplace-without-a-shell.md",
@@ -99,7 +99,7 @@
     ]
   },
   "019-a-live-session-in-the-pane.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "018-run-create-authoring-on-the-agent-sdk.md"
     ]

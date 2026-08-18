@@ -6,7 +6,7 @@ Scaffolds a new Claude Code skill — either inside a marketplace plugin or dire
 
 1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Skill** from the top bar and fills the split-pane form (auto/manual mode, marketplace/project target, name, idea, triggers) with a live preview of the file on the right.
 2. On submit the route calls `scaffoldSkill` in `apps/maestro/src/core`: the directory and the `SKILL.md` frontmatter are written **immediately**, with no model involved.
-3. If anything is left to author — an auto-mode body — the route builds a prose prompt carrying the payload and the scaffold result, shows it in full (prompt, argv, cwd, files it may write), and runs it through `claude -p` once the user confirms. This file (`SKILL.md`) is what that prompt asks Claude to follow.
+3. If anything is left to author — an auto-mode body — the route builds a prose prompt carrying the payload and the scaffold result, shows it in full (what it may read, prompt, equivalent command line, cwd, files it may write), and runs it as an Agent SDK session once the user confirms. The run may write only the files that confirmation listed. This file (`SKILL.md`) is what that prompt asks Claude to follow.
 4. Invoked directly in a session instead (`/create-skill`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 
 The ordering in 2–3 is the design: the skill exists on disk before Claude is asked for anything, so declining the confirmation still leaves the user with their skill.

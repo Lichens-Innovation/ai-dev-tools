@@ -37,6 +37,16 @@ session grant is one more origin on that list, which is also what makes it lista
 the header without a second rendering path. Keep the provenance: "the user granted this, in this
 session" is exactly the distinction a flat list of directories destroys.
 
+**Nothing has widened a read scope yet, so the ground is emptier than the shape suggests.** `018`
+deliberately did **not** widen reads: it passes **no `additionalDirectories`**, and a run's read
+scope is its cwd. It also loads no filesystem settings (`settingSources: []`), so the user-, project-
+and local-tier directories `017` was built to disclose are no longer contributed by anything —
+what remains is the cwd plus the managed (administrator) policy tier, which `[]` does not drop. The
+`ClaudeReadDirectory` provenance machinery is therefore in place and barely exercised; `019` adds the
+first real `additionalDirectories` (the project and the marketplace), and this slice adds the first
+that came from a user decision. Expect to be the first caller to prove the origin field earns its
+keep, and do not read "the settings say so" as a live origin in a run.
+
 Watch the other doors while you are here. The scope can also be widened by a directory-add command
 typed into the composer, by a control request from outside, and by the working directory moving.
 Hooks exist that report all three; treat them as boundary events rather than log lines.

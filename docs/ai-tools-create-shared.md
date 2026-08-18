@@ -29,8 +29,10 @@ of two ways:
 - **From the Maestro desktop app.** `apps/maestro`'s four `create-*` routes are the forms now. On
   submit the route scaffolds deterministically in-process, then builds a prose prompt carrying the
   payload and the scaffold result, shows it in full in a confirmation dialog, and — once the user
-  confirms — runs it through `claude -p`. If you are reading this inside such a run, the payload is
-  already inlined above.
+  confirms — runs it as an Agent SDK session. If you are reading this inside such a run, the payload
+  is already inlined above, and the run may write **only the paths that confirmation listed**: a
+  write anywhere else, including elsewhere under the working directory, is refused with a reason. It
+  is also offered no shell (`Bash`) and no subagents.
 - **From the conversation.** A user can invoke the skill directly (`/create-skill`) with no app
   involved. There is no form and nothing is pre-scaffolded: gather the same fields by asking, then
   do every step yourself.

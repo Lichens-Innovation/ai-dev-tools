@@ -19,6 +19,15 @@ be configured away.
 Previews are opt-in: without declaring the preview format at session start, no previews are emitted
 at all and the option list arrives bare.
 
+**`AskUserQuestion` is not in the tool set yet.** `018` shipped `SESSION_TOOLS` in
+`src/core/agent-sdk.ts` as `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch, Edit, Write`, and left
+`AskUserQuestion` and `Skill` out deliberately: the form path is headless, so a question has nobody
+to answer it. `019` is where the pane makes them answerable. If a question never arrives, check that
+constant before anything else — and check `toolConfig`, since previews are separately opt-in. Extend
+`SESSION_TOOLS`; do not declare a second list. Note also that `018` uses `tools`/`disallowedTools`
+and never `allowedTools`, which auto-approves without restricting — a question routed through
+`allowedTools` would be answered by the SDK instead of by the user.
+
 **The answer travels back through the field this app otherwise refuses to expose**, and that
 collision needs an explicit, checkable carve-out rather than an exception. The renderer sends a
 *selection* — which question, which option labels — and the main process constructs the payload,
