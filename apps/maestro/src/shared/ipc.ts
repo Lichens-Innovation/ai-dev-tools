@@ -26,10 +26,16 @@ import type {
   MaestroTask,
   SessionLogEntry,
   SaveResult,
+  RepoDetection,
   InstallStatus,
   InstallReport,
   UninstallPlan,
   UninstallReport,
+  ClaudeRequest,
+  ClaudePreview,
+  ClaudeWriteTarget,
+  ClaudeOutputChunk,
+  ClaudeRunResult,
 } from "@repo/maestro-core/contracts";
 
 export type {
@@ -47,10 +53,16 @@ export type {
   MaestroTask,
   SessionLogEntry,
   SaveResult,
+  RepoDetection,
   InstallStatus,
   InstallReport,
   UninstallPlan,
   UninstallReport,
+  ClaudeRequest,
+  ClaudePreview,
+  ClaudeWriteTarget,
+  ClaudeOutputChunk,
+  ClaudeRunResult,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -75,6 +87,14 @@ export interface WorkflowsData {
    * anything on disk. The canvas opens populated, but nothing is persisted until the user saves.
    */
   seeded: boolean;
+  /**
+   * How the starter chain was chosen, and why — null once the project has a `maestro.json`, since
+   * the config on disk is the user's answer and re-deriving one would be noise.
+   *
+   * Carried on the same payload as the seed rather than fetched from its own channel: the evidence
+   * has to describe the chain the canvas is actually showing, and two round trips could disagree.
+   */
+  detection: RepoDetection | null;
   agents: DiscoveredDefinition[];
   skills: DiscoveredDefinition[];
 }
@@ -102,6 +122,7 @@ export const IPC = {
   projectForget: "project:forget",
 
   workflowsData: "data:workflows",
+  workflowsReseed: "data:reseed",
   rulesData: "data:rules",
   configSave: "config:save",
 
@@ -113,6 +134,12 @@ export const IPC = {
   installUninstallPlan: "install:uninstall-plan",
   installUninstall: "install:uninstall",
 
+  // Two channels, deliberately not one. `claude:preview` builds the prompt and cannot spawn;
+  // `claude:run` spawns and cannot build. See MaestroApi.claude below.
+  claudePreview: "claude:preview",
+  claudeRun: "claude:run",
+  claudeCancel: "claude:cancel",
+
   logSubscribe: "log:subscribe",
   logUnsubscribe: "log:unsubscribe",
 
@@ -121,6 +148,7 @@ export const IPC = {
 
 /** Push channels: main → renderer. */
 export const IPC_EVENTS = {
+  claudeOutput: "claude:output",
   logInit: "log:init",
   logEntry: "log:entry",
   logReset: "log:reset",
@@ -139,6 +167,12 @@ export interface MaestroApi {
   };
   data: {
     workflows(): Promise<WorkflowsData>;
+    /**
+     * Rebuild the starter config around a different implementation-agent chain — what the user
+     * corrected the detection to. Pure: it writes nothing, so the canvas can be re-seeded as often
+     * as the user changes their mind, and the project stays unconfigured until they press Save.
+     */
+    reseed(implAgents: string[]): Promise<MaestroConfigV3>;
     rules(): Promise<RulesData>;
   };
   config: {
@@ -166,6 +200,31 @@ export interface MaestroApi {
      * the renderer has to ask for it explicitly, so no call can turn into a purge by accident.
      */
     uninstall(opts?: { purge?: boolean }): Promise<UninstallReport>;
+  };
+  /**
+   * The `claude -p` bridge. Two operations, and the split is the security design.
+   *
+   * `preview` builds the prompt from a REQUEST — never from prompt text the renderer supplies —
+   * and hands back the exact argv, the working directory, what may be written, whether the CLI
+   * was found, and a single-use token. It cannot spawn: the main-process module behind it imports
+   * no child_process, and a test in `@repo/maestro-core` walks its import graph to keep it that way.
+   *
+   * `run` takes that token and NOTHING ELSE, so there is no argument by which a caller could make
+   * the run differ from the preview the user confirmed. The property this buys is that the only
+   * executable prompts are ones the user was shown; a renderer bug cannot invent one and run it.
+   * Collapsing these into a single "run this prompt" call looks like a simplification and is the
+   * removal of that guarantee.
+   */
+  claude: {
+    preview(request: ClaudeRequest): Promise<ClaudePreview>;
+    /**
+     * Start the previewed run. `onOutput` fires as output arrives — these runs are minutes long,
+     * so the UI must never wait for the resolve to show anything. Resolves with how it ended;
+     * rejects only when the token is refused (forged, replayed, or expired).
+     */
+    run(token: string, onOutput: (chunk: ClaudeOutputChunk) => void): Promise<ClaudeRunResult>;
+    /** Stop a run. Signals the child's whole process group, so the CLI's own children go too. */
+    cancel(token: string): Promise<void>;
   };
   log: {
     /**

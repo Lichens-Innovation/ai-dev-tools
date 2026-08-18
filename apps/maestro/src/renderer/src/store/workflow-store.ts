@@ -37,6 +37,27 @@ export function seedWorkflowStore(config: MaestroConfigV3, projectRoot: string) 
   workflowStore.setState((prev) => ({ ...prev, config, projectRoot, activeWorkflowIdx: 0 }));
 }
 
+/**
+ * Replace the whole config — the user amending the detected implementation chain, which re-seeds
+ * every starter workflow around the agents they chose.
+ *
+ * Unlike `seedWorkflowStore` this is unconditional, because the caller is the edit itself rather
+ * than a loader that may be re-running mid-edit. It still takes the project root and drops the
+ * write when it no longer matches: a re-seed is an async round trip to the main process, and one
+ * in flight while the user switches projects would otherwise land project A's starter graph in
+ * project B's canvas — the same failure `seedWorkflowStore`'s guard exists to prevent.
+ */
+export function replaceConfig(config: MaestroConfigV3, projectRoot: string) {
+  workflowStore.setState((s) => {
+    if (s.projectRoot !== projectRoot) return s;
+    return {
+      ...s,
+      config,
+      activeWorkflowIdx: Math.min(s.activeWorkflowIdx, Math.max(0, config.workflows.length - 1)),
+    };
+  });
+}
+
 export function setActiveWorkflowIdx(idx: number) {
   workflowStore.setState((s) => ({ ...s, activeWorkflowIdx: idx }));
 }

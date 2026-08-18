@@ -5,7 +5,13 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_EVENTS } from "../shared/ipc.js";
-import type { MaestroApi, ProjectState, SaveInput, SessionLogEntry } from "../shared/ipc.js";
+import type {
+  ClaudeOutputChunk,
+  MaestroApi,
+  ProjectState,
+  SaveInput,
+  SessionLogEntry,
+} from "../shared/ipc.js";
 
 const api: MaestroApi = {
   project: {
@@ -21,6 +27,7 @@ const api: MaestroApi = {
   },
   data: {
     workflows: () => ipcRenderer.invoke(IPC.workflowsData),
+    reseed: (implAgents) => ipcRenderer.invoke(IPC.workflowsReseed, implAgents),
     rules: () => ipcRenderer.invoke(IPC.rulesData),
   },
   config: {
@@ -35,6 +42,24 @@ const api: MaestroApi = {
     run: () => ipcRenderer.invoke(IPC.installRun),
     uninstallPlan: () => ipcRenderer.invoke(IPC.installUninstallPlan),
     uninstall: (opts) => ipcRenderer.invoke(IPC.installUninstall, opts),
+  },
+  claude: {
+    preview: (request) => ipcRenderer.invoke(IPC.claudePreview, request),
+    // The token is the ONLY thing that crosses on a run — no prompt, no argv, no cwd. Whatever
+    // this renderer believes it is running, what actually runs is the invocation main recorded
+    // when it built the preview. Keep it that way: an extra argument here is the whole hole.
+    run: (token, onOutput) => {
+      // The token doubles as the run's id, so output can be routed before the invoke resolves —
+      // there is no window in which a chunk arrives with nothing to attribute it to.
+      const listener = (_e: unknown, payload: ClaudeOutputChunk & { token: string }) => {
+        if (payload.token === token) onOutput({ stream: payload.stream, chunk: payload.chunk });
+      };
+      ipcRenderer.on(IPC_EVENTS.claudeOutput, listener);
+      return ipcRenderer
+        .invoke(IPC.claudeRun, token)
+        .finally(() => ipcRenderer.removeListener(IPC_EVENTS.claudeOutput, listener));
+    },
+    cancel: (token) => ipcRenderer.invoke(IPC.claudeCancel, token),
   },
   log: {
     subscribe: (handlers) => {

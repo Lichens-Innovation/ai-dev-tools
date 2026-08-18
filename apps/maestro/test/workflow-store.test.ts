@@ -8,7 +8,13 @@
 // Nothing about that fails loudly, which is why it is pinned here.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { workflowStore, seedWorkflowStore, setActiveWorkflowIdx, addWorkflow } from "../src/renderer/src/store/workflow-store.js";
+import {
+  workflowStore,
+  seedWorkflowStore,
+  replaceConfig,
+  setActiveWorkflowIdx,
+  addWorkflow,
+} from "../src/renderer/src/store/workflow-store.js";
 import type { MaestroConfigV3, MaestroWorkflowV3 } from "../src/renderer/src/utils/maestro.js";
 
 const PROJECT_A = "/tmp/project-a";
@@ -76,5 +82,38 @@ describe("seedWorkflowStore", () => {
     seedWorkflowStore(config("alpha", "second"), PROJECT_A);
 
     expect(workflowStore.state.activeWorkflowIdx).toBe(1);
+  });
+});
+
+// The user correcting the detected implementation chain rebuilds the whole starter graph, which
+// is the one edit that legitimately throws the in-memory config away. It is also asynchronous —
+// the seed is built in the main process — so it needs the same project guard as seeding does.
+describe("replaceConfig", () => {
+  it("replaces the config for the project it belongs to", () => {
+    seedWorkflowStore(config("alpha"), PROJECT_A);
+
+    replaceConfig(config("default", "tdd"), PROJECT_A);
+
+    expect(names()).toEqual(["default", "tdd"]);
+  });
+
+  it("drops a re-seed that resolves after the user has switched projects", () => {
+    seedWorkflowStore(config("alpha"), PROJECT_A);
+    seedWorkflowStore(config("beta"), PROJECT_B);
+
+    // In flight since before the switch: applying it now would put project A's starter graph on
+    // project B's canvas, and Save would write it to B's maestro.json.
+    replaceConfig(config("a-reseed"), PROJECT_A);
+
+    expect(names()).toEqual(["beta"]);
+  });
+
+  it("clamps the selected workflow index to the incoming list", () => {
+    seedWorkflowStore(config("one", "two", "three"), PROJECT_A);
+    setActiveWorkflowIdx(2);
+
+    replaceConfig(config("only"), PROJECT_A);
+
+    expect(workflowStore.state.activeWorkflowIdx).toBe(0);
   });
 });

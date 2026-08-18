@@ -13,6 +13,7 @@ import type {
   MaestroWorkflowV3,
   MaestroRuleV3,
   DiscoveredDefinition,
+  RepoDetection,
   SaveResult,
   SaveInput,
   TreeNode,
@@ -26,6 +27,7 @@ export type {
   MaestroEdgeV3,
   MaestroWorkflowV3,
   MaestroRuleV3,
+  RepoDetection,
   SaveResult,
 };
 
@@ -43,6 +45,8 @@ export interface MaestroConfigResult {
   projectRoot: string;
   /** True when `config` is the starter seed and nothing is on disk yet. */
   seeded: boolean;
+  /** Why the seed picked the implementation agents it did. Null once a config exists on disk. */
+  detection: RepoDetection | null;
   bundledAgents: BundledAgent[];
   projectSkills: ProjectSkill[];
 }
@@ -53,9 +57,18 @@ export async function getMaestroConfig(): Promise<MaestroConfigResult> {
     config: data.config,
     projectRoot: data.projectRoot,
     seeded: data.seeded,
+    detection: data.detection,
     bundledAgents: data.agents,
     projectSkills: data.skills,
   };
+}
+
+/**
+ * Rebuild the starter config around the chain the user corrected the detection to. Writes
+ * nothing — the project is still unconfigured until Save.
+ */
+export function reseedMaestroConfig(implAgents: string[]): Promise<MaestroConfigV3> {
+  return window.maestro.data.reseed(implAgents);
 }
 
 export interface MaestroRulesResult extends MaestroConfigResult {
@@ -77,6 +90,8 @@ export async function getRulesData(): Promise<MaestroRulesResult> {
     config: d.config,
     projectRoot: d.projectRoot,
     seeded: d.seeded,
+    // /rules seeds a BLANK config, not the starter graph, so there is no detected chain to explain.
+    detection: null,
     bundledAgents: [],
     projectSkills: [],
     tree: d.tree,

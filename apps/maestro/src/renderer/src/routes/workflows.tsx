@@ -7,9 +7,11 @@ import { toast } from "@repo/ui/toast";
 import TopNav from "../components/top-nav";
 import WorkflowCanvas from "../components/workflow-canvas";
 import SeededBanner from "../components/seeded-banner";
+import DetectedChain from "../components/detected-chain";
 import { callMain } from "../utils/call-main";
 import {
   getMaestroConfig,
+  reseedMaestroConfig,
   submitMaestroConfig,
   type MaestroWorkflowV3,
   type MaestroConfigResult,
@@ -17,6 +19,7 @@ import {
 import {
   workflowStore,
   seedWorkflowStore,
+  replaceConfig as storeReplaceConfig,
   setActiveWorkflowIdx,
   setAgentsAvailable as storeSetAgentsAvailable,
   setSkillsAvailable as storeSetSkillsAvailable,
@@ -34,6 +37,12 @@ export const Route = createFileRoute("/workflows")({
 
 type Phase = "idle" | "saving";
 
+/**
+ * The agents every seed carries whatever the repo is. Subtracting them from the config's instances
+ * leaves the implementation chain — the part detection proposes and the user may correct.
+ */
+const CORE_SEED_AGENTS = ["test", "reviewer", "refactor", "scribe"];
+
 function WorkflowsPage() {
   const loaderData = Route.useLoaderData() as MaestroConfigResult;
   const { bundledAgents, projectSkills } = loaderData;
@@ -49,6 +58,7 @@ function WorkflowsPage() {
   const activeWorkflowIdx = useStore(workflowStore, (s) => s.activeWorkflowIdx);
 
   const [phase, setPhase] = useState<Phase>("idle");
+  const [reseeding, setReseeding] = useState(false);
   const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState("");
   const [newWorkflowSource, setNewWorkflowSource] = useState<number | null>(null);
@@ -79,6 +89,26 @@ function WorkflowsPage() {
   };
 
   const cancelCreateWorkflow = () => setCreatingWorkflow(false);
+
+  /**
+   * The user correcting the detected implementation chain. The seed builder lives in the main
+   * process — it is the same `defaultV3Config` the loader used, so a corrected chain produces
+   * exactly the graph the repo would have got had detection been right in the first place.
+   * Nothing is written: the project stays unconfigured until Save.
+   */
+  const changeImplAgents = async (implAgents: string[]) => {
+    setReseeding(true);
+    try {
+      const res = await callMain(() => reseedMaestroConfig(implAgents));
+      if (!res.ok) {
+        toast(<>Could not re-seed the workflows: {res.error}</>, { variant: "error" });
+        return;
+      }
+      storeReplaceConfig(res.value, loaderData.projectRoot);
+    } finally {
+      setReseeding(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!config) return;
@@ -146,6 +176,17 @@ function WorkflowsPage() {
   const activeWorkflow = config.workflows[activeWorkflowIdx] ?? null;
   const availableSkillIds = config.skills_available;
 
+  // Read the chain back off the config rather than tracking it separately, so the chips can never
+  // disagree with the graph on the canvas.
+  const implChain = config.workflow_instances
+    .map((i) => i.name)
+    .filter((name) => !CORE_SEED_AGENTS.includes(name));
+  // Every discovered agent that isn't one of the core four is a candidate — including a project's
+  // own. `implChain` is unioned in so an agent the seed used but discovery didn't find still shows.
+  const implCandidates = [
+    ...new Set([...implChain, ...allAgents.map((a) => a.id).filter((id) => !CORE_SEED_AGENTS.includes(id))]),
+  ];
+
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden flex flex-col">
       <TopNav
@@ -164,6 +205,21 @@ function WorkflowsPage() {
           The workflows below are a starter configuration and are{" "}
           <strong className="text-(--ink)">not saved</strong> — press Save workflows to write them.
         </SeededBanner>
+      )}
+
+      {/*
+        Only while seeded. Once maestro.json exists the chain is the user's saved answer, and
+        re-proposing a detected one — over a graph they may have spent an afternoon on — would be
+        offering to overwrite their work.
+      */}
+      {loaderData.seeded && loaderData.detection && (
+        <DetectedChain
+          detection={loaderData.detection}
+          selected={implChain}
+          candidates={implCandidates}
+          busy={reseeding}
+          onChange={(agents) => void changeImplAgents(agents)}
+        />
       )}
 
       <div

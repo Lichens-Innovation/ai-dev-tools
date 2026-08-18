@@ -132,6 +132,33 @@ export {
   type UninstallReport,
 } from "./uninstall.js";
 
+export { detectImplAgents, type RepoDetection } from "./detect.js";
+
+// The `claude -p` bridge, in three modules on purpose: preview cannot spawn, run cannot invent.
+// Import `claude-preview.js` directly if you want that guarantee at the import level — pulling
+// preview off this barrel re-exports the spawn path alongside it.
+export {
+  previewClaudeRun,
+  CLAUDE_BASE_FLAGS,
+  type ClaudePreview,
+  type ClaudeRequest,
+  type ClaudeWriteTarget,
+} from "./claude-preview.js";
+
+export { resolveClaudeCli, claudeSearchDirs, cliNotFoundMessage, type ClaudeCli } from "./claude-cli.js";
+
+export {
+  runPreviewedClaude,
+  cancelClaudeRun,
+  disposeClaudeRuns,
+  TokenRefused,
+  type ClaudeRunEvents,
+  type ClaudeOutputChunk,
+  type ClaudeRunResult,
+} from "./claude-run.js";
+
+export { clearInvocations, TOKEN_TTL_MS, type ClaudeInvocation } from "./claude-tokens.js";
+
 export {
   defaultV3Config,
   buildWorkflow,
