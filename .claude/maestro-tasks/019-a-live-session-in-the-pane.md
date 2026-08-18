@@ -34,6 +34,15 @@ SDK session, so several things this task used to imply were new are not.
   empty write scope is already a working state: `writable: []` refuses every write with a reason
   saying the run was started to answer rather than to author. Do not build a second engine for the
   pane — `020` builds the _UI_ on this one.
+- **The permission callback bounds writes only, and cannot bound reads.** `decideWrite` returns
+  `allow` for `Read`/`Glob`/`Grep` without ever looking at the path, and that is deliberate: reads
+  are auto-approved by the permission system and never raise a prompt, which is the entire reason
+  `017` had to disclose the read scope up front. So the boundary check in the criteria below is
+  genuinely the `PreToolUse` hook layer from `SESSION-PANE-PLAN.md` — the one that returns
+  `permissionDecision: "ask"` to _route_ an out-of-scope read into the prompt UI — and not an
+  extension of `write-scope.ts`. Reaching for `decideWrite` first is the obvious wrong turn, because
+  it looks like it already handles every tool. Along with the streaming-input pump, this is the
+  largest piece of new ground in the slice.
 - **The tool set is a constant to extend, not to invent.** `SESSION_TOOLS` and
   `SESSION_DISALLOWED_TOOLS` are exported from `agent-sdk.ts`. `AskUserQuestion` and `Skill` are
   absent because the form path is headless; the pane is what makes them answerable, so this slice is

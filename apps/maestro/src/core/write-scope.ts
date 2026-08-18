@@ -37,6 +37,15 @@ export const WRITE_TOOLS = ["Edit", "Write", "MultiEdit", "NotebookEdit"] as con
 /**
  * Tools that cannot write to the filesystem at all, and are therefore allowed without a path check.
  *
+ * **This module bounds WRITES. It does not bound reads, and it is not the place to make it.** A
+ * `Read` of anything at all is allowed here without the path being looked at — because reads are
+ * auto-approved by the permission system and never raise a prompt at all, which is the whole reason
+ * `read-scope.ts` exists to disclose the directory list up front. Bounding what a session may read
+ * is a `PreToolUse` hook returning `permissionDecision: "ask"` (see SESSION-PANE-PLAN.md), which
+ * routes an out-of-scope read into a prompt rather than silently allowing or silently failing it.
+ * Adding a path check to the branch below would look like the fix and would not be one: it cannot
+ * see the read the model has already been told it may make.
+ *
  * `WebFetch`/`WebSearch` are here on the reasoning recorded in SESSION-PANE-PLAN.md: neither touches
  * the filesystem, authoring a skill usually means authoring about something external, and the
  * control on them is that the confirmation shows what a run can read rather than a blanket ban.
