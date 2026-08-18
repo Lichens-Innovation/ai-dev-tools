@@ -9,6 +9,15 @@ per-project container and port, its `/tmp` channel files, and the ~470 lines of 
 was to show a window. If you find a doc still describing a container to launch or a result file to
 wait on, it is stale — say so rather than following it.
 
+In M6 it also absorbed `apps/help-server`, the second and last of this repo's containerised web
+apps: its dashboard is `/tools`, its doc reader is `/docs`, its chat is a panel on the bridge, and
+its node logic is the last five modules of `src/core/`. That app, its `Dockerfile`,
+its `docker-compose.yml` and the `/help-server` slash command that started them are gone —
+**there is no server to start and no port 3008**. `plugins/ai-tools-manager/skills/super-help/`
+stayed: it is a skill the CLI invokes, not app machinery, and the chat panel still asks for it by
+name. This file is where that app's CLAUDE.md was re-homed; the ported modules and components each
+carry a `PORTED FROM` header naming their original.
+
 ## Why it exists
 
 In the web app every write went through Claude. The app ran in Docker and could only reach the
@@ -230,6 +239,37 @@ from overflowing when help-server's two sections arrived, and it is safe only be
 staleness badge moved onto the Library **button**: the badge is the one item in the bar nobody goes
 looking for, so it has to be visible from whatever route the user is already on.
 
+### Adding a tab to `/tools`, or a doc page
+
+Re-homed from `apps/help-server/CLAUDE.md`, which is where these two recipes lived until that app
+was deleted. Both changed shape in the move — a tab is an IPC round trip rather than a
+`createServerFn`, and a doc is read from the **open project** rather than a Docker mount — but the
+work is the same shape.
+
+**A tab.** Four of the five steps are in `src/core/` and `src/main/`; only the last is a component.
+
+1. Write the read in a `src/core/*.ts` module, taking `projectRoot` as an argument — never
+   `process.cwd()`, which under Docker was always this repo and here is wherever the app happened to
+   be launched from. This is what makes the dashboard work against a project that is not this one.
+2. Put the type it returns in `src/core/contracts.ts` (interfaces only) and widen `ToolsData`.
+3. Fold it into the **existing** `data:tools` handler in `src/main/ipc.ts` rather than adding a
+   channel. help-server's dashboard made one server-fn call per tab; this is one round trip
+   precisely so four tabs cannot each re-walk the project tree.
+4. Add the component under `src/renderer/src/components/tabs/` and an entry to `TABS` in
+   `routes/tools.tsx`.
+
+Unless the tab **runs something** — then it is not loader data at all, and needs a preview/run
+channel pair and a purpose-tagged token, like Usage Stats above.
+
+**A doc page.** Drop a `.md` file into the open project's `docs/`. The slug is the filename;
+`listDocs()` and `searchDocs()` in `src/core/docs.ts` pick it up with no registration anywhere.
+Heading anchors come from `slugifyHeading()`, which the search index and the reader must go on
+sharing — a second slugifier means search hits that scroll nowhere.
+
+**`src/renderer/src/routeTree.gen.ts` is generated** by the router plugin: commit it, never
+hand-edit it. help-server said the same about its own copy; it is the one piece of that app's stack
+that came across unchanged.
+
 ## The create-\* routes
 
 They are the last part of the web app to come across, and the only one where a model is genuinely
@@ -351,6 +391,12 @@ never opens this tab should not carry it.
   zero `<mark>` elements in an article opened from a search hit. Text nodes are reachable from a
   rehype plugin, so `utils/highlight.ts` marks the hast tree instead; that also means a term inside
   a link, a list item or a table cell lights up, which the per-element approach could not do.
+- **A doc slug is renderer input, and the reader treats it as such.** `isValidDocSlug` in
+  `src/core/docs.ts` rejects anything containing `/`, `\` or `.` _before_ the path is joined. The
+  slug arrives as a route param, so `../../../etc/passwd` is a file `readDoc` would otherwise be
+  perfectly happy to open and render. help-server validated it with a regex for exactly this
+  reason — keep the check if you touch that function, and keep it before the `path.join`, not
+  after.
 - **Two functions answer to "get the rules", and they are not the same set.**
   `discoverRuleLibrary` reads `<project>/rules/*.md` — what the project publishes, shown on
   `/tools`. `discoverProjectRules` reads every `.claude/rules/` in the tree — what is assigned to a

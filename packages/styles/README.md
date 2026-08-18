@@ -2,8 +2,8 @@
 
 The shared design system: Tailwind theme wiring, Sass partials, and the three UI typefaces.
 
-Consumed by `apps/maestro` and `apps/help-server`, each of which does
-`@import '@repo/styles/shared-styles.css'` from its own entry stylesheet.
+Consumed by `apps/maestro`, which does `@import '@repo/styles/shared-styles.css'` from its own
+entry stylesheet. `apps/help-server` was the second consumer until it was folded into Maestro.
 
 ## Fonts are vendored, not fetched
 
@@ -87,8 +87,10 @@ nothing off-origin, and the woff2 files are emitted beside it.
 
 ### The `file://` / HTTP split
 
-`fonts.css` uses relative `url('./fonts/…')`, which each consumer's bundler rewrites for its own
-`base`: Maestro emits `url(./x.woff2)` because a packaged Electron build loads over `file://` with
-`base: "./"`, while help-server and ai-tools-manager emit `url(/assets/x.woff2)` for an HTTP root.
-Both were checked in a running window. A change here that is only tested under one of the two can
-break the other while looking perfectly fine.
+`fonts.css` uses relative `url('./fonts/…')`, which a consumer's bundler rewrites for its own
+`base`. Maestro emits `url(./x.woff2)` because a packaged Electron build loads over `file://` with
+`base: "./"`; the two web apps this package used to serve — help-server and ai-tools-manager, both
+now folded into Maestro — emitted `url(/assets/x.woff2)` for an HTTP root, and both paths were
+checked in a running window. Maestro is the only consumer left, so only the `file://` path is
+exercised today: a change here that assumes it is the only one will break the next HTTP-served
+consumer while looking perfectly fine.

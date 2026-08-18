@@ -5,6 +5,11 @@ app that configures Maestro with no Claude session in the loop. As of M5 that we
 the container, its port allocation, the `/tmp` channel files and the launcher scripts are gone, and
 the plugin keeps only the runtime hooks.
 
+**The migration is complete.** M6 folded `apps/help-server` in and deleted it too, so `apps/`
+holds one application and this repo has no web app, no Dockerfile for one, and no slash command
+that starts one. Everything below is now history: read it for the reasoning, not for the layout —
+`apps/maestro/CLAUDE.md` describes what actually exists.
+
 | Plan | Status | Queued as |
 |---|---|---|
 | M1 — extract `packages/maestro-core` | **done** | — |
@@ -13,8 +18,8 @@ the plugin keeps only the runtime hooks.
 | [M3 — in-app install / update / uninstall](m3-in-app-install.md) | **done** | `004`, `005`, `006` |
 | [M4 — the `claude -p` bridge and the create-\* routes](m4-claude-bridge.md) | **done** | `007`, `008` |
 | [M5 — retire the Docker path](m5-retire-docker.md) | **done** | `009` |
-| [Core absorption — fold `maestro-core` into the app](core-absorption.md) | after M5, before M6 | `010`, `011` |
-| [M6 — fold in help-server](m6-help-server-merge.md) | last | `012`, `013`, `014` |
+| [Core absorption — fold `maestro-core` into the app](core-absorption.md) | **done** | `010`, `011` |
+| [M6 — fold in help-server](m6-help-server-merge.md) | **done** — help-server is deleted | `012`, `013`, `014` |
 
 These plans are the design; `.claude/maestro-tasks/` is the runnable decomposition of them, and
 `status.json` there holds the dependency graph and each task's ready/blocked state. The task files
