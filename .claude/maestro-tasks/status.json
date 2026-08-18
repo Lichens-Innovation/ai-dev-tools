@@ -99,13 +99,13 @@
     ]
   },
   "019-a-live-session-in-the-pane.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "018-run-create-authoring-on-the-agent-sdk.md"
     ]
   },
   "020-permission-prompts-in-the-pane.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "019-a-live-session-in-the-pane.md"
     ]
@@ -129,7 +129,7 @@
     ]
   },
   "024-a-budget-ceiling-you-can-continue-past.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "019-a-live-session-in-the-pane.md"
     ]

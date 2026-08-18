@@ -405,10 +405,12 @@ export interface GitPort {
  * and each names the artifact the deterministic scaffold has ALREADY written, so the run's job is
  * finishing a file rather than creating one.
  *
- * `help-chat` is here for the same reason and is the interesting one: help-server ran the chat by
- * spawning `claude` itself, with no preview and no confirmation. It carries the user's own prose,
- * which `create-skill`'s `idea` always did too — what matters is that the SENTENCE AROUND it is
- * still built in `claude-preview.ts`, and that the result is shown before it can run.
+ * `help-chat` USED TO BE HERE, and its deletion is the shape of this union's rule rather than an
+ * exception to it. The chat had no session, so every question re-sent a capped copy of the
+ * transcript as prompt text; the live session pane holds the conversation instead, and a second
+ * conversational surface would have meant two transcripts and two consent models. The pane does
+ * not go through this union at all — a turn there is user-typed text on `session:say`, not a
+ * request main builds a prompt from. See `SessionEvent` below.
  */
 export type ClaudeRequest =
   | {
@@ -416,26 +418,7 @@ export type ClaudeRequest =
       /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
       filename: string;
     }
-  | {
-      kind: "help-chat";
-      /** The question, as typed. Trimmed, length-capped and wrapped into a prompt by preview. */
-      message: string;
-      /**
-       * The exchange so far, so a follow-up question means something.
-       *
-       * Sent from the renderer rather than remembered in main, ON PURPOSE: it is then part of the
-       * prompt the preview displays, and "the user saw exactly what ran" holds on the tenth
-       * message as much as the first. Only the last few turns survive into the prompt.
-       */
-      history: ChatTurn[];
-    }
   | CreateRequest;
-
-/** One side of a help-chat exchange, as it rides along on the next question. */
-export interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
-}
 
 /** A path the run may write, and how. Shown in the confirmation before anything is spawned. */
 export interface ClaudeWriteTarget {
@@ -520,8 +503,17 @@ export interface SettingsPort {
   resolve(cwd: string): Promise<EffectiveSettingsSnapshot>;
 }
 
-/** Where a readable directory came from: the run's own working directory, or a settings file. */
-export type ReadScopeOrigin = "cwd" | "settings";
+/**
+ * Where a readable directory came from.
+ *
+ * `cwd` is the working directory the app chose. `settings` is a tree a file on disk added, which
+ * the app did not ask for. `app` arrived with the session pane: a live session reads the open
+ * project AND the marketplaces resolved out of `~/.claude/plugins/known_marketplaces.json`, which
+ * this app passes as `additionalDirectories` — chosen by the app, like `cwd`, but not the place the
+ * session is running. Three origins rather than a flag, because "the app widened this" and "a file
+ * you have never read widened this" are different things to consent to.
+ */
+export type ReadScopeOrigin = "cwd" | "app" | "settings";
 
 /** A tree the run can read. Everything under it, with no prompt at any point. */
 export interface ClaudeReadDirectory {
@@ -658,6 +650,84 @@ export interface ClaudeRunResult {
    */
   argv: string[];
   cwd: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The session pane — one live, multi-turn conversation per open project.
+//
+// A run on `claude:run` is a previewed invocation: main authored the prompt, the user approved it,
+// and a token authorises exactly that. A session is the other shape entirely — the user types
+// every turn, so there is no prompt for main to build and nothing for a confirmation to display
+// that the user did not just write. The invariant is restated rather than dropped: `session:say`
+// carries USER-TYPED TEXT AND NOTHING ELSE, and it is stamped `origin: { kind: "human" }` at the
+// SDK boundary, which is what makes "the renderer never authors a prompt" checkable rather than
+// merely intended.
+//
+// What the session may WRITE is nothing, and there is no field here by which it could become
+// anything: `SessionInfo.writable` is reported so the header can say so, and the permission
+// callback reads an empty list off the session itself. `020` builds the prompt UI on that engine;
+// `022` is the first thing allowed to add a directory to it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One thing that happened in a session, as it happened.
+ *
+ * A discriminated union rather than a text stream, which is what `claude:run` delivers. A run's
+ * output is destined for a `<pre>`; a transcript has to render an assistant's prose differently
+ * from a tool call, and a refusal differently from both. Flattening them into text in main and
+ * re-parsing them in the renderer is how the log view's shapes ended up in two places.
+ */
+export type SessionEvent =
+  /** Assistant prose, one complete message at a time. */
+  | { kind: "assistant"; seq: number; text: string }
+  /** A tool the model used. Rendered through the same humanizer the log view uses. */
+  | { kind: "tool"; seq: number; tool: string; target: string | null }
+  /**
+   * A tool call this app refused, with the reason the model was given — the same string, so the
+   * transcript and the model's context agree about what happened.
+   */
+  | { kind: "refusal"; seq: number; tool: string; target: string | null; reason: string }
+  /** Something about the session itself: stderr worth surfacing, a boundary event. */
+  | { kind: "notice"; seq: number; text: string }
+  /** A turn finished. `ok: false` means the session reported an error rather than an answer. */
+  | { kind: "turn"; seq: number; ok: boolean; error: string | null; costUsd: number | null }
+  /** The session is over — no further turn can be sent. `error` is null on a clean close. */
+  | { kind: "ended"; seq: number; error: string | null };
+
+/**
+ * One session event before the sequence number is stamped on it.
+ *
+ * Written as a distributive conditional because a bare `Omit<SessionEvent, "seq">` is NOT: applied
+ * to a union it collapses to the shared keys, so `{ kind, text }` stops type-checking and every
+ * emit site looks broken for a reason that is not about the emit site. The producer stamps `seq`;
+ * everything else is decided where the event happens.
+ */
+export type SessionEventBody = SessionEvent extends infer T ? (T extends SessionEvent ? Omit<T, "seq"> : never) : never;
+
+/** Everything the pane header states about the session it is attached to. */
+export interface SessionInfo {
+  /** Null when no session is running: every other field then describes what one WOULD get. */
+  id: string | null;
+  projectRoot: string;
+  /** Where the session runs. The open project — a create-\* handoff changing that arrives in `022`. */
+  cwd: string;
+  /**
+   * What it can see, in the same shape and rendered by the same component as the confirmation
+   * dialog's disclosure. Not a second notion of "what this session can read".
+   */
+  read: ClaudeReadScope;
+  /**
+   * What it may write. Empty, and there is no path to add to it in this slice — the header says so
+   * in words, because an empty list on screen says nothing.
+   */
+  writable: string[];
+  /** The tools the session was offered, so the header can name them rather than imply them. */
+  tools: string[];
+  /** Skills declared for the session, including the help skill the deleted chat asked for by name. */
+  skills: string[];
+  /** False when the `claude` CLI could not be found: the composer says so instead of failing on send. */
+  available: boolean;
+  unavailable: string | null;
 }
 
 export interface SaveResult {

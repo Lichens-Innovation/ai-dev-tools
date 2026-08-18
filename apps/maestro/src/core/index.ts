@@ -190,6 +190,7 @@ export {
   cancelClaudeRun,
   disposeClaudeRuns,
   spawnClaudeChild,
+  terminateChildGroup,
   TokenRefused,
   type ClaudeRunDeps,
   type ClaudeRunEvents,
@@ -212,11 +213,18 @@ export {
   resolveEffectiveSettings,
   billingFrom,
   startAgentSession,
+  startPaneSession,
+  paneSessionTarget,
   AGENT_SDK_PACKAGE,
   BILLING_ENV_VARS,
   SMOKE_PROMPT,
   SESSION_TOOLS,
   SESSION_DISALLOWED_TOOLS,
+  PANE_TOOLS,
+  PANE_SKILLS,
+  type PaneSession,
+  type PaneSessionRequest,
+  type PaneSessionTarget,
   type AgentBilling,
   type AgentChildEnv,
   type AgentDenial,
@@ -237,6 +245,19 @@ export {
   type WriteDecision,
   type WriteScopeInput,
 } from "./write-scope.js";
+
+// What a live session may READ, decided per tool call by a `PreToolUse` hook. Pure, and a THIRD
+// module rather than a branch of the two above: `decideWrite` structurally cannot bound reads
+// (`canUseTool` never sees them) and `read-scope.ts` only discloses. See ./session-scope.ts.
+export {
+  decideBoundary,
+  boundaryTargetOf,
+  BOUNDED_TOOLS,
+  UNBOUNDED_TOOLS,
+  type BoundaryDecision,
+  type BoundaryInput,
+  type BoundaryTarget,
+} from "./session-scope.js";
 
 // Usage stats. The same preview-then-run shape and the same token store as the bridge above,
 // because the thing being confirmed is the same kind of thing: a command about to run on the

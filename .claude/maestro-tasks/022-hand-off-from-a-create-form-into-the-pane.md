@@ -47,9 +47,29 @@ the write target leaves the user having consented to a read scope the session th
 again. Note what that scope contains after `018`: a run loads **no filesystem settings**
 (`settingSources: []`), so it is the run's cwd plus whatever the managed (administrator) policy tier
 contributes, and no `additionalDirectories` — user-, project- and local-tier entries are simply not
-there any more. The pane's own scope is wider (`019` adds the project and the marketplace), so the
-handoff is a **widening** and should read as one on screen rather than silently replacing one list
-with another.
+there any more. The pane's own scope is wider, so the handoff is a **widening** and should read as
+one on screen rather than silently replacing one list with another.
+
+### What `019` already built, and what it deliberately did not
+
+- **The pane's read scope is already wide, and wider than this task assumed.** Not "the resolved
+  marketplace" but **the open project plus every local marketplace** — with no create-form handoff in
+  `019` there was no single marketplace to name, so main resolves them all itself with
+  `listMarketplaces()` (the `source: "directory"` entries of
+  `~/.claude/plugins/known_marketplaces.json`). They are passed as `additionalDirectories` and
+  disclosed with `origin: "app"`. So the widening this slice performs is usually **already done**:
+  expect the target marketplace to be readable before the handoff, and make the on-screen story
+  about the **write** scope rather than pretending the read scope just grew.
+- **No name and no path crosses the process boundary for that list.** `scaffold.ts`'s rule — _a
+  renderer describes an artifact and never nominates a directory_ — is enforced literally in `019`.
+  A handoff must keep it: pass a completed preview token, never a resolved path.
+- **`session:start` takes no argument today.** The cwd comes from main's own project state, and
+  `session:say` is the only way into the conversation — it always spends a turn. Both the handoff
+  entry point and the append-without-a-turn seeding (`shouldQuery: false`) are genuinely new ground
+  in this slice.
+- **There is no write-scope accumulator to extend.** The pane reaches `decideWrite` with
+  `writable: []`, so every write is refused with "started to answer, not to author". This slice
+  builds the accumulator; the engine and the refusal message it must keep are already there.
 
 The existing headless finish stays available. The two paths differ in who is driving, not in what
 they are allowed to do — and since `018` that is literally true rather than aspirational: the

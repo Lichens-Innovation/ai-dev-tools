@@ -13,7 +13,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 // The barrel, deliberately: this is a node-side test, and the point of the prompt-drift check
 // below is to compare the renderer's literal against what the MAIN process actually builds.
-import { previewClaudeRun, SESSION_TOOLS, SESSION_DISALLOWED_TOOLS } from "../src/core/index.js";
+import {
+  previewClaudeRun,
+  PANE_SKILLS,
+  PANE_TOOLS,
+  SESSION_TOOLS,
+  SESSION_DISALLOWED_TOOLS,
+} from "../src/core/index.js";
 import { IPC, IPC_EVENTS } from "../src/shared/ipc.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -251,7 +257,7 @@ describe("the claude bridge across the process boundary", () => {
     // `read-scope.ts` from a resolution main performed; the components render `preview.read` and
     // compute nothing. A renderer that assembled its own list would be describing a run that is
     // not the run about to happen — which is what a confirmation exists to prevent.
-    for (const file of ["src/renderer/src/components/read-scope.tsx", "src/renderer/src/components/chat-panel.tsx"]) {
+    for (const file of ["src/renderer/src/components/read-scope.tsx", "src/renderer/src/components/session-pane.tsx"]) {
       const src = stripComments(read(file));
       expect(src, `${file} builds paths of its own`).not.toMatch(/\bpath\.(join|resolve|relative)\(/);
       // Rendering `read.sources[].permissions.additionalDirectories.length` is fine — that value
@@ -261,7 +267,9 @@ describe("the claude bridge across the process boundary", () => {
     }
     // And the scope reaches the components as one prop, rather than being reassembled from parts.
     expect(read("src/renderer/src/components/claude-run-dialog.tsx")).toMatch(/<ReadScope read=\{preview\.read\}/);
-    expect(read("src/renderer/src/components/chat-panel.tsx")).toMatch(/<ReadScope read=\{preview\.read\}/);
+    // The pane header shows the SAME thing the confirmation does, through the same component and
+    // off a scope main built — a second notion of "what this session can see" is the defect here.
+    expect(read("src/renderer/src/components/session-pane.tsx")).toMatch(/<ReadScope read=\{session\.info\.read\}/);
   });
 
   it("drops outstanding preview tokens when the project changes", () => {
@@ -391,9 +399,12 @@ describe("the claude bridge across the process boundary", () => {
     // resolve the other and the dialog keeps describing a session that no longer exists, with
     // nothing failing.
     const sdk = stripComments(read("src/core/agent-sdk.ts"));
-    // Three: the startup smoke, the session a run is, and the resolution the disclosure is built on.
+    // Four: the startup smoke, the session a RUN is, the session the PANE is, and the resolution
+    // both disclosures are built on. `019` added the fourth, and it carries a consequence of its
+    // own — a pane session loads no CLAUDE.md, since the SDK needs `settingSources` to include
+    // 'project' for that.
     const sessions = sdk.match(/settingSources:\s*\[\]/g) ?? [];
-    expect(sessions.length, "a query or a resolution stopped passing an empty settingSources").toBe(3);
+    expect(sessions.length, "a query or a resolution stopped passing an empty settingSources").toBe(4);
     expect(sdk).toMatch(/resolveSettings\(\{\s*cwd,\s*settingSources:\s*\[\]\s*\}\)/);
   });
 
@@ -521,72 +532,27 @@ describe("the surface folded in from help-server", () => {
     expect(menu).toContain('badge !== "none"');
   });
 
-  it("runs the chat through the bridge, from one place", () => {
-    // The acceptance criterion, asserted where it can regress. help-server's chat spawned the
-    // `claude` CLI directly, per message, with no preview — the second independently-grown spawn
-    // path the bridge exists to replace. `chat-context.tsx` is the one module that may reach the
-    // bridge, and it previews before it runs; the panel is a view of it.
-    //
-    // Comments stripped throughout: both files' headers name the calls they must not make, and
-    // prose about a forbidden call matches a check for one exactly as well as a real call does.
-    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
-    expect(ctx).toContain('window.maestro.claude.preview({ kind: "help-chat"');
-    expect(ctx).toContain("window.maestro.claude.run(");
-    // Preview first: a run is only ever started from an object the preview channel produced.
-    expect(ctx.indexOf("window.maestro.claude.preview")).toBeGreaterThan(-1);
+  it("has no help chat left to run, and one conversational surface in its place", () => {
+    // `019` DELETED the chat: its panel, its context, and the `{ kind: "help-chat" }` request kind.
+    // Two conversational surfaces would have meant two transcripts and two consent models, and the
+    // chat was strictly weaker — it had no session, so it re-sent a capped copy of its own history
+    // as prompt text on every question. Asserted as an ABSENCE because a partial revival (the
+    // request kind back without the panel, or the reverse) is exactly the shape a merge produces.
+    const files = sourcesUnder("src").map((f) => path.relative(appRoot, f));
+    expect(files).not.toContain("src/renderer/src/utils/chat-context.tsx");
+    expect(files).not.toContain("src/renderer/src/components/chat-panel.tsx");
 
-    const panel = stripComments(read("src/renderer/src/components/chat-panel.tsx"));
-    expect(panel, "the chat panel talks to the bridge directly").not.toMatch(/window\.maestro\.claude/);
-    expect(panel).not.toMatch(/claude\s+-p\b|--permission-mode|child_process|spawn\(/);
-    expect(panel).toContain("SlidePanel");
-
-    // And nowhere else in the renderer, so there is no second chat path to review.
-    const callSites = sourcesUnder("src/renderer")
+    const revivals = sourcesUnder("src")
       .filter((f) => /kind:\s*["']help-chat["']/.test(stripComments(fs.readFileSync(f, "utf8"))))
       .map((f) => path.relative(appRoot, f));
-    expect(callSites).toEqual(["src/renderer/src/utils/chat-context.tsx"]);
-  });
+    expect(revivals, "the help-chat request kind is back").toEqual([]);
 
-  it("shows the prompt before the chat runs, and lets declining run nothing", () => {
-    // The confirmation is inline in the transcript rather than a modal (the answer belongs in the
-    // conversation), so `ClaudeRunDialog`'s own guarantees do not cover it. What it must render is
-    // the same list: the full prompt verbatim, the exact argv, and the working directory.
-    const panel = read("src/renderer/src/components/chat-panel.tsx");
-    expect(panel).toContain("{preview.prompt}");
-    expect(panel).toContain("preview.argv");
-    expect(panel).toContain("{preview.cwd}");
-
-    // Declining drops the preview. Nothing was spawned to produce it — `claude:preview` cannot —
-    // so `decline` has nothing to stop and must not reach the run channel.
-    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
-    const decline = ctx.slice(ctx.indexOf("const decline ="), ctx.indexOf("const stop ="));
-    expect(decline).toContain("setPending(null)");
-    expect(decline).not.toMatch(/window\.maestro\.claude\.run|runPreview/);
-  });
-
-  it("defaults the chat's confirmation to ASKING, and scopes the opt-out to the session", () => {
-    // A chat makes per-message confirmation feel heavy, so there is an opt-out. Three properties
-    // are what make it an opt-out rather than the removal of the confirmation, and all three are
-    // one-character changes away from being lost.
-    const ctx = stripComments(read("src/renderer/src/utils/chat-context.tsx"));
-
-    // 1. It defaults to asking.
-    expect(ctx).toMatch(/const \[askBeforeRun, setAskBeforeRun\] = useState\(true\)/);
-
-    // 2. It is scoped no wider than the session: nothing persists it, so a restart asks again.
-    expect(ctx).not.toMatch(/localStorage|sessionStorage|indexedDB/);
-    expect(ctx).not.toMatch(/askBeforeRun[^\n]*(?:invoke|maestro\.config|writeFile)/);
-    // And a project switch resets it, like the transcript and the outstanding tokens.
-    expect(ctx).toMatch(/setAskBeforeRun\(true\)[\s\S]{0,200}\[projectRoot\]/);
-
-    // 3. It is visible and revocable in the UI, in both states — a checkbox bound to the setter,
-    //    rendered unconditionally rather than only while it is on.
-    const panel = read("src/renderer/src/components/chat-panel.tsx");
-    expect(panel).toContain("checked={chat.askBeforeRun}");
-    expect(panel).toContain("chat.setAskBeforeRun(e.target.checked)");
-    // Even with it off the prompt is kept on the answer: not being interrupted is not the same as
-    // not being told what ran.
-    expect(panel).toContain("msg.prompt");
+    // What it inherits: the help skill, by name rather than pasted into a prompt string. It is a
+    // declared SESSION skill now, which is why `Skill` had to join the pane's tool set.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(PANE_SKILLS, "the help skill is no longer reachable").toContain("super-help");
+    expect(PANE_TOOLS, "the pane cannot invoke a skill").toContain("Skill");
+    expect(sdk).toMatch(/skills:\s*\[\.\.\.PANE_SKILLS\]/);
   });
 
   it("previews the usage-stats command before running it, and pins any network fetch", () => {
@@ -632,6 +598,93 @@ describe("the surface folded in from help-server", () => {
       expect(src, `${route} does not use callMain`).toContain("callMain(");
       expect(src, `${route} awaits a channel directly`).not.toMatch(/await\s+window\.maestro\./);
     }
+  });
+});
+
+describe("the session pane", () => {
+  // The pane is the app's SECOND way to reach a model and the first one that holds a conversation.
+  // Its guarantees are not the bridge's — there is no prompt to preview, because the user typed it
+  // — so they are pinned separately here, and every one of them fails silently on its own.
+  const ipc = read("src/main/ipc.ts");
+
+  it("lets the pane send user-typed text and nothing else", () => {
+    // THE INVARIANT, RESTATED. `claude:run` guarantees the only executable prompts are ones the
+    // user was SHOWN, and it buys that by taking a token and no other argument. A session turn has
+    // nothing to show — the user wrote it — so the guarantee becomes: the only prompts are ones the
+    // user WROTE. That rests on two things a diff could quietly undo.
+    //
+    // 1. The preload forwards the session id and the text. A preload that "helpfully" attached a
+    //    system prompt, a history array or a directory would make the renderer a prompt author.
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.sessionSay,\s*id,\s*text\s*\)/);
+    expect(preload).toMatch(/invoke\(IPC\.sessionStart\)/);
+    expect(preload, "the renderer picks the session's directory").not.toMatch(/sessionStart,\s*\w/);
+
+    // 2. The turn is stamped as human-authored at the SDK boundary. Claude Code treats an
+    //    unattributed user message differently and checks that require a human-typed prompt reject
+    //    it, so this is what makes the property enforceable rather than merely intended.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/origin:\s*\{\s*kind:\s*"human"\s*\}/);
+
+    // And exactly one module in the renderer may reach the session channels, so there is no second
+    // composer to review. The pane is a view of it — the same rule the chat panel had.
+    const callers = sourcesUnder("src/renderer")
+      .filter((f) => /window\.maestro\.session\./.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(callers).toEqual(["src/renderer/src/utils/session-context.tsx"]);
+    expect(stripComments(read("src/renderer/src/components/session-pane.tsx"))).not.toMatch(/window\.maestro/);
+  });
+
+  it("gives the pane an empty write scope with no channel that could widen it", () => {
+    // The pane ships before permission prompts exist, and that is only safe because it CANNOT
+    // write. Two properties, both of which fail silently: the callback is the same engine the form
+    // path uses (a second one would drift), and it is handed a literal empty list rather than
+    // anything a caller supplied.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    expect(pane).toMatch(/decideWrite\(\{\s*tool,\s*input,\s*writable:\s*\[\],/);
+    expect(pane, "the pane grew its own permission engine").not.toMatch(/behavior:\s*"deny"/);
+
+    // Nothing on the wire names a writable path, so `022` has to add a channel rather than a field.
+    const shared = read("src/shared/ipc.ts");
+    const session = shared.slice(shared.indexOf("  session: {"), shared.indexOf("  stats: {"));
+    expect(session).not.toMatch(/writable|writeable|addDirector/i);
+  });
+
+  it("bounds what a live session may READ with a hook, not with the write callback", () => {
+    // The obvious wrong turn, asserted so it stays wrong. `decideWrite` returns `allow` for
+    // Read/Glob/Grep WITHOUT LOOKING AT THE PATH, deliberately — reads are auto-approved by the
+    // permission system and never reach `canUseTool` at all, which is why `read-scope.ts` exists to
+    // disclose them. The only place a read can be stopped is a `PreToolUse` hook, which fires for
+    // every tool call before the permission flow.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/PreToolUse:\s*\[/);
+    expect(sdk).toMatch(/decideBoundary\(/);
+    expect(sdk).toMatch(/permissionDecision:\s*"deny"/);
+    // The boundary and the disclosure are ONE list. Two would let the header describe a session
+    // that can see more (or less) than the hook allows, with nothing failing.
+    expect(sdk).toMatch(/additionalDirectories:\s*\[\.\.\.request\.additionalDirectories\]/);
+
+    // And no path check was smuggled into the write decision, where it would look like the fix.
+    const write = stripComments(read("src/core/write-scope.ts"));
+    const readBranch = write.slice(write.indexOf("export function decideWrite"), write.indexOf("if (!(WRITE_TOOLS"));
+    expect(readBranch).toMatch(/READ_ONLY_TOOLS[\s\S]*return \{ behavior: "allow" \}/);
+  });
+
+  it("ends a session on a project switch and reaps it on quit", () => {
+    // A detached process group outlives its parent BY DESIGN — that is how Stop reaches the CLI's
+    // own children — so every exit has to kill it. Three exits, and the transcript makes the first
+    // one the easiest to forget.
+    const announce = ipc.slice(ipc.indexOf("function announce("), ipc.indexOf("export function registerIpc"));
+    expect(announce, "a project switch leaves the previous project's session running").toContain("endAllSessions()");
+    expect(ipc).toMatch(/export function disposeIpc[\s\S]*disposeSessions\(\)/);
+    // A window that closes or reloads is the case with no user action to hang the cleanup off.
+    expect(ipc).toMatch(/destroyed",\s*\(\)\s*=>\s*endSession\(/);
+
+    // And nothing starts a session implicitly: the only caller of `startSession` is the channel the
+    // user's own click reaches.
+    const starts = (ipc.match(/startSession\(/g) ?? []).length;
+    expect(starts, "something starts a session without being asked").toBe(1);
   });
 });
 

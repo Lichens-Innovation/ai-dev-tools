@@ -19,14 +19,28 @@ be configured away.
 Previews are opt-in: without declaring the preview format at session start, no previews are emitted
 at all and the option list arrives bare.
 
-**`AskUserQuestion` is not in the tool set yet.** `018` shipped `SESSION_TOOLS` in
-`src/core/agent-sdk.ts` as `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch, Edit, Write`, and left
-`AskUserQuestion` and `Skill` out deliberately: the form path is headless, so a question has nobody
-to answer it. `019` is where the pane makes them answerable. If a question never arrives, check that
-constant before anything else — and check `toolConfig`, since previews are separately opt-in. Extend
-`SESSION_TOOLS`; do not declare a second list. Note also that `018` uses `tools`/`disallowedTools`
-and never `allowedTools`, which auto-approves without restricting — a question routed through
-`allowedTools` would be answered by the SDK instead of by the user.
+**`AskUserQuestion` is still not in the tool set, and this slice is where it arrives.** `018` shipped
+`SESSION_TOOLS` in `src/core/agent-sdk.ts` as `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch,
+Edit, Write`, leaving `AskUserQuestion` and `Skill` out deliberately: the form path is headless, so a
+question has nobody to answer it.
+
+### What `019` already built, and what it deliberately did not
+
+**`019` added `Skill` and only `Skill`** — `PANE_TOOLS = [...SESSION_TOOLS, "Skill"]` in
+`agent-sdk.ts`. It did **not** add `AskUserQuestion`, and that was a decision rather than an
+oversight: nothing in `019` can render a structured question, and an offered-then-refused tool costs
+turns to argue with where an unoffered one costs nothing. So this slice owns **both** mechanical
+preconditions, and neither exists anywhere in the app today:
+
+- adding `AskUserQuestion` to `PANE_TOOLS` — extend that constant, do not declare a third list; and
+- passing `toolConfig: { askUserQuestion: { previewFormat: 'markdown' } }`, which is **not passed
+  anywhere** at present. Without it Claude emits no previews at all and the option list arrives bare.
+
+If a question never arrives, check those two before anything else. Note also that `018` uses
+`tools`/`disallowedTools` and never `allowedTools`, which auto-approves without restricting — a
+question routed through `allowedTools` would be answered by the SDK instead of by the user. And
+`020` owns the callback branch this slice hangs a component off; the permission prompt is where the
+tool-name branch lives.
 
 **The answer travels back through the field this app otherwise refuses to expose**, and that
 collision needs an explicit, checkable carve-out rather than an exception. The renderer sends a

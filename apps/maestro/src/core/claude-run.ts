@@ -136,6 +136,21 @@ export function spawnClaudeChild(options: SpawnOptions): ChildProcessByStdio<Wri
 }
 
 /**
+ * Ask a child's whole process group to stop, and insist after a grace.
+ *
+ * The escalation `cancelClaudeRun` performs, exported so the session pane's teardown is the same
+ * teardown rather than a second one written from the same description. The pane holds no token —
+ * its turns are typed, not previewed — so it cannot go through `cancelClaudeRun`, but the property
+ * that matters is identical: closing the SDK query releases the child the SDK knows about and
+ * reaches none of its grandchildren, so the group has to be signalled too.
+ */
+export function terminateChildGroup(child: ChildProcess): void {
+  signalGroup(child, "SIGTERM");
+  const timer = setTimeout(() => signalGroup(child, "SIGKILL"), SIGKILL_AFTER_MS);
+  timer.unref?.();
+}
+
+/**
  * Run the invocation a token authorises, streaming its output, and resolve with how it ended.
  *
  * Throws `TokenRefused` — before anything is spawned — for a forged, replayed or expired token.

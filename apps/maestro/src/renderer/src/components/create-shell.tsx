@@ -4,6 +4,7 @@ import ShortcutsDialog from "@repo/ui/shortcuts-dialog";
 import Button from "@repo/ui/button";
 import { Keyboard, Sparkles } from "lucide-react";
 import TopNav from "./top-nav";
+import { useSession } from "../utils/session-context";
 
 /**
  * The chrome the four create-* routes share: navigation, a header with the mode pills, the
@@ -97,10 +98,19 @@ export default function CreateShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [fieldIds, rowIds, onSubmit, onToggleMode, onHelpOpenChange]);
 
+  // THE PANE TAKES THIS COLUMN. The preview exists to show the file that WILL be generated; once a
+  // conversation is open the artifact is already on disk and the conversation is the more useful
+  // thing to have beside the form. Two 460px columns would also leave the form unusably narrow on
+  // this app's 960px minimum, so the choice is not decoration.
+  const { open: sessionOpen } = useSession();
+
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden flex flex-col">
       <TopNav />
-      <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "minmax(0, 1fr) 460px" }}>
+      <div
+        className="flex-1 grid overflow-hidden"
+        style={{ gridTemplateColumns: sessionOpen ? "minmax(0, 1fr)" : "minmax(0, 1fr) 460px" }}
+      >
         {/* Left — the form */}
         <div className="overflow-y-auto px-10 py-8">
           <div className="max-w-155 mx-auto">
@@ -138,8 +148,9 @@ export default function CreateShell({
           </div>
         </div>
 
-        {/* Right — the file that will be written, as it will be written */}
-        <div className="border-l border-(--line) overflow-y-auto flex flex-col">{preview}</div>
+        {/* Right — the file that will be written, as it will be written. Yielded to the session
+            pane while one is open; see the note above the grid. */}
+        {!sessionOpen && <div className="border-l border-(--line) overflow-y-auto flex flex-col">{preview}</div>}
       </div>
 
       <ShortcutsDialog

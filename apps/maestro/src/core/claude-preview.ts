@@ -27,7 +27,6 @@ import { resolveCreateTarget } from "./scaffold.js";
 import { tasksDirFor } from "./tasks.js";
 import { joinOxford } from "./text.js";
 import type {
-  ChatTurn,
   ClaudePreview,
   ClaudeReadScope,
   ClaudeRequest,
@@ -70,13 +69,6 @@ export interface PreviewOptions extends ResolveOptions {
  * comes back on `ClaudeRunResult.argv`.
  */
 export const CLAUDE_BASE_FLAGS = ["-p"] as const;
-
-/** Turns of chat history that ride along in the prompt. Older ones are dropped. */
-const CHAT_HISTORY_TURNS = 10;
-
-/** Per-turn and per-message caps, so the prompt the user is shown stays a thing they can read. */
-const CHAT_MESSAGE_MAX = 4000;
-const CHAT_TURN_MAX = 1500;
 
 interface BuiltRequest {
   prompt: string;
@@ -210,55 +202,6 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
 }
 
 /**
- * The help chat's prompt: one question, plus the exchange it follows.
- *
- * The chat is the one request kind whose payload is free prose the user typed, so it is worth
- * being precise about what that does and does not change. It does not make the renderer the source
- * of a prompt: the sentence around the question — "Use the /super-help skill to answer" — is built
- * here and nowhere else, and there is no field on the request that can reach argv. It is the same
- * arrangement `create-skill`'s `idea` has always had. What makes it safe is the other half of the
- * bridge: whatever comes out of here is shown to the user, in full, before it can run.
- *
- * History travels ON THE REQUEST rather than being kept in this process, and that is deliberate
- * too. A transcript held in main would be prompt text the user could not see accumulating; carried
- * on the request, it is part of the string the preview displays, so "the user saw what ran" stays
- * literally true on the tenth message as much as the first. It is capped for the same reason — a
- * prompt too long to read is one nobody reads.
- */
-function buildChat(message: unknown, history: unknown): BuiltRequest {
-  const question = String(message ?? "")
-    .trim()
-    .slice(0, CHAT_MESSAGE_MAX);
-  if (!question) throw new Error("Ask a question first — the chat has nothing to send.");
-
-  const turns: ChatTurn[] = (Array.isArray(history) ? history : [])
-    .filter((t): t is ChatTurn => !!t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string")
-    .slice(-CHAT_HISTORY_TURNS)
-    .map((t) => ({ role: t.role, content: t.content.trim().slice(0, CHAT_TURN_MAX) }))
-    .filter((t) => t.content !== "");
-
-  const head = `Use the /super-help skill to answer the user's question: ${question}`;
-  const prompt = turns.length
-    ? [
-        head,
-        "",
-        "Earlier in this conversation:",
-        "",
-        ...turns.map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`),
-      ].join("\n")
-    : head;
-
-  return {
-    prompt,
-    // Nothing, and it is enforced rather than hoped for: an empty write scope rides on the token,
-    // and the session's permission callback denies every write with a reason (`write-scope.ts`).
-    // A question is not an authoring job, and a chat message must not have the write authority of a
-    // form the user filled in on purpose.
-    targets: [],
-  };
-}
-
-/**
  * The prompt for one request kind, and the paths it may touch.
  *
  * Every branch here is a prompt the app can execute; there is no branch that takes prompt text from
@@ -266,8 +209,6 @@ function buildChat(message: unknown, history: unknown): BuiltRequest {
  */
 function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions): BuiltRequest {
   switch (request?.kind) {
-    case "help-chat":
-      return buildChat(request.message, request.history);
     case "maestro-task": {
       // basename, not the path as given: a request must not be able to name a file outside the
       // tasks directory, and `filename` crosses a process boundary.

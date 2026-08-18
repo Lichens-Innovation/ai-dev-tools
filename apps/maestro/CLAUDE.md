@@ -10,12 +10,14 @@ was to show a window. If you find a doc still describing a container to launch o
 wait on, it is stale — say so rather than following it.
 
 In M6 it also absorbed `apps/help-server`, the second and last of this repo's containerised web
-apps: its dashboard is `/tools`, its doc reader is `/docs`, its chat is a panel on the bridge, and
-its node logic is the last five modules of `src/core/`. That app, its `Dockerfile`,
+apps: its dashboard is `/tools`, its doc reader is `/docs`, and its node logic is the last five
+modules of `src/core/`. That app, its `Dockerfile`,
 its `docker-compose.yml` and the `/help-server` slash command that started them are gone —
-**there is no server to start and no port 3008**. `plugins/ai-tools-manager/skills/super-help/`
-stayed: it is a skill the CLI invokes, not app machinery, and the chat panel still asks for it by
-name. This file is where that app's CLAUDE.md was re-homed; the ported modules and components each
+**there is no server to start and no port 3008**. Its chat came across as a panel on the bridge and
+has since been **deleted by `019`**, which replaced it with the session pane;
+`plugins/ai-tools-manager/skills/super-help/` stayed either way — it is a skill the CLI invokes, not
+app machinery, and the pane now declares it as a session skill rather than naming it in a prompt
+string. This file is where that app's CLAUDE.md was re-homed; the ported modules and components each
 carry a `PORTED FROM` header naming their original.
 
 ## Why it exists
@@ -47,7 +49,7 @@ is the short one.
 
 ```
 src/core/      ALL node-side Maestro logic, framework-free. No React, no Electron.
-src/main/      electron. Owns the project state, the log watcher, the IPC handlers.
+src/main/      electron. Owns the project state, the log tail, the pane session, the IPC handlers.
 src/preload/   the contextBridge. The ONLY path from renderer to node.
 src/renderer/  a TanStack Router SPA. No node imports at all.
 src/shared/    ipc.ts — the typed channel contract, imported by all three.
@@ -80,6 +82,7 @@ second.
 | `claude-run.ts`                         | The only module that starts Claude, and only for a token preview issued                |
 | `read-scope.ts`                         | What a run can **read**, derived from a settings snapshot. Pure — no `fs`, no spawn    |
 | `write-scope.ts`                        | What a run may **write**, decided per tool call. Pure — no `fs`, no spawn, no SDK      |
+| `session-scope.ts`                      | What a pane session may **read**, decided per tool call by a hook. Pure, no `fs`       |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
@@ -346,9 +349,13 @@ claude:cancel   → closes the query, then kills the child's process group
 ```
 
 It was the `claude -p` bridge, and a run **is no longer a `claude -p` spawn**: every run on
-`claude:run` — create-\*, `/maestro-tasks`, the help chat — is an Agent SDK session
+`claude:run` — create-\*, `/maestro-tasks` — is an Agent SDK session
 (`startAgentSession` in `agent-sdk.ts`). Nothing else about the bridge moved: preview still builds
 the prompt and issues the token, and run still accepts a token and nothing else.
+
+The **`session:*` namespace is a separate surface**, not a fifth bridge channel — it carries no
+token because there is no prompt to consent to: the user types every turn. See "The session pane"
+below.
 
 `ClaudeRunDialog` is the user-facing half: what may be **read**, then full prompt (scrollable,
 selectable — never a summary), the **equivalent** command line, working directory, what may be
@@ -378,8 +385,10 @@ the app would spawn `npx` while every message on screen said Claude.
 Reads are the larger surface: file reads and searches are auto-approved and never raise a prompt, so
 the directory list handed over at spawn is the whole bound on what the model can see. The preview
 carries a `ClaudeReadScope`, built by `src/core/read-scope.ts` and rendered by **one** component,
-`renderer/src/components/read-scope.tsx` — used by `ClaudeRunDialog` and by the chat's inline
-`ConfirmCard` (`compact` changes the type scale, never the content).
+`renderer/src/components/read-scope.tsx` — used by `ClaudeRunDialog` and by the session pane's own
+disclosure (`compact` changes the type scale, never the content). `ReadScopeInput.additional` is how
+directories the **app itself** opened get onto that list; they render with `origin: "app"`, which is
+what distinguishes them from the cwd and from anything a settings file contributed.
 
 - **The disclosure narrowed when the run became a session, visibly.** A run loads **no filesystem
   settings** (`settingSources: []`), so the confirmation no longer lists user-, project- or
@@ -426,9 +435,9 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
 - **It bounds writes and does NOT bound reads.** `decideWrite` returns `allow` for
   `Read`/`Glob`/`Grep` without looking at the path, deliberately: reads are auto-approved and never
   raise a prompt, which is why the disclosure above exists at all. Bounding what a session may read
-  is a `PreToolUse` hook returning `permissionDecision: "ask"` — it _routes_ an out-of-scope read
-  into a prompt instead of silently allowing or silently failing it. Adding a path check to the
-  read-tool branch looks like the fix and is not one.
+  is a `PreToolUse` hook, and `019` built it as a **third** scope module — `src/core/session-scope.ts`
+  (`decideBoundary`), described below. Adding a path check to the read-tool branch looks like the fix
+  and is not one; the two layers are wired to different sessions on purpose.
 - **The fall-through is a deny, never `undefined`/`null`.** The SDK reads `null` as "the host
   answered out of band" and the tool call then blocks forever with no timeout. `WriteDecision` is a
   two-shape union and the `default` branch is a refusal.
@@ -445,7 +454,12 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `016`
   moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` and
   `Skill` are deliberately **not** in the set: this path is still headless, so a question has nobody
-  to answer it. They arrive with the session pane.
+  to answer it. The pane extends the constant rather than declaring a second list —
+  `PANE_TOOLS = [...SESSION_TOOLS, "Skill"]`. **`AskUserQuestion` is still offered nowhere in the
+  app**: `019` left it out on purpose, because nothing yet renders a structured question and an
+  offered-then-refused tool costs turns to argue with while an unoffered one costs nothing. It
+  arrives with `021`, together with `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`,
+  which is not passed anywhere today.
 - **`systemPrompt: { type: "preset", preset: "claude_code" }` is passed explicitly.** The SDK's
   default is a minimal prompt, not Claude Code's, and a create-\* run that lost it would author
   against different defaults than every prompt in this app was written for.
@@ -461,39 +475,93 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   SDK's private stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`), and
   `spawnClaudeChild` is tested directly for the process-group property.
 
-### The help chat is a bridge consumer, not a second spawn path
+### The session pane — a live conversation, and still not a second spawn path
 
-help-server ran its chat by calling `execFile("claude", ["-p", prompt, …])` from a server
-function, once per message, with no preview and no confirmation. That is precisely the thing the
-bridge exists to prevent, so the port rebuilt it rather than moving it:
-`utils/chat-context.tsx` previews a `{ kind: "help-chat", message, history }` request and runs the
-token that comes back. `components/chat-panel.tsx` is a view of that context and may not touch
-`window.maestro.claude` at all.
+`019` deleted the help chat and replaced it. `utils/chat-context.tsx`, `components/chat-panel.tsx`
+and the `{ kind: "help-chat" }` member of `ClaudeRequest` are gone, along with `buildChat` and its
+history caps in `claude-preview.ts`. Two conversational surfaces would have meant two transcripts and
+two consent models, and the chat was strictly the weaker one: it re-sent its own capped history in
+every prompt precisely because it had no session. What the pane inherited is the `super-help`
+dependency, now a **session skill** rather than a name in a prompt string.
 
-Four things about it are decisions rather than styling:
+**One live, multi-turn session per open project**, in a resizable right-hand pane that _shifts_ the
+layout rather than overlaying it. It is **read-only**, which is what made it shippable before any
+permission UI existed.
 
-- **The confirmation is inline in the transcript**, not `ClaudeRunDialog`. In a chat the answer
-  belongs in the conversation, so the consent does too — a modal would put the prompt in one place
-  and the streamed reply behind a dialog the user has to dismiss. It shows the same list: full
-  prompt verbatim, the equivalent command line, working directory.
-- **The chat carries no write authority, and that is now a property of the token rather than a
-  flag.** There used to be a `CLAUDE_ASK_FLAGS` / `CLAUDE_BASE_FLAGS` split, because a create-\* run
-  needed `--permission-mode acceptEdits` to finish the file it was started for and a question is not
-  an authoring job. Both are gone: `CLAUDE_ASK_FLAGS` was deleted along with `BuiltRequest.flags`,
-  and `CLAUDE_BASE_FLAGS` is just `["-p"]`. The difference between an authoring invocation and an
-  asking one is the **write scope** — a list of paths on screen — not a flag whose meaning the
-  reader has to already know. `targets` is empty for a chat because nothing is writable, so
-  `writable` is empty on the token and `decideWrite` refuses every write with a reason saying the
-  run was started to answer, not to author.
-- **History travels on the request**, not in main's memory. It is then part of the string the
-  preview displays, so "the user saw exactly what ran" stays literally true on the tenth message.
-  It is capped (ten turns, clipped) for the same reason: a prompt too long to read is one nobody
-  reads.
-- **"Don't ask again" defaults to asking, dies with the session, and is on screen.** It is
-  `useState(true)` in the context — nothing persists it, and a project switch resets it along with
-  the transcript. The checkbox renders in both states, so it can always be turned back on, and the
-  prompt is kept under each answer even when the confirmation is off: not being interrupted is not
-  the same as not being told what ran. `test/isolation.test.ts` pins all three properties.
+```
+src/core/session-scope.ts                       the read boundary (pure)
+src/main/claude-session.ts                      one session per webContents.id
+src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope disclosure
+src/renderer/src/utils/session-context.tsx      SessionProvider / useSession — single-owner
+```
+
+```
+session:start  → SessionInfo      no argument; the cwd comes from main's project state
+session:info   → SessionInfo      reads only
+session:say    → (id, text)       USER-TYPED TEXT ONLY
+session:stop   → (id)             interrupt the turn; the session stays usable
+session:end    → ()               end, and reap the process group
+session:event  ← SessionEvent     the streamed transcript
+```
+
+- **The session lives in main, one per `webContents.id` — the same ownership shape as the log tail.**
+  `announce()` calls `endAllSessions()` on a project switch and `disposeIpc()` calls
+  `disposeSessions()`, for the same reason the log tail is retargeted and `disposeClaudeRuns()`
+  exists. Teardown reuses `terminateChildGroup(child)`, exported from `claude-run.ts` so the pane
+  performs the identical SIGTERM-to-the-group → SIGKILL escalation `cancelClaudeRun` does rather than
+  growing a second one.
+- **`startPaneSession()` is a sibling of `startAgentSession()`, not a second SDK importer.**
+  `agent-sdk.ts` is still the only module in the app that imports the SDK. The difference is the
+  input: a `prompt` string gives a one-shot query with no way to add a turn and no working Stop, so
+  the pane feeds a **streaming-input pump** instead. `claude-session.ts` composes no prompt, resolves
+  no CLI path and imports no `child_process`.
+- **`session:say` carries user-typed text and nothing else.** The bridge's invariant restated for a
+  surface with no per-turn confirmation: the renderer never authors a prompt, the user does. Turns
+  are stamped human-authored, so it holds at the SDK boundary and not only in a test.
+- **The write scope is empty, and the refusal is `decideWrite`'s.** Nothing can add to it yet
+  (`022` is where a submitted form can), so every write is refused with the same "started to answer,
+  not to author" reason the token path already produced. One engine, two callers.
+- **Reads are bounded by a `PreToolUse` hook, and that is a third scope module.** `read-scope.ts`
+  _discloses_, `write-scope.ts` _bounds writes_, and `src/core/session-scope.ts` bounds **reads** —
+  `decideBoundary` / `boundaryTargetOf` / `BOUNDED_TOOLS` / `UNBOUNDED_TOOLS`, pure, exhaustively
+  tested in `test/core/session-scope.test.ts`. It returns `{ decision: "allow" }` or
+  `{ decision: "out-of-scope", path, reason }` — deliberately **not** the word `"deny"`, even though
+  `agent-sdk.ts` currently maps it to `permissionDecision: "deny"`. `020` routes it to `"ask"`
+  instead, and that is one word in `agent-sdk.ts` plus the UI.
+- **The boundary hook runs only on the read-only tools**, by design. Letting it answer for
+  `Write`/`Edit` too would have replaced `decideWrite`'s reason with a new one, and the requirement
+  is that a refused write still carries the original. `session-scope.ts` knows how to check write
+  tools all the same, so `023` cannot widen reads by accident when it widens writes.
+- **The readable set is the open project plus EVERY local marketplace**, not "the resolved
+  marketplace" — with no create-form handoff yet there is no single marketplace to name. Main
+  resolves them itself with `listMarketplaces()` (the `source: "directory"` entries of
+  `~/.claude/plugins/known_marketplaces.json`); **no name and no path crosses the process boundary**,
+  which is `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied
+  one layer up. They reach the SDK as `additionalDirectories` and the disclosure as `origin: "app"`.
+- **`skills` alone does not load a skill — the plugin has to be loaded too.** Measured in the window:
+  with `settingSources: []`, `skills: ['super-help', …]` on its own makes the `Skill` tool answer
+  _"Unknown skill"_ for every name, because no installed plugin reaches the session. The fix is
+  `plugins: [{ type: "local", path: bundledPluginDir() }]` (`src/main/bundled-assets.ts`), after
+  which the session reports exactly `ai-tools-manager:create-marketplace`, `:create-plugin`,
+  `:create-skill`, `:create-subagent`, `:super-help` and nothing else. Note **which** copy that is:
+  the plugin **bundled with the app** (`plugins/ai-tools-manager/`), never the user's installed
+  marketplace cache — so a `SKILL.md` edit in this repo reaches the pane with no version bump and no
+  marketplace update, unlike every other delivery path the `updating-maestro` skill describes.
+- **The plugin's `hooks.json` does NOT fire in a pane session.** Also measured: a turn that read a
+  file inside a fixture project _with_ a `maestro.json` wrote no `maestro_session.log.jsonl`. So the
+  `/session-log` pollution that loading project `settingSources` would cause does not arrive with
+  `plugins`, and the pane's tool calls stay out of a view built for orchestrator runs.
+- **Nothing budget-related is passed.** No `maxBudgetUsd`, `taskBudget`, `effort`,
+  `enableFileCheckpointing` or `persistSession`; `startPaneSession` simply ends the session when the
+  SDK stream ends. All of that is `024`.
+- **`interrupt()`'s receipt is discarded.** `stop()` awaits `query.interrupt()` and drops the result,
+  so a `still_queued` is not reflected anywhere in the UI. Outstanding.
+- **The layout is a root-level flex row, and the pane is not rendered by `TopNav`.** `__root.tsx`
+  puts the route column and the pane side by side; `top-nav.tsx` carries only the toggle
+  (`data-session-toggle`), because the top bar remounts on every navigation and a transcript owned
+  there would be discarded the moment the user opened another route — the same argument that put the
+  chat's state in a provider, now applied to the pane. `create-shell.tsx` drops its 460px
+  `FilePreview` column while the pane is open, so the create grid goes `936px 460px` → one column.
 
 ### Running a tool from the network — the usage-stats decision
 
@@ -552,12 +620,16 @@ never opens this tab should not carry it.
   so they were deliberately not unified; the names and the return types (`RuleLibraryEntry` with
   `title`/`paths` vs `ProjectRule` with `id`/`dir`) are what keep the next reader from assuming one
   view manages the other's files.
-- **The chat's state cannot live in the panel — `TopNav` remounts on every navigation.** The
-  toggle and the panel are rendered by the top bar, which each route mounts for itself, so a
-  transcript held in `chat-panel.tsx` would be discarded the moment the user clicked Docs to look
-  something up. Worse, `runningToken` is the only handle on a run in flight: losing it leaves
-  Claude running with no Stop to press. Hence `ChatProvider` in `__root.tsx`, inside
-  `ProjectProvider` (a project switch ends the chat session) and above the `Outlet`.
+- **The pane's state cannot live in the pane — `TopNav` remounts on every navigation.** The toggle
+  is rendered by the top bar, which each route mounts for itself, so a transcript held in
+  `session-pane.tsx` would be discarded the moment the user clicked Docs to look something up.
+  Worse, the session id is the only handle on a turn in flight: losing it leaves Claude running with
+  no Stop to press. Hence `SessionProvider` in `__root.tsx`, inside `ProjectProvider` (a project
+  switch ends the session) and above the `Outlet`, with the pane a **sibling of the route column**
+  rather than a child of the top bar. `utils/session-context.tsx` is also the only module in the
+  renderer allowed to touch `window.maestro.session` — single-owner, exactly like
+  `SessionLogProvider` and the log tail, and for the same reason: main keeps one session per
+  `webContents.id`, so a second subscriber steals it.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.
@@ -601,15 +673,17 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   (`CLAUDE_CODE_USE_BEDROCK` and friends) left alone but reported. `settingSources: []` closes the
   second door, a key in `~/.claude/settings.json`, which would override the environment anyway.
   `test/core/agent-sdk.test.ts` pins both halves.
-- **`settingSources: []` appears THREE times in `agent-sdk.ts`, and they must stay in lockstep.** The
-  smoke query, the run's own session, and `resolveEffectiveSettings(cwd)` — the last of which backs
-  the read disclosure. The first two are so nothing on disk can redirect billing or widen
-  permissions; the third is so the confirmation describes **the session that actually exists**.
+- **`settingSources: []` appears FOUR times in `agent-sdk.ts`, and they must stay in lockstep.** The
+  smoke query, the run's own session, the **pane session** (`019`), and `resolveEffectiveSettings(cwd)`
+  — the last of which backs the read disclosure. The first three are so nothing on disk can redirect
+  billing or widen permissions; the fourth is so the confirmation describes **the session that
+  actually exists**. The pane inherits the consequence in full: **a pane session auto-loads no
+  `CLAUDE.md`**, so the model should be expected to be told to `Read` one.
   `resolveEffectiveSettings` used to leave it unset (loading every tier), because that is what a
   `claude -p` run got; when the run became a session it had to move with it. Configure the run one
   way and resolve the other and the disclosure silently becomes a lie — it keeps describing a
-  session that is gone, and **nothing fails**. `test/isolation.test.ts` counts the three occurrences
-  for exactly that reason. Note `[]` does not drop the managed (administrator) policy tier: it is
+  session that is gone, and **nothing fails**. `test/isolation.test.ts` counts the four occurrences
+  for exactly that reason (it counted three until `019` added the pane). Note `[]` does not drop the managed (administrator) policy tier: it is
   still read from disk and still applies. `defaultMode` goes through the SDK's
   `filterEscalatingDefaultMode`, since the raw cascade reports an escalating mode from a
   repo-committed file as though it applied.
@@ -778,7 +852,10 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   session's writes by what the preview displayed, and offers it no shell"** pins `canUseTool`,
   `decideWrite`, `permissionMode: "default"`, `spawnClaudeCodeProcess`, the two tool lists and
   `writable: inv.writable`; and **"loads no filesystem settings for a run, and discloses the same
-  resolution"** counts the three `settingSources: []` so the run and the disclosure cannot drift.
+  resolution"** counts the four `settingSources: []` so the run and the disclosure cannot drift.
+  `019` replaced its three help-chat blocks with a **"the session pane"** describe, which pins the
+  pane's own properties: `session:say` carries only user-typed text, `session-context.tsx` is the
+  single owner of `window.maestro.session`, and the pane is not rendered by `top-nav.tsx`.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the
