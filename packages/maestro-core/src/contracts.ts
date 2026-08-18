@@ -232,6 +232,125 @@ export interface UninstallReport {
   status: InstallStatus;
 }
 
+/** A local plugin marketplace the create forms can write into, and what it already holds. */
+export interface MarketplaceEntry {
+  name: string;
+  /** Absolute path of the marketplace repo on this machine. */
+  path: string;
+  /** Plugin names listed in its `.claude-plugin/marketplace.json`. */
+  plugins: string[];
+  /**
+   * Its owner, which a new plugin inherits as its `author`.
+   *
+   * Carried so the plugin form can PREVIEW the author it is about to write. The form never asks
+   * for one — the honest answer already sits in the marketplace's manifest — and a field the user
+   * cannot predict is exactly the kind the preview has to show.
+   */
+  owner: { name: string; email: string } | null;
+}
+
+/** What a create route needs to populate its selectors: the marketplaces, and where they are. */
+export interface CreateOptions {
+  marketplaces: MarketplaceEntry[];
+  /** The open project's root, or "" — where `target: "project"` writes. */
+  projectRoot: string;
+}
+
+/**
+ * One create-* form's answers, as they cross the process boundary.
+ *
+ * Note what is NOT on these: a destination path. `target: "project"` means the open project, which
+ * only the main process knows, and `marketplace` is a NAME the user picked out of a list main
+ * produced — main turns it back into a path. So the renderer describes an artifact; it never
+ * nominates a directory to write in. The one exception is `create-marketplace.targetDir`, which is
+ * the whole point of that form (the user is choosing where a brand-new marketplace goes) and is
+ * validated as an absolute path and shown in the confirmation before anything is written.
+ */
+export type CreateSkillRequest = {
+  kind: "create-skill";
+  /** auto: Claude authors the body afterwards. manual: the skeleton is the finished artifact. */
+  mode: "auto" | "manual";
+  target: "marketplace" | "project";
+  /** Blank derives one from `idea`, deterministically — a directory name cannot wait for a model. */
+  name: string;
+  /** The idea (auto) or the description (manual). */
+  idea: string;
+  useWhen: string[];
+  marketplace: string;
+  plugin: string;
+};
+
+export type CreateSubagentRequest = {
+  kind: "create-subagent";
+  mode: "auto" | "manual";
+  target: "marketplace" | "project";
+  name: string;
+  idea: string;
+  description: string;
+  triggers: string[];
+  tools: string[];
+  marketplace: string;
+  plugin: string;
+};
+
+export type CreatePluginRequest = {
+  kind: "create-plugin";
+  name: string;
+  description: string;
+  keywords: string[];
+  marketplace: string;
+};
+
+export type CreateMarketplaceRequest = {
+  kind: "create-marketplace";
+  name: string;
+  description: string;
+  ownerName: string;
+  ownerEmail: string;
+  homepage: string;
+  /** Absolute path of the directory to become the marketplace. */
+  targetDir: string;
+  privateRepo: boolean;
+};
+
+export type CreateRequest =
+  | CreateSkillRequest
+  | CreateSubagentRequest
+  | CreatePluginRequest
+  | CreateMarketplaceRequest;
+
+/**
+ * What the deterministic scaffold wrote — no model involved in any of it.
+ *
+ * `scaffolded: false` is not a half-success: a failed scaffold leaves the disk exactly as it was
+ * (see `scaffold.ts`), and `reason` is what to tell the user. The web app's third state — "the
+ * target is outside the Docker mount, let Claude create it host-side" — is gone with the container;
+ * every path on the host is reachable, so a failure here is a real failure.
+ */
+export interface ScaffoldResult {
+  scaffolded: boolean;
+  /**
+   * The kebab-case name the artifact was actually created under.
+   *
+   * Worth returning because it is not always the one the form holds: a blank name is derived from
+   * the idea, and the user has no other way to learn what it became.
+   */
+  name: string;
+  /** Absolute path of the primary artifact: the file for a skill/agent, the directory otherwise. */
+  path: string;
+  /** Every file created, absolute. Empty when `scaffolded` is false. */
+  written: string[];
+  /** What is left for a model to do, in prose. "" when the artifact is already complete. */
+  remaining: string;
+  /**
+   * `remaining` needs a model, so the route offers the bridge straight away rather than waiting to
+   * be asked. False for a manual skeleton or a plugin manifest, which are finished as written.
+   */
+  needsModel: boolean;
+  /** Why nothing was written. Set only when `scaffolded` is false. */
+  reason?: string;
+}
+
 /**
  * What the user is asking Claude to do, as a shape the MAIN process knows how to turn into a
  * prompt — never the prompt itself.
@@ -241,14 +360,18 @@ export interface UninstallReport {
  * over a request, the set is the small, enumerable list of things this union can express, and every
  * member of it is built by code in `claude-preview.ts` that a reviewer can read end to end.
  *
- * The four `create-*` kinds join this union when those routes are ported; each new member is a new
- * prompt builder and a new entry in the preview's `targets`.
+ * The four `create-*` kinds are here because those routes went through the bridge rather than
+ * growing a spawn of their own: each is a prompt builder and an entry in the preview's `targets`,
+ * and each names the artifact the deterministic scaffold has ALREADY written, so the run's job is
+ * finishing a file rather than creating one.
  */
-export type ClaudeRequest = {
-  kind: "maestro-task";
-  /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
-  filename: string;
-};
+export type ClaudeRequest =
+  | {
+      kind: "maestro-task";
+      /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
+      filename: string;
+    }
+  | CreateRequest;
 
 /** A path the run may write, and how. Shown in the confirmation before anything is spawned. */
 export interface ClaudeWriteTarget {

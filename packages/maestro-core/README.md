@@ -33,6 +33,9 @@ a graph.
 | `claude-preview.ts` | Builds the prompt and issues a token. **Cannot spawn** |
 | `claude-tokens.ts` | The single-use, expiring authorisation between preview and run |
 | `claude-run.ts` | The only module that spawns Claude, and only for a token preview issued |
+| `marketplaces.ts` | The user's local plugin marketplaces, read from `~/.claude/` at call time |
+| `scaffold.ts` | The deterministic half of the four create-* flows, all-or-nothing |
+| `text.ts` | Pure string helpers. The **one** home — the renderer imports the same module |
 
 ### `install.ts` — the project owns its runtime
 
@@ -153,6 +156,48 @@ constant hidden in a resolver.
 Cancellation kills the **process group**: the child is spawned `detached`, because the CLI spawns
 its own children and signalling only the process we started leaves them running with the UI
 reporting the run as stopped.
+
+### `scaffold.ts` — the create-* flows, minus the model
+
+The four `create-*` routes split in two. Everything deterministic — the directory, the frontmatter,
+the plugin manifest, the marketplace registration — happens here the instant the form is submitted;
+only the *body* of a skill or an agent needs a model, and that goes out through the bridge above as
+a `ClaudeRequest`. So the artifact is on disk before Claude is mentioned, and a user with no CLI
+installed still gets everything but the prose.
+
+```
+scaffoldCreate(root, request, opts) → { scaffolded, name, path, written[], remaining, needsModel, reason? }
+resolveCreateTarget(root, request, opts) → { name, path, marketplacePath }
+```
+
+**One resolution of where things go.** `resolveCreateTarget` is called by the writer *and* by
+`claude-preview.ts`, so the file the confirmation names is the file on disk. Two resolutions would
+be a modal describing a different artifact than the one being edited.
+
+**No destination crosses the process boundary.** A request carries a marketplace *name* the user
+picked out of `listMarketplaces()`; this module turns it back into a path. `target: "project"` means
+the open project, which only the main process knows. The single exception is
+`create-marketplace.targetDir` — the whole point of that form — which is validated as absolute and
+shown before anything is written.
+
+**Writes are all-or-nothing.** The web app's version wrote a plugin manifest, then best-effort
+created `skills/`, then best-effort registered the plugin, and reported success if the *first* one
+landed — so a `marketplace.json` it could not rewrite left a plugin on disk that no marketplace knew
+about, under a summary saying it was fine. Here each flow declares its complete list of steps, the
+pre-check refuses to clobber anything that exists, and a failure part-way rolls back the files and
+directories it created and restores any JSON it had rewritten. `test/scaffold.test.ts` pins that.
+
+### `marketplaces.ts` — and why it doesn't call `@repo/claude-fs`
+
+`claude-fs` has these readers, and this module deliberately does not use them. It fixes `CLAUDE_DIR`
+from `process.env.HOME` at module-evaluation time, so a test cannot point it at a fixture; and
+`claude-preview.ts`'s no-spawn guarantee is enforced by an import-graph walk that follows only
+*relative* imports, so a hop into a workspace package would leave the graph unwalked. Everything here
+takes an explicit `home` — the same lever `claude-cli.ts` uses — and is a relative import.
+
+Only `source: "directory"` marketplaces are offered. A GitHub-sourced one resolves into the plugin
+cache, which the next `claude plugin marketplace update` overwrites, so a skill written there would
+vanish without ever having been somewhere the user could commit it.
 
 ## Generated plugin libs
 

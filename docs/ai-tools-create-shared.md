@@ -33,6 +33,12 @@ The form data is a JSON object, supplied one of two ways:
 Either way, parse the JSON and proceed. The shape (`mode`, `target`, fields) is documented per
 flow in that flow's own `SKILL.md`.
 
+> **The desktop app is where these flows live now.** `apps/maestro`'s four `create-*` routes do the
+> deterministic scaffold in-process (`scaffold.ts` in `@repo/maestro-core`) and hand the remaining
+> body-authoring to `claude -p` through a confirmation that shows the exact prompt. The contract
+> below still describes what a session is asked to finish; what has gone is the form-and-result-file
+> round trip that used to deliver it.
+
 ## Finishing a scaffold
 
 The app **pre-scaffolds deterministically** the moment a form is submitted (see

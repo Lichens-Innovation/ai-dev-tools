@@ -14,6 +14,10 @@ import { Route as SessionLogRouteImport } from './routes/session-log'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
 import { Route as InstallRouteImport } from './routes/install'
+import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
+import { Route as CreateSkillRouteImport } from './routes/create-skill'
+import { Route as CreatePluginRouteImport } from './routes/create-plugin'
+import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as IndexRouteImport } from './routes/index'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
@@ -41,6 +45,26 @@ const InstallRoute = InstallRouteImport.update({
   path: '/install',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreateSubagentRoute = CreateSubagentRouteImport.update({
+  id: '/create-subagent',
+  path: '/create-subagent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateSkillRoute = CreateSkillRouteImport.update({
+  id: '/create-skill',
+  path: '/create-skill',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreatePluginRoute = CreatePluginRouteImport.update({
+  id: '/create-plugin',
+  path: '/create-plugin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateMarketplaceRoute = CreateMarketplaceRouteImport.update({
+  id: '/create-marketplace',
+  path: '/create-marketplace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +73,10 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/create-marketplace': typeof CreateMarketplaceRoute
+  '/create-plugin': typeof CreatePluginRoute
+  '/create-skill': typeof CreateSkillRoute
+  '/create-subagent': typeof CreateSubagentRoute
   '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
@@ -57,6 +85,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/create-marketplace': typeof CreateMarketplaceRoute
+  '/create-plugin': typeof CreatePluginRoute
+  '/create-skill': typeof CreateSkillRoute
+  '/create-subagent': typeof CreateSubagentRoute
   '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
@@ -66,6 +98,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/create-marketplace': typeof CreateMarketplaceRoute
+  '/create-plugin': typeof CreatePluginRoute
+  '/create-skill': typeof CreateSkillRoute
+  '/create-subagent': typeof CreateSubagentRoute
   '/install': typeof InstallRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
@@ -76,6 +112,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/create-marketplace'
+    | '/create-plugin'
+    | '/create-skill'
+    | '/create-subagent'
     | '/install'
     | '/maestro-tasks'
     | '/rules'
@@ -84,6 +124,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/create-marketplace'
+    | '/create-plugin'
+    | '/create-skill'
+    | '/create-subagent'
     | '/install'
     | '/maestro-tasks'
     | '/rules'
@@ -92,6 +136,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/create-marketplace'
+    | '/create-plugin'
+    | '/create-skill'
+    | '/create-subagent'
     | '/install'
     | '/maestro-tasks'
     | '/rules'
@@ -101,6 +149,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreateMarketplaceRoute: typeof CreateMarketplaceRoute
+  CreatePluginRoute: typeof CreatePluginRoute
+  CreateSkillRoute: typeof CreateSkillRoute
+  CreateSubagentRoute: typeof CreateSubagentRoute
   InstallRoute: typeof InstallRoute
   MaestroTasksRoute: typeof MaestroTasksRoute
   RulesRoute: typeof RulesRoute
@@ -145,6 +197,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstallRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/create-subagent': {
+      id: '/create-subagent'
+      path: '/create-subagent'
+      fullPath: '/create-subagent'
+      preLoaderRoute: typeof CreateSubagentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create-skill': {
+      id: '/create-skill'
+      path: '/create-skill'
+      fullPath: '/create-skill'
+      preLoaderRoute: typeof CreateSkillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create-plugin': {
+      id: '/create-plugin'
+      path: '/create-plugin'
+      fullPath: '/create-plugin'
+      preLoaderRoute: typeof CreatePluginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create-marketplace': {
+      id: '/create-marketplace'
+      path: '/create-marketplace'
+      fullPath: '/create-marketplace'
+      preLoaderRoute: typeof CreateMarketplaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -157,6 +237,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreateMarketplaceRoute: CreateMarketplaceRoute,
+  CreatePluginRoute: CreatePluginRoute,
+  CreateSkillRoute: CreateSkillRoute,
+  CreateSubagentRoute: CreateSubagentRoute,
   InstallRoute: InstallRoute,
   MaestroTasksRoute: MaestroTasksRoute,
   RulesRoute: RulesRoute,

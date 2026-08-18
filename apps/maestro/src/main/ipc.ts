@@ -19,6 +19,8 @@ import {
   hasVibeRules,
   listTasks,
   closeTask,
+  listMarketplaces,
+  scaffoldCreate,
   tailSessionLog,
   installStatus,
   installRuntime,
@@ -34,6 +36,9 @@ import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   ClaudePreview,
   ClaudeRequest,
+  CreateOptions,
+  CreateRequest,
+  ScaffoldResult,
   ClaudeRunResult,
   MaestroConfigV3,
   InstallReport,
@@ -200,6 +205,30 @@ export function registerIpc(): void {
   // ── tasks ────────────────────────────────────────────────────────────
   ipcMain.handle(IPC.tasksList, () => listTasks(currentRoot()));
   ipcMain.handle(IPC.tasksClose, (_e, filename: string) => closeTask(currentRoot(), filename));
+
+  // ── create-* ─────────────────────────────────────────────────────────
+  // The deterministic half of the four create forms. `create:scaffold` is the ONLY channel in the
+  // app that writes an artifact from a form, and it cannot reach a model — `scaffoldCreate` is a
+  // pure function of the request plus the filesystem. Whatever it leaves unfinished goes back out
+  // through `claude:preview` below, so the model half is confirmed like every other one.
+  //
+  // Note what does not cross this wire: a destination path. The renderer sends a marketplace NAME
+  // it picked out of `create:options`, and `target: "project"` means the project THIS process has
+  // open — so main resolves every path it writes to. The one exception is create-marketplace's
+  // target directory, which is the whole point of that form and is validated as absolute and shown
+  // in the scaffold's report.
+  ipcMain.handle(IPC.createOptions, (): CreateOptions => ({
+    marketplaces: listMarketplaces(),
+    projectRoot: currentRoot() ?? "",
+  }));
+
+  // Throws on an invalid request or a failed write, so the caller must go through `callMain` —
+  // "the write failed and here is why" has to reach the user, not an unhandled rejection.
+  ipcMain.handle(IPC.createScaffold, (_e, request: CreateRequest): ScaffoldResult => {
+    const result = scaffoldCreate(currentRoot() ?? "", request);
+    if (!result.scaffolded) throw new Error(result.reason ?? "Nothing was written.");
+    return result;
+  });
 
   // ── install ──────────────────────────────────────────────────────────
   // The other half of the milestone: a project's Maestro runtime — the orchestrator skill, the

@@ -9,7 +9,17 @@ The app communicates with the host via two `/tmp/` files mounted as Docker volum
 | File (host) | Mounted as (container) | Direction | Purpose |
 |---|---|---|---|
 | `/tmp/ai-tools-result.<key>.json` | `/tmp/result.json` | app → hook | Form submission payload, read by hook after user submits |
-| `/tmp/ai-tools-marketplace.<key>.json` | `/tmp/marketplace-data.json` | hook → app | Pre-computed marketplace/plugin list for dropdowns |
+| `/tmp/ai-tools-marketplace.<key>.json` | `/tmp/marketplace-data.json` | hook → app | Pre-computed `cwd` / vibe-rules / impl-agent data. **No longer read for marketplaces** — see below |
+
+> **The marketplace loaders no longer read that file.** `src/utils/marketplace.ts` reads
+> `~/.claude` directly (mounted read-only at `/root/.claude`), because the desktop app's ported
+> `create-*` routes took over the half that needed host *write* access. What still reads the
+> precompute file is Docker plumbing — `readCwd`/`mountedProjectPath` (`maestro-fs.ts`), the
+> vibe-rules list (`maestro-vibe.ts`), and the impl-agent seed (`maestro.ts`) — all of which go
+> when the container does, in M5. See `docs/plans/m5-retire-docker.md`.
+>
+> The four `create-*` routes here are superseded by `apps/maestro`'s. They still work, and they
+> are deleted with the app.
 
 The reason marketplace data is pre-computed on the host: local marketplace `installLocation` paths in `known_marketplaces.json` are host paths — they don't exist inside the container. The file also includes `cwd` (the Claude working directory at hook time) so forms can use it as a default (e.g. `targetDir` in `create-marketplace`) and so the app can write project-scoped files back.
 
@@ -107,7 +117,7 @@ The container mounts `../..` at `/app` and `~/.claude` at `/root/.claude` (read-
 - `src/utils/scaffold.ts` — deterministic pre-scaffold helpers (`scaffoldSkill/Subagent/Plugin/Marketplace`); reuses `text.ts` + `mountedProjectPath`, degrades gracefully for unreachable targets
 - `docs/ai-tools-create-shared.md` (repo root) — shared reference doc the four `create-*` `SKILL.md` link to: the reference-doc list, where the form payload comes from, and the scaffold-finishing contract (replaces the boilerplate each skill used to repeat)
 - `src/utils/ai-tools-session.ts` — `shutdownAppSession` server fn (writes `aiToolsAction: "shutdown"`), wired to the top-nav **Stop** button
-- `src/utils/marketplace.ts` — loader server fns (`getMarketplaceData`, `getMarketplaceList`, `getMarketplaceDefaults`). Returns `cwd` so target=project can write under the user's working directory.
+- `src/utils/marketplace.ts` — loader server fns (`getMarketplaceData`, `getMarketplaceList`, `getMarketplaceDefaults`), reading `~/.claude` directly. `cwd` is always `""` now: it came off the precompute file, and its only consumers were the `create-*` routes that moved to `apps/maestro`.
 - `src/utils/text.ts` — shared text helpers (`buildDesc`, `firstSentence`, `joinOxford`, `clip`, `titleFromName`)
 - `src/components/{skill,subagent}-template-preview.tsx` and `{plugin,marketplace}-manifest-preview.tsx` — per-route `FilePreview` renderers
 - `packages/ui/src/` — shared primitives consumed by every form

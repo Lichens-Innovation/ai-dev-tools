@@ -37,6 +37,12 @@ const api: MaestroApi = {
     list: () => ipcRenderer.invoke(IPC.tasksList),
     close: (filename) => ipcRenderer.invoke(IPC.tasksClose, filename),
   },
+  create: {
+    options: () => ipcRenderer.invoke(IPC.createOptions),
+    // A request, never a path and never prompt text — same discipline as the claude channels
+    // below, because the create routes reach the model through exactly those.
+    scaffold: (request) => ipcRenderer.invoke(IPC.createScaffold, request),
+  },
   install: {
     status: () => ipcRenderer.invoke(IPC.installStatus),
     run: () => ipcRenderer.invoke(IPC.installRun),

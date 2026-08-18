@@ -36,6 +36,10 @@ import type {
   ClaudeWriteTarget,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  CreateOptions,
+  CreateRequest,
+  MarketplaceEntry,
+  ScaffoldResult,
 } from "@repo/maestro-core/contracts";
 
 export type {
@@ -63,6 +67,10 @@ export type {
   ClaudeWriteTarget,
   ClaudeOutputChunk,
   ClaudeRunResult,
+  CreateOptions,
+  CreateRequest,
+  MarketplaceEntry,
+  ScaffoldResult,
 };
 
 /** A project the app has opened, as remembered in the recent-projects list. */
@@ -129,6 +137,9 @@ export const IPC = {
   tasksList: "tasks:list",
   tasksClose: "tasks:close",
 
+  createOptions: "create:options",
+  createScaffold: "create:scaffold",
+
   installStatus: "install:status",
   installRun: "install:run",
   installUninstallPlan: "install:uninstall-plan",
@@ -181,6 +192,29 @@ export interface MaestroApi {
   tasks: {
     list(): Promise<MaestroTask[]>;
     close(filename: string): Promise<MaestroTask[]>;
+  };
+  /**
+   * The four create-* forms. Two operations, mirroring the bridge's own split for the same reason:
+   * one of them writes, and it is not the one that can reach a model.
+   *
+   * `scaffold` does everything deterministic — the directory, the frontmatter, the manifest, the
+   * marketplace registration — and returns what it wrote. No model is involved and none can be:
+   * the module behind it calls nothing. The artifact exists the moment the user presses Create.
+   *
+   * Whatever is left (a skill's prose, an agent's system prompt) is a `ClaudeRequest` like any
+   * other, so it goes out through `claude.preview` and the confirmation dialog. These routes have
+   * no spawn path of their own; that is the point, since a route that shelled out directly would
+   * have opted out of the preview the user is owed.
+   */
+  create: {
+    /** The marketplaces and plugins the selectors offer, read from ~/.claude at call time. */
+    options(): Promise<CreateOptions>;
+    /**
+     * Write the deterministic part. Rejects on an invalid request and on a failed write — and a
+     * failed write leaves the disk as it found it, so the caller reports a reason rather than
+     * discovering a half-made artifact later.
+     */
+    scaffold(request: CreateRequest): Promise<ScaffoldResult>;
   };
   install: {
     status(): Promise<InstallStatus>;
