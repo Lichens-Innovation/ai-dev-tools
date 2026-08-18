@@ -76,8 +76,7 @@ const FAMILIES = [
 ];
 
 const LICENCE_URL = (dir) => `https://raw.githubusercontent.com/google/fonts/main/ofl/${dir}/OFL.txt`;
-const CSS_URL = (spec) =>
-  `https://fonts.googleapis.com/css2?family=${spec}&display=swap`;
+const CSS_URL = (spec) => `https://fonts.googleapis.com/css2?family=${spec}&display=swap`;
 
 /** Each `@font-face` block in the API response is preceded by a `/* subset *\/` comment. */
 const FACE_RE = /\/\*\s*([\w-]+)\s*\*\/\s*@font-face\s*\{([^}]*)\}/g;
@@ -89,8 +88,7 @@ async function fetchText(url, headers = {}) {
 }
 
 function parseFaces(css) {
-  const declaration = (block, prop) =>
-    block.match(new RegExp(`${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
+  const declaration = (block, prop) => block.match(new RegExp(`${prop}\\s*:\\s*([^;]+);`))?.[1].trim();
 
   return [...css.matchAll(FACE_RE)].map(([, subset, block]) => ({
     subset,
@@ -109,8 +107,8 @@ async function main() {
   const rules = [];
 
   for (const { family, slug, spec, licenceDir, expect } of FAMILIES) {
-    const faces = parseFaces(await fetchText(CSS_URL(spec), { "User-Agent": CHROME_UA })).filter(
-      (face) => SUBSETS.includes(face.subset),
+    const faces = parseFaces(await fetchText(CSS_URL(spec), { "User-Agent": CHROME_UA })).filter((face) =>
+      SUBSETS.includes(face.subset)
     );
 
     /**
@@ -129,7 +127,7 @@ async function main() {
             candidate.family === family &&
             candidate.weight === weight &&
             candidate.style === style &&
-            candidate.subset === subset,
+            candidate.subset === subset
         );
         if (!face) throw new Error(`${family} ${weight} ${style} ${subset}: not served by the API`);
         if (!face.url?.endsWith(".woff2")) {
@@ -161,7 +159,7 @@ async function main() {
           `  src: url('./fonts/${file}') format('woff2');`,
           `  unicode-range: ${face.unicodeRange};`,
           "}",
-        ].join("\n"),
+        ].join("\n")
       );
     }
 
@@ -186,7 +184,7 @@ async function main() {
       "",
       ...rules,
       "",
-    ].join("\n"),
+    ].join("\n")
   );
 
   console.log(`vendored ${written.size} files into ${FONT_DIR}`);

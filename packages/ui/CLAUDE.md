@@ -13,21 +13,21 @@ since `apps/help-server` was folded into it, though nothing here assumes that.
 
 ## Component map
 
-| Component | Purpose | Notable props |
-|---|---|---|
-| `button` | Primary / ghost button with optional icon + loading state | `variant`, `icon`, `loading` |
-| `chip-input` | Tag/chip input that emits `string[]` — Enter to add | `values`, `onChange` (note: `values`, not `value`) |
-| `copyable-text` | Inline text with a copy button | — |
-| `dialog` | Base UI dialog shell with optional title row + close button | `open`, `onOpenChange`, `title`, `titleIcon`, `widthClass` |
-| `field` | Labeled form row with hint + error slot; exports `Field`, `Input`, `Textarea` | `label`, `hint`, `error` |
-| `file-preview` | "Fake editor" chrome with numbered lines + syntax-highlighted rendering | `filename`, `fileIcon`, `path`, `lines` (or `children` for custom) |
-| `mode-pill` | Animated segmented control for picking among 2–N values | `value`, `onChange`, `options: { value, label, icon? }[]` |
-| `select` | Styled Base UI Select with `{ id, name }[]` options | `value`, `options`, `onChange` |
-| `shortcuts-dialog` | Pre-built dialog rendering `{ title, items: [label, keys][] }[]` sections | `sections`, optional `title`, `titleIcon` |
-| `slide-panel` | Right-side slide-out panel | — |
-| `syntax-line` | Renders a single line of YAML or JSON with key-highlighting; used by `file-preview` | `raw` |
-| `theme-toggle` | Light/dark theme switcher | — |
-| `toast` | Transient bottom-right notifications. Named exports (not a default): imperative `toast(message, { variant?, duration? })` + a `<Toaster />` portal mounted once at the app root | `message`, `variant`, `duration` |
+| Component          | Purpose                                                                                                                                                                         | Notable props                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `button`           | Primary / ghost button with optional icon + loading state                                                                                                                       | `variant`, `icon`, `loading`                                       |
+| `chip-input`       | Tag/chip input that emits `string[]` — Enter to add                                                                                                                             | `values`, `onChange` (note: `values`, not `value`)                 |
+| `copyable-text`    | Inline text with a copy button                                                                                                                                                  | —                                                                  |
+| `dialog`           | Base UI dialog shell with optional title row + close button                                                                                                                     | `open`, `onOpenChange`, `title`, `titleIcon`, `widthClass`         |
+| `field`            | Labeled form row with hint + error slot; exports `Field`, `Input`, `Textarea`                                                                                                   | `label`, `hint`, `error`                                           |
+| `file-preview`     | "Fake editor" chrome with numbered lines + syntax-highlighted rendering                                                                                                         | `filename`, `fileIcon`, `path`, `lines` (or `children` for custom) |
+| `mode-pill`        | Animated segmented control for picking among 2–N values                                                                                                                         | `value`, `onChange`, `options: { value, label, icon? }[]`          |
+| `select`           | Styled Base UI Select with `{ id, name }[]` options                                                                                                                             | `value`, `options`, `onChange`                                     |
+| `shortcuts-dialog` | Pre-built dialog rendering `{ title, items: [label, keys][] }[]` sections                                                                                                       | `sections`, optional `title`, `titleIcon`                          |
+| `slide-panel`      | Right-side slide-out panel                                                                                                                                                      | —                                                                  |
+| `syntax-line`      | Renders a single line of YAML or JSON with key-highlighting; used by `file-preview`                                                                                             | `raw`                                                              |
+| `theme-toggle`     | Light/dark theme switcher                                                                                                                                                       | —                                                                  |
+| `toast`            | Transient bottom-right notifications. Named exports (not a default): imperative `toast(message, { variant?, duration? })` + a `<Toaster />` portal mounted once at the app root | `message`, `variant`, `duration`                                   |
 
 ## Adding a new component
 

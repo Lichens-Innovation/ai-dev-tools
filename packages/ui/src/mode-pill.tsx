@@ -1,21 +1,24 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react";
 
 export interface ModePillOption<T extends string> {
-  value: T
-  label: string
-  icon?: ReactNode
+  value: T;
+  label: string;
+  icon?: ReactNode;
 }
 
 interface ModePillProps<T extends string> {
-  options: ModePillOption<T>[]
-  value: T
-  onChange: (value: T) => void
+  options: ModePillOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
 }
 
 export default function ModePill<T extends string>({ options, value, onChange }: ModePillProps<T>) {
-  const activeIndex = Math.max(0, options.findIndex((o) => o.value === value))
-  const trackWidth = `${100 / options.length}%`
-  const trackLeft = `calc(${(activeIndex / options.length) * 100}% + 3px)`
+  const activeIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === value)
+  );
+  const trackWidth = `${100 / options.length}%`;
+  const trackLeft = `calc(${(activeIndex / options.length) * 100}% + 3px)`;
 
   return (
     <div className="relative inline-flex p-[3px] rounded-full bg-(--bg-2) border border-(--line)">
@@ -29,7 +32,7 @@ export default function ModePill<T extends string>({ options, value, onChange }:
           type="button"
           onClick={() => onChange(opt.value)}
           className={`relative z-10 inline-flex items-center gap-1.5 px-3.5 py-[5px] rounded-full text-xs font-semibold cursor-pointer transition-colors duration-200 focus:outline-none focus:shadow-none ${
-            opt.value === value ? 'text-(--ink)' : 'text-(--ink-3)'
+            opt.value === value ? "text-(--ink)" : "text-(--ink-3)"
           }`}
         >
           {opt.icon}
@@ -37,5 +40,5 @@ export default function ModePill<T extends string>({ options, value, onChange }:
         </button>
       ))}
     </div>
-  )
+  );
 }

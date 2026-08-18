@@ -1,11 +1,11 @@
-import { useState, type ReactNode, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { useState, type ReactNode, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 interface FieldProps {
-  id?: string
-  label: string
-  hint?: string
-  error?: string | null
-  children: ReactNode
+  id?: string;
+  label: string;
+  hint?: string;
+  error?: string | null;
+  children: ReactNode;
 }
 
 export function Field({ id, label, hint, error, children }: FieldProps) {
@@ -23,25 +23,25 @@ export function Field({ id, label, hint, error, children }: FieldProps) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
-  value: string
-  onChange: (v: string) => void
-  mono?: boolean
-  error?: string | null
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  value: string;
+  onChange: (v: string) => void;
+  mono?: boolean;
+  error?: string | null;
 }
 
 export function Input({ value, onChange, mono, error, ...rest }: InputProps) {
-  const [focus, setFocus] = useState(false)
-  const ringColor = error ? 'var(--red)' : focus ? 'var(--primary)' : 'var(--line)'
+  const [focus, setFocus] = useState(false);
+  const ringColor = error ? "var(--red)" : focus ? "var(--primary)" : "var(--line)";
   return (
     <div
       className="flex items-center px-3 h-10 rounded-lg bg-(--bg-elev) transition-all duration-150"
       style={{
         border: `1.5px solid ${ringColor}`,
-        boxShadow: focus && !error ? '0 0 0 3px var(--primary-dim)' : 'none',
+        boxShadow: focus && !error ? "0 0 0 3px var(--primary-dim)" : "none",
       }}
     >
       <input
@@ -49,36 +49,36 @@ export function Input({ value, onChange, mono, error, ...rest }: InputProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => {
-          setFocus(true)
-          rest.onFocus?.(e)
+          setFocus(true);
+          rest.onFocus?.(e);
         }}
         onBlur={(e) => {
-          setFocus(false)
-          rest.onBlur?.(e)
+          setFocus(false);
+          rest.onBlur?.(e);
         }}
         className={`flex-1 h-full bg-transparent border-none outline-none text-(--ink) placeholder:text-(--ink-4) focus:outline-none focus:shadow-none ${
-          mono ? 'font-mono text-[13px]' : 'font-sans text-sm'
+          mono ? "font-mono text-[13px]" : "font-sans text-sm"
         }`}
       />
     </div>
-  )
+  );
 }
 
-interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
-  value: string
-  onChange: (v: string) => void
-  error?: string | null
+interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange"> {
+  value: string;
+  onChange: (v: string) => void;
+  error?: string | null;
 }
 
 export function Textarea({ value, onChange, error, rows = 4, ...rest }: TextareaProps) {
-  const [focus, setFocus] = useState(false)
-  const ringColor = error ? 'var(--red)' : focus ? 'var(--primary)' : 'var(--line)'
+  const [focus, setFocus] = useState(false);
+  const ringColor = error ? "var(--red)" : focus ? "var(--primary)" : "var(--line)";
   return (
     <div
       className="px-3 py-2.5 rounded-lg bg-(--bg-elev) transition-all duration-150"
       style={{
         border: `1.5px solid ${ringColor}`,
-        boxShadow: focus && !error ? '0 0 0 3px var(--primary-dim)' : 'none',
+        boxShadow: focus && !error ? "0 0 0 3px var(--primary-dim)" : "none",
       }}
     >
       <textarea
@@ -87,15 +87,15 @@ export function Textarea({ value, onChange, error, rows = 4, ...rest }: Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => {
-          setFocus(true)
-          rest.onFocus?.(e)
+          setFocus(true);
+          rest.onFocus?.(e);
         }}
         onBlur={(e) => {
-          setFocus(false)
-          rest.onBlur?.(e)
+          setFocus(false);
+          rest.onBlur?.(e);
         }}
         className="w-full border-none outline-none bg-transparent resize-y font-sans text-sm text-(--ink) placeholder:text-(--ink-4) leading-relaxed box-border focus:outline-none focus:shadow-none"
       />
     </div>
-  )
+  );
 }

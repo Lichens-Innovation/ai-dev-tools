@@ -27,7 +27,7 @@
 }
 
 .cmd-row .name::before {
-  content: '/';
+  content: "/";
   color: var(--primary);
   font-weight: 600;
 }

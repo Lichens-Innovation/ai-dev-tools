@@ -1,52 +1,52 @@
-import { Dialog } from '@base-ui/react/dialog'
-import { useEffect, useRef } from 'react'
+import { Dialog } from "@base-ui/react/dialog";
+import { useEffect, useRef } from "react";
 
 interface SlidePanelProps {
-  isOpen: boolean
-  onClose: () => void
-  side: 'left' | 'right'
-  widthClass?: string
-  toggleDataAttr?: string | string[]
-  children: React.ReactNode
-  className?: string
+  isOpen: boolean;
+  onClose: () => void;
+  side: "left" | "right";
+  widthClass?: string;
+  toggleDataAttr?: string | string[];
+  children: React.ReactNode;
+  className?: string;
 }
 
 export default function SlidePanel({
   isOpen,
   onClose,
   side,
-  widthClass = 'w-64',
+  widthClass = "w-64",
   toggleDataAttr,
   children,
-  className = '',
+  className = "",
 }: SlidePanelProps) {
-  const popupRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
     function onMouseDown(e: MouseEvent) {
-      const target = e.target as HTMLElement
-      const attrs = Array.isArray(toggleDataAttr) ? toggleDataAttr : toggleDataAttr ? [toggleDataAttr] : []
-      if (attrs.some((attr) => target.closest(`[${attr}]`))) return
+      const target = e.target as HTMLElement;
+      const attrs = Array.isArray(toggleDataAttr) ? toggleDataAttr : toggleDataAttr ? [toggleDataAttr] : [];
+      if (attrs.some((attr) => target.closest(`[${attr}]`))) return;
       if (popupRef.current && !popupRef.current.contains(target)) {
-        onClose()
+        onClose();
       }
     }
-    document.addEventListener('mousedown', onMouseDown)
-    return () => document.removeEventListener('mousedown', onMouseDown)
-  }, [isOpen, onClose, toggleDataAttr])
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [isOpen, onClose, toggleDataAttr]);
 
-  const borderClass = side === 'left' ? 'left-0 border-r' : 'right-0 border-l'
+  const borderClass = side === "left" ? "left-0 border-r" : "right-0 border-l";
   const animClass =
-    side === 'left'
-      ? 'data-[starting-style]:-translate-x-full data-[ending-style]:-translate-x-full'
-      : 'data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full'
+    side === "left"
+      ? "data-[starting-style]:-translate-x-full data-[ending-style]:-translate-x-full"
+      : "data-[starting-style]:translate-x-full data-[ending-style]:translate-x-full";
 
   return (
     <Dialog.Root
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) onClose()
+        if (!open) onClose();
       }}
       modal={false}
       disablePointerDismissal
@@ -62,5 +62,5 @@ export default function SlidePanel({
         </Dialog.Viewport>
       </Dialog.Portal>
     </Dialog.Root>
-  )
+  );
 }

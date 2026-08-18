@@ -8,10 +8,10 @@ Abstracts all `~/.claude/` path construction and JSON parsing so consumers never
 
 ## Directory constants (`src/config/directories.ts`)
 
-| Export | Path |
-|---|---|
-| `CLAUDE_DIR` | `~/.claude` |
-| `PLUGINS_DIR` | `~/.claude/plugins` |
+| Export                   | Path                             |
+| ------------------------ | -------------------------------- |
+| `CLAUDE_DIR`             | `~/.claude`                      |
+| `PLUGINS_DIR`            | `~/.claude/plugins`              |
 | `MARKETPLACES_CACHE_DIR` | `~/.claude/plugins/marketplaces` |
 
 ## API
@@ -22,13 +22,14 @@ Returns parsed JSON or `null` on any error (missing file, parse error). Used int
 
 ### Marketplace functions — `src/marketplace.ts`
 
-| Function | Source file | Returns |
-|---|---|---|
-| `getKnownMarketplaces()` | `~/.claude/plugins/known_marketplaces.json` | All registered marketplaces keyed by name |
-| `getLocalMarketplaces()` | same | Only `source.source === 'directory'` entries |
+| Function                                 | Source file                                 | Returns                                            |
+| ---------------------------------------- | ------------------------------------------- | -------------------------------------------------- |
+| `getKnownMarketplaces()`                 | `~/.claude/plugins/known_marketplaces.json` | All registered marketplaces keyed by name          |
+| `getLocalMarketplaces()`                 | same                                        | Only `source.source === 'directory'` entries       |
 | `getMarketplacePluginsFromPath(dirPath)` | `<dirPath>/.claude-plugin/marketplace.json` | Plugin names listed in that marketplace's manifest |
 
 `KnownMarketplace` shape:
+
 ```ts
 {
   source: { source: 'github' | 'directory'; repo?: string; path?: string }
@@ -40,12 +41,12 @@ Returns parsed JSON or `null` on any error (missing file, parse error). Used int
 
 ### Plugin functions — `src/plugin.ts`
 
-| Function | Source file | Returns |
-|---|---|---|
-| `getInstalledPlugins()` | `~/.claude/plugins/installed_plugins.json` | Flat list of `InstalledPlugin` (one entry per scope per plugin) |
-| `isPluginInstalled(key)` | same | Boolean |
-| `getInstalledPluginsByMarketplace()` | same | `Record<marketplaceName, pluginName[]>` |
-| `getCachedMarketplacePlugins(name)` | `~/.claude/plugins/marketplaces/<name>/plugins/` | Plugins cached from a GitHub-sourced marketplace |
+| Function                             | Source file                                      | Returns                                                         |
+| ------------------------------------ | ------------------------------------------------ | --------------------------------------------------------------- |
+| `getInstalledPlugins()`              | `~/.claude/plugins/installed_plugins.json`       | Flat list of `InstalledPlugin` (one entry per scope per plugin) |
+| `isPluginInstalled(key)`             | same                                             | Boolean                                                         |
+| `getInstalledPluginsByMarketplace()` | same                                             | `Record<marketplaceName, pluginName[]>`                         |
+| `getCachedMarketplacePlugins(name)`  | `~/.claude/plugins/marketplaces/<name>/plugins/` | Plugins cached from a GitHub-sourced marketplace                |
 
 Plugin key format: `<pluginName>@<marketplaceName>`.
 
