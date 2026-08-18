@@ -1281,6 +1281,100 @@ export type QuestionChoice = { choice: "answer"; selections: QuestionSelection[]
  */
 export type SessionEventBody = SessionEvent extends infer T ? (T extends SessionEvent ? Omit<T, "seq"> : never) : never;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Picking up a conversation the app did not start (`025`).
+//
+// The CLI persists every session it runs — this app's own included, since `024` passes
+// `persistSession: true` — under its own store. So a conversation someone started in their terminal
+// is on disk, and the pane can attach to it. Three shapes cross the wire for that, and the split is
+// the point: a LIST is cheap metadata main read from the store, a DISCLOSURE is the expensive walk
+// of one transcript, and neither is a path a renderer nominated. What comes back on `session:resume`
+// is an id that must have come from a list main published.
+
+/**
+ * One conversation on disk, as the store describes it — enough to recognise, not enough to trust.
+ *
+ * Every field is READ from the CLI's own session store by main. The renderer never names a session
+ * file, a directory or a project: it picks a row out of this list by its `id`, which is the same
+ * discipline as a grant carrying a scope word and a model selector carrying an id main published.
+ */
+export interface ResumableSession {
+  /** The CLI's own session id. What a resume is issued against, and the only thing the wire takes. */
+  id: string;
+  /** The store's display title: a `/rename`, an auto-generated summary, or the first prompt. */
+  summary: string;
+  /**
+   * The first meaningful thing the user typed.
+   *
+   * Listed BESIDE the summary rather than as a fallback for it: a generated summary is the model's
+   * reading of a conversation, and the sentence the person actually wrote is what they will
+   * recognise. When the store has only one of the two, that one stands alone.
+   */
+  firstPrompt: string | null;
+  /** The branch recorded at the end of the session. Null when the session was not in a repository. */
+  branch: string | null;
+  /** The working directory it ran in — always the open project, or it is not offered at all. */
+  cwd: string;
+  /** Last write to the transcript, ms since epoch. */
+  lastModified: number;
+  /** First entry's timestamp, ms since epoch. Null when the store did not record one. */
+  createdAt: number | null;
+  /**
+   * Transcript size on disk, in bytes.
+   *
+   * The cheap half of "what will replaying this cost" — it is on the listing because it is free,
+   * while the token estimate below needs the file parsed and belongs to the disclosure.
+   */
+  sizeBytes: number;
+}
+
+/** One thing a stored transcript already read, and whether the pane could read it too. */
+export interface ResumeRead {
+  /** Absolute path, resolved against the recorded session's own working directory. */
+  path: string;
+  /** The tool that read it, so "Grep across the repo" and "Read one file" do not look the same. */
+  tool: string;
+  /**
+   * False when the path is outside everything this pane session may read.
+   *
+   * THE ONES THAT MATTER. A resumed conversation was produced under the terminal session's rules, so
+   * it can carry the contents of files the pane's boundary would refuse today — the boundary applies
+   * going FORWARD only. These are exactly the paths the pane will now start asking about, because a
+   * resumed session starts with no grants.
+   */
+  inScope: boolean;
+}
+
+/**
+ * What the user is shown before a resume, and can decline.
+ *
+ * The one disclosure in this app that is about the PAST rather than about what is permitted next.
+ * Everything else — `ClaudeReadScope`, the write scope, the grants — describes a boundary in force;
+ * this describes context that already exists and that the boundary cannot retract.
+ */
+export interface ResumeDisclosure {
+  /** The row this describes, carried along so the confirmation can restate what it is about. */
+  session: ResumableSession;
+  /** Turns in the transcript, as the store counts messages. */
+  messages: number;
+  /** Paths the transcript's own tool calls named, first-seen order, out-of-scope ones first. */
+  reads: ResumeRead[];
+  /** How many reads were dropped from `reads` for length. Zero when the list is complete. */
+  more: number;
+  /** How many of the listed reads are outside what this pane session may read. */
+  outside: number;
+  /** Estimated tokens replayed as input on the first turn. An estimate, and the note says so. */
+  replayTokens: number;
+  /** What that replay is estimated to cost, in USD, at the rate `replayNote` names. */
+  replayUsd: number;
+  /** The sentence about that cost — written once, in `session-resume.ts`, like every other. */
+  replayNote: string;
+  /** The sentence about what the transcript already carries, and what this list cannot see. */
+  readNote: string;
+  /** The sentence about what does NOT come across: grants, write scope, settings. */
+  scopeNote: string;
+}
+
 /** Everything the pane header states about the session it is attached to. */
 export interface SessionInfo {
   /** Null when no session is running: every other field then describes what one WOULD get. */

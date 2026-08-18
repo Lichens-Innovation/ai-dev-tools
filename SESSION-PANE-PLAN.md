@@ -1,6 +1,6 @@
 # Session pane — a Claude session inside the desktop app
 
-**Status: queued as tasks `015`–`026`; `015`–`020` and `023` are done.** Written 2026-08-04 after M5.
+**Status: cut into tasks `015`–`026`, and all of them are now done.** Written 2026-08-04 after M5.
 Revised 2026-08-05 twice: first against the vendored SDK reference, then against a design interview
 that changed roughly half of it. The earlier draft's conclusions about transport and permissions
 survive; its scope, sequencing and tool story did not.
@@ -553,10 +553,15 @@ ENOENT` in a GUI-launched app. On this machine `~/.local/bin/claude` is a bun-co
 ## Probes to run before building
 
 - Does `resume` honour the pane's `cwd`/`additionalDirectories`, or restore the recorded ones?
-  **Still open, and `025` owns it — but `023` settled the half that matters most.** The `PreToolUse`
-  hook runs before the permission system and checks a list this app owns, so it remains the authority
-  over reads whatever a resume restores. What is left to probe is `settingSources` and the recorded
-  `cwd`.
+  **Answered by `025`, measured against a running CLI: it honours the pane's and restores neither.**
+  `init.cwd` comes back as the **resuming** query's cwd, and a `Read` of the recorded session's own
+  cwd reached `canUseTool` rather than being waved through. `settingSources` is not restored either —
+  a project-tier custom slash command present in the recorded session's `slash_commands` was absent
+  from the resumed one's, so `[]` holds across a resume and neither door it closes reopens. `023` had
+  already settled the half that matters most: the `PreToolUse` hook runs before the permission system
+  and checks a list this app owns, so it is the authority over reads whatever a resume restores.
+  **What a resume genuinely does carry across is the transcript itself**, which no boundary gates —
+  see the `025` drift-log entry.
 - Does the **`PermissionDenied` hook** fire for hook-issued denials? If so it collapses the
   hook-owns-its-own-transcript-entries awkwardness into one funnel, and its `retry` output is
   interesting. **Still open.** `020` shipped the awkwardness as designed — the hook writes its own
@@ -611,14 +616,19 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
     in the UI rather than dropped. — **`020`** (it left `024`)
 13. Budget fires, the session ends, **Continue** resumes it with the transcript intact. — **`024`**
 14. The packaged build resolves the CLI. Only fails in `build`, never in `dev`. — **`015`**
+15. A conversation the app did not start is listed, disclosed, declinable, and resumed by **forking** —
+    the source transcript byte-identical on disk afterwards, the fork under a new id, and a path that
+    conversation read freely raising a prompt on the first turn in the pane. — **`025`**, 15/15 in the
+    window against fixtures under `~/gits`
 
 ## Acceptance criteria
 
 - [x] A live, multi-turn Claude session runs inside the app, per project, on the Agent SDK (`019`)
 - [x] The help chat is gone and the pane is the only conversational surface (`019`)
 - [x] Permission requests render per-tool (path + diff, full URL) and are answerable (`020`)
-- [ ] `AskUserQuestion` renders as a structured choice, answered by validated selection — `021`;
-      the tool is still not in `PANE_TOOLS`
+- [x] `AskUserQuestion` renders as a structured choice, answered by validated selection (`021`) — it
+      is in `PANE_TOOLS` with the `toolConfig` opt-in and never in `allowedTools`, and the answer is
+      rebuilt from the questions the model asked rather than forwarded
 - [x] Read scope is disclosed before a session starts; write scope starts empty and grows only per submit
       — disclosed and empty since `019`, `023` made the READ half mutable mid-session, and `022`
       closed the write half: one directory per claimed preview token, and nothing else in the app
@@ -635,15 +645,17 @@ Slice attributions are on the items that have been closed. Anything unmarked is 
       not one: `maxBudgetUsd` stops, `taskBudget` paces (where the model accepts one), `maxTurns`
       brakes; and the ending leaves the read loop rather than waiting for a stream end that a
       streaming-input query never delivers
-- [ ] A terminal-started session can be resumed, with its prior reads disclosed first — `025`;
-      `024` built the resume half (`persistSession`, `resume`, `sessionId()`, one `openSession`
-      builder), so what is left is the picker, the disclosure and `forkSession`
+- [x] A terminal-started session can be resumed, with its prior reads disclosed first (`025`) — and
+      the picker is wider than the title: it lists every conversation recorded for the project, because
+      `includeProgrammatic: false` returns zero rows for SDK-started ones and would have hidden the
+      app's own. Attaching **forks**, so the source history is never written to
 - [ ] `test/isolation.test.ts` pins the invariant properties above — partially; `019` added the
       **"the session pane"** describe, `020` added three blocks to it, `023` widened one of those
       and added two more, `022` replaced the empty-write-scope block with one that pins how the
-      scope grows and added a block for the no-turn seed, and `024` added two — the ceiling's two
+      scope grows and added a block for the no-turn seed, `024` added two — the ceiling's two
       exits with the token-only continue wire, and the two header levers choosing from lists main
-      published
+      published — and `025` added one, pinning that a foreign session id is honoured only from the
+      list main published and that attaching forks
 
 ## Drift log — where the build left the plan
 
@@ -673,7 +685,10 @@ tool call has to render pinned above the composer and a separate file for one ca
 `context`, `notice`, `turn`, `ended`), and no `session:answer` at all yet. `021` owns that last one and should
 decide whether an `AskUserQuestion` answer is a sixth channel or a second arm of `session:permission`,
 now that `023` has demonstrated the arm-extension pattern. `023` added `session:revoke` and `022`
-added `session:handoff`, neither of which the plan anticipated at all.
+added `session:handoff`, neither of which the plan anticipated at all. Nor did it anticipate the six
+that followed: `021` chose a **sixth channel** (`session:question`) over a second arm, `024` added
+`session:continue`, `session:effort` and `session:model`, and `025` added `session:resumable`,
+`session:resume-detail` and `session:resume`. The current list lives in `apps/maestro/CLAUDE.md`.
 
 ### `020` — permission prompts in the pane
 
@@ -844,3 +859,49 @@ beside the four scope ones. Five things on the page above were wrong or missing.
   `persistSession: true`, `resume`, `PaneSession.sessionId()` and the builder already exist, and what
   remains there is listing the user's own sessions and choosing one — plus `forkSession`, which
   Continue deliberately does not do.
+
+### `025` — resume a session started in the terminal
+
+"Resuming a session started in the terminal" shipped as **resuming a conversation the app did not
+start this time**, and the difference is the first divergence below. Three channels are new —
+`session:resumable` (no argument), `session:resume-detail` (id), `session:resume` (id) — and
+`resumeSession` is the **fourth** caller of `openSession`, carrying one new `CarriedSession` field,
+`fork`, which becomes `forkSession: true` on the query and only ever alongside `resume`. The policy
+and every sentence the user reads live in a new pure module, `src/core/session-resume.ts`, the sixth
+beside the four scope ones and `session-budget.ts`. Five things on the page above were wrong, missing,
+or answered.
+
+- **"Started in the terminal" is not a property the store can be filtered on usefully.** This page
+  says `listSessions({ dir })` returns every session for a project, which is true; what it does not
+  say is that `includeProgrammatic: false` — the option that gives parity with the terminal's
+  `/resume` — returns **zero** rows for SDK-started sessions, which would have hidden every
+  conversation this app itself has run. `resumableFrom` filters by recorded `cwd` **equality** (not
+  containment) plus `includeWorktrees: false`, minus this window's own live and exhausted ids.
+  Yesterday's pane conversation is as resumable as yesterday's terminal one.
+- **THE DISCLOSURE IS NOT A FORMALITY, and the measurement is the argument for it.** The resumed
+  conversation answered a question about a file's contents with **no tool call at all** — the bytes
+  were already in the transcript, so nothing reached `canUseTool` and nothing reached the boundary
+  hook. This page's "the pane's options apply going forward only" is exactly right and easy to
+  under-read. What it could not say is the honest limit of the disclosure: it is built from the
+  transcript's recorded **tool calls**, and attached, pasted or auto-loaded text never appears as one,
+  so `readNote()` states that in the sentence rather than presenting the list as complete.
+- **The probe is answered, and the answer is the reassuring one on both halves.** A resume restores
+  neither `settingSources` (a project-tier custom slash command in the recorded session was absent
+  from the resumed one's `slash_commands`) nor the recorded `cwd`/readable set (`init.cwd` is the
+  resuming query's, and a `Read` of the recorded cwd was asked about). A resumed session also starts
+  with zero grants and an empty write scope, because grants live on main's per-window entry and are
+  written nowhere.
+- **The store is read through the SDK, never walked, and neither wrapper throws.** `listStoredSessions`
+  and `readStoredMessages` in `agent-sdk.ts` wrap `listSessions` / `getSessionMessages`;
+  `~/.claude/projects/<slug>/` is private layout with a lossy slug encoding, and a store that cannot be
+  read is an empty picker rather than a broken pane. `forkSession: true` is a query option, so the
+  SDK's separate `forkSession()` helper is unused. Fork verified on disk: the source transcript was
+  byte-identical (sha, size, mtime) and the fork landed in the resuming project's own store under a new
+  id.
+- **Two things this page had no opinion about, decided.** The replay estimate is quoted at a **named**
+  rate (`REPLAY_USD_PER_MTOK = 3`, in the sentence itself) because the pane's model is selectable and a
+  bare dollar figure would be trusted for something it cannot be; and a resumed session's earlier turns
+  are **not** re-rendered in the scrollback — they are in the model's context, and the pane posts one
+  notice saying what was picked up, what it cost and that it forked. A trap found only in the window
+  belongs with that last one: the renderer must clear the transcript **before** the resume round trip,
+  because main pushes the notice during the call.

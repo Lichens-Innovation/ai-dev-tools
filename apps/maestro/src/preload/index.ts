@@ -111,6 +111,14 @@ const api: MaestroApi = {
     // An extra argument here (a ceiling, a session to resume) is the only hole this channel could
     // have, and it is the same hole `claude:run` refuses by taking a token alone.
     continue: (id) => ipcRenderer.invoke(IPC.sessionContinue, id),
+    // NO ARGUMENT, then A SESSION ID FROM THE LIST THAT ANSWERED IT (`025`). `resumable` takes
+    // nothing for the reason `start` takes nothing — the project is main's — and the two calls that
+    // follow carry an id main published on that list and nothing else. No path, no project, no
+    // transcript file: this is the one place on the surface where an id names something main has no
+    // record of, so main checks it against what it offered THIS window rather than resolving it.
+    resumable: () => ipcRenderer.invoke(IPC.sessionResumable),
+    resumeDetail: (id) => ipcRenderer.invoke(IPC.sessionResumeDetail, id),
+    resume: (id) => ipcRenderer.invoke(IPC.sessionResume, id),
     // A word from a closed set, and a model id from the list main published with the session.
     setEffort: (id, effort) => ipcRenderer.invoke(IPC.sessionEffort, id, effort),
     setModel: (id, model) => ipcRenderer.invoke(IPC.sessionModel, id, model),

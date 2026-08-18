@@ -26,6 +26,8 @@ import type {
   PermissionPrompt,
   QuestionChoice,
   QuestionPrompt,
+  ResumableSession,
+  ResumeDisclosure,
   SessionEvent,
   SessionInfo,
 } from "../../../shared/ipc";
@@ -119,6 +121,33 @@ interface SessionContextValue {
   continueSession(): Promise<void>;
   /** True while that round trip is in flight, so the button cannot be pressed twice. */
   continuing: boolean;
+  /**
+   * Conversations Claude Code's own store holds for this project — what the picker offers (`025`).
+   *
+   * Empty until `loadResumable()` is called, and re-read every time it is: a session the user was in
+   * a minute ago belongs on the list. Nothing here is a path — main published these rows, and the
+   * only thing that goes back is an `id` off one of them.
+   */
+  resumable: ResumableSession[];
+  loadingResumable: boolean;
+  loadResumable(): Promise<void>;
+  /**
+   * What one of them already read, and what replaying it costs. Null when main refused the id.
+   *
+   * Fetched on selection rather than with the list because it walks a whole transcript — and because
+   * the user is entitled to browse the list without the app parsing every conversation they own.
+   */
+  resumeDetail(id: string): Promise<ResumeDisclosure | null>;
+  /**
+   * Attach to it, forking. The transcript on screen is CLEARED, unlike a Continue.
+   *
+   * The opposite decision from `continueSession`, and for the same underlying reason: a Continue is
+   * the conversation above the composer carrying on, so wiping it would throw away what the user is
+   * reading. This is a DIFFERENT conversation arriving — one whose turns were never in this pane —
+   * so leaving the old ones on screen would show two conversations as one.
+   */
+  resume(id: string): Promise<boolean>;
+  resuming: boolean;
   /** Change how hard the model thinks, from the next turn. The conversation is untouched. */
   setEffort(effort: SessionEffort): Promise<void>;
   /** Change the model mid-conversation, choosing from `info.models`. Null is the CLI's default. */
@@ -146,6 +175,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<TranscriptEntry[]>([]);
   const [starting, setStarting] = useState(false);
   const [continuing, setContinuing] = useState(false);
+  const [resumable, setResumable] = useState<ResumableSession[]>([]);
+  const [loadingResumable, setLoadingResumable] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PermissionPrompt[]>([]);
@@ -260,6 +292,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setPending([]);
     setQuestions([]);
     setOutcomes({});
+    // The store's rows are per PROJECT. Keeping them across a switch would offer conversations
+    // recorded somewhere the window has moved off — the same failure the preview tokens are dropped
+    // for, and the pane would happily resume one.
+    setResumable([]);
     if (!projectRoot) return;
     // What a session WOULD be able to see, so the header can disclose it before one exists.
     void callMain(() => window.maestro.session.info()).then((res) => {
@@ -405,6 +441,80 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [continuing, info?.id]);
 
+  /**
+   * Re-read what the store holds for this project.
+   *
+   * Reads only, and costs nothing — no session is started and no transcript is parsed. The list is
+   * short-lived state rather than something kept in step: it is fetched when the picker opens, so a
+   * conversation the user just left in their terminal is on it.
+   */
+  const loadResumable = useCallback(async () => {
+    if (!projectRoot) return;
+    setLoadingResumable(true);
+    try {
+      const res = await callMain(() => window.maestro.session.resumable());
+      if (!res.ok) {
+        setError(res.error);
+        setResumable([]);
+        return;
+      }
+      setResumable(res.value);
+    } finally {
+      setLoadingResumable(false);
+    }
+  }, [projectRoot]);
+
+  /** The disclosure for one row. The id came off the list main published; nothing else is sent. */
+  const resumeDetail = useCallback(async (id: string) => {
+    const res = await callMain(() => window.maestro.session.resumeDetail(id));
+    if (!res.ok) {
+      setError(res.error);
+      return null;
+    }
+    return res.value;
+  }, []);
+
+  /**
+   * Attach to a conversation this app did not start.
+   *
+   * The transcript is cleared FIRST: what is on screen belongs to whatever the pane was doing
+   * before, and the arriving conversation's own turns are in the model's context rather than in this
+   * scrollback — main writes one notice saying what was picked up and what it cost. Leaving the old
+   * entries above that notice would render two conversations as one continuous one.
+   */
+  const resume = useCallback(
+    async (id: string) => {
+      if (resuming) return false;
+      setResuming(true);
+      setError(null);
+      // CLEARED BEFORE THE CALL, NOT AFTER, and that ordering is the whole of a bug this cost a
+      // window run to find: main resumes, then pushes the notice saying what was picked up and what
+      // it cost — and that event arrives on the subscription BEFORE this promise resolves. Clearing
+      // afterwards deletes it, leaving a session that looks like it started silently. Clearing first
+      // is also honest about what has happened on the other side regardless: `resumeSession` ends
+      // whatever session this window had before it opens the new one.
+      setEntries([]);
+      setPending([]);
+      setQuestions([]);
+      setOutcomes({});
+      try {
+        const res = await callMain(() => window.maestro.session.resume(id));
+        if (!res.ok) {
+          setError(res.error);
+          return false;
+        }
+        setInfo(res.value);
+        sessionId.current = res.value.id;
+        setLive(res.value.id !== null);
+        if (res.value.id === null) setError(res.value.unavailable);
+        return res.value.id !== null;
+      } finally {
+        setResuming(false);
+      }
+    },
+    [resuming]
+  );
+
   /** Effort, from the next turn. Nothing is sent that is not one of the levels main published. */
   const setEffort = useCallback(async (effort: SessionEffort) => {
     const id = sessionId.current;
@@ -458,6 +568,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       error,
       start,
       continueSession,
+      resumable,
+      loadingResumable,
+      loadResumable,
+      resumeDetail,
+      resume,
+      resuming,
       setEffort,
       setModel,
       handoff,
@@ -483,7 +599,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       open,
       outcomes,
       pending,
+      loadResumable,
+      loadingResumable,
       questions,
+      resumable,
+      resume,
+      resumeDetail,
+      resuming,
       revoke,
       say,
       setEffort,

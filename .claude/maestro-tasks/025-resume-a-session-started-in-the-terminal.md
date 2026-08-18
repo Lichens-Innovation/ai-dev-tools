@@ -90,15 +90,61 @@ session started elsewhere.
 
 ## Acceptance criteria
 
-- [ ] The pane lists recent sessions for the open project with enough detail to recognise one — **entirely remaining**; nothing enumerates sessions today
-- [ ] Resuming restores the conversation and continues it in the pane — **mechanically delivered by `024`** (`persistSession`, the `resume` option, `PaneSession.sessionId()`, `openSession`'s `CarriedSession`); what remains is pointing it at a session the app did not start
-- [ ] Resuming forks: the original terminal session's history is not written to — verified on disk — **remaining**, and note `024`'s Continue deliberately does the opposite: it resumes the app's own session in place, so forking is new behaviour rather than a setting to flip
-- [ ] Before resuming, the user is shown what that session previously read, and can decline — **remaining**
-- [ ] Whether resume honours the pane's directory scope is established by probe and recorded, and the boundary behaves correctly either way — **remaining**; `024` resumed only sessions started under this app's own options, so it settled nothing here
-- [ ] A resumed session is subject to the same tool set, boundary and prompts as a fresh one — **largely held by construction**: `openSession` is the single builder and composes the same options for every caller; what is left is asserting it for a foreign session id
-- [ ] The cost of replaying a long transcript is surfaced before the user commits to it — **remaining**, and `024` supplies the vocabulary for it: `formatUsd`, `spendLabel` and `spendNote` already say "an estimate, not a bill" in one place
-- [ ] Sessions belonging to other projects are not offered — **remaining**
+- [x] The pane lists recent sessions for the open project with enough detail to recognise one — a History control in the header opens `session-resume.tsx`; each row carries summary, first prompt, branch, cwd, age and size, verified in the window
+- [x] Resuming restores the conversation and continues it in the pane — verified in the window: the model answered `TERMTOKEN-7741` from the imported context, which it could only have had from the transcript
+- [x] Resuming forks: the original terminal session's history is not written to — verified on disk — `forkSession: true` on the query; both fixture stores were byte-identical (sha, size, mtime) after the resume and a new fork transcript appeared in the resuming project's own store under a new id
+- [x] Before resuming, the user is shown what that session previously read, and can decline — `resumeDisclosure` listed the out-of-scope read in amber (`data-in-scope="false"`), and declining returned to the list having started nothing
+- [x] Whether resume honours the pane's directory scope is established by probe and recorded, and the boundary behaves correctly either way — measured against a running CLI: it does **not** restore the recorded `cwd` or readable set (`init.cwd` is the resuming query's) and does **not** restore `settingSources`; a `Read` of the path that conversation had read freely raised a prompt
+- [x] A resumed session is subject to the same tool set, boundary and prompts as a fresh one — `resumeSession` is the fourth caller of `openSession`; asserted in the window, where the resumed session's tool set and skills were identical to a fresh one's, with zero grants and an empty write scope
+- [x] The cost of replaying a long transcript is surfaced before the user commits to it — the disclosure shows the replay estimate (189 tokens, ≈$0.0006 in the fixture) at a named rate, with `024`'s "an estimate, not a bill" sentence
+- [x] Sessions belonging to other projects are not offered — `resumableFrom` filters by recorded `cwd` **equality**; a session in a second fixture project was not listed
 
 ## Blocked by
 
 - `024-a-budget-ceiling-you-can-continue-past.md`
+
+## What was actually built
+
+Added: `src/core/session-resume.ts` (pure — `resumableFrom`, `resumeDisclosure`, `replayNote`,
+`readNote`, `RESUME_SCOPE_NOTE`, `resumedNotice`, `formatTokens`; reads nothing itself),
+`src/renderer/src/components/session-resume.tsx` (the picker and the disclosure, reaching
+`useSession()` only), `test/core/session-resume.test.ts` (16 tests).
+
+Changed: `agent-sdk.ts` (`listStoredSessions`, `readStoredMessages`, `PaneSessionRequest.fork`),
+`contracts.ts` (`ResumableSession`, `ResumeRead`, `ResumeDisclosure`), `core/index.ts`,
+`main/claude-session.ts` (`listResumableSessions`, `describeResume`, `resumeSession`, the
+per-`webContents.id` `offered` set, `CarriedSession.fork`), `main/ipc.ts` / `shared/ipc.ts` /
+`preload/index.ts` (three channels), `session-context.tsx`, `session-pane.tsx`,
+`test/isolation.test.ts`.
+
+### Divergences
+
+1. **The picker lists every conversation recorded for the project, not only terminal-started ones.**
+   `listSessions({ includeProgrammatic: false })` gives parity with the terminal's `/resume`, but
+   measured it returns **zero** rows for SDK-started sessions — which would hide every conversation
+   this app itself has run. So the filter is recorded `cwd` **equality** (not containment) plus
+   `includeWorktrees: false`, minus this window's own live and exhausted ids. Yesterday's pane
+   conversation is as resumable as yesterday's terminal one; the page's title still describes the
+   motivating case rather than the rule.
+2. **The store is read through the SDK, never walked.** This page did not say how.
+   `~/.claude/projects/<slug>/` is private layout with a lossy slug encoding, so `listSessions` /
+   `getSessionMessages` are wrapped instead — the same "do not become a second reader of someone
+   else's format" rule `ccusage.ts` records. Neither wrapper throws: a store that cannot be read is an
+   empty picker. `forkSession: true` is a query option, so the SDK's separate `forkSession()` helper
+   is unused.
+3. **The disclosure enumerates the transcript's recorded TOOL CALLS, and says what it cannot see.**
+   Attached, pasted and auto-loaded text never appears as a tool call in `getSessionMessages`' output,
+   so `readNote()` states the limit plainly. Implying completeness would have been worse than
+   disclosing less.
+4. **The replay cost is quoted at a named rate.** `REPLAY_USD_PER_MTOK = 3`, written into the sentence
+   itself, because the pane's model is selectable and a bare dollar figure would be trusted for
+   something it cannot be.
+5. **A resumed session's earlier turns are NOT re-rendered in the pane's scrollback** — they are in the
+   model's context. The pane clears the transcript and posts one notice saying what was picked up, what
+   it cost and that it forked.
+6. **A fourth probe answer, and it is why the disclosure is not optional.** The resumed conversation
+   answered a question about a file's contents with **no tool call at all** — the bytes were already in
+   the transcript, so nothing reached `canUseTool` and nothing reached the boundary hook.
+7. **A trap found only in the window:** the renderer must clear the transcript **before** the resume
+   round trip. Main pushes its notice during the call, so clearing afterwards deleted it and the
+   session looked as though it had started silently. Nothing errored and no test caught it.

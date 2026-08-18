@@ -5,6 +5,43 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — resume a session started in the terminal
+
+- **The pane can pick up a conversation it did not start, and it forks rather than continues.** A
+  History control in the session header lists the conversations the CLI's own store holds for the open
+  project (summary, first prompt, branch, cwd, age, size); choosing one shows what that transcript
+  already read and what replaying it will cost, and Decline starts nothing. Three new channels —
+  `session:resumable` (no argument), `session:resume-detail` (id), `session:resume` (id) — and an id is
+  honoured only if it came from the list main published. `resumeSession` is the fourth caller of the
+  single `openSession` builder, so a resumed session gets the same tool set, boundary and prompts as a
+  fresh one; `CarriedSession.fork` becomes `forkSession: true` on the query, only ever with `resume`.
+  New pure module `src/core/session-resume.ts` decides what may be offered and owns every sentence
+  about it.
+- **The three probes, measured against a running CLI.** A resume does **not** restore the recorded
+  session's `settingSources` (a project-tier slash command present in the terminal session was absent
+  from the resumed one, so `settingSources: []` holds — no permissions widening, no settings-file
+  `ANTHROPIC_API_KEY` redirecting billing); it does **not** restore the recorded working directory or
+  readable set (`init.cwd` is the resuming query's, and a `Read` of the recorded cwd reached
+  `canUseTool`); and `forkSession: true` leaves the source transcript byte-identical while writing the
+  fork into the resuming project's store under a new id. Why the disclosure is not optional was also
+  measured: the resumed conversation answered a question about a file's contents with **no tool call at
+  all**, because the bytes were already in the transcript.
+- **Divergences from the plan.** The picker lists every conversation recorded for the project, not only
+  terminal-started ones — `listSessions({ includeProgrammatic: false })` returns zero rows for
+  SDK-started sessions, which would hide every conversation the app itself has run, so the filter is
+  recorded-`cwd` equality plus `includeWorktrees: false` minus this window's own ids. The store is read
+  through the SDK's `listSessions` / `getSessionMessages` (new `listStoredSessions` /
+  `readStoredMessages` in `agent-sdk.ts`, neither of which throws) rather than by walking
+  `~/.claude/projects/`. The disclosure states that it is built from recorded **tool calls** and cannot
+  enumerate attached or pasted text. The replay estimate is quoted at a named rate
+  (`REPLAY_USD_PER_MTOK = 3`) because the pane's model is selectable. Earlier turns are not re-rendered
+  in the scrollback — one notice says what was picked up.
+- Tests: `test/core/session-resume.test.ts` (16) plus one isolation block, and 15/15 assertions driven
+  in a real window against fixtures under `~/gits` — including that a session in a second fixture
+  project was not offered and that both fixture stores were byte-identical afterwards. One bug only a
+  window found: the renderer must clear the transcript **before** the resume round trip, since main
+  pushes its notice during the call.
+
 ### maestro — a budget ceiling you can continue past
 
 - **A session runs under three limits, and a Continue that makes a low ceiling survivable.**

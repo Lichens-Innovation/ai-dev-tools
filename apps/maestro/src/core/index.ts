@@ -226,6 +226,9 @@ export {
   startAgentSession,
   startPaneSession,
   paneSessionTarget,
+  // The CLI's own session store, read through the SDK rather than walked (`025`).
+  listStoredSessions,
+  readStoredMessages,
   AGENT_SDK_PACKAGE,
   BILLING_ENV_VARS,
   SMOKE_PROMPT,
@@ -313,6 +316,25 @@ export {
   type BudgetPolicy,
   type CeilingEnding,
 } from "./session-budget.js";
+
+// Picking up a conversation this app did not start (`025`): which of the store's own rows may be
+// offered for the open project, and the disclosure that has to be read before one is. Pure — the
+// store is read by `agent-sdk.ts`, which is where the SDK and `fs` already live.
+export {
+  formatTokens,
+  readNote,
+  replayNote,
+  resumableFrom,
+  resumeDisclosure,
+  resumedNotice,
+  CHARS_PER_TOKEN,
+  RESUME_LIST_LIMIT,
+  RESUME_READ_CAP,
+  RESUME_SCOPE_NOTE,
+  REPLAY_USD_PER_MTOK,
+  type StoredMessage,
+  type StoredSession,
+} from "./session-resume.js";
 
 // The parked promises behind that ask: idempotent per request id, and resolved — denied — by every
 // teardown path, because permission prompts do not time out and nothing else will. Pure.

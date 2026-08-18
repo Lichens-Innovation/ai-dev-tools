@@ -57,6 +57,9 @@ import type {
   QuestionPrompt,
   QuestionSelection,
   RefusalSource,
+  ResumableSession,
+  ResumeDisclosure,
+  ResumeRead,
   GrantScope,
   SessionGrant,
   SessionGrantOption,
@@ -135,6 +138,9 @@ export type {
   QuestionPrompt,
   QuestionSelection,
   RefusalSource,
+  ResumableSession,
+  ResumeDisclosure,
+  ResumeRead,
   GrantScope,
   SessionGrant,
   SessionGrantOption,
@@ -308,6 +314,16 @@ export const IPC = {
   // the record main is already holding, so a renderer can no more choose what a continuation
   // inherits than it can choose a prompt.
   sessionContinue: "session:continue",
+  // PICKING UP A CONVERSATION THIS APP DID NOT START (`025`) — three channels, in the order the user
+  // meets them. `session:resumable` lists what the CLI's own store holds for the open project;
+  // `session:resume-detail` walks ONE transcript and says what it already read and what replaying it
+  // costs; `session:resume` attaches to it, forking so the terminal session keeps its own history.
+  // All three carry a session ID and nothing else, and the id must be one main published on the
+  // list — this is the one place on the surface where an id names something main has no record of,
+  // which is exactly why it is checked rather than resolved.
+  sessionResumable: "session:resumable",
+  sessionResumeDetail: "session:resume-detail",
+  sessionResume: "session:resume",
   // The two levers the header can move on a live session. Both carry a value from a list MAIN
   // published — an effort level from a closed set, a model id from the CLI's own `supportedModels()`
   // — and both leave the conversation exactly where it is.
@@ -535,6 +551,38 @@ export interface MaestroApi {
      * a session that failed is not a session that ran out of allowance.
      */
     continue(id: string): Promise<SessionInfo>;
+    /**
+     * The conversations Claude Code's own store holds for the open project, newest first (`025`).
+     *
+     * Reads only; starts nothing and costs nothing. Main asks the CLI for the store rather than
+     * walking `~/.claude/projects` itself, drops everything whose recorded working directory is not
+     * this project, and drops this window's own conversation — Continue is the door to that one.
+     * The renderer names no directory and no file here: it gets a list, and may later send back one
+     * `id` FROM that list.
+     */
+    resumable(): Promise<ResumableSession[]>;
+    /**
+     * What one of those conversations already read, and what replaying it costs.
+     *
+     * THE DISCLOSURE, AND IT IS ABOUT THE PAST. Every other disclosure in this app describes a
+     * boundary in force; this one describes context that already exists and that the boundary cannot
+     * retract — a transcript produced under the terminal session's rules can hold the contents of
+     * files from anywhere on disk, and resuming puts them back in front of the model. The user is
+     * shown this and can decline.
+     *
+     * Rejects on an id this window was not offered, and on one whose transcript has since gone.
+     */
+    resumeDetail(id: string): Promise<ResumeDisclosure>;
+    /**
+     * Attach to it, FORKING: the session the user started keeps its own history.
+     *
+     * An id and nothing else, and the id must be one `resumable()` published. What the new session
+     * gets is what a fresh one gets — same tools, same read boundary, same `settingSources: []`,
+     * same prompts — plus the transcript. What it does NOT get is anything about the old session's
+     * permissions: no grants, nothing writable, and a fresh allowance, because none of that was
+     * agreed to here.
+     */
+    resume(id: string): Promise<SessionInfo>;
     /**
      * Change how hard the model thinks, from the next turn. The transcript is untouched.
      *

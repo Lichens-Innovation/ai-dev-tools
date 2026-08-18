@@ -28,6 +28,7 @@ import {
   FilePen,
   FileText,
   FolderOpen,
+  History,
   Info,
   MessagesSquare,
   Play,
@@ -43,6 +44,7 @@ import {
 } from "lucide-react";
 import QuestionCard from "./agent-question";
 import ReadScope from "./read-scope";
+import ResumePicker from "./session-resume";
 import { humanizeLog } from "../utils/session-log";
 import { useProject } from "../utils/project-context";
 import { useSession, MAX_PANE_WIDTH, MIN_PANE_WIDTH, type TranscriptEntry } from "../utils/session-context";
@@ -77,6 +79,7 @@ export default function SessionPane() {
   const { current } = useProject();
   const [input, setInput] = useState("");
   const [showScope, setShowScope] = useState(false);
+  const [showResume, setShowResume] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -141,6 +144,22 @@ export default function SessionPane() {
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {/*
+            PICKING UP A CONVERSATION THIS APP DID NOT START (`025`). Beside the eye rather than in
+            the empty state, because the reason to reach for it is usually mid-work: the user got
+            partway in their terminal and wants the app, and everything they said getting there is
+            otherwise retyped.
+          */}
+          <button
+            type="button"
+            data-testid="session-resume-toggle"
+            onClick={() => setShowResume((v) => !v)}
+            disabled={noProject}
+            title="Pick up a conversation recorded for this project"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-subtle hover:bg-(--bg-elev) hover:text-(--ink) bg-transparent border-0 cursor-pointer focus:outline-none disabled:opacity-40"
+          >
+            <History size={14} />
+          </button>
           <button
             type="button"
             data-testid="session-scope-toggle"
@@ -187,6 +206,8 @@ export default function SessionPane() {
         on what the model can see — the reason `017` built this disclosure in the first place. The
         write half is said in WORDS because an empty list on screen says nothing at all.
       */}
+      {showResume && !noProject && <ResumePicker onClose={() => setShowResume(false)} />}
+
       {showScope && session.info && (
         <div
           data-testid="session-scope"
@@ -908,6 +929,17 @@ function EmptyState({ noProject, live }: { noProject: boolean; live: boolean }) 
         <p className="m-0 mt-1.5 text-[11px] text-(--ink-3)">
           The help skill the old chat panel ran, now a skill this session can reach by name.
         </p>
+        {/*
+          Said HERE as well as on the header button, because this is the screen a user is looking at
+          when they realise they already had this conversation somewhere else — in their own
+          terminal, half-finished — and retyping it is what they are about to do instead.
+        */}
+        {!noProject && (
+          <p data-testid="session-empty-resume" className="m-0 mt-2.5 text-[11px] text-(--ink-3)">
+            Started this in your terminal? The clock icon above lists the conversations recorded for this project, shows
+            what each one already read, and picks one up as a fork — your terminal session keeps its own history.
+          </p>
+        )}
       </div>
     </div>
   );

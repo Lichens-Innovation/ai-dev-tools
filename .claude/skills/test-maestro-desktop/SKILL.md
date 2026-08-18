@@ -1,6 +1,6 @@
 ---
 name: test-maestro-desktop
-description: "Drive the Maestro desktop app (apps/maestro) in a real Electron window over the Chrome DevTools Protocol to test things no unit test can reach — React Flow canvas layout, node drags, modals, first-paint timing, theme, and save/reopen round trips. Use when verifying UI behaviour in a running window, reproducing a canvas or rendering bug, checking a change actually works in the packaged build, or when a claim about the app can only be settled by looking at a rendered window."
+description: "Drive the Maestro desktop app (apps/maestro) in a real Electron window over the Chrome DevTools Protocol to test things no unit test can reach — React Flow canvas layout, node drags, modals, first-paint timing, theme, and save/reopen round trips. Use when verifying UI behaviour in a running window, reproducing a canvas or rendering bug, checking a change actually works in the packaged build, or when a claim about the app can only be settled by looking at a rendered window. Also carries the rules for where fixture projects may live, and the scribe handoff that closes out a task from .claude/maestro-tasks/."
 ---
 
 # Test the Maestro desktop app in a real window
@@ -196,8 +196,21 @@ button. Contrast regressions here are invisible to everything except reading pix
 
 ## Fixtures
 
-Build throwaway projects in the scratchpad; never point a probe at a repo you care about — saving
-rewrites `.claude/maestro.json` and *moves rule files*. Two shapes cover most work:
+**Fixture projects live under `~/gits/<throwaway-name>` and nowhere else.** Two separate reasons,
+and the second is the one that matters:
+
+- Never point a probe at a repo you care about — saving rewrites `.claude/maestro.json` and *moves
+  rule files*.
+- Never point one outside `~/gits` at all. Opening a project **grants its root to a live Claude
+  session** with real tools, and any probe that clicks through a permission prompt is deciding, on
+  the user's behalf and with nobody watching, what an agent may read. `~/Documents`, the home
+  directory itself, `/etc`, `/proc`, `/sys`, `/usr` and anything else the OS owns are out of bounds
+  three times over: as a fixture root, as a directory added to a session's scope, and as the target
+  of anything a probe answers "allow" to. If a test seems to need one of those, the test is wrong.
+
+The scratchpad is still right for probe *scripts* and `--user-data-dir` profiles; it is the project
+roots that belong in `~/gits`. Name them for the slice (`~/gits/maestro-025-pane`), and say in your
+report where they were, so the grant is auditable. Two shapes cover most work:
 
 - a project whose workflow nodes carry **no** `position`, which is what forces a dagre layout;
 - a project with **no** `.claude/maestro.json` at all, which exercises the seeded starter config
@@ -211,3 +224,41 @@ rewrites `.claude/maestro.json` and *moves rule files*. Two shapes cover most wo
 Report what you measured — the numbers, the before/after, the frame counts — and say plainly when
 something could not be verified. If a probe passes, check it isn't passing vacuously: a summary
 with `frames: 0` or an unchanged node position means the assertions never ran against anything.
+
+## Finishing a maestro task
+
+When the work being probed is a slice from `.claude/maestro-tasks/`, the run is not done when the
+window is green. **Hand off to the `scribe` agent** (`plugins/ai-tools-manager/agents/scribe.md`)
+before reporting back.
+
+Why it is a step rather than a nicety: those task pages are written *before* the slice is built, and
+a slice that diverges silently leaves the next one planned against an app that no longer exists.
+`025` was written expecting to filter the session store for terminal-started conversations; the
+option that does that was measured to return zero rows for the app's own sessions, so the rule
+shipped inverted. A later task reading the unamended page would have planned around a filter that is
+not there. The scribe's job is to close that gap while you still remember the measurement.
+
+Tell it, in one handoff message:
+
+- **What was built** — files added, changed, renamed; new channels, modules, exported names.
+- **What diverged from the task page, and why** — one entry per divergence, each with the
+  measurement or constraint that forced it. This is the part the page cannot reconstruct later.
+- **To amend the task page itself** — tick the acceptance criteria with the evidence beside each,
+  and record the divergences on the page, so it describes what exists rather than what was planned.
+- **To check the *following* task pages for staleness** — anything downstream that assumed the
+  planned shape needs correcting now, so the task structure has no gaps.
+- **To update `TODO.md`** with the next task to pick up, and **`.claude/maestro-tasks/status.json`**
+  with the finished task's state.
+
+Three things learned running this:
+
+- **The scribe cannot run commands** (`disallowedTools: [Bash, Task]`) and its own workflow forbids
+  re-discovering changes by scanning code. Your handoff is the only source it has — if a file or a
+  divergence is not in the message, it will not be in the docs. Do not send it to "go look".
+- **It can fail after writing.** A 529 mid-run reported the whole agent as failed while every edit
+  was already on disk. Check `git status` and read the diffs before re-running anything, or you will
+  duplicate its work on top of itself.
+- **Verify its claims like any other report.** Grep for the exported names and files it says it
+  documented; a doc that names something that does not exist is worse than no doc.
+
+Then relay what it changed to the user — its report goes to you, not to them.

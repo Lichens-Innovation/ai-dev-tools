@@ -1132,6 +1132,89 @@ describe("the session pane", () => {
     expect(sdk).toMatch(/request\.pacing === false \? \{\} : \{ taskBudget/);
   });
 
+  it("picks up a foreign conversation only from a list main published, and forks when it does", () => {
+    // `025`. THE ONE PLACE ON THIS SURFACE WHERE AN ID NAMES SOMETHING MAIN HAS NO RECORD OF.
+    // `session:continue` takes an id too, but that id is a key into main's own `LiveSession`; here
+    // it names a file in the CLI's session store, so "the renderer cannot nominate a directory"
+    // becomes "the renderer cannot nominate a transcript" — and that is a check rather than a
+    // resolution. Every assertion below is one hop of it, and all of them fail silently.
+    const session = stripComments(read("src/main/claude-session.ts"));
+
+    // 1. The id must be one THIS WINDOW was offered. Without this the channel accepts any session id
+    //    on the machine, and the cwd filter that keeps other projects out is bypassed entirely.
+    const byId = session.slice(session.indexOf("async function resumableById"));
+    expect(byId).toMatch(/offered\.get\(webContentsId\)\?\.has\(id\)/);
+    // …and the row is re-read from the store rather than trusted, so a deleted transcript is a
+    // refusal instead of a session started against nothing.
+    expect(byId).toMatch(/resumableFrom\(await listStoredSessions\(projectRoot\)/);
+
+    // 2. It FORKS. `024`'s Continue deliberately resumes in place — same conversation, one allowance
+    //    later — and doing that to a session the user started in their terminal would write this
+    //    pane's turns into the history of a session the app was never given. Measured (`025`): with
+    //    the flag, the source transcript is byte-identical afterwards and the fork lands under a new
+    //    id in the resuming project's directory.
+    const resume = session.slice(
+      session.indexOf("export async function resumeSession"),
+      session.indexOf("async function resumableById")
+    );
+    expect(resume).toMatch(/openSession\(webContentsId, projectRoot, \{ resume: session\.id, fork: true \}\)/);
+    // 3. …and it carries NOTHING ELSE. No grants (they die with an entry and are written nowhere, so
+    //    there is nothing on disk to restore), no write scope (that answers a form THIS user
+    //    submitted), and no spend (the other conversation was never measured against this ceiling).
+    expect(resume, "a resumed session must start with no grants").not.toMatch(/grants:/);
+    expect(resume, "a resumed session must start with nothing writable").not.toMatch(/writes:/);
+
+    // 4. The fork reaches the SDK only WITH a resume, and the two callers that resume this app's own
+    //    conversation must not set it — a Continue that forked would split one conversation into two
+    //    records of itself.
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
+    expect(pane).toMatch(/request\.resume && request\.fork \? \{ forkSession: true \} : \{\}/);
+    const cont = session.slice(session.indexOf("export async function continueSession"));
+    expect(cont, "a Continue must resume in place").not.toMatch(/fork: true/);
+    const reopen = session.slice(
+      session.indexOf("async function reopenWithoutPacing"),
+      session.indexOf("export async function continueSession")
+    );
+    expect(reopen, "the pacing reopen must resume in place").not.toMatch(/fork: true/);
+
+    // 5. The store is read through the SDK, never walked. `~/.claude/projects/<slug>/` is a private
+    //    layout with a lossy slug encoding and its own summary-extraction rule; re-deriving it here
+    //    would be the `ccusage` mistake — a second reader of someone else's format, drifting in
+    //    silence. So the two readers live in the app's only SDK importer, and nowhere else.
+    expect(sdk).toMatch(/const \{ listSessions \} = await import\("@anthropic-ai\/claude-agent-sdk"\)/);
+    expect(sdk).toMatch(/const \{ getSessionMessages \} = await import\("@anthropic-ai\/claude-agent-sdk"\)/);
+    const walkers = sourcesUnder("src")
+      .filter((f) => /\.claude\/projects/.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(appRoot, f));
+    expect(walkers, "something is walking the CLI's session store by hand").toEqual([]);
+
+    // 6. The wire: no argument to list, an id and nothing else to describe or attach.
+    const preload = read("src/preload/index.ts");
+    expect(preload).toMatch(/invoke\(IPC\.sessionResumable\)/);
+    expect(preload, "the renderer picks which project's sessions to list").not.toMatch(/sessionResumable,\s*\w/);
+    expect(preload).toMatch(/invoke\(IPC\.sessionResumeDetail, id\)/);
+    expect(preload).toMatch(/invoke\(IPC\.sessionResume, id\)/);
+    expect(preload, "the renderer describes what a resume inherits").not.toMatch(/sessionResume, id,/);
+
+    // 7. THE DISCLOSURE IS NOT OPTIONAL, and it is about the PAST. A resumed transcript was produced
+    //    under the terminal session's rules and can already hold file contents from anywhere on
+    //    disk — measured in probe A, where the resumed conversation answered a question about a
+    //    file's contents with no tool call at all. The boundary applies going forward only, so the
+    //    UI lists what was read, marks what is out of scope, and offers a way to decline.
+    const picker = read("src/renderer/src/components/session-resume.tsx");
+    expect(picker).toMatch(/data-testid="session-resume-read"/);
+    expect(picker).toMatch(/data-in-scope=\{read\.inScope\}/);
+    expect(picker).toMatch(/data-testid="session-resume-decline"/);
+    expect(picker).toMatch(/data-testid="session-resume-confirm"/);
+    // Every sentence on it comes off the disclosure main built — the picker states no policy of its
+    // own, exactly as the pane composes no prompt.
+    expect(picker).toMatch(/\{disclosure\.readNote\}/);
+    expect(picker).toMatch(/\{disclosure\.replayNote\}/);
+    expect(picker).toMatch(/\{disclosure\.scopeNote\}/);
+    expect(stripComments(picker), "the picker reached the session channels directly").not.toMatch(/window\.maestro/);
+  });
+
   it("ends a session on a project switch and reaps it on quit", () => {
     // A detached process group outlives its parent BY DESIGN — that is how Stop reaches the CLI's
     // own children — so every exit has to kill it. Three exits, and the transcript makes the first

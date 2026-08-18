@@ -48,6 +48,8 @@ import { IPC, IPC_EVENTS } from "../shared/ipc.js";
 import type {
   PermissionChoice,
   QuestionChoice,
+  ResumableSession,
+  ResumeDisclosure,
   SessionEffort,
   SessionInfo,
   ClaudePreview,
@@ -77,10 +79,13 @@ import {
   answerPermission,
   answerQuestion,
   continueSession,
+  describeResume,
   disposeSessions,
   endAllSessions,
   endSession,
   handoffToSession,
+  listResumableSessions,
+  resumeSession,
   revokeGrant,
   saySession,
   sessionInfo,
@@ -470,6 +475,28 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.sessionContinue, async (e, id: string): Promise<SessionInfo> => {
     e.sender.once("destroyed", () => endSession(e.sender.id));
     return continueSession(e.sender.id, id);
+  });
+
+  // Picking up a conversation this app did not start (`025`) — the list, the disclosure, the attach.
+  // Each takes what main published: the list takes nothing (the project is main's own state), and
+  // the other two take an id that must have been on a list this window was given. That check is the
+  // whole difference from `session:continue`, where an id is a key into main's own record and here
+  // it names a file in the CLI's store.
+  ipcMain.handle(
+    IPC.sessionResumable,
+    async (e): Promise<ResumableSession[]> => listResumableSessions(e.sender.id, currentRoot() ?? "")
+  );
+
+  ipcMain.handle(
+    IPC.sessionResumeDetail,
+    async (e, id: string): Promise<ResumeDisclosure> => describeResume(e.sender.id, currentRoot() ?? "", id)
+  );
+
+  // The attach itself, and the one call on this surface that opens a session against a transcript
+  // the app never wrote. It forks, so the terminal session the user started keeps its own history.
+  ipcMain.handle(IPC.sessionResume, async (e, id: string): Promise<SessionInfo> => {
+    e.sender.once("destroyed", () => endSession(e.sender.id));
+    return resumeSession(e.sender.id, currentRoot() ?? "", id);
   });
 
   // The two header controls that change a LIVE session without ending it. Both values are checked

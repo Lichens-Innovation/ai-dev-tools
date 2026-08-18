@@ -70,6 +70,7 @@ import {
   QUESTION_UNRENDERABLE,
 } from "./session-question.js";
 import { createPermissionRegistry } from "./permission-registry.js";
+import type { StoredMessage, StoredSession } from "./session-resume.js";
 import {
   accrueTurn,
   ceilingOf,
@@ -829,6 +830,21 @@ export interface PaneSessionRequest {
    */
   resume?: string | null;
   /**
+   * Resume into a COPY, leaving the resumed session's own transcript alone (`025`).
+   *
+   * False for a Continue and true for the picker, and the difference is whose history is being
+   * written. A Continue resumes this app's own conversation in place: it is the same session, the
+   * same transcript, one allowance later, and forking it would leave the user with two records of
+   * one conversation. Attaching to a session the user started elsewhere is the opposite case — the
+   * terminal they started it in still has that session, and writing this pane's turns into its
+   * history would corrupt something the app was never given.
+   *
+   * Measured (`025`): with this set, the source transcript is byte-identical after the resume and
+   * the fork is written into the RESUMING session's project directory, under a new id that
+   * `sessionId()` reports.
+   */
+  fork?: boolean;
+  /**
    * Send the model a pacing budget. True in the app, and false only on the reopen that follows a
    * model refusing one — see `isPacingUnsupported` and `onPacingRejected` below.
    */
@@ -1441,6 +1457,10 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           // The same conversation, picked up where the last allowance ran out. Absent on a session
           // the user started themselves.
           ...(request.resume ? { resume: request.resume } : {}),
+          // FORK, so a conversation the app did not start keeps its own history (`025`). Only ever
+          // set with `resume`, and only by the picker: a Continue is the same session carrying on,
+          // and a fork there would split one conversation into two records of itself.
+          ...(request.resume && request.fork ? { forkSession: true } : {}),
           // A budget can land mid-write. Checkpointing is what makes that recoverable rather than
           // merely reported — the files the interrupted turn had already touched are tracked, so a
           // rewind is possible without re-deriving what changed from the transcript.
@@ -1724,6 +1744,9 @@ export function startPaneSession(request: PaneSessionRequest): PaneSession {
           // rather than appends. What it is here for is the session id: it is the handle a Continue
           // resumes against, and on a resumed query it comes back UNCHANGED, which is the evidence
           // that continuing is the same conversation rather than a new one wearing its transcript.
+          // On a FORKED resume (`025`) it comes back DIFFERENT, and that is the same evidence read
+          // the other way: a new id is a new transcript, which is how the session the user started
+          // in their terminal keeps its own.
           cliSessionId = message.session_id ?? cliSessionId;
           if (!announcedSettings) {
             announcedSettings = true;
@@ -2082,6 +2105,69 @@ export async function resolveEffectiveSettings(cwd: string): Promise<EffectiveSe
       defaultMode: permissionsOf(filterEscalatingDefaultMode(resolved)).defaultMode,
     },
   };
+}
+
+// ── The CLI's own session store, read (`025`) ─────────────────────────────────────────────
+//
+// A conversation someone started in their terminal is on disk, and so is every session this app has
+// ever run — `024` passes `persistSession: true` explicitly. Reading that store is a THIRD reason
+// this module exists, beside starting sessions and resolving settings, and it lands here for the
+// same reason both of those did: the SDK is imported in exactly one file.
+//
+// NOT A SECOND READER OF SOMEONE ELSE'S FORMAT. The transcripts are JSONL under
+// `~/.claude/projects/<slug>/`, and walking them here would be the `ccusage` mistake — a private
+// layout, a slug encoding, and a summary-extraction rule, all re-derived and drifting in silence.
+// `listSessions`/`getSessionMessages` are the CLI's own answer to both questions.
+//
+// NEITHER FUNCTION THROWS. A store that cannot be read is a picker with nothing in it, which is a
+// state the pane already renders; it is not a reason to lose the pane.
+
+/**
+ * The conversations the store holds for one project directory, newest first.
+ *
+ * `includeWorktrees: false` is deliberate and is half of "sessions belonging to other projects are
+ * not offered": a worktree is a different directory, its transcript's relative paths mean something
+ * else there, and the pane's boundary is anchored to the open project. The other half is the `cwd`
+ * equality check in `resumableFrom`, because the store's directory slug flattens every `/` to `-`
+ * and cannot distinguish `/home/a-b` from `/home/a/b`.
+ *
+ * `includeProgrammatic` is left at its default (true) ON PURPOSE, and it is the one filtering
+ * decision here worth arguing with. Passing false would mean parity with the terminal's own
+ * `/resume`, which lists interactive sessions only — but it would also hide every session this app
+ * has run, since an SDK session records a programmatic entrypoint, and "yesterday's pane
+ * conversation" is exactly as resumable as yesterday's terminal one. Measured: with false, a
+ * fixture project whose only sessions were SDK-started listed zero rows.
+ */
+export async function listStoredSessions(dir: string): Promise<StoredSession[]> {
+  if (!dir) return [];
+  try {
+    // Literal specifier, not AGENT_SDK_PACKAGE — see the note at the query above.
+    const { listSessions } = await import("@anthropic-ai/claude-agent-sdk");
+    const rows = await listSessions({ dir, includeWorktrees: false });
+    return Array.isArray(rows) ? (rows as StoredSession[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * One stored transcript's messages, for the disclosure that has to be read before it is resumed.
+ *
+ * `includeSystemMessages: true` because the point is to account for what is ALREADY in front of the
+ * model, and a compact boundary or an injected notice is part of that. What this cannot see is the
+ * store's attachment records — files auto-loaded, pasted or `@`-mentioned — which is why
+ * `readNote()` says so rather than letting the list imply completeness.
+ */
+export async function readStoredMessages(sessionId: string, dir: string): Promise<StoredMessage[]> {
+  if (!sessionId) return [];
+  try {
+    // Literal specifier, not AGENT_SDK_PACKAGE — see the note at the query above.
+    const { getSessionMessages } = await import("@anthropic-ai/claude-agent-sdk");
+    const messages = await getSessionMessages(sessionId, { ...(dir ? { dir } : {}), includeSystemMessages: true });
+    return Array.isArray(messages) ? (messages as unknown as StoredMessage[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

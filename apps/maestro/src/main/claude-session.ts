@@ -30,12 +30,17 @@ import {
   handoffTitle,
   isEffortLevel,
   listMarketplaces,
+  listStoredSessions,
   newSpend,
   nodeSettings,
   paneBudget,
   paneSessionTarget,
   permissionReason,
+  readStoredMessages,
   renewAllowance,
+  resumableFrom,
+  resumeDisclosure,
+  resumedNotice,
   spawnClaudeChild,
   startPaneSession,
   terminateChildGroup,
@@ -55,6 +60,8 @@ import type {
   PermissionChoice,
   PermissionPrompt,
   QuestionChoice,
+  ResumableSession,
+  ResumeDisclosure,
   SessionEffort,
   SessionEndReason,
   SessionEvent,
@@ -312,6 +319,14 @@ export async function startSession(webContentsId: number, projectRoot: string): 
 interface CarriedSession {
   /** The CLI session id to pick the transcript back up from. */
   resume?: string | null;
+  /**
+   * Resume into a COPY rather than into the conversation itself (`025`).
+   *
+   * True for exactly one caller — `resumeSession`, attaching to a session the user started
+   * elsewhere — and false for the two that resume this app's own: a Continue and the pacing reopen
+   * are the same conversation carrying on, and forking either would leave two records of it.
+   */
+  fork?: boolean;
   /** The lifetime figures, with a fresh allowance already applied. */
   spend?: SessionSpend;
   grants?: SessionGrant[];
@@ -372,6 +387,10 @@ async function openSession(webContentsId: number, projectRoot: string, carried: 
     effort: entry.effort,
     model: entry.model,
     resume: entry.resumeId,
+    // Only ever true on the picker's resume. `PaneSession.sessionId()` then reports the FORK's id,
+    // which is what a later Continue resumes — so the terminal session's transcript is read once and
+    // written never.
+    fork: carried.fork === true,
     pacing: entry.pacing,
     // The model would not take a pacing budget. Reopening without one is the whole recovery — the
     // hard ceiling is untouched, so nothing is widened by it.
@@ -432,6 +451,111 @@ async function openSession(webContentsId: number, projectRoot: string, carried: 
   });
 
   return describeSession(projectRoot, entry);
+}
+
+// ── Picking up a conversation this app did not start (`025`) ─────────────────────────────
+//
+// THE ONE GENUINE DIFFERENCE FROM A CONTINUE, and everything below is arranged around it: the id
+// names a session MAIN HAS NO ENTRY FOR. `session:continue` resolves everything about the
+// conversation from its own `LiveSession`, so the id it takes is only ever a key into main's own
+// record. Here the id names a file in the CLI's store, so it has to have come from a list this
+// process built and published — the same discipline as a model id being checked against
+// `entry.models` and a grant's scope word being resolved against the prompt main asked.
+
+/**
+ * The session ids this window has been OFFERED, per `webContents.id`.
+ *
+ * Not a cache: the rows are re-read from the store on every list, because a session the user was
+ * working in a minute ago should be there. This holds only the ids, and only so `resumeSession` can
+ * refuse one that was never on screen — a renderer that invents a UUID gets a refusal rather than a
+ * transcript out of some other project.
+ */
+const offered = new Map<number, Set<string>>();
+
+/**
+ * What the picker may show for the open project, newest first.
+ *
+ * Reads only. The `exclude` list is this window's own conversation — the live one and any exhausted
+ * entry kept for Continue — because resuming your own session would fork it beside itself and leave
+ * two records of one conversation with one of them on screen.
+ */
+export async function listResumableSessions(webContentsId: number, projectRoot: string): Promise<ResumableSession[]> {
+  if (!projectRoot) return [];
+  const entry = sessions.get(webContentsId);
+  const mine = [entry?.resumeId, entry?.session ? entry.session.sessionId() : null].filter(
+    (id): id is string => typeof id === "string" && id !== ""
+  );
+  const rows = resumableFrom(await listStoredSessions(projectRoot), { projectRoot, exclude: mine });
+  offered.set(webContentsId, new Set(rows.map((r) => r.id)));
+  return rows;
+}
+
+/**
+ * What that conversation already read, and what replaying it costs — before anything is resumed.
+ *
+ * THE DISCLOSURE THIS SLICE EXISTS FOR. A transcript produced under the terminal session's rules can
+ * already contain the contents of files from anywhere on disk, and this app's boundary applies to
+ * what happens NEXT. Showing the list is what keeps "this session cannot leave the selected
+ * directory" from being true of every future turn and quietly false of the context it starts with.
+ *
+ * The id must be one this window was offered, for the reason above. Resolving the row from the store
+ * again rather than trusting a shape the renderer sent is the rest of it.
+ */
+export async function describeResume(
+  webContentsId: number,
+  projectRoot: string,
+  id: string
+): Promise<ResumeDisclosure> {
+  const session = await resumableById(webContentsId, projectRoot, String(id ?? ""));
+  const extra = additionalDirectories();
+  return resumeDisclosure({
+    session,
+    messages: await readStoredMessages(session.id, projectRoot),
+    // What THIS pane's session may read, so `inScope` answers "would today's boundary have allowed
+    // it". Grants are not in it and cannot be: a resumed session starts with none.
+    directories: [projectRoot, ...extra.map((d) => d.path)],
+  });
+}
+
+/**
+ * Attach to it — forking, so the session the user started keeps its own history.
+ *
+ * A FOURTH CALLER OF `openSession`, and deliberately nothing more than that. The tool set, the read
+ * boundary, `settingSources: []`, `permissionMode: "default"` and the preset prompt are composed in
+ * one place for every caller, so a resumed session is subject to the same rules as a fresh one by
+ * construction rather than by a second code path that has to be kept in step.
+ *
+ * What it carries in is the id and nothing else. No grants — they die with an entry and are written
+ * nowhere, so there is nothing on disk for a resume to restore, and a path that conversation read
+ * freely raises a prompt on the first turn here. No write scope, for the same reason plus a stronger
+ * one: a write scope entry answers a form THIS user submitted in THIS app. And a fresh allowance,
+ * because the spend on the other conversation was not measured against this app's ceiling.
+ */
+export async function resumeSession(webContentsId: number, projectRoot: string, id: string): Promise<SessionInfo> {
+  const session = await resumableById(webContentsId, projectRoot, String(id ?? ""));
+  // Built BEFORE the session starts, so the notice states what the user was shown rather than
+  // re-deriving it afterwards from a transcript that now has a fork in it.
+  const disclosure = await describeResume(webContentsId, projectRoot, session.id).catch(() => null);
+
+  endSession(webContentsId);
+  const info = await openSession(webContentsId, projectRoot, { resume: session.id, fork: true });
+  // No CLI on this machine: `openSession` returned a description rather than a session, and there is
+  // nothing to say a conversation was picked up into. The pane renders the reason it already has.
+  if (info.id) send(webContentsId, { kind: "notice", seq: --injectedSeq, text: resumedNotice(session, disclosure) });
+  return info;
+}
+
+/** The offered row for an id, or the refusal that says which of the two things went wrong. */
+async function resumableById(webContentsId: number, projectRoot: string, id: string): Promise<ResumableSession> {
+  if (!projectRoot) throw new Error("No project is open.");
+  if (!offered.get(webContentsId)?.has(id)) {
+    throw new Error("That conversation was not one of the ones offered for this project. Open the list again.");
+  }
+  // Re-read rather than trusting the id's membership alone: the transcript may have been deleted,
+  // and the row is what the notice and the disclosure are written from.
+  const row = resumableFrom(await listStoredSessions(projectRoot), { projectRoot }).find((r) => r.id === id);
+  if (!row) throw new Error("That conversation is no longer in Claude Code's session store for this project.");
+  return row;
 }
 
 /**
@@ -891,6 +1015,12 @@ export function endSession(webContentsId: number): void {
  */
 export function endAllSessions(): void {
   for (const id of [...sessions.keys()]) endSession(id);
+  // AND THE OFFERS GO WITH THEM (`025`). Every id on that map names a conversation recorded for the
+  // project the window has just moved off. `resumableById` would refuse one anyway — it re-reads the
+  // store for the CURRENT project and the row would not be there — but a list of ids belonging to a
+  // repository this app is no longer showing is exactly what `clearInvocations()` drops preview
+  // tokens for, and keeping it would leave that refusal as the only thing standing between the two.
+  offered.clear();
 }
 
 /** Called when the app quits. A detached process group outlives its parent unless it is killed. */

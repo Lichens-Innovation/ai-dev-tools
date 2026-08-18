@@ -88,6 +88,7 @@ second.
 | `permission-registry.ts`                | The parked promises — one per outstanding ask, idempotent, denied on every exit        |
 | `session-question.ts`                   | A structured question, read out of the tool call and answered back into it. Pure       |
 | `session-budget.ts`                     | What a session may spend, and every sentence it says about having spent it. Pure       |
+| `session-resume.ts`                     | Which stored conversations may be offered, and what picking one up costs. Pure         |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
@@ -520,9 +521,11 @@ src/core/permission-registry.ts                 the parked promises, one per out
 src/core/session-question.ts                    the OTHER kind of ask: read a question, build its answer (pure)
 src/core/session-handoff.ts                     what a create-* handoff says: seed, notice, title (pure)
 src/core/session-budget.ts                      what it may spend, and every sentence about it (pure)
+src/core/session-resume.ts                      which stored conversations may be offered, and what one costs (pure)
 src/main/claude-session.ts                      one session per webContents.id
 src/renderer/src/components/session-pane.tsx    transcript + composer + resize + scope + PermissionCard
 src/renderer/src/components/agent-question.tsx  the question card — options, previews, freeform reply
+src/renderer/src/components/session-resume.tsx  the picker + the pre-resume disclosure
 src/renderer/src/utils/session-context.tsx      SessionProvider / useSession — single-owner
 ```
 
@@ -530,6 +533,9 @@ src/renderer/src/utils/session-context.tsx      SessionProvider / useSession —
 session:start      → SessionInfo              no argument; the cwd comes from main's project state
 session:handoff    → (token) → SessionInfo    A PREVIEW TOKEN ONLY; the one call that widens writes
 session:continue   → (id) → SessionInfo       A SESSION ID ONLY; a fresh allowance on the same transcript
+session:resumable  → ResumableSession[]       no argument; the list MAIN builds, and the only ids it honours
+session:resume-detail → (id) → ResumeDisclosure what that transcript already read, and what replaying it costs
+session:resume     → (id) → SessionInfo       AN ID FROM THAT LIST ONLY; attaches by FORKING it
 session:info       → SessionInfo              reads only
 session:say        → (id, text)               USER-TYPED TEXT ONLY
 session:stop       → (id)                     interrupt the turn; the session stays usable
@@ -820,6 +826,61 @@ session:event      ← SessionEvent             the streamed transcript
     `MAESTRO_AGENT_SDK_SMOKE` precedent — because proving the CLI really stops at $0.50 costs $0.50 of
     somebody's subscription each time, and that is a check people run once. Nothing on any channel
     reaches it, and `paneBudget` clamps a nonsense value back to the default.
+- **The pane can pick up a conversation it did not start, and it does so by FORKING** (`025`). The
+  History control in the header opens a picker of the conversations the CLI's own store holds for the
+  open project; choosing one shows what that transcript already read and what replaying it will cost,
+  and only then attaches. `resumeSession` is the **fourth** caller of `openSession`, so a resumed
+  session gets `PANE_TOOLS`, the `PreToolUse` boundary, `settingSources: []` and the preset prompt by
+  construction — `CarriedSession` gained one field, `fork`, and `startPaneSession` turns it into
+  `forkSession: true`, only ever together with `resume`. The policy, the arithmetic and every sentence
+  the user reads live in `src/core/session-resume.ts` (pure, the sixth module beside the four scope
+  ones and `session-budget.ts`); it reads nothing itself.
+  - **THE IMPORTED CONTEXT IS NOT GATED BY THE BOUNDARY, and that is the whole reason for the
+    disclosure.** Measured: a resumed conversation answered a question about a file's contents with
+    **no tool call at all** — the bytes were already in the transcript, so nothing reached
+    `canUseTool` and nothing reached the hook. The pane's boundary applies going forward only, which
+    makes "this session cannot leave the selected directory" true of future turns and quietly false
+    of the context it starts with. `resumeDisclosure` therefore enumerates the transcript's recorded
+    reads before anything starts, flags the ones outside the pane's scope in amber
+    (`data-in-scope="false"`), and Decline returns to the list having started nothing.
+  - **The disclosure says what it CANNOT see, because implying completeness would be worse.** It is
+    built from the transcript's recorded **tool calls**; attached, pasted and auto-loaded text never
+    appears as one, so `readNote()` states that limit in the sentence itself rather than presenting
+    the list as the whole of what the model has.
+  - **The three probes, measured against a running CLI rather than read off the reference.** (a) A
+    resume does **not** restore the recorded session's `settingSources` — a project-tier custom slash
+    command present in the terminal session's `slash_commands` was absent from the resumed one's, so
+    `[]` holds across a resume and neither door it closes reopens. (b) A resume does **not** restore
+    the recorded working directory or readable set — `init.cwd` came back as the **resuming** query's
+    cwd, and a `Read` of the recorded session's own cwd reached `canUseTool` and was asked about
+    rather than waved through. (c) `forkSession: true` works: the source transcript was byte-identical
+    (same sha, size and mtime) afterwards, and the fork landed in the resuming project's own store
+    under a new session id. A resumed session also starts with **zero grants and an empty write
+    scope** — grants live on main's per-window entry and are written nowhere — so a path that
+    conversation read freely raises a prompt on its first turn in the pane.
+  - **The store is read through the SDK, never walked.** `listStoredSessions(dir)` and
+    `readStoredMessages(id, dir)` in `agent-sdk.ts` wrap the SDK's `listSessions` /
+    `getSessionMessages`; `~/.claude/projects/<slug>/` is private layout with a lossy slug encoding,
+    and this is `ccusage.ts`'s "do not become a second reader of someone else's format" applied
+    again. **Neither throws** — a store that cannot be read is an empty picker, not a broken pane.
+    `forkSession: true` is a query option, so the SDK's separate `forkSession()` helper is unused.
+  - **The filter is the recorded `cwd`, not "started in a terminal", and that is a measured
+    divergence.** `listSessions({ includeProgrammatic: false })` gives parity with the terminal's
+    `/resume`, but it returns **zero** rows for SDK-started sessions — which would hide every
+    conversation this app itself has ever run. `resumableFrom` filters by recorded `cwd` **equality**
+    (not containment) plus `includeWorktrees: false`, minus this window's own live and exhausted ids.
+    Yesterday's pane conversation is as resumable as yesterday's terminal one.
+  - **An id crosses only if main published it.** `session:resume` names a session main has **no entry
+    for**, so `claude-session.ts` keeps a per-`webContents.id` `offered` set of the ids it put in the
+    last list and refuses anything else — the same discipline as `session:model` choosing from
+    `supportedModels()` and `session:handoff` taking a token, applied to a wire that would otherwise
+    let a renderer nominate an arbitrary transcript.
+  - **The replay cost is quoted at a NAMED rate.** `REPLAY_USD_PER_MTOK = 3`, written into the
+    sentence, alongside `024`'s "an estimate, not a bill" — the pane's model is selectable, so a bare
+    dollar figure would be trusted for something it cannot be.
+  - **A resumed session's earlier turns are NOT re-rendered in the scrollback** — they are in the
+    model's context. The pane clears the transcript and posts one `resumedNotice` saying what was
+    picked up, what it cost and that it forked.
 - **`interrupt()`'s receipt is surfaced.** `stop()` returns `{ stillQueued }` off the
   `query.interrupt()` receipt and `stopSession` emits a `notice` when the interrupt left messages
   queued. `020` picked this up; `024` no longer owns it.
@@ -902,6 +963,12 @@ never opens this tab should not carry it.
   renderer allowed to touch `window.maestro.session` — single-owner, exactly like
   `SessionLogProvider` and the log tail, and for the same reason: main keeps one session per
   `webContents.id`, so a second subscriber steals it.
+- **Clear the transcript BEFORE a resume round trip, never after** (`025`). Main pushes the resumed
+  session's notice **during** the `session:resume` call, so `setEntries([])` after the `await`
+  deletes the one thing that says what was picked up, what it cost and that it forked — and the pane
+  then looks as though it started a session silently. Nothing errors, no test caught it, and it was
+  only visible in a real window. The same ordering applies to any channel where main streams an event
+  while the handler is still resolving.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.
@@ -1165,7 +1232,12 @@ false`, the absence of an `origin` stamp on the seeded message, the zero-cost-re
   `claude-session.ts` — a second builder is how a resumed session quietly gets a different tool set;
   and **"changes effort and model on a live session, from lists main published"** pins that both are
   checked against something this process produced (`isEffortLevel`, `entry.models.some`), which is the
-  permission wire's discipline applied to a header control.
+  permission wire's discipline applied to a header control. `025` added one more —
+  **"picks up a foreign conversation only from a list main published, and forks when it does"** —
+  which pins the `offered` set (an id main did not publish is refused), that `fork` reaches the query
+  as `forkSession: true` and only ever alongside `resume`, that `resumeSession` goes through the same
+  single `openSession` builder as the other three callers, and that the store is read through
+  `listStoredSessions` / `readStoredMessages` rather than by walking `~/.claude/projects/`.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the

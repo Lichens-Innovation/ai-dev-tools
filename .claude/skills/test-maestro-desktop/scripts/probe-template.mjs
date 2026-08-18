@@ -10,12 +10,16 @@
 // that prints a wall of state and leaves you to eyeball it will quietly stop being run.
 
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { withApp, openProjectAt, overlaps } from "./cdp.mjs";
 
 const REPO = "/home/superadmin/gits/ai-dev-tools";
 const APP = `${REPO}/apps/maestro`;
 const ELECTRON = `${APP}/node_modules/.bin/electron`;
-const TMP = process.env.PROBE_DIR ?? "/tmp/maestro-probe";
+// Fixture roots live under ~/gits and nowhere else — opening a project GRANTS its root to a live
+// Claude session, so the fixture path is a permission decision, not a temp-file convenience. See
+// the Fixtures section of SKILL.md. `PROBE_DIR` is honoured, but keep it under ~/gits too.
+const TMP = process.env.PROBE_DIR ?? `${homedir()}/gits/maestro-probe`;
 const PROJ = `${TMP}/fixture`;
 
 const results = [];

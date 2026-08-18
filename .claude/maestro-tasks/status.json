@@ -135,7 +135,7 @@
     ]
   },
   "025-resume-a-session-started-in-the-terminal.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "024-a-budget-ceiling-you-can-continue-past.md"
     ]
