@@ -68,6 +68,14 @@ const active = new Map<string, ActiveRun>();
 export interface ClaudeRunEvents {
   /** Called for every chunk, as it arrives. */
   output(chunk: ClaudeOutputChunk): void;
+  /**
+   * The bundled plugin's root, so the run can reach the create-\* skills the prompt names.
+   *
+   * Supplied by main, the composition root, for the same structural reason `GitPort` and
+   * `SettingsPort` are: only it knows where the app's own files landed. Omitted, the session loads
+   * no plugin and the prompt's facts are all the run has — thinner, never wrong.
+   */
+  pluginDir?: string | null;
 }
 
 /**
@@ -203,6 +211,9 @@ export async function runPreviewedClaude(
     // Off the invocation, so what the confirmation listed is what the callback allows. There is no
     // argument on this function by which a caller could widen it.
     writable: inv.writable,
+    // Not off the invocation: this names a directory INSIDE THE APP, not one in the user's tree,
+    // and it widens nothing — a loaded plugin contributes skills, and its hooks do not run.
+    pluginDir: events.pluginDir ?? null,
     output: record,
     spawn: (options) => {
       argv = [options.command, ...options.args];

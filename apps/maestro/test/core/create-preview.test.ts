@@ -106,6 +106,22 @@ describe("the finishing prompt", () => {
     expect(preview.prompt).toContain("a .sql file changes or a migration is added");
   });
 
+  it("names the skill that holds the guidance, instead of carrying a second copy of it", async () => {
+    // `026`. Each prompt used to paste in the instructions its matching SKILL.md already carried —
+    // two copies, one reachable only from the app and one only from a terminal, drifting apart with
+    // nothing to catch it. The prompt keeps the FACTS and names the skill for the rest; `Skill` and
+    // the bundled plugin (pinned in `test/isolation.test.ts`) are what make the name resolvable.
+    for (const request of allFour()) {
+      const preview = await previewClaudeRun(project, request, opts());
+      expect(preview.prompt, request.kind).toContain(`Follow the ${request.kind} skill`);
+      // The phrases that were deleted, each from a different prompt. They are what "duplicated
+      // guidance" looked like, and a re-inlining is exactly how the drift starts again.
+      expect(preview.prompt, request.kind).not.toMatch(/domain expert/i);
+      expect(preview.prompt, request.kind).not.toMatch(/reference tables or/i);
+      expect(preview.prompt, request.kind).not.toMatch(/how to install it from this marketplace/i);
+    }
+  });
+
   it("is prose, never a slash command that would re-enter the form flow", async () => {
     // `/create-skill` in a headless run fires the plugin's UserPromptExpansion hook, which brings
     // the Docker app up and waits for a submission that can never arrive.
@@ -146,12 +162,16 @@ describe("where the run happens", () => {
     expect(preview.prompt).toContain("CLAUDE.md");
   });
 
-  it("mentions private-repo token setup only when the form asked for it", async () => {
+  it("carries the private-repo FLAG only when the form asked for it, and never what it implies", async () => {
+    // `026`: the env-var table this used to assert on lives in `create-marketplace/SKILL.md`, which
+    // is now the only copy of it. What the prompt owes the run is the fact the form captured —
+    // whether the repository is private — not a paraphrase of the documentation about it.
     const targetDir = path.join(tmp, "private-one");
     const plain = await previewClaudeRun(project, marketplaceRequest(targetDir), opts());
     const priv = await previewClaudeRun(project, { ...marketplaceRequest(targetDir), privateRepo: true }, opts());
-    expect(plain.prompt).not.toMatch(/GITHUB_TOKEN/);
-    expect(priv.prompt).toMatch(/GITHUB_TOKEN/);
+    expect(plain.prompt).not.toMatch(/PRIVATE repository/);
+    expect(priv.prompt).toMatch(/PRIVATE repository/);
+    expect(priv.prompt, "the skill's env-var table is inlined again").not.toMatch(/GITHUB_TOKEN/);
   });
 });
 

@@ -91,7 +91,8 @@ interface BuiltRequest {
 /**
  * The finishing prompt for a create-* flow, and the file it may touch.
  *
- * Shape, and why it is this shape:
+ * FACTS ONLY, PLUS THE NAME OF THE SKILL THAT HOLDS THE GUIDANCE. That split is `026`'s, and it is
+ * the whole shape of this function:
  *
  *   • It names an artifact that ALREADY EXISTS. The deterministic scaffold ran when the form was
  *     submitted, so the run's job is to finish a file, not to create one — and the path comes from
@@ -100,12 +101,18 @@ interface BuiltRequest {
  *   • It forbids touching the frontmatter. The `description:` was computed by `buildDesc` and shown
  *     in the form's live preview; a model rewriting it would silently replace the string the user
  *     approved with one they never saw.
- *   • It is self-contained prose, NOT `/create-skill`. The slash command would re-run the skill's
- *     own create flow from the top — re-deriving fields this payload already carries and possibly
- *     recreating what the scaffold just wrote. (It used to be worse: the plugin's
- *     `UserPromptExpansion` hook launched the Docker app and blocked on a form submission a
- *     headless run could never make. M5 deleted that hook; the rule outlives it.) The instructions
- *     the skill would have supplied are inlined here instead.
+ *   • It carries the FORM'S OWN WORDS — the name, the idea, the triggers — because they are facts
+ *     about this artifact that exist nowhere else.
+ *   • It carries NO authoring guidance. "Write it as a domain expert would", the README's sections,
+ *     the private-repo env vars: all of that used to be inlined here AND written in the matching
+ *     `SKILL.md`, two copies with nothing to catch them drifting. The prompt names the skill
+ *     instead, and `SESSION_SKILLS` in `agent-sdk.ts` is what makes the name resolvable on both app
+ *     entries — the headless run and the pane. One source, for the app and the terminal both.
+ *   • It is still prose, NOT a slash command. That rule outlives its original reason (M5 deleted
+ *     the `UserPromptExpansion` hook that launched the Docker app and blocked on a form submission
+ *     a headless run could never make): a slash command re-enters the skill from the top, where
+ *     naming it as a skill lets the model arrive holding what the form already decided.
+ *     `test/core/create-preview.test.ts` asserts no create prompt contains one.
  */
 function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveOptions): BuiltRequest {
   const target = resolveCreateTarget(projectRoot, request, { home: opts.home });
@@ -115,6 +122,9 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
   const preamble = [
     `The deterministic scaffold has already written ${target.path}, with its frontmatter/manifest complete.`,
     `Do not recreate it, do not move it, and do not change its frontmatter — the description shown there is the one the user approved.`,
+    // The one line that replaces the deleted instructions. Named rather than pasted: the skill
+    // describes this exact entry — the artifact exists, its fields are decided, nothing is re-asked.
+    `Follow the ${request.kind} skill for how to finish it; this is the app entry it describes, so do not re-ask for anything below.`,
     "",
   ];
   const only = (file: string, note: string): ClaudeWriteTarget[] => [{ path: file, action: "modify", note }];
@@ -124,9 +134,7 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
       return {
         prompt: [
           ...preamble,
-          `Author the body of that SKILL.md from the idea below, replacing the placeholder comment.`,
-          `Write it as a domain expert would: a clear workflow, concrete steps, and any reference tables or`,
-          `decision trees that help. Leave no placeholder text.`,
+          `The work: author the body of that SKILL.md, replacing the placeholder comment.`,
           "",
           `Skill name: ${target.name}`,
           `Idea: ${request.idea.trim()}`,
@@ -140,9 +148,7 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
       return {
         prompt: [
           ...preamble,
-          `Author the body of that agent file from the idea below, replacing the placeholder comment.`,
-          `Follow the agents.md structure: a role description, "When to apply", a step-by-step workflow, and`,
-          `the expected output format. Write it as a domain expert would, with no placeholder text.`,
+          `The work: author the body of that agent file, replacing the placeholder comment.`,
           "",
           `Subagent name: ${target.name}`,
           `Idea: ${(request.mode === "auto" ? request.idea : request.description).trim()}`,
@@ -158,8 +164,8 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
         prompt: [
           ...preamble,
           `The plugin.json manifest and the skills/ directory exist, and the plugin is registered in the`,
-          `marketplace's marketplace.json. Write ${path.join(target.path, "README.md")}: a title, what the plugin`,
-          `provides, and how to install it from this marketplace. Change nothing else.`,
+          `marketplace's marketplace.json.`,
+          `The work: write ${path.join(target.path, "README.md")}. Change nothing else.`,
           "",
           `Plugin name: ${target.name}`,
           `Description: ${request.description.trim()}`,
@@ -173,10 +179,7 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
       return {
         prompt: [
           ...preamble,
-          `Finish the marketplace: enrich the starter README.md (title, what it offers, and the`,
-          `\`claude plugin marketplace add\` / \`claude plugin install\` instructions), and write a CLAUDE.md`,
-          `explaining that this repo is a marketplace catalog, pointing at .claude-plugin/marketplace.json and`,
-          `describing the plugins/<name>/ source layout. Do not edit marketplace.json.`,
+          `The work: enrich the starter README.md and write a CLAUDE.md beside it. Do not edit marketplace.json.`,
           // Repository setup left this prompt when it became a scaffold step, and the run is told
           // the OUTCOME instead — read off the disk the scaffold just wrote, so the sentence is true
           // in both cases rather than a claim about what should have happened. Left unsaid, a model
@@ -186,9 +189,9 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
           enclosingRepo(target.path)
             ? `The directory is already a git repository with the scaffold committed: do not run git.`
             : `The directory is not a git repository and the app could not make it one: do not run git — the user will.`,
-          request.privateRepo
-            ? `\nThis marketplace will live in a PRIVATE repository: document the token env vars (GITHUB_TOKEN / GH_TOKEN, GITLAB_TOKEN / GL_TOKEN, BITBUCKET_TOKEN) that background auto-update needs, since credential helpers are skipped there.`
-            : "",
+          // The FLAG, not what it implies. The env-var table it used to spell out lives in the
+          // skill, which is the only place it can be corrected once.
+          request.privateRepo ? `\nThis marketplace will live in a PRIVATE repository.` : "",
           "",
           `Marketplace name: ${target.name}`,
           `Description: ${request.description.trim()}`,

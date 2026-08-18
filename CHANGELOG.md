@@ -5,6 +5,30 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
 
 ## Unreleased
 
+### maestro — rewrite the create-\* skills for interactive sessions
+
+- **One copy of the create-\* finishing guidance, not two.** The four
+  `plugins/ai-tools-manager/skills/create-*/SKILL.md` files are now the single source of it — rewritten
+  to serve three entries (app pane, app headless, bare terminal) and to ask rather than guess, using
+  `AskUserQuestion` in the pane. `claude-preview.ts`'s `buildCreate` no longer inlines a second copy:
+  it states facts only — the scaffold already wrote the target with its frontmatter/manifest complete,
+  do not recreate it, move it, or change its frontmatter — and names the skill that holds the
+  guidance.
+- **Divergence from the plan: `Skill` is no longer pane-only, and a headless run now loads a plugin.**
+  The plan assumed `Skill` was a pane-only tool and that a headless run loaded no plugin and no
+  skills; deleting the inlined guidance would then have left a headless run reading an instruction
+  with its middle removed. `Skill` moved into the base `SESSION_TOOLS`; new `SESSION_SKILLS` (the
+  four create-\* skills) and `PANE_SKILLS` (`SESSION_SKILLS` plus `super-help`); `AgentSessionRequest`
+  and `ClaudeRunEvents` gained `pluginDir?: string | null`, plumbed from `ipc.ts`'s
+  `bundledPluginDir()` through `claude-run.ts` into `agent-sdk.ts` so a headless run can load the
+  bundled plugin the same way the pane always has. `AskUserQuestion` stays pane-only.
+- `plugin.json` bumped `0.7.0` → `0.8.0` so a terminal reading the version-keyed marketplace cache
+  picks up the rewritten skills.
+- Tests: 460 tests / 25 files, `pnpm verify` green. Verified in the packaged build: a live pane run, a
+  headless create-subagent run, a headless create-marketplace run (repo untouched beyond the
+  scaffold's own commit), a headless create-plugin run, and all four skills run from a bare terminal —
+  fixtures under `~/gits`, deleted afterward.
+
 ### maestro — structured questions from the agent
 
 - **The pane's headline feature: a real choice, not a paragraph to answer in prose.** When
@@ -19,7 +43,7 @@ Notable changes, newest first. This file starts at maestro task `018`; everythin
   `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }` — without that second piece Claude
   emits no `preview` on any option and the list arrives bare. Neither was passed anywhere before this.
 - **The answer travels back through `updatedInput`, the one field this app otherwise refuses to
-  expose, and the carve-out is checkable rather than trusted.** The renderer sends only a *selection*
+  expose, and the carve-out is checkable rather than trusted.** The renderer sends only a _selection_
   — which question, which option labels, via `session:question` and a `QuestionChoice` — and
   `answerQuestions` (`src/core/session-question.ts`, pure) rebuilds the payload from the questions the
   model asked, **rejecting any label that was not among the options it offered** rather than filtering

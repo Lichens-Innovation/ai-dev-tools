@@ -141,7 +141,7 @@
     ]
   },
   "026-rewrite-the-create-skills-for-interactive-sessions.md": {
-    "status": "ready",
+    "status": "done",
     "blockedBy": [
       "022-hand-off-from-a-create-form-into-the-pane.md"
     ]

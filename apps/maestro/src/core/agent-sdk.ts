@@ -409,10 +409,33 @@ export function writeSmokeReceipt(file: string, result: AgentSdkSmokeResult): vo
  * a path check cannot see what `cd .. && cat` does at runtime — so withholding it is what makes the
  * check below meaningful rather than decorative.
  *
- * `AskUserQuestion` and `Skill` are in SESSION-PANE-PLAN.md's set and deliberately not here: this
- * path is still headless, so a question has nobody to answer it. They arrive with the pane.
+ * `AskUserQuestion` is in SESSION-PANE-PLAN.md's set and deliberately not here: this path is still
+ * headless, so a question has nobody to answer it. It arrives with the pane.
+ *
+ * `Skill` WAS in that same sentence until `026`, and the reason it moved is the reason `026`
+ * exists. The four create-\* prompts used to inline the instructions their matching `SKILL.md`
+ * already carried — two copies of the same guidance, one reachable only from the app and one only
+ * from a terminal, with nothing to catch them drifting apart. Deleting the inlined copy means the
+ * headless run has to be able to reach the surviving one, which is `Skill` plus the plugin loaded
+ * at the query (see `SESSION_SKILLS` and `AgentSessionRequest.pluginDir`). Nothing about the
+ * headless contract widened with it: a skill invocation reads a file that ships with the app, and
+ * the write scope, the missing shell and the missing subagents are all unchanged.
  */
-export const SESSION_TOOLS = [...READ_ONLY_TOOLS, "Edit", "Write"] as const;
+export const SESSION_TOOLS = [...READ_ONLY_TOOLS, "Edit", "Write", "Skill"] as const;
+
+/**
+ * The skills any session may reach by name — the four create-\* flows.
+ *
+ * They are the single source of "how to finish a scaffolded artifact" since `026`: the prompt a
+ * confirmation displays carries the FACTS (the path, the form's own words, the repository state)
+ * and names the skill for the rest. So this list is not a convenience — a run that cannot resolve
+ * these names is a run working from a prompt with the guidance taken out of it.
+ *
+ * Resolvable only because the plugin is loaded programmatically alongside it. `skills` on its own,
+ * with `settingSources: []`, makes the `Skill` tool answer "Unknown skill" for every name: measured
+ * in the window, silently, with nothing logged.
+ */
+export const SESSION_SKILLS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"] as const;
 
 /**
  * Named as forbidden as well as omitted from `SESSION_TOOLS`, and the redundancy is the point:
@@ -450,6 +473,16 @@ export interface AgentSessionRequest {
   spawn: (options: SpawnOptions) => SpawnedProcess;
   /** Output as it arrives — assistant text, tool activity, and the CLI's stderr. */
   output(chunk: ClaudeOutputChunk): void;
+  /**
+   * The bundled plugin's root, so `SESSION_SKILLS` resolve to something.
+   *
+   * Supplied by main, which is the only place that knows where the app's own files landed — the
+   * same composition-root shape as `GitPort` and `SettingsPort`. Absent (a test, or a layout where
+   * the plugin could not be found) the session simply loads no plugin and no skills: the prompt
+   * still carries every fact about the artifact, so the run degrades to a thinner instruction
+   * rather than to a wrong one.
+   */
+  pluginDir?: string | null;
   /** Resolution options for the child environment. Tests pass a fake machine; the app passes none. */
   envOptions?: ResolveOptions;
 }
@@ -550,6 +583,10 @@ export function startAgentSession(request: AgentSessionRequest): AgentSession {
           // The base tool set, and the same names forbidden outright. See both constants above.
           tools: [...SESSION_TOOLS],
           disallowedTools: [...SESSION_DISALLOWED_TOOLS],
+          // The create-* skills, and the plugin that makes their names resolvable. Both or neither:
+          // `skills` alone answers "Unknown skill" under `settingSources: []`. See `SESSION_SKILLS`.
+          skills: request.pluginDir ? [...SESSION_SKILLS] : [],
+          plugins: request.pluginDir ? [{ type: "local" as const, path: request.pluginDir }] : [],
           // `default`, never `acceptEdits` and never `bypassPermissions`: the callback below is the
           // whole permission model, and a mode that pre-decides would make it unreachable.
           permissionMode: "default",
@@ -659,10 +696,10 @@ export function startAgentSession(request: AgentSessionRequest): AgentSession {
 /**
  * The tools a PANE session is offered — `SESSION_TOOLS` extended, never a second list.
  *
- * `Skill` arrives here and not in the headless set for the reason `SESSION_TOOLS` states: a session
- * can be asked a follow-up question and a print-mode run cannot. It is also what the deleted help
- * chat is replaced by — that chat asked for `super-help` by pasting its name into a prompt string;
- * the pane declares it as a session skill and lets the model reach it as a tool.
+ * `Skill` used to arrive HERE rather than in the base set, and moved down to it in `026` when the
+ * four create-\* prompts stopped carrying their own copy of the guidance: a headless run that
+ * cannot reach the skill is a run reading an instruction with its middle removed. See
+ * `SESSION_TOOLS`.
  *
  * `AskUserQuestion` arrives with `021`, and it is the pane's headline feature rather than one more
  * tool: it is how the model asks a real question with real options instead of guessing. It has TWO
@@ -671,17 +708,8 @@ export function startAgentSession(request: AgentSessionRequest): AgentSession {
  * emits no previews at all and every option list arrives bare. If a question never arrives, check
  * those two before anything else.
  */
-export const PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL] as const;
+export const PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL] as const;
 
-/**
- * The skills a pane session may reach by name.
- *
- * The four create-\* skills so a conversation can finish the work a form started — which `022` made
- * literal: a submitted form can hand its completed preview to this session, seed what it scaffolded
- * and open the artifact's own directory for writing. `super-help` is here because it is the one
- * thing the pane inherits from the help chat —
- * now a declared session skill rather than a sentence in a generated prompt.
- */
 /**
  * What an outstanding permission request is told when the session goes away underneath it.
  *
@@ -692,13 +720,16 @@ export const PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL] as const;
  */
 export const TEARDOWN_DENIAL = "The session ended before this could be answered, so it was refused. Nothing was done.";
 
-export const PANE_SKILLS = [
-  "create-skill",
-  "create-subagent",
-  "create-plugin",
-  "create-marketplace",
-  "super-help",
-] as const;
+/**
+ * The skills a PANE session may reach by name — `SESSION_SKILLS` extended, never a second list.
+ *
+ * The four create-\* skills so a conversation can finish the work a form started — which `022` made
+ * literal: a submitted form can hand its completed preview to this session, seed what it scaffolded
+ * and open the artifact's own directory for writing. They are shared with the headless run since
+ * `026`; what is added here is `super-help`, the one thing the pane inherits from the deleted help
+ * chat — a declared session skill now, rather than a name pasted into a generated prompt.
+ */
+export const PANE_SKILLS = [...SESSION_SKILLS, "super-help"] as const;
 
 /** What the pane can say about the CLI before a session exists. Resolved here, never in main. */
 export interface PaneSessionTarget {

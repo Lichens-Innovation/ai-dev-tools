@@ -458,21 +458,29 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   Denials are also pushed onto the output stream as stderr — a run that quietly declined half of
   what it was asked and then reported success is the failure worth seeing.
 - **The tool set is the first permission layer.**
-  `SESSION_TOOLS` = `Read, Glob, Grep, TodoWrite, WebSearch, WebFetch, Edit, Write`.
+  `SESSION_TOOLS = [...READ_ONLY_TOOLS, "Edit", "Write", "Skill"]`.
   `SESSION_DISALLOWED_TOOLS` = `Bash, Agent, NotebookEdit`. A
   tool that was never offered costs nothing; a tool that is offered and denied costs turns to argue
   with. `allowedTools` is the trap — it auto-approves without restricting, so it is not used.
   Withholding `Bash` is what makes the path check meaningful at all: it is the one tool whose
   filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `016`
-  moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` and
-  `Skill` are deliberately **not** in the set for a HEADLESS run: that path has nobody to answer a
-  question. The pane extends the constant rather than declaring a second list —
-  `PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL]`, where the third arrived with `021`
-  together with its two mechanical preconditions. The second is
-  `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on the pane query and
-  nowhere else: **without it Claude emits no `preview` on any option and the list arrives bare**,
-  which looks like a rendering bug and is not one. If a question never arrives at all, check those
-  two before anything else.
+  moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` is
+  deliberately **not** in the set for a HEADLESS run: that path has nobody to answer a question.
+  `Skill` **is**, though — `026` moved it out of the pane-only set and into this one, because
+  deleting the create-\* skills' inlined prompt guidance would otherwise have left a headless run
+  reading an instruction with its middle cut out. A headless session only reaches a skill's body
+  when it is handed somewhere to load one from: `AgentSessionRequest` gained `pluginDir?: string |
+null`, and the headless query passes `skills: request.pluginDir ? [...SESSION_SKILLS] : []` and
+  `plugins: request.pluginDir ? [{ type: "local", path: request.pluginDir }] : []` — where
+  `SESSION_SKILLS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"]`. The
+  pane extends the tool constant rather than declaring a second list —
+  `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]`, where `QUESTION_TOOL` (`AskUserQuestion`) arrived
+  with `021` together with its two mechanical preconditions; `Skill` is no longer named a second time
+  here since `026`. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help"]`.
+  The second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed
+  on the pane query and nowhere else: **without it Claude emits no `preview` on any option and the
+  list arrives bare**, which looks like a rendering bug and is not one. If a question never arrives
+  at all, check those two before anything else.
 - **`systemPrompt: { type: "preset", preset: "claude_code" }` is passed explicitly.** The SDK's
   default is a minimal prompt, not Claude Code's, and a create-\* run that lost it would author
   against different defaults than every prompt in this app was written for.
@@ -992,8 +1000,14 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   fired the plugin's `UserPromptExpansion` hook, which launched the Docker app and blocked on a form
   submission that could never arrive. That hook is gone, but the rule stands: a slash command
   re-enters the skill from the top instead of finishing the scaffold, and re-derives fields the
-  payload already carries. The instructions the skill would have supplied are inlined into the
-  prompt, and a test asserts no create prompt contains a slash command.
+  payload already carries. **The reason changed under `026`, though.** The prompt used to carry its
+  own inlined copy of the skill's finishing instructions; now `buildCreate` states facts only — the
+  scaffold already wrote the target with its frontmatter complete, do not recreate or move it — plus
+  the name of the `plugins/ai-tools-manager/skills/<kind>/SKILL.md` that holds the guidance, and the
+  session loads that guidance itself with the `Skill` tool rather than reading it pre-pasted into the
+  prompt. A slash command is still wrong for the same underlying reason: it re-enters the skill's
+  "gather everything from scratch" entry instead of the one written for an already-scaffolded
+  artifact. A test asserts no create prompt contains a slash command.
 - **`claude:run` takes a token and nothing else, and the preload must keep it that way.** The
   bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
   run channel having no argument that could describe a different run. A preload that "helpfully"

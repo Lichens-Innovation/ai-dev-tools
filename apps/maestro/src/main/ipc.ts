@@ -71,7 +71,7 @@ import type {
   UsageStatsView,
   WorkflowsData,
 } from "../shared/ipc.js";
-import { bundledAgentsDir } from "./bundled-assets.js";
+import { bundledAgentsDir, bundledPluginDir } from "./bundled-assets.js";
 import {
   answerPermission,
   answerQuestion,
@@ -383,6 +383,10 @@ export function registerIpc(): void {
         output: (chunk) => {
           if (!e.sender.isDestroyed()) e.sender.send(IPC_EVENTS.claudeOutput, { token, ...chunk });
         },
+        // The same plugin the pane loads, for the same reason and with the same caveat: without it
+        // the create-* skills the prompt names resolve to nothing at all. `026` deleted the inlined
+        // copies of that guidance, so this line is what a headless run finishes an artifact with.
+        pluginDir: bundledPluginDir(),
       })
   );
 

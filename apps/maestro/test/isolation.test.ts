@@ -392,6 +392,37 @@ describe("the claude bridge across the process boundary", () => {
     expect(run).toMatch(/writable:\s*inv\.writable/);
   });
 
+  it("keeps the create-* guidance in one place, and hands every session a way to reach it", () => {
+    // `026`. The four create-* prompts used to inline the instructions their matching SKILL.md
+    // already carried; the prompt names the skill now instead. That makes three things load-bearing
+    // that were previously decoration, and every one of them fails SILENTLY — the run still gets a
+    // perfectly reasonable-looking prompt, just with the middle taken out of it:
+    //
+    //   • `Skill` missing from the tool set → the model cannot invoke what the prompt names;
+    //   • `plugins` missing at the query → the name resolves to "Unknown skill" (measured in `019`,
+    //     with nothing logged);
+    //   • `pluginDir` dropped anywhere along preview → run → main → the same, from one line up.
+    expect(SESSION_TOOLS, "a session cannot invoke the skill its prompt names").toContain("Skill");
+
+    const sdk = stripComments(read("src/core/agent-sdk.ts"));
+    expect(sdk).toMatch(/skills:\s*request\.pluginDir\s*\?\s*\[\.\.\.SESSION_SKILLS\]\s*:\s*\[\]/);
+    expect(sdk).toMatch(/plugins:\s*request\.pluginDir\s*\?\s*\[\{\s*type:\s*"local"/);
+
+    const run = stripComments(read("src/core/claude-run.ts"));
+    expect(run).toMatch(/pluginDir:\s*events\.pluginDir/);
+    // The composition root, like `nodeGit()` and `nodeSettings()` beside it: only main knows where
+    // the app's own files landed, and dropping this argument breaks nothing that throws.
+    const ipc = stripComments(read("src/main/ipc.ts"));
+    expect(ipc).toMatch(/pluginDir:\s*bundledPluginDir\(\)/);
+
+    // And the names have to name something. A skill renamed or moved in the plugin leaves four
+    // prompts pointing at nothing, which is a broken run and a green suite.
+    const pluginSkills = path.resolve(appRoot, "../../plugins/ai-tools-manager/skills");
+    for (const skill of ["create-skill", "create-subagent", "create-plugin", "create-marketplace"]) {
+      expect(fs.existsSync(path.join(pluginSkills, skill, "SKILL.md")), `${skill} has no SKILL.md`).toBe(true);
+    }
+  });
+
   it("loads no filesystem settings for a run, and discloses the same resolution", () => {
     // The trap `017` left standing. The session is configured entirely by this app, so nothing on
     // disk can widen it and no key in a settings file can redirect billing — and `resolveEffectiveSettings`,
@@ -548,7 +579,8 @@ describe("the surface folded in from help-server", () => {
     expect(revivals, "the help-chat request kind is back").toEqual([]);
 
     // What it inherits: the help skill, by name rather than pasted into a prompt string. It is a
-    // declared SESSION skill now, which is why `Skill` had to join the pane's tool set.
+    // declared SESSION skill now, which is why `Skill` had to reach the pane's tool set — and, since
+    // `026` deleted the create-* prompts' inlined guidance, the headless set below it too.
     const sdk = stripComments(read("src/core/agent-sdk.ts"));
     expect(PANE_SKILLS, "the help skill is no longer reachable").toContain("super-help");
     expect(PANE_TOOLS, "the pane cannot invoke a skill").toContain("Skill");
@@ -921,7 +953,7 @@ describe("the session pane", () => {
     // 6. THE TWO MECHANICAL PRECONDITIONS, neither of which existed before `021`: the tool has to be
     //    offered, and previews have to be asked for. Without the second, Claude emits no preview on
     //    any option and the list arrives bare — which looks like a rendering bug and is not one.
-    expect(sdk).toMatch(/export const PANE_TOOLS = \[\.\.\.SESSION_TOOLS, "Skill", QUESTION_TOOL\]/);
+    expect(sdk).toMatch(/export const PANE_TOOLS = \[\.\.\.SESSION_TOOLS, QUESTION_TOOL\]/);
     expect(sdk).toMatch(/toolConfig:\s*\{\s*askUserQuestion:\s*\{\s*previewFormat:\s*QUESTION_PREVIEW_FORMAT\s*\}/);
     const pane = sdk.slice(sdk.indexOf("export function startPaneSession"));
     // `allowedTools` would auto-approve the tool, and the SDK would then answer the question itself.

@@ -25,28 +25,22 @@
 - 021
 - 022
 - 023
+- 026
 
 ## Next
 
-Two are `ready`. `021` closed the tool gap `026` was waiting on; `025` still waits on `024`, which
-is now the only task in the queue that unblocks anything.
+One is `ready`. `026` is done — the four `create-*` skills now carry their own finishing guidance
+and ask rather than guess — which leaves `024` as the only task in the queue that unblocks
+anything; `025` still waits on it.
 
-- 026-rewrite-the-create-skills-for-interactive-sessions.md — recommended next. `status.json` only
-  ever listed `022` as its blocker, but the task's own prose made `021` the real precondition —
-  "rewrite them to ask rather than guess" means `AskUserQuestion`, which was in no tool set in the
-  app until now. It is done: `PANE_TOOLS = [...SESSION_TOOLS, "Skill", QUESTION_TOOL]`,
-  `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }` is passed on the pane query, and a
-  question answered through `session:question` reaches the model as `updatedInput` with the labels it
-  offered. `026` is now genuinely the only thing left after it — nothing else in the queue is
-  `ready` and unblocked by nothing but done work.
-- 024-a-budget-ceiling-you-can-continue-past.md — the only one that unblocks anything (`025`). `019`
-  passed nothing budget-related, so this slice owns `maxBudgetUsd`, `taskBudget`, `effort`,
-  `enableFileCheckpointing` and `persistSession` outright, and items keep leaving it: `020` surfaced
-  `interrupt()`'s `still_queued` receipt, and `023`, `022` and `021` each extended `SessionInfo`
-  and/or `SessionEvent` in place — so spend and effort are more fields on objects that already reach
-  the header, not a second header. One thing `022` added that this slice must not undo: a zero-cost
-  `result` answering a `shouldQuery: false` append is deliberately not reported as a turn, and a
-  running spend figure has to be fed from that same guard.
+- 024-a-budget-ceiling-you-can-continue-past.md — recommended next, and the only one that unblocks
+  anything (`025`). `019` passed nothing budget-related, so this slice owns `maxBudgetUsd`,
+  `taskBudget`, `effort`, `enableFileCheckpointing` and `persistSession` outright, and items keep
+  leaving it: `020` surfaced `interrupt()`'s `still_queued` receipt, and `023`, `022` and `021` each
+  extended `SessionInfo` and/or `SessionEvent` in place — so spend and effort are more fields on
+  objects that already reach the header, not a second header. One thing `022` added that this slice
+  must not undo: a zero-cost `result` answering a `shouldQuery: false` append is deliberately not
+  reported as a turn, and a running spend figure has to be fed from that same guard.
 
 ## Prompt
 

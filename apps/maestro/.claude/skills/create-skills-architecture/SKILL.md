@@ -54,8 +54,11 @@ utils/create-flow.tsx  — the submit path all four routes share
                   scaffolded without spending a turn, and the user drives it
         │
         ▼
-The headless run reads plugins/ai-tools-manager/skills/create-<name>/SKILL.md
-and finishes only what the scaffold left — authoring a body, enriching a README.
+The run — headless or in the pane — calls the Skill tool for
+plugins/ai-tools-manager/skills/create-<name>/SKILL.md and finishes only what
+the scaffold left — authoring a body, enriching a README. `026` deleted the
+second copy of that guidance that used to be inlined into the prompt itself;
+see "The guidance lives in exactly one place" below.
 ```
 
 **The ordering in 1–2 is the design.** The artifact is on disk before Claude is mentioned, so
@@ -77,6 +80,39 @@ where `dir` is `""` — a project-target subagent shares `.claude/agents/` with 
 There is no hook in this path, no result file, and no blocking wait. `/create-skill` typed into a
 session is a different thing entirely: the skill prompt with no payload and nothing pre-scaffolded,
 which the SKILL.md handles by gathering the fields conversationally.
+
+## The guidance lives in exactly one place (`026`)
+
+The finishing guidance for a scaffolded artifact used to exist twice: once in the four
+`plugins/ai-tools-manager/skills/create-*/SKILL.md` files, and a second time inlined into the prompt
+`claude-preview.ts`'s `buildCreate` built for a headless run. `026` deleted the second copy.
+`buildCreate` now states facts only — the scaffold already wrote the target with its
+frontmatter/manifest complete, do not recreate it, move it, or change its frontmatter — plus the name
+of the `SKILL.md` that holds the guidance, and tells the session to follow it because "this is the
+app entry it describes, so do not re-ask for anything below."
+
+That only works because a run can actually reach the skill's body now, on **both** entries:
+
+- `SESSION_TOOLS = [...READ_ONLY_TOOLS, "Edit", "Write", "Skill"]` — `Skill` moved out of the
+  pane-only tool set and into the base one. A headless run offers it too; `AskUserQuestion` remains
+  pane-only, since a headless run still has nobody to answer a question.
+- `SESSION_SKILLS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"]`. The
+  pane extends it with `super-help`: `PANE_SKILLS = [...SESSION_SKILLS, "super-help"]`.
+  `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]` — it no longer names `"Skill"` a second time.
+- Naming a skill is not enough on its own — `019` already established that `skills: [...]` with no
+  `plugins` entry makes the `Skill` tool answer "Unknown skill" for every name, because
+  `settingSources: []` means no installed plugin reaches the session either. So `AgentSessionRequest`
+  gained `pluginDir?: string | null`, and the headless query now passes
+  `skills: request.pluginDir ? [...SESSION_SKILLS] : []` and
+  `plugins: request.pluginDir ? [{ type: "local", path: request.pluginDir }] : []` — the same
+  `bundledPluginDir()` the pane has always used, now plumbed through the composition root for a
+  headless run too: `src/main/ipc.ts` passes `pluginDir: bundledPluginDir()` on `claude:run`,
+  `ClaudeRunEvents` carries it, and `runPreviewedClaude` forwards it into `agent-sdk.ts`.
+
+The four `SKILL.md` files were rewritten alongside this to serve both entries: a table near the top
+("Which entry you are on") tells the session whether it is finishing an already-scaffolded artifact
+(app — pane or headless) or starting one from nothing (a bare terminal), and the app entries are told
+never to re-ask for a field the form already decided.
 
 ## File-by-file map
 
@@ -224,8 +260,12 @@ Three rules hold it together:
 - **The prompt is prose, never `/create-skill`.** A slash command in a headless run would re-enter
   the skill from the top instead of finishing the scaffold — and historically it fired the plugin's
   `UserPromptExpansion` hook, which launched the Docker app and blocked forever on a form submission
-  that could never arrive. That hook is gone, but the rule stands: inline the instructions. A test
-  asserts no create prompt contains a slash command.
+  that could never arrive. That hook is gone, but the rule stands. What changed under `026` is _how_
+  it stands: the prompt used to carry its own inlined copy of the finishing instructions; now it
+  states facts only and names the `SKILL.md` that holds the guidance, which the session loads itself
+  with the `Skill` tool. A slash command is still wrong for the same reason as before — it re-enters
+  the skill's "gather everything from scratch" entry rather than the one written for an
+  already-scaffolded artifact. A test asserts no create prompt contains a slash command.
 - **`claude:run` takes a token and nothing else.** The bridge's guarantee — the only executable
   prompts are ones the user was shown — comes from the run channel having no argument that could
   describe a different run. A preload that "helpfully" forwarded the prompt or argv alongside the
@@ -245,13 +285,15 @@ Three rules hold it together:
   pre-acceptance exists nowhere in the app**, and `test/isolation.test.ts` fails if it comes back.
   A `writable` of `[]` (the help chat, `ccusage`) refuses every write, saying the run was started to
   answer rather than to author.
-- **The run is offered no shell and no subagents.** `SESSION_TOOLS` is `Read, Glob, Grep, TodoWrite,
-WebSearch, WebFetch, Edit, Write`; `SESSION_DISALLOWED_TOOLS` is `Bash, Agent, NotebookEdit`. Both
-  are in `agent-sdk.ts`. Withholding `Bash` is what makes the path check meaningful — it is the one
-  tool whose reach cannot be bounded by inspecting `tool_input` — and it is only affordable because
-  `016` moved `git init` into the scaffold. `allowedTools` is deliberately unused: it auto-approves
-  without restricting. `AskUserQuestion` and `Skill` are **not** offered either: this path is still
-  headless, so a question has nobody to answer it.
+- **The run is offered no shell and no subagents.** `SESSION_TOOLS` is
+  `[...READ_ONLY_TOOLS, "Edit", "Write", "Skill"]`; `SESSION_DISALLOWED_TOOLS` is
+  `Bash, Agent, NotebookEdit`. Both are in `agent-sdk.ts`. Withholding `Bash` is what makes the path
+  check meaningful — it is the one tool whose reach cannot be bounded by inspecting `tool_input` —
+  and it is only affordable because `016` moved `git init` into the scaffold. `allowedTools` is
+  deliberately unused: it auto-approves without restricting. `AskUserQuestion` is **not** offered:
+  this path is still headless, so a question has nobody to answer it. `Skill` **is** offered, as of
+  `026` — see "The guidance lives in exactly one place" above for why a headless run needs it and how
+  it actually reaches a skill's body (`pluginDir`, not just the tool name).
 - **`ClaudePreview.argv` is the _equivalent_ command line, not what is spawned.** It is what you
   would type to reproduce the run yourself — which is what **Copy prompt** is for — and the dialog
   labels the row "Equivalent" for that reason. The SDK spawns the same binary with its own

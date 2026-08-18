@@ -1,14 +1,19 @@
-# Shared reference for the create-* skills
+# Shared reference for the create-\* skills
 
-This doc holds the parts the four create flows (`create-skill`, `create-subagent`,
-`create-plugin`, `create-marketplace`) have in common, so each `SKILL.md` can link here instead of
-repeating them. The flow-specific bits — target dispatch, auto/manual rules, skeletons, report
-steps — stay in each skill.
+This doc holds what the four create flows (`create-skill`, `create-subagent`, `create-plugin`,
+`create-marketplace`) have in common **for a reader** — the reference docs, and the three entries a
+flow can be reached from.
+
+It is **not** the guidance a session follows. Since `026` that lives in exactly one place per flow:
+`plugins/ai-tools-manager/skills/<flow>/SKILL.md`. The desktop app's confirmation prompt carries the
+facts (the path the scaffold wrote, the form's own words, the repository state) and names the skill
+for the rest; a terminal invocation loads the same file. Anything written here that a session is
+supposed to obey would be a second copy, which is the drift `026` removed.
 
 ## References
 
-Consult the relevant doc(s) before generating content in auto mode or before making structural
-decisions in manual mode (paths relative to this `docs/` directory):
+Consult the relevant doc(s) before generating content, or before making structural decisions
+(paths relative to this `docs/` directory):
 
 - [`skills.md`](skills.md) — skill format, popular repositories, skills CLI
 - [`plugins.md`](plugins.md) — plugin structure, manifest, hooks and relative paths
@@ -21,57 +26,37 @@ decisions in manual mode (paths relative to this `docs/` directory):
 - [`skills-cli.md`](skills-cli.md) — skills CLI commands
 - [`claude-code.md`](claude-code.md) — Claude Code settings, commands, IDE integrations
 
-## Where the payload comes from
+## The three entries
 
-The flow's inputs are a JSON object (`mode`, `target`, and the per-flow fields). It reaches you one
-of two ways:
+A create flow reaches a model one of three ways, and they differ in what is already on disk and in
+whether anybody is there to answer a question. Each `SKILL.md` opens by working out which one it is
+on; this is the same table from the outside.
 
-- **From the Maestro desktop app.** `apps/maestro`'s four `create-*` routes are the forms now. On
-  submit the route scaffolds deterministically in-process, then builds a prose prompt carrying the
-  payload and the scaffold result, shows it in full in a confirmation dialog, and — once the user
-  confirms — runs it as an Agent SDK session. If you are reading this inside such a run, the payload
-  is already inlined above, and the run may write **only the paths that confirmation listed**: a
-  write anywhere else, including elsewhere under the working directory, is refused with a reason. It
-  is also offered no shell (`Bash`) and no subagents.
-- **From the conversation.** A user can invoke the skill directly (`/create-skill`) with no app
-  involved. There is no form and nothing is pre-scaffolded: gather the same fields by asking, then
-  do every step yourself.
+| Entry | What exists | Who is there |
+| --- | --- | --- |
+| **App — headless run** | The artifact, scaffolded before any model was involved | Nobody. A refused write is final; there is no `AskUserQuestion` and no `Bash` |
+| **App — session pane** | The same artifact, plus a seeded context block naming it | The user. A write outside the scope, or a read outside the boundary, becomes a prompt they can allow |
+| **Terminal** | Nothing | The user, through whatever their CLI offers |
 
-Either way, the flow-specific shape is documented in that flow's own `SKILL.md`.
+On both app entries the form captured the name, the description and the triggers, and the user
+approved the exact frontmatter on screen — so none of it is re-asked, and the frontmatter is not
+rewritten. On the terminal entry all of it is still to be gathered.
 
-There is no form-and-result-file round trip any more. Nothing writes `/tmp/result.json`, nothing
-blocks on it, and no `UserPromptExpansion` hook launches a UI — if you find a skill or doc still
-describing that, it is stale.
+## The scaffold, and why the ordering matters
 
-## Finishing a scaffold
-
-When the run came from the desktop app, the artifact is **already on disk**: the route calls
+When the flow came from the desktop app, the artifact is **already on disk**: the route calls
 `scaffoldSkill` / `scaffoldSubagent` / `scaffoldPlugin` / `scaffoldMarketplace` in
 `apps/maestro/src/core` *before* Claude is mentioned, so cancelling the confirmation still leaves the
-user with the thing they asked for. The payload therefore carries a `Deterministic scaffold` object
-`{ scaffolded, path, remaining, reason?, repo? }`:
+user with the thing they asked for. What is left for a session is the part that genuinely needs a
+model: a body, a README, a `CLAUDE.md`.
 
-- **`scaffolded: true`** — the artifact exists at `path` with its frontmatter/manifest written (the
-  description was already computed by core's `buildDesc`, the single implementation the app's live
-  preview also renders). **Do not recreate it.** Do only the `remaining` work, **in place** — for an
-  auto-mode body that means `Edit` the placeholder at `path`; a manual-mode skeleton or a
-  plugin/marketplace manifest is usually already complete, so verify and report.
-- **`scaffolded: false`** — the scaffold could not write and `reason` says why (a bad path, a
-  permission error, an existing file it refused to clobber). Create the artifact from scratch at
-  `path` following the flow's normal rules below.
-- **No `scaffold` object at all** — you were invoked conversationally. Nothing exists yet; do
-  everything.
+`create-marketplace` is the sharp case. `git init` and the first commit are steps in that same
+all-or-nothing scaffold, so the repository question is settled before a session starts, and the
+session is **told which of three states it left** — created here, already inside one, or no `git` on
+the machine. A session reads that rather than probing for it, and runs no `git` itself; on the
+terminal entry, where no scaffold ran, the repository is the user's to create and the commands are
+offered rather than run.
 
-### `repo` — do not run git
-
-Present only for `create-marketplace`, which is the one flow whose artifact is a repository of its
-own. The scaffold runs `git init` and the first commit itself, as a step in the same all-or-nothing
-list — so it happens whether or not a run like yours ever starts, and it is undone with the rest of
-the scaffold if anything fails. `repo` is `{ initialized, root, note }` and reports which of three
-states it left: a repository was created there, the directory was already inside one, or the machine
-has no `git` (in which case the repository is the user's to create, not yours).
-
-**Read that field rather than probing, and do not run `git init` or `git commit` yourself** — either
-nests a second repository or re-commits the scaffold under a different author. Remotes, private-repo
-credentials and auto-update are genuinely yours to guide: they need a host, an account and secrets
-the app has not got. Offer them; never do them silently.
+There is no form-and-result-file round trip. Nothing writes `/tmp/result.json`, nothing blocks on
+it, and no `UserPromptExpansion` hook launches a UI — if you find a skill or doc still describing
+that, it is stale.
