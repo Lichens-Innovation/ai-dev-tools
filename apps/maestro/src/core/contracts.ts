@@ -347,6 +347,48 @@ export interface ScaffoldResult {
   needsModel: boolean;
   /** Why nothing was written. Set only when `scaffolded` is false. */
   reason?: string;
+  /**
+   * What became of the artifact's git repository. Present only for the flows that make one — a
+   * skill or a plugin is written INTO a repository somebody else already owns.
+   */
+  repo?: RepoResult;
+}
+
+/**
+ * Whether the scaffold left a repository behind, and what to tell the user either way.
+ *
+ * There is always something to say. A repository was created, or the directory already sat inside
+ * one, or `git` is not on this machine — and the last two are not failures: the marketplace on disk
+ * is complete and usable in all three, which is why this is a field on a successful result rather
+ * than a reason on a failed one.
+ */
+export interface RepoResult {
+  /** True when THIS scaffold ran `git init` and committed what it wrote. */
+  initialized: boolean;
+  /** The repository: the one created, or the one the directory turned out to be inside. */
+  root: string | null;
+  /** Plain-English account — what happened, or why nothing did. Always worth showing. */
+  note: string;
+}
+
+/**
+ * Making a directory a git repository — the one scaffold step `fs` alone cannot do.
+ *
+ * It is a PORT the caller supplies rather than an import, and that is not ceremony.
+ * `claude-preview.ts` imports `scaffold.ts` for `resolveCreateTarget`, and
+ * `test/core/claude.test.ts` walks the preview's import graph to prove it cannot start a process.
+ * A `child_process` import inside the scaffold's graph would take that guarantee away for a
+ * capability the preview never uses. So the composition root (`src/main/ipc.ts`) hands the scaffold
+ * a `nodeGit()` from `src/core/git.ts`, and the scaffold stays a pure function of the form, the
+ * filesystem and this interface.
+ */
+export interface GitPort {
+  /** Whether the `git` binary is here at all, and where it was looked for. Never spawns. */
+  availability(): { available: boolean; reason: string };
+  /** `git init` in `dir`; returns the `.git` it created, so a rollback has a handle on it. */
+  init(dir: string): string;
+  /** Stage everything under `dir` and make the first commit. Throws git's own message on failure. */
+  commit(dir: string, message: string, author: { name: string; email: string }): void;
 }
 
 /**

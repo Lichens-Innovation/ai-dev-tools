@@ -81,6 +81,8 @@ second.
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
 | `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
 | `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
+| `git.ts`                                | `git init` + the first commit, via `execFile` and never a shell. A `GitPort`           |
+| `repo.ts`                               | Is a directory inside a repository? Asked with `fs`, so it holds with no `git`         |
 | `tasks.ts`                              | The `/maestro-tasks` queue                                                             |
 | `plugins.ts` / `curated.ts`             | Installed plugins, the project's own marketplace, and the curated marketplaces' cache  |
 | `commands.ts` / `docs.ts`               | The CLI command table parsed out of `docs/claude-code.md`; the docs reader's node side |
@@ -277,8 +279,9 @@ required — not to write files, but to author a **body**: the prose of a `SKILL
 system prompt. So each submit is two operations, in this order:
 
 1. `create:scaffold` writes everything deterministic — directory, frontmatter, plugin manifest,
-   marketplace registration — and returns what it wrote. No model, and none reachable: the module
-   behind it (`src/core/scaffold.ts`) calls nothing.
+   marketplace registration, and for a new marketplace the `git init` and first commit — and returns
+   what it wrote. No model, and none reachable: the module behind it (`src/core/scaffold.ts`)
+   imports nothing that can reach one.
 2. Whatever is left goes out as a `ClaudeRequest` through `claude:preview` and `ClaudeRunDialog`.
 
 **The ordering is the design.** The artifact is on disk before Claude is mentioned, so cancelling
@@ -294,6 +297,40 @@ Per-route files are the schema, the fields and the preview. The chrome is shared
 The `target` toggle survived; only its Docker half did not. Marketplace vs. project is a real
 choice about where a skill lives — what went is the path ambiguity that existed _because_ the
 container could not reach outside its mount.
+
+### A new marketplace is a git repository, and the scaffold makes it one
+
+It used to be a sentence in the prompt, so whether the directory ended up a repository depended on
+whether a run happened and did as it was told. It is a step in the same all-or-nothing list now:
+`dir` → `repo` (`git init`) → manifest → README → `plugins/` → `commit`. `planRepo()` decides up
+front which of **three states** applies and reports it as `ScaffoldResult.repo` — created here,
+already inside one, or no `git` on this machine — and the last two are not failures: the marketplace
+on disk is complete and usable in all three. `create-result.tsx` renders the note;
+`create-marketplace/SKILL.md` has a **"Do not run git"** section and reads that field rather than
+probing. Remotes, private-repo credentials and auto-update stay conversational — they need a host,
+an account and secrets the app has not got.
+
+Three rules hold it together, and each exists for a reason that is not obvious from the diff:
+
+- **The capability is a port, not an import.** `claude-preview.ts` imports `scaffold.ts` for
+  `resolveCreateTarget`, and `test/core/claude.test.ts` walks the preview's transitive import graph
+  to prove it cannot start a process — one `child_process` anywhere in that graph costs the
+  guarantee. So `GitPort` is an interface in `contracts.ts`, `nodeGit()` implements it in
+  `src/core/git.ts`, and **`src/main/ipc.ts` is the composition root**: the `{ git: nodeGit() }` it
+  passes to `scaffoldCreate` is the whole reason a new marketplace is a repository. The cost is that
+  the capability can go missing in a diff that still passes every test in `src/core/`, which is why
+  `test/isolation.test.ts` pins that wiring instead of trusting it.
+- **A decision that must survive a missing tool is made with `fs`, not with the tool.**
+  `enclosingRepo()` in `src/core/repo.ts` is a walk-up looking for `.git` — not `git rev-parse`,
+  which needs the binary and, worse, answers about the _process's_ cwd when the directory it was
+  pointed at does not exist yet. That is exactly this case: the scaffold asks before it creates the
+  marketplace. It is its own module because both callers must stay spawn-free.
+- **Git steps roll back only themselves; every other step rolls back everything.** Asymmetric on
+  purpose. A `git commit` failure removes the half-made `.git` and is _reported_, because a
+  marketplace without a repository is precisely what a machine with no git gets — complete and
+  usable — and destroying the artifact over it would be worse. But a failure of any _other_ step
+  after `git init` does take the repository with it. That is why `init` is first and `commit` is
+  last.
 
 ## The `claude -p` bridge
 
@@ -569,7 +606,16 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   app gets a PATH that does not include `~/.local/bin`, which is where the CLI installs — so the
   app reported "not installed" on machines where `which claude` answers instantly. This does not
   reproduce from a terminal, and no unit test in this app can see it. Verified by launching from a
-  desktop entry; see `src/core/claude-cli.ts`.
+  desktop entry; see `src/core/claude-cli.ts`. `git` is resolved the same way and for the same
+  reason, through the `resolveOnPath(names, opts)` that `resolveClaudeCli` is now a one-line call to.
+- **`src/core/git.ts` is a _sixth_ entry on the reviewed spawner list in `test/isolation.test.ts`,
+  and that list got wider on purpose.** The marketplace repository task was framed as removing the
+  last shell from the create-\* system; what it removed is the shell from the **session** — the app
+  runs `git` itself, `execFileSync` with an argument vector and no shell interpretation, so a
+  marketplace name with a quote in it cannot become syntax. The trade was one more module that can
+  spawn, in exchange for taking `Bash` out of the create-marketplace conversation. Whoever narrows
+  that list next should read this as a decision, not an oversight. It is also **not** a path to
+  Claude: the neighbouring comment about the `resolveClaudeCli` caller list is a different list.
 - **The log tail is retargeted on a project switch**, in `main/ipc.ts`. Otherwise a window keeps
   streaming the previously-opened repo's session log.
 - **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id`

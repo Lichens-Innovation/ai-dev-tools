@@ -25,6 +25,12 @@ scaffold exists:
 Assuming a scaffold is present is how a terminal session ends up confidently discussing a file
 nobody made. Assuming one is absent is how the app's users get asked for a name they already typed.
 
+`create-marketplace` is the sharp case, and its current contract must survive the rewrite: its
+**"Do not run git"** section, and its report of which of three repository states the scaffold left
+(created here / already inside one / no `git` on this machine), read from the payload rather than
+probed for. That contract belongs to the *app* entry. On the terminal entry, where no scaffold ran,
+the repository is the user's to create — offer the commands, do not run them.
+
 Rewrite them to ask rather than guess. A skill that needs a decision should put the options in front
 of the user, with enough description to choose between them — that facility exists now and these
 skills are its first real consumer.

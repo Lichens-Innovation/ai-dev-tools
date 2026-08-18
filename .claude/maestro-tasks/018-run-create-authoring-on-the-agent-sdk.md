@@ -35,6 +35,15 @@ Everything else about the path is preserved deliberately:
 The session also gets an explicit tool set for the first time: no shell, no subagents. A denied tool
 costs turns to argue with, while a tool that was never offered costs nothing.
 
+Withholding the shell is already **safe for create-marketplace**, which was the one create-\* prompt
+that needed one: `016` moved `git init` and the first commit into the deterministic scaffold, and the
+prompt now forbids git rather than asking for it. Nothing left in a create-\* prompt wants a shell.
+
+A related note for whoever revisits the isolation tests here: the reviewed spawner list in
+`test/isolation.test.ts` gained `src/core/git.ts` in `016`. That entry is the app running `git`
+itself with an argument vector — it is **not** a path to Claude, and it must survive this slice. The
+existing comment there about narrowing the `resolveClaudeCli` caller list is about a different list.
+
 When this lands, edit pre-acceptance exists nowhere in the app.
 
 ## Acceptance criteria

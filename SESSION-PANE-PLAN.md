@@ -154,13 +154,16 @@ tools: ["Read", "Glob", "Grep", "Edit", "Write", "AskUserQuestion", "Skill", "To
 disallowedTools: ["Bash", "Agent", "NotebookEdit"];
 ```
 
-**No `Bash`.** Its only genuine consumer in this system is a _prompt string_ — `scaffold.ts:430`
-asks Claude to set up git for a new marketplace — and a `git init` is exactly as deterministic as a
-`mkdir`, so it moves into `scaffold.ts` with the rest of the all-or-nothing writes. A bare name in
-`disallowedTools` removes the tool from the model's context entirely, so it never tries and finding
-5's four wasted turns never happen. This deletes the entire `sandbox` layer from the build: Bash is
-the only tool whose filesystem reach cannot be bounded by inspecting `tool_input`, because a path
-check cannot see what `cd .. && cat` does at runtime.
+**No `Bash`.** Its only genuine consumer in this system was a _prompt string_ — the
+create-marketplace prompt asked Claude to set up git — and a `git init` is exactly as deterministic
+as a `mkdir`, so it moved into `scaffold.ts` with the rest of the all-or-nothing writes. **Done in
+`016`**: the steps are `dir → repo → manifest → README → plugins/ → commit`, `git` reaches the
+scaffold as an injected `GitPort` (`src/core/git.ts`, `execFile` and never a shell), and the prompt
+now forbids git instead of asking for it. Nothing left in a create-\* prompt wants a shell. A bare
+name in `disallowedTools` removes the tool from the model's context entirely, so it never tries and
+finding 5's four wasted turns never happen. This deletes the entire `sandbox` layer from the build:
+Bash is the only tool whose filesystem reach cannot be bounded by inspecting `tool_input`, because a
+path check cannot see what `cd .. && cat` does at runtime.
 
 **Web tools stay in, deliberately.** Authoring a skill usually means authoring _about something
 external_, and this repo has the staleness problem twice already (`docs/claude-code.md`,
@@ -487,7 +490,7 @@ ENOENT` in a GUI-launched app. On this machine `~/.local/bin/claude` is a bun-co
 - [ ] A `PreToolUse` hook enforces the boundary and routes out-of-scope calls to the prompt UI
 - [ ] Session-scoped directory grants work and never touch disk
 - [ ] Auto-denied and hook-denied tool calls are both visible in the transcript
-- [ ] `Bash` is absent from the session and `git init` is deterministic
+- [ ] `Bash` is absent from the session and `git init` is deterministic (second half done in `016`)
 - [ ] `acceptEdits` exists nowhere in the app
 - [ ] No orphaned child process survives window close, project switch, or app quit
 - [ ] A per-session budget ceiling is enforced, surfaced, and continuable

@@ -22,6 +22,7 @@ import {
   closeTask,
   listMarketplaces,
   scaffoldCreate,
+  nodeGit,
   tailSessionLog,
   installStatus,
   installRuntime,
@@ -285,8 +286,13 @@ export function registerIpc(): void {
 
   // Throws on an invalid request or a failed write, so the caller must go through `callMain` —
   // "the write failed and here is why" has to reach the user, not an unhandled rejection.
+  //
+  // `nodeGit()` is the composition root for the one create step that is not `fs`: a new marketplace
+  // is initialised as a repository and committed here, rather than by asking a model to run `git`.
+  // The scaffold takes it as a port so its import graph stays spawn-free (see `GitPort`), which
+  // means THIS line is what makes a new marketplace a repository — `test/isolation.test.ts` pins it.
   ipcMain.handle(IPC.createScaffold, (_e, request: CreateRequest): ScaffoldResult => {
-    const result = scaffoldCreate(currentRoot() ?? "", request);
+    const result = scaffoldCreate(currentRoot() ?? "", request, { git: nodeGit() });
     if (!result.scaffolded) throw new Error(result.reason ?? "Nothing was written.");
     return result;
   });

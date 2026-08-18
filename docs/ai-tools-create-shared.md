@@ -47,7 +47,7 @@ When the run came from the desktop app, the artifact is **already on disk**: the
 `scaffoldSkill` / `scaffoldSubagent` / `scaffoldPlugin` / `scaffoldMarketplace` in
 `apps/maestro/src/core` *before* Claude is mentioned, so cancelling the confirmation still leaves the
 user with the thing they asked for. The payload therefore carries a `Deterministic scaffold` object
-`{ scaffolded, path, remaining, reason? }`:
+`{ scaffolded, path, remaining, reason?, repo? }`:
 
 - **`scaffolded: true`** — the artifact exists at `path` with its frontmatter/manifest written (the
   description was already computed by core's `buildDesc`, the single implementation the app's live
@@ -59,3 +59,17 @@ user with the thing they asked for. The payload therefore carries a `Determinist
   `path` following the flow's normal rules below.
 - **No `scaffold` object at all** — you were invoked conversationally. Nothing exists yet; do
   everything.
+
+### `repo` — do not run git
+
+Present only for `create-marketplace`, which is the one flow whose artifact is a repository of its
+own. The scaffold runs `git init` and the first commit itself, as a step in the same all-or-nothing
+list — so it happens whether or not a run like yours ever starts, and it is undone with the rest of
+the scaffold if anything fails. `repo` is `{ initialized, root, note }` and reports which of three
+states it left: a repository was created there, the directory was already inside one, or the machine
+has no `git` (in which case the repository is the user's to create, not yours).
+
+**Read that field rather than probing, and do not run `git init` or `git commit` yourself** — either
+nests a second repository or re-commits the scaffold under a different author. Remotes, private-repo
+credentials and auto-update are genuinely yours to guide: they need a host, an account and secrets
+the app has not got. Offer them; never do them silently.
