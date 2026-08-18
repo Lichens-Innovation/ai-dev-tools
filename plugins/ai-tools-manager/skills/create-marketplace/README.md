@@ -4,15 +4,14 @@ Scaffolds a new plugin marketplace: creates the directory structure, `marketplac
 
 ## How it works
 
-1. User invokes `/create-marketplace`.
-2. `hooks.json` matches and runs `scripts/launch-ai-tools-manager-app.sh create-marketplace`, which opens the web form at `http://localhost:3009/create-marketplace`.
-3. User fills the form (name, description, owner name/email, optional homepage, target directory, private-repo flag) and submits.
-4. The form writes a JSON payload to `/tmp/result.json`.
-5. The hook unblocks and returns the payload to Claude as `additionalContext`. This file (`SKILL.md`) reads it and scaffolds the new marketplace at `<targetDir>`.
+1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Marketplace** from the top bar and fills the form (name, description, owner name/email, optional homepage, target directory, private-repo flag).
+2. On submit the route calls `scaffoldMarketplace` in `@repo/maestro-core`, writing the `marketplace.json` manifest and a starter `README.md` under `targetDir`.
+3. A new marketplace still needs docs, so the route builds a prose prompt carrying the payload and the scaffold result, shows it in full for confirmation, and runs it through `claude -p`. This file (`SKILL.md`) is what that prompt asks Claude to follow.
+4. Invoked directly in a session instead (`/create-marketplace`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 
-The `targetDir` field defaults to the user's `cwd` (captured by `launch-ai-tools-manager-app.sh` before launching the container).
+`targetDir` is commonly **outside** the open project. The run's working directory is `targetDir` itself, so a headless run's edits land where `--permission-mode acceptEdits` can accept them.
 
-See the project-local skill `apps/ai-tools-manager/.claude/skills/create-skills-architecture/` for the full architecture.
+See `apps/maestro/.claude/skills/create-skills-architecture/` for the full architecture.
 
 ## Payload contract
 

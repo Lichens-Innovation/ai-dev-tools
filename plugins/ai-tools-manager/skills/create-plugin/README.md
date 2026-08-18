@@ -4,13 +4,12 @@ Scaffolds a new plugin inside a local marketplace: creates the directory, writes
 
 ## How it works
 
-1. User invokes `/create-plugin`.
-2. `hooks.json` matches and runs `scripts/launch-ai-tools-manager-app.sh create-plugin`, which opens the web form at `http://localhost:3009/create-plugin`.
-3. User fills the form (name, description, keywords, marketplace) and submits.
-4. The form writes a JSON payload to `/tmp/result.json`.
-5. The hook unblocks and returns the payload to Claude as `additionalContext`. This file (`SKILL.md`) reads it and creates the plugin directory + manifest + registry entry.
+1. In the **Maestro desktop app** (`apps/maestro`), the user picks **Create → Plugin** from the top bar and fills the form (name, description, keywords, marketplace).
+2. On submit the route calls `scaffoldPlugin` in `@repo/maestro-core`, which writes `plugin.json`, creates `skills/`, and registers the plugin in the marketplace manifest — all deterministic, no model involved.
+3. A plugin manifest is complete as written, so the confirmation does **not** open by itself; **Finish with Claude** on the result card is what runs this prompt, for the README and any hooks.
+4. Invoked directly in a session instead (`/create-plugin`), there is no form and nothing pre-scaffolded: gather the fields conversationally and do every step.
 
-See the project-local skill `apps/ai-tools-manager/.claude/skills/create-skills-architecture/` for the full architecture.
+See `apps/maestro/.claude/skills/create-skills-architecture/` for the full architecture.
 
 ## Payload contract
 
@@ -18,7 +17,7 @@ See the project-local skill `apps/ai-tools-manager/.claude/skills/create-skills-
 { name, description, keywords, marketplacePath }
 ```
 
-`keywords` is a `string[]` (was a comma string in the old form; now collected via `ChipInput`).
+`keywords` is a `string[]`, collected via `ChipInput` in the app form.
 
 ## Output
 

@@ -1,9 +1,13 @@
 # maestro (desktop)
 
-The Maestro desktop app — an Electron shell over `@repo/maestro-core`. Replaces the containerised
-`apps/ai-tools-manager` web app: it opens a project folder, edits and saves the full Maestro
-config with **no Claude session in the loop**, and live-tails the session log the Claude Code
-hooks write.
+The Maestro desktop app — an Electron shell over `@repo/maestro-core`. It opens a project folder,
+edits and saves the full Maestro config with **no Claude session in the loop**, and live-tails the
+session log the Claude Code hooks write.
+
+It **replaced** `apps/ai-tools-manager`, which was deleted in M5 along with its image, its
+per-project container and port, its `/tmp` channel files, and the ~470 lines of bash whose only job
+was to show a window. If you find a doc still describing a container to launch or a result file to
+wait on, it is stale — say so rather than following it.
 
 ## Why it exists
 
@@ -15,6 +19,20 @@ no LLM**, but had to run on the host, so they were Steps 3 and 4 of a SKILL.md. 
 was acting as transport for `fs.writeFileSync` and `execFileSync`.
 
 Here a save is one IPC call.
+
+## Architecture docs live in `.claude/skills/`
+
+Six of them, moved here when the web app was deleted. They are the long-form reference; this file
+is the short one.
+
+| Skill | Covers |
+|---|---|
+| `maestro-architecture` | the **runtime** — install pipeline, orchestrator + hook lifecycle, the four config/state files, the HANDOFF routing contract |
+| `workflow-view` | `/workflows` — the React Flow canvas and how the diagram maps to `maestro.json` |
+| `rule-view` | `/rules` — the two rule selectors, the directory tree, and how a save moves rule files |
+| `log-view` | `/session-log` — the three panes, how entries become instances, and how the hooks write the log it reads |
+| `create-skills-architecture` | the four `create-*` flows — scaffold, confirmation dialog, consuming prompts |
+| `updating-maestro` | how a runtime change actually reaches a project, on either delivery path |
 
 ## Process layout
 
@@ -47,6 +65,43 @@ from it pulls all of that into the renderer's type graph. `/contracts` is interf
 The `SaveResult` carries the rendered success paths and the rule summary, so the toast reports
 what actually changed on disk. Gone: `RESULT_FILE`, `aiToolsAction`, `hookSpecificOutput`,
 `wait-ai-tools-result.sh`, and `/maestro-app` Steps 2–5.
+
+## Form architecture (the four create-\* routes)
+
+All four follow one pattern, inherited from the web app and still accurate:
+
+- **State**: `react-hook-form` + `zod` (via `@hookform/resolvers/zod`). The schema lives at the top
+  of the route file; the inferred type drives `useForm<T>`.
+- **UI primitives**: `@repo/ui` — `Button`, `Field`, `Input`, `Textarea`, `ChipInput`, `Select`,
+  `ModePill`, `ThemeToggle`, `ShortcutsDialog`, `FilePreview`, `SyntaxLine`. Icons from
+  `lucide-react`.
+- **Layout**: split pane — form left, live `FilePreview` right showing the file that will be
+  generated. Per-route preview components compose `FilePreview` with their own `lines: string[]`.
+- **Submit feedback**: the window is long-lived and the user creates repeatedly, so a form is never
+  replaced by a terminal success view. Each submit fires a `toast` (`@repo/ui/toast`) and the route
+  stays mounted; the create forms `reset()` for the next artifact.
+- **Keyboard shortcuts**: ⌘N (jump to field), ⌘↵ (submit), `?` (help), Esc (close). The map lives in
+  the route and is rendered by `create-shell.tsx`.
+- **`target` toggle (skill & subagent only)**: a second `ModePill` picks `marketplace` or `project`.
+  In project mode the marketplace/plugin selectors are hidden and the file is written under
+  `<projectRoot>/.claude/`.
+
+### Adding a route / form
+
+1. Create `src/renderer/src/routes/<name>.tsx` mirroring `create-plugin.tsx` (no mode) or
+   `create-skill.tsx` (auto/manual + target). Define the zod schema, wire `useForm` + `Controller`,
+   render with `Field`/`Input`/`Select`/`ChipInput` from `@repo/ui`, and wrap it in `create-shell`.
+2. Add a `scaffold<X>` function to `scaffold.ts` in `@repo/maestro-core` and a prompt builder to
+   `claude-preview.ts`. Both must resolve the path through `resolveCreateTarget`.
+3. Create the preview component under `src/renderer/src/components/`.
+4. Add the channel to `src/shared/ipc.ts` and the handler to `src/main/ipc.ts` — the renderer must
+   never touch `fs`.
+5. Write the consuming prompt at `plugins/ai-tools-manager/skills/<name>/SKILL.md`, documenting the
+   payload shape and the file(s) Claude should finish.
+
+There is **no hook to register** for a new form. The `UserPromptExpansion` entries that used to
+launch one per route are gone with the container; a route is reached from the top bar's **Create**
+menu, and the prompt reaches Claude through the bridge.
 
 ## What still requires Claude Code
 
@@ -218,10 +273,12 @@ out of the confirmation, which is the whole point.
   are all outside its cwd gets none of them auto-accepted by `--permission-mode acceptEdits`, with
   nobody to ask. `claude-preview.ts` derives the cwd from the same resolution that chose the path;
   the dialog shows it. Verified in the window: a marketplace-target skill runs in the marketplace.
-- **The prompt is prose, never `/create-skill`.** A slash command in a headless run would fire the
-  plugin's `UserPromptExpansion` hook, which launches the Docker app and blocks waiting for a form
-  submission that can never arrive. The instructions the skill would have supplied are inlined into
-  the prompt instead, and a test asserts no create prompt contains a slash command.
+- **The prompt is prose, never `/create-skill`.** Historically a slash command in a headless run
+  fired the plugin's `UserPromptExpansion` hook, which launched the Docker app and blocked on a form
+  submission that could never arrive. That hook is gone, but the rule stands: a slash command
+  re-enters the skill from the top instead of finishing the scaffold, and re-derives fields the
+  payload already carries. The instructions the skill would have supplied are inlined into the
+  prompt, and a test asserts no create prompt contains a slash command.
 - **`claude:run` takes a token and nothing else, and the preload must keep it that way.** The
   bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
   run channel having no argument that could describe a different run. A preload that "helpfully"

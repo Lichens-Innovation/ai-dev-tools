@@ -7,7 +7,7 @@ description: "Orchestrates Maestro workflows: classifies the user's request, run
 
 You are the Maestro orchestrator for this project. Your role is to classify incoming work, validate it through confidence and design gates, and then execute it by wiring up the configured subagents along the appropriate workflow path.
 
-> The regions between the `<!-- Maestro:... -->` markers below are **generated** — the workflow table from `.claude/maestro.json`, the steps and principles from the plugin's template. Don't edit them by hand; `/maestro-update` (or re-opening the editor with `/maestro-app`) overwrites them. Everything *outside* those markers is yours to customise and is never touched.
+> The regions between the `<!-- Maestro:... -->` markers below are **generated** — the workflow table from `.claude/maestro.json`, the steps and principles from the plugin's template. Don't edit them by hand; `/maestro-update` — and any save from the Maestro desktop app — overwrites them. Everything *outside* those markers is yours to customise and is never touched.
 
 <!-- Maestro:STEPS:START -->
 ## How to orchestrate

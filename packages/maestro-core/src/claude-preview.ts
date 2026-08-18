@@ -70,10 +70,12 @@ interface BuiltRequest {
  *   • It forbids touching the frontmatter. The `description:` was computed by `buildDesc` and shown
  *     in the form's live preview; a model rewriting it would silently replace the string the user
  *     approved with one they never saw.
- *   • It is self-contained prose, NOT `/create-skill`. Invoking the slash command would re-run the
- *     skill's own create flow — including the plugin's `UserPromptExpansion` hook, which launches
- *     the Docker app and blocks waiting for a form submission that a headless run can never make.
- *     The instructions the skill would have supplied are inlined here instead.
+ *   • It is self-contained prose, NOT `/create-skill`. The slash command would re-run the skill's
+ *     own create flow from the top — re-deriving fields this payload already carries and possibly
+ *     recreating what the scaffold just wrote. (It used to be worse: the plugin's
+ *     `UserPromptExpansion` hook launched the Docker app and blocked on a form submission a
+ *     headless run could never make. M5 deleted that hook; the rule outlives it.) The instructions
+ *     the skill would have supplied are inlined here instead.
  */
 function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveOptions): BuiltRequest {
   const target = resolveCreateTarget(projectRoot, request, { home: opts.home });

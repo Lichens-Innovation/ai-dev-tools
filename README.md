@@ -21,6 +21,30 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 2. Install the `ai-tools-manager` plugin following the [plugin installation](#plugin)
 3. Start a claude code session and launch the help server using the `/help-server`
 
+## Maestro
+
+**Maestro** turns a project into a multi-agent workflow: an orchestrator skill that classifies each
+request, picks a configured workflow, and dispatches subagents whose skills and handoff rules are
+injected at runtime from `.claude/maestro.json`. It has two halves that meet at that file:
+
+- **Authoring** — the [Maestro desktop app](./apps/maestro), an Electron app. Open a project folder
+  and edit the workflow graph, the rule assignments, and the runtime install; watch the session log
+  live; run the four create-\* forms. No Claude session is involved in a save, and there is no
+  server, container or browser to start.
+
+  ```bash
+  pnpm install
+  pnpm --filter maestro build && pnpm --filter maestro start
+  ```
+
+- **Runtime** — hook scripts in the `ai-tools-manager` plugin that fire inside a Claude session
+  (`SubagentStart`, `PreToolUse`, `SubagentStop`, `PostToolUse`, `SessionEnd`). These need a
+  session to run, but not to be installed.
+
+Without the desktop app you can still set a project up entirely from a session: `/maestro-install`
+scaffolds the orchestrator, seeds `maestro.json` and renders the handoff table; `/maestro-update`
+refreshes it; `/maestro-uninstall` removes it.
+
 ## Installation
 
 ### Plugin

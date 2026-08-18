@@ -38,7 +38,7 @@
     ]
   },
   "009-retire-the-docker-path.md": {
-    "status": "blocked",
+    "status": "done",
     "blockedBy": [
       "005-uninstall-the-runtime-from-a-project.md",
       "006-detect-the-repo-instead-of-seeding-backend.md",
@@ -46,7 +46,7 @@
     ]
   },
   "010-fold-maestro-core-into-the-app.md": {
-    "status": "blocked",
+    "status": "ready",
     "blockedBy": [
       "009-retire-the-docker-path.md"
     ]

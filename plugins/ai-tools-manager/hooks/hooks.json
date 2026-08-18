@@ -53,18 +53,6 @@
         ]
       }
     ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-app-session-register.sh"]
-          }
-        ]
-      }
-    ],
     "SessionEnd": [
       {
         "matcher": "",
@@ -73,48 +61,6 @@
             "type": "command",
             "command": "bash",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/maestro-session-cleanup.sh"]
-          }
-        ]
-      }
-    ],
-    "UserPromptExpansion": [
-      {
-        "matcher": "create-skill",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-skill"]
-          }
-        ]
-      },
-      {
-        "matcher": "create-subagent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-subagent"]
-          }
-        ]
-      },
-      {
-        "matcher": "create-plugin",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-plugin"]
-          }
-        ]
-      },
-      {
-        "matcher": "create-marketplace",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/launch-ai-tools-manager-app.sh", "create-marketplace"]
           }
         ]
       }

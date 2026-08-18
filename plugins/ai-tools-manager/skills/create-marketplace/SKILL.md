@@ -13,13 +13,13 @@ $ARGUMENTS
 
 ## References & shared contract
 
-See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (marketplace, plugins, skills, …), where the form payload comes from, and the **scaffold-finishing contract**.
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (marketplace, plugins, skills, …), where the payload comes from, and the **scaffold-finishing contract**.
 
 ## Workflow
 
-Parse the form payload — the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` (see the shared contract above for its source) — and proceed.
+Parse the payload — the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` (see the shared contract above for its source) — and proceed.
 
-**Applying the scaffold contract here:** when `scaffolded: true`, the `marketplace.json` manifest and a starter `README.md` already exist under `targetDir` — verify them and skip recreating; focus on the remaining work (CLAUDE.md, enriching the README, local test + private-repo/auto-update setup). A brand-new marketplace dir is usually **outside** the mounted repo, so under Docker the scaffold typically reports `scaffolded: false` — in that case do every step below from scratch.
+**Applying the scaffold contract here:** when `scaffolded: true`, the `marketplace.json` manifest and a starter `README.md` already exist under `targetDir` — verify them and skip recreating; focus on the remaining work (CLAUDE.md, enriching the README, local test + private-repo/auto-update setup). When `scaffolded: false` (or there is no scaffold object at all, i.e. you were invoked conversationally), do every step below from scratch. Note that a new marketplace commonly lives **outside** the open project — the run's working directory is `targetDir`, not the project root, so write with absolute paths and don't assume relative ones resolve where you expect.
 
 1. **Create marketplace directory structure**
    ```

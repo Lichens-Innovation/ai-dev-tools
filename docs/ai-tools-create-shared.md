@@ -1,9 +1,9 @@
 # Shared reference for the create-* skills
 
-This doc holds the parts the four ai-tools-manager create flows
-(`create-skill`, `create-subagent`, `create-plugin`, `create-marketplace`) have in common, so each
-`SKILL.md` can link here instead of repeating them. The flow-specific bits — target dispatch,
-auto/manual rules, skeletons, report steps — stay in each skill.
+This doc holds the parts the four create flows (`create-skill`, `create-subagent`,
+`create-plugin`, `create-marketplace`) have in common, so each `SKILL.md` can link here instead of
+repeating them. The flow-specific bits — target dispatch, auto/manual rules, skeletons, report
+steps — stay in each skill.
 
 ## References
 
@@ -23,33 +23,39 @@ decisions in manual mode (paths relative to this `docs/` directory):
 
 ## Where the payload comes from
 
-The form data is a JSON object, supplied one of two ways:
+The flow's inputs are a JSON object (`mode`, `target`, and the per-flow fields). It reaches you one
+of two ways:
 
-- The `UserPromptExpansion` hook injected it into your context as `additionalContext` (when the
-  flow was launched on its own, e.g. `/create-skill`), or
-- The `/ai-tools` dispatcher hands it to you directly (when the user is in a persistent app
-  session).
+- **From the Maestro desktop app.** `apps/maestro`'s four `create-*` routes are the forms now. On
+  submit the route scaffolds deterministically in-process, then builds a prose prompt carrying the
+  payload and the scaffold result, shows it in full in a confirmation dialog, and — once the user
+  confirms — runs it through `claude -p`. If you are reading this inside such a run, the payload is
+  already inlined above.
+- **From the conversation.** A user can invoke the skill directly (`/create-skill`) with no app
+  involved. There is no form and nothing is pre-scaffolded: gather the same fields by asking, then
+  do every step yourself.
 
-Either way, parse the JSON and proceed. The shape (`mode`, `target`, fields) is documented per
-flow in that flow's own `SKILL.md`.
+Either way, the flow-specific shape is documented in that flow's own `SKILL.md`.
 
-> **The desktop app is where these flows live now.** `apps/maestro`'s four `create-*` routes do the
-> deterministic scaffold in-process (`scaffold.ts` in `@repo/maestro-core`) and hand the remaining
-> body-authoring to `claude -p` through a confirmation that shows the exact prompt. The contract
-> below still describes what a session is asked to finish; what has gone is the form-and-result-file
-> round trip that used to deliver it.
+There is no form-and-result-file round trip any more. Nothing writes `/tmp/result.json`, nothing
+blocks on it, and no `UserPromptExpansion` hook launches a UI — if you find a skill or doc still
+describing that, it is stale.
 
 ## Finishing a scaffold
 
-The app **pre-scaffolds deterministically** the moment a form is submitted (see
-`src/utils/scaffold.ts`), so the payload carries a `Deterministic scaffold` object
+When the run came from the desktop app, the artifact is **already on disk**: the route calls
+`scaffoldSkill` / `scaffoldSubagent` / `scaffoldPlugin` / `scaffoldMarketplace` in
+`@repo/maestro-core` *before* Claude is mentioned, so cancelling the confirmation still leaves the
+user with the thing they asked for. The payload therefore carries a `Deterministic scaffold` object
 `{ scaffolded, path, remaining, reason? }`:
 
-- **`scaffolded: true`** — the artifact already exists at `path` with its frontmatter/manifest
-  written (the description was already computed by the app's `buildDesc`). **Do not recreate it.**
-  Do only the `remaining` work, **in place** — for an auto-mode body that means `Edit` the
-  placeholder at `path`; a manual-mode skeleton or a plugin/marketplace manifest is usually already
-  complete, so just verify and report.
-- **`scaffolded: false`** — the app couldn't write (e.g. a brand-new marketplace dir outside the
-  mounted repo under Docker; `reason` says why). Create the artifact from scratch at `path`
-  following the flow's normal rules below.
+- **`scaffolded: true`** — the artifact exists at `path` with its frontmatter/manifest written (the
+  description was already computed by core's `buildDesc`, the single implementation the app's live
+  preview also renders). **Do not recreate it.** Do only the `remaining` work, **in place** — for an
+  auto-mode body that means `Edit` the placeholder at `path`; a manual-mode skeleton or a
+  plugin/marketplace manifest is usually already complete, so verify and report.
+- **`scaffolded: false`** — the scaffold could not write and `reason` says why (a bad path, a
+  permission error, an existing file it refused to clobber). Create the artifact from scratch at
+  `path` following the flow's normal rules below.
+- **No `scaffold` object at all** — you were invoked conversationally. Nothing exists yet; do
+  everything.

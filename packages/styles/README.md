@@ -2,7 +2,7 @@
 
 The shared design system: Tailwind theme wiring, Sass partials, and the three UI typefaces.
 
-Consumed by `apps/maestro`, `apps/help-server`, and `apps/ai-tools-manager`, each of which does
+Consumed by `apps/maestro` and `apps/help-server`, each of which does
 `@import '@repo/styles/shared-styles.css'` from its own entry stylesheet.
 
 ## Fonts are vendored, not fetched
