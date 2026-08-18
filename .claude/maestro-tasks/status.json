@@ -2,5 +2,78 @@
   "001-verify-workflow-canvas-interactions.md": {
     "status": "done",
     "blockedBy": []
+  },
+  "002-self-host-the-ui-fonts.md": {
+    "status": "ready",
+    "blockedBy": []
+  },
+  "003-keep-seeded-condition-labels-off-nodes.md": {
+    "status": "ready",
+    "blockedBy": []
+  },
+  "004-install-and-update-the-runtime-from-the-app.md": {
+    "status": "ready",
+    "blockedBy": []
+  },
+  "005-uninstall-the-runtime-from-a-project.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "004-install-and-update-the-runtime-from-the-app.md"
+    ]
+  },
+  "006-detect-the-repo-instead-of-seeding-backend.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "004-install-and-update-the-runtime-from-the-app.md"
+    ]
+  },
+  "007-the-claude-bridge-preview-and-run.md": {
+    "status": "ready",
+    "blockedBy": []
+  },
+  "008-port-the-create-routes-onto-the-bridge.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "007-the-claude-bridge-preview-and-run.md"
+    ]
+  },
+  "009-retire-the-docker-path.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "005-uninstall-the-runtime-from-a-project.md",
+      "006-detect-the-repo-instead-of-seeding-backend.md",
+      "008-port-the-create-routes-onto-the-bridge.md"
+    ]
+  },
+  "010-fold-maestro-core-into-the-app.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "009-retire-the-docker-path.md"
+    ]
+  },
+  "011-make-prettier-check-pass.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "010-fold-maestro-core-into-the-app.md"
+    ]
+  },
+  "012-fold-in-help-servers-read-only-surface.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "010-fold-maestro-core-into-the-app.md"
+    ]
+  },
+  "013-put-chat-and-stats-behind-the-bridge.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "007-the-claude-bridge-preview-and-run.md",
+      "012-fold-in-help-servers-read-only-surface.md"
+    ]
+  },
+  "014-delete-help-server-and-re-home-its-docs.md": {
+    "status": "blocked",
+    "blockedBy": [
+      "013-put-chat-and-stats-behind-the-bridge.md"
+    ]
   }
 }
