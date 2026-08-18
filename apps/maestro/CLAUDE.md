@@ -50,29 +50,38 @@ second.
 
 ## `src/core/` — the node side
 
-| Module                                  | What it owns                                                                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------ |
-| `types.ts`                              | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json`            |
-| `contracts.ts`                          | Every type that crosses a process boundary. **Renderer-safe** — interfaces only      |
-| `text.ts`                               | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it |
-| `success-path.ts`                       | Success-path derivation, node labels, agent→skill resolution (pure)                  |
-| `skill-regions.ts`                      | Managed/rendered region markers in the orchestrator `SKILL.md` (pure)                |
-| `config.ts`                             | Read / merge-slice / write of `maestro.json`                                         |
-| `render.ts`                             | Rewrites the `Maestro:HANDOFFS` table from `maestro.json`                            |
-| `save.ts`                               | The three-step save the `config:save` channel is a wrapper around                    |
-| `seed.ts` / `label-layout.ts`           | The starter workflows an unconfigured project opens with (pure)                      |
-| `detect.ts`                             | Which implementation agent(s) the repo needs, and the evidence for it                |
-| `discovery.ts` / `fs-scan.ts`           | The agents, skills, rules and directory tree a project can pick from                 |
-| `install.ts` / `uninstall.ts`           | Installs the runtime into a project, reports staleness, removes it                   |
-| `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail                                    |
-| `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                 |
-| `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                               |
-| `claude-tokens.ts`                      | The single-use, expiring authorisation between preview and run                       |
-| `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued              |
-| `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time            |
-| `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                   |
-| `tasks.ts`                              | The `/maestro-tasks` queue                                                           |
-| `plugin-entries/`                       | esbuild entry points for the plugin's generated CJS libs — see below                 |
+| Module                                  | What it owns                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `types.ts`                              | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json`              |
+| `contracts.ts`                          | Every type that crosses a process boundary. **Renderer-safe** — interfaces only        |
+| `text.ts`                               | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it   |
+| `success-path.ts`                       | Success-path derivation, node labels, agent→skill resolution (pure)                    |
+| `skill-regions.ts`                      | Managed/rendered region markers in the orchestrator `SKILL.md` (pure)                  |
+| `config.ts`                             | Read / merge-slice / write of `maestro.json`                                           |
+| `render.ts`                             | Rewrites the `Maestro:HANDOFFS` table from `maestro.json`                              |
+| `save.ts`                               | The three-step save the `config:save` channel is a wrapper around                      |
+| `seed.ts` / `label-layout.ts`           | The starter workflows an unconfigured project opens with (pure)                        |
+| `detect.ts`                             | Which implementation agent(s) the repo needs, and the evidence for it                  |
+| `discovery.ts` / `fs-scan.ts`           | The agents, skills, rules and directory tree a project can pick from                   |
+| `install.ts` / `uninstall.ts`           | Installs the runtime into a project, reports staleness, removes it                     |
+| `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail                                      |
+| `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                   |
+| `claude-preview.ts`                     | Builds the prompt and issues a token. **Cannot spawn**                                 |
+| `claude-tokens.ts`                      | The single-use, expiring authorisation between preview and run                         |
+| `claude-run.ts`                         | The only module that spawns Claude, and only for a token preview issued                |
+| `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
+| `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
+| `tasks.ts`                              | The `/maestro-tasks` queue                                                             |
+| `plugins.ts` / `curated.ts`             | Installed plugins, the project's own marketplace, and the curated marketplaces' cache  |
+| `commands.ts` / `docs.ts`               | The CLI command table parsed out of `docs/claude-code.md`; the docs reader's node side |
+| `plugin-entries/`                       | esbuild entry points for the plugin's generated CJS libs — see below                   |
+
+The last four came from `apps/help-server` (`docs/plans/m6-help-server-merge.md`) and landed here
+rather than in a package, deliberately: this milestone sits _after_ the core absorption so that
+writing them into `packages/` and moving them a week later never happens. help-server's
+`utils/helpers.ts` did not come across at all — its `PROJECT_ROOT`/`PLUGINS_DIR`/`DOCS_DIR` were
+Docker-mount constants derived from `process.cwd()`, and here every path is joined onto the **open
+project**, which is the only reason these views work against a project that is not this repo.
 
 It was `packages/maestro-core` until it was folded in here (`docs/plans/core-absorption.md`).
 The package existed so "the same code could serve two
@@ -208,6 +217,17 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the `claude -p` bridge: **Run with Claude** previews the invocation, confirms it, and streams it. |
 | `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                            |
 | `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                    |
+| `/tools`                                                                     | help-server's tabbed dashboard: installed plugins + CLI commands, the project's marketplace + rule library, curated plugins. One `data:tools` round trip.         |
+| `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                 |
+
+### The top bar is grouped, not a list
+
+Four top-level links (Workflows, Rules, Session Log, Maestro Tasks) — the things a user came to
+_do_, all of which write — then a divider, then two menus: **Library** (Tools, Docs, Runtime) for
+everything that only reads, and **Create**. Folding `/install` into Library is what kept the bar
+from overflowing when help-server's two sections arrived, and it is safe only because the runtime
+staleness badge moved onto the Library **button**: the badge is the one item in the bar nobody goes
+looking for, so it has to be visible from whatever route the user is already on.
 
 ## The create-\* routes
 
@@ -254,7 +274,27 @@ out of the confirmation, which is the whole point.
 ## Things that bite
 
 - **Hash history, not browser history.** A packaged build loads the renderer over `file://`,
-  where pushState paths don't resolve on reload. See `src/renderer/src/main.tsx`.
+  where pushState paths don't resolve on reload. See `src/renderer/src/main.tsx`. **Corollary: a
+  route cannot also use the URL fragment.** The whole route already lives in `location.hash`, so a
+  second `#` in it is not something the router or `querySelector` can be trusted to split — which
+  is why the docs reader carries the heading to scroll to as the `at` SEARCH param and scrolls by
+  element id, where help-server read `window.location.hash`. For the same reason `/docs/$slug`
+  intercepts in-page `#anchor` links in rendered markdown: left alone, one would rewrite the route
+  and throw the reader out of the app.
+- **`components={{ text: … }}` in react-markdown highlights nothing.** `components` is keyed by
+  ELEMENT name, and `text` is the **SVG** `<text>` element, not a markdown text node. It
+  type-checks (it is a real JSX intrinsic), it renders, and the body highlight silently never
+  happens — help-server shipped it that way, and the port inherited it until a window probe counted
+  zero `<mark>` elements in an article opened from a search hit. Text nodes are reachable from a
+  rehype plugin, so `utils/highlight.ts` marks the hast tree instead; that also means a term inside
+  a link, a list item or a table cell lights up, which the per-element approach could not do.
+- **Two functions answer to "get the rules", and they are not the same set.**
+  `discoverRuleLibrary` reads `<project>/rules/*.md` — what the project publishes, shown on
+  `/tools`. `discoverProjectRules` reads every `.claude/rules/` in the tree — what is assigned to a
+  directory, shown on `/rules`, and what a save MOVES. A project can have either without the other,
+  so they were deliberately not unified; the names and the return types (`RuleLibraryEntry` with
+  `title`/`paths` vs `ProjectRule` with `id`/`dir`) are what keep the next reader from assuming one
+  view manages the other's files.
 - **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
   so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
   `src/renderer/index.html` now, along with the renderer CSP.
@@ -403,7 +443,16 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the
-  project picker, which needs none of that — so startup parse drops by roughly 75%. What makes
+  project picker, which needs none of that — so startup parse drops by roughly 75%.
+  Re-measured 2026-08-04 after help-server was folded in, by counting the chunks the packaged app
+  actually requests (CDP `Network.requestWillBeSent`; `file://` module loads produce no
+  `PerformanceResourceTiming` entries, so the obvious way to measure this returns an empty array
+  and reads as "nothing loaded"): the landing route pulls 14 chunks / 1,107 kB and **none of the
+  new code**; `/tools` adds 117 kB; `/docs/$slug` adds 558 kB, of which 555 kB is the react-markdown
+  chunk now SHARED with `/maestro-tasks` rather than duplicated into it. help-server's
+  `@tanstack/react-table`, `react-highlight-words` and `highlight.js` were deliberately not carried
+  across — the tables filter with a `useMemo` and the highlighter is `utils/highlight.ts` — so the
+  fold-in added no runtime dependency. What makes
   this safe over the packaged `file://` load is that assets resolve relatively (`base: "./"`);
   anything that regresses that leaves routes blank in a packaged build while `dev` — served over
   `http://localhost:5173` — stays perfectly happy. **`dev` does not exercise the `file://` path

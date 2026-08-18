@@ -1,5 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FolderOpen, Workflow, BookOpenCheck, ScrollText, ListChecks, Download, X } from "lucide-react";
+import {
+  FolderOpen,
+  Workflow,
+  BookOpenCheck,
+  ScrollText,
+  ListChecks,
+  Download,
+  LayoutGrid,
+  BookOpen,
+  X,
+} from "lucide-react";
 import Button from "@repo/ui/button";
 import { useProject } from "../utils/project-context";
 
@@ -23,6 +33,8 @@ const SECTIONS = [
   },
   { path: "/maestro-tasks", label: "Tasks", icon: ListChecks, blurb: "The queue /to-maestro-tasks wrote." },
   { path: "/install", label: "Runtime", icon: Download, blurb: "Install or update Maestro's hooks in this project." },
+  { path: "/tools", label: "Tools", icon: LayoutGrid, blurb: "Installed plugins, CLI commands, marketplaces." },
+  { path: "/docs", label: "Docs", icon: BookOpen, blurb: "Read and search the project's docs/." },
 ] as const;
 
 /**

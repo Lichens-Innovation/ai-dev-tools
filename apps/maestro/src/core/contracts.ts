@@ -457,3 +457,113 @@ export interface SaveResult {
   /** Human-readable notes worth surfacing in the save toast. */
   warnings: string[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The read-only surface folded in from apps/help-server (docs/plans/m6-help-server-merge.md).
+//
+// These describe what the machine and the open project ALREADY contain — installed plugins, the
+// project's own marketplace manifest, the curated marketplaces' cache, the rule library, the CLI
+// command table, the docs. Nothing here is written by the app, which is why the whole group is a
+// single loader payload per view rather than a channel per question.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A plugin installed for this machine, as `~/.claude/plugins/installed_plugins.json` records it.
+ *
+ * Narrower than `@repo/claude-fs`'s `InstalledPlugin` on purpose: `installPath` and `projectPath`
+ * are absolute paths on this machine that no view renders, and a contract carries what crosses,
+ * not what the reader happened to have.
+ */
+export interface InstalledPluginInfo {
+  /** `<plugin>@<marketplace>` — the key `claude plugin install` uses. */
+  key: string;
+  pluginName: string;
+  marketplace: string;
+  /** "user" or "project". */
+  scope: string;
+  version: string;
+  /** ISO timestamp; "" when the record predates the field. */
+  installedAt: string;
+}
+
+/** A skill or subagent contributed by a plugin, as the marketplace tab lists it. */
+export interface DefinitionSummary {
+  name: string;
+  description: string;
+}
+
+/** A plugin listed in the OPEN PROJECT's own `.claude-plugin/marketplace.json`. */
+export interface MarketplacePluginInfo {
+  name: string;
+  description: string;
+  version: string;
+  skills: DefinitionSummary[];
+  agents: DefinitionSummary[];
+  /** Whether `<name>@<this marketplace>` is installed on this machine. */
+  isInstalled: boolean;
+  installCommand: string;
+}
+
+/** A plugin from one of the curated marketplaces, read out of `~/.claude`'s marketplace cache. */
+export interface CuratedPlugin {
+  name: string;
+  marketplace: string;
+  /** Display name for the marketplace, e.g. "Anthropic Official". */
+  marketplaceLabel: string;
+  description: string;
+  isInstalled: boolean;
+  installCommand: string;
+}
+
+/**
+ * A rule file in the project's `rules/` LIBRARY — authored rules, before any assignment.
+ *
+ * Deliberately not a `ProjectRule`, and deliberately not produced by `discoverProjectRules`.
+ * The two answer different questions about overlapping files: this one is "what does this repo
+ * publish", read from `<project>/rules/*.md`; `ProjectRule` is "what is assigned where", read
+ * from every `.claude/rules/` in the tree, and is what a save MOVES. Naming both "rules" is what
+ * the merge plan warned about, so the library keeps `title`/`paths` (its frontmatter) and the
+ * assignable one keeps `id`/`dir`.
+ */
+export interface RuleLibraryEntry {
+  filename: string;
+  /** First `# heading`, falling back to the filename. */
+  title: string;
+  /** `paths:` frontmatter — which files the rule claims to apply to. Empty means all. */
+  paths: string[];
+  description: string;
+}
+
+/** A row of the CLI command table in `<project>/docs/claude-code.md`. */
+export interface ClaudeCommand {
+  command: string;
+  description: string;
+}
+
+/** A markdown file under `<project>/docs/`. */
+export interface DocMeta {
+  slug: string;
+  title: string;
+}
+
+/**
+ * One heading's worth of a doc, which is the unit docs search matches against.
+ *
+ * Per-heading rather than per-file so a hit can deep-link to `#headingId` and the reader can
+ * highlight the term in place — searching whole files would only ever be able to name the file.
+ */
+export interface DocSection {
+  slug: string;
+  docTitle: string;
+  /** Slugified heading text; the `id` the reader puts on the rendered heading. */
+  headingId: string;
+  headingText: string;
+  bodyText: string;
+}
+
+/** A doc's rendered body, as `data:doc` returns it. */
+export interface DocContent {
+  slug: string;
+  title: string;
+  content: string;
+}

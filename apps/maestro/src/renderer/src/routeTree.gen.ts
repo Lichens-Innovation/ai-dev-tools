@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as SessionLogRouteImport } from './routes/session-log'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
@@ -19,10 +20,17 @@ import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
+import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
   id: '/workflows',
   path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ToolsRoute = ToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SessionLogRoute = SessionLogRouteImport.update({
@@ -70,6 +78,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsSlugRoute = DocsSlugRouteImport.update({
+  id: '/docs/$slug',
+  path: '/docs/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,7 +99,10 @@ export interface FileRoutesByFullPath {
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
+  '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs/': typeof DocsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -93,7 +114,10 @@ export interface FileRoutesByTo {
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
+  '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs': typeof DocsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -106,7 +130,10 @@ export interface FileRoutesById {
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
+  '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
+  '/docs/$slug': typeof DocsSlugRoute
+  '/docs/': typeof DocsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,7 +147,10 @@ export interface FileRouteTypes {
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
+    | '/tools'
     | '/workflows'
+    | '/docs/$slug'
+    | '/docs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -132,7 +162,10 @@ export interface FileRouteTypes {
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
+    | '/tools'
     | '/workflows'
+    | '/docs/$slug'
+    | '/docs'
   id:
     | '__root__'
     | '/'
@@ -144,7 +177,10 @@ export interface FileRouteTypes {
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
+    | '/tools'
     | '/workflows'
+    | '/docs/$slug'
+    | '/docs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -157,7 +193,10 @@ export interface RootRouteChildren {
   MaestroTasksRoute: typeof MaestroTasksRoute
   RulesRoute: typeof RulesRoute
   SessionLogRoute: typeof SessionLogRoute
+  ToolsRoute: typeof ToolsRoute
   WorkflowsRoute: typeof WorkflowsRoute
+  DocsSlugRoute: typeof DocsSlugRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -167,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/workflows'
       fullPath: '/workflows'
       preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tools': {
+      id: '/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof ToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/session-log': {
@@ -232,6 +278,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$slug': {
+      id: '/docs/$slug'
+      path: '/docs/$slug'
+      fullPath: '/docs/$slug'
+      preLoaderRoute: typeof DocsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -245,7 +305,10 @@ const rootRouteChildren: RootRouteChildren = {
   MaestroTasksRoute: MaestroTasksRoute,
   RulesRoute: RulesRoute,
   SessionLogRoute: SessionLogRoute,
+  ToolsRoute: ToolsRoute,
   WorkflowsRoute: WorkflowsRoute,
+  DocsSlugRoute: DocsSlugRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

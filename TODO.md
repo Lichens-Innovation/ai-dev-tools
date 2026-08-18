@@ -12,7 +12,8 @@
 - 008
 - 009
 - 010
+- 011
 
 ## Prompt
 
-For the following task, use the /test-maestro-desktop skill for your tests. Do the task from .claude/maestro-tasks/011-make-prettier-check-pass.md
+For the following task, use the /test-maestro-desktop skill for your tests. Do the task from .claude/maestro-tasks/012-fold-in-help-servers-read-only-surface.md

@@ -327,6 +327,67 @@ describe("the create-* routes", () => {
   });
 });
 
+describe("the surface folded in from help-server", () => {
+  const nav = read("src/renderer/src/components/top-nav.tsx");
+
+  it("is reachable from the app's navigation", () => {
+    // Same reason as the create-* routes below: a route with no way in is a route nobody finds.
+    // These two live behind the Library menu, alongside /install.
+    for (const route of ["/tools", "/docs"]) expect(nav, `no nav entry for ${route}`).toContain(`"${route}"`);
+  });
+
+  it("leaves the project picker as the landing page", () => {
+    // help-server's dashboard was ITS `/`. Landing it on this app's `/` would have replaced the
+    // project picker with a view describing a project the user has not chosen yet.
+    const landing = read("src/renderer/src/routes/index.tsx");
+    expect(landing).toContain("useProject");
+    expect(landing).not.toMatch(/CommandCenter|CuratedTools|ProjectMarketplace/);
+  });
+
+  it("keeps the runtime badge visible now that /install sits inside a menu", () => {
+    // The badge is the one thing in the bar a user never goes looking for. Moving the link into
+    // the Library menu is only acceptable because the dot moved onto the menu's own button.
+    const menu = nav.slice(nav.indexOf('label="Library"'), nav.indexOf('label="Create"'));
+    expect(menu).toContain('badge !== "none"');
+  });
+
+  it("does not let the chat panel spawn anything", () => {
+    // The acceptance criterion, asserted where it can regress. help-server's chat spawned the
+    // `claude` CLI directly with no preview — the second, independently-grown spawn path the
+    // bridge exists to replace. Until it is rebuilt on claude:preview/claude:run, the panel must
+    // reach neither the bridge nor anything that could stand in for one.
+    // Comments stripped: the file's own header names the thing it must not do, and prose about a
+    // forbidden call matches a check for one exactly as well as a real call does.
+    const panel = stripComments(read("src/renderer/src/components/chat-panel.tsx"));
+    expect(panel).not.toMatch(/window\.maestro\.claude/);
+    expect(panel).not.toMatch(/claude\s+-p\b|--permission-mode|child_process|spawn\(/);
+    expect(panel).toContain("SlidePanel");
+  });
+
+  it("reads the open project rather than a Docker mount or a precompute file", () => {
+    // help-server's `utils/helpers.ts` pinned every path to `process.cwd()/../..` — the repo the
+    // container was built around. Ported, those constants would silently read the DIRECTORY THE
+    // APP WAS LAUNCHED FROM instead of the project the window is showing.
+    for (const mod of ["plugins", "curated", "commands", "docs"] as const) {
+      const src = stripComments(read(`src/core/${mod}.ts`));
+      expect(src, `src/core/${mod}.ts resolves a path from the process cwd`).not.toMatch(/process\.cwd\(\)/);
+      expect(src, `src/core/${mod}.ts reads a /tmp precompute file`).not.toMatch(/\/tmp\/|os\.tmpdir\(\)/);
+    }
+  });
+
+  it("routes both new loaders through callMain", () => {
+    // `data:doc` rejects on a missing or unreadable file, and `data:tools` / `data:docs` can still
+    // reject on anything unforeseen. A loader that let one through hands TanStack an error
+    // boundary carrying Electron's "Error invoking remote method" framing, which tells a user
+    // nothing — the same failure `callMain` was written for.
+    for (const route of ["tools", "docs.index", "docs.$slug"]) {
+      const src = read(`src/renderer/src/routes/${route}.tsx`);
+      expect(src, `${route} does not use callMain`).toContain("callMain(");
+      expect(src, `${route} awaits a channel directly`).not.toMatch(/await\s+window\.maestro\./);
+    }
+  });
+});
+
 describe("session log tail ownership", () => {
   // The main process keeps one tail per webContents id and stops the old one before starting a
   // new one, so `log.subscribe` is single-owner by construction. A second subscriber anywhere in

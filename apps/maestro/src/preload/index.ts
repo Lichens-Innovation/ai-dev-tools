@@ -23,6 +23,11 @@ const api: MaestroApi = {
     workflows: () => ipcRenderer.invoke(IPC.workflowsData),
     reseed: (implAgents) => ipcRenderer.invoke(IPC.workflowsReseed, implAgents),
     rules: () => ipcRenderer.invoke(IPC.rulesData),
+    tools: () => ipcRenderer.invoke(IPC.toolsData),
+    docs: () => ipcRenderer.invoke(IPC.docsData),
+    // A slug, never a path: main joins it onto the open project's docs directory and refuses
+    // anything with a separator or a dot in it, so this cannot be steered at another file.
+    doc: (slug) => ipcRenderer.invoke(IPC.docContent, slug),
   },
   config: {
     save: (input: SaveInput) => ipcRenderer.invoke(IPC.configSave, input),

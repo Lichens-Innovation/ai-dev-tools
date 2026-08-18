@@ -20,8 +20,8 @@ import {
 } from "@repo/claude-fs";
 import { IGNORE_DIRS, walkDirs, rulesFilesIn, ruleSearchDirs } from "./fs-scan.js";
 
-import type { DiscoveredDefinition, ProjectRule, TreeNode } from "./contracts.js";
-export type { DiscoveredDefinition, ProjectRule, TreeNode };
+import type { DiscoveredDefinition, ProjectRule, RuleLibraryEntry, TreeNode } from "./contracts.js";
+export type { DiscoveredDefinition, ProjectRule, RuleLibraryEntry, TreeNode };
 
 const execFileAsync = promisify(execFile);
 
@@ -130,6 +130,59 @@ export function discoverProjectRules(projectRoot: string): ProjectRule[] {
     }
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * The project's rule LIBRARY — `<project>/rules/*.md`, as authored.
+ *
+ * THE NAME IS THE POINT. This and `discoverProjectRules` above both answer to "get the rules",
+ * and they are not the same set, which is exactly why the merge plan flagged them: this one reads
+ * the flat `rules/` directory a repo publishes from — the files `vibe-rules` installs and the
+ * /tools dashboard lists — while `discoverProjectRules` reads every `.claude/rules/` in the tree,
+ * which is where a rule lands once it is ASSIGNED and what a save moves around. A project can have
+ * either without the other. Unifying them would have made the dashboard claim the /rules view
+ * manages files it does not, so they stay two functions with two names and two return types.
+ *
+ * Ported from apps/help-server/src/utils/rules.ts, whose `RULES_DIR` was the Docker mount.
+ */
+export function discoverRuleLibrary(projectRoot: string): RuleLibraryEntry[] {
+  if (!projectRoot) return [];
+  const dir = path.join(projectRoot, "rules");
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir).filter((f) => f.endsWith(".md"));
+  } catch {
+    return [];
+  }
+
+  const out: RuleLibraryEntry[] = [];
+  for (const file of files.sort()) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(dir, file), "utf8");
+    } catch {
+      continue;
+    }
+    const fm = parseFrontmatter(text);
+    out.push({
+      filename: file,
+      title: text.match(/^#\s+(.+)/m)?.[1].trim() ?? file.replace(/\.md$/, ""),
+      // `paths:` is a YAML list on one line (`paths: ["src/**", "test/**"]`), and the shared
+      // frontmatter reader hands back scalars — so the brackets and quotes are stripped here.
+      paths: parsePathsList(fm.paths),
+      description: fm.description ?? "",
+    });
+  }
+  return out;
+}
+
+function parsePathsList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((p) => p.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
 }
 
 /** Directory tree used by the /rules view to assign rules to paths. */
