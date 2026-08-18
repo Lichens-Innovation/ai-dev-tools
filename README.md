@@ -4,16 +4,16 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 
 ## Table Of Content
 
-  - [Claude Code](./docs/claude-code.md)
-  - [Hooks](./docs/hooks.md)
-  - [Marketplace](./docs/marketplace.md)
-  - [MCP](./docs/mcp.md)
-  - [Plugins](./docs/plugins.md)
-  - [Rules](./docs/rules.md)
-  - [Skills](./docs/skills.md)
-  - [Skills CLI](./docs/skills-cli.md)
-  - [Subagents](./docs/subagents.md)
-  - [Helpers & Tooling](./docs/helpers-and-tools.md)
+- [Claude Code](./docs/claude-code.md)
+- [Hooks](./docs/hooks.md)
+- [Marketplace](./docs/marketplace.md)
+- [MCP](./docs/mcp.md)
+- [Plugins](./docs/plugins.md)
+- [Rules](./docs/rules.md)
+- [Skills](./docs/skills.md)
+- [Skills CLI](./docs/skills-cli.md)
+- [Subagents](./docs/subagents.md)
+- [Helpers & Tooling](./docs/helpers-and-tools.md)
 
 ## Getting Started
 
