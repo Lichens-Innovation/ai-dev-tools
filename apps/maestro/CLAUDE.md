@@ -1,46 +1,21 @@
 # maestro (desktop)
 
-The Maestro desktop app — an Electron shell over the node-side Maestro logic in `src/core/`. It
+The Maestro desktop app is an Electron shell over the node-side Maestro logic in `src/core/`. It
 opens a project folder, edits and saves the full Maestro config with **no Claude session in the
-loop**, and live-tails the session log the Claude Code hooks write.
-
-It **replaced** `apps/ai-tools-manager`, which was deleted in M5 along with its image, its
-per-project container and port, its `/tmp` channel files, and the ~470 lines of bash whose only job
-was to show a window. If you find a doc still describing a container to launch or a result file to
-wait on, it is stale — say so rather than following it.
-
-In M6 it also absorbed `apps/help-server`, the second and last of this repo's containerised web
-apps: its dashboard is `/tools`, its doc reader is `/docs`, and its node logic is the last five
-modules of `src/core/`. That app, its `Dockerfile`,
-its `docker-compose.yml` and the `/help-server` slash command that started them are gone —
-**there is no server to start and no port 3008**. Its chat came across as a panel on the bridge and
-has since been **deleted by `019`**, which replaced it with the session pane;
-`plugins/ai-tools-manager/skills/super-help/` stayed either way — it is a skill the CLI invokes, not
-app machinery, and the pane now declares it as a session skill rather than naming it in a prompt
-string. This file is where that app's CLAUDE.md was re-homed; the ported modules and components each
-carry a `PORTED FROM` header naming their original.
-
-## Why it exists
-
-In the web app every write went through Claude. The app ran in Docker and could only reach the
-project through a `/project` bind mount, so `submitMaestroConfig` wrote `maestro.json`
-"for local dev" and the `/maestro-app` skill re-wrote it host-side to be safe. The two steps that
-finish a save — `maestro-render-orchestrator.cjs` and `maestro-apply-rules.js` — are **pure node,
-no LLM**, but had to run on the host, so they were Steps 3 and 4 of a SKILL.md. A Claude session
-was acting as transport for `fs.writeFileSync` and `execFileSync`.
-
-Here a save is one IPC call.
+loop** for a save, and live-tails the session log the Claude Code hooks write. It also owns the
+`/tools` dashboard and `/docs` documentation reader, and can run Claude itself — either as a
+one-shot confirmed run (create-\* forms, `/maestro-tasks`) or as a live, multi-turn session in a
+right-hand pane.
 
 ## Architecture docs live in `.claude/skills/`
 
-Six of them, moved here when the web app was deleted. They are the long-form reference; this file
-is the short one.
+Six of them — the long-form reference; this file is the short one.
 
 | Skill                        | Covers                                                                                                                       |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `maestro-architecture`       | the **runtime** — install pipeline, orchestrator + hook lifecycle, the four config/state files, the HANDOFF routing contract |
 | `workflow-view`              | `/workflows` — the React Flow canvas and how the diagram maps to `maestro.json`                                              |
-| `rule-view`                  | `/rules` — the two rule selectors, the directory tree, and how a save moves rule files                                       |
+| `rule-view`                  | `/rules` — the two rule selectors, the directory tree, and how a save moves rule files                                      |
 | `log-view`                   | `/session-log` — the three panes, how entries become instances, and how the hooks write the log it reads                     |
 | `create-skills-architecture` | the four `create-*` flows — scaffold, confirmation dialog, consuming prompts                                                 |
 | `updating-maestro`           | how a runtime change actually reaches a project, on either delivery path                                                     |
@@ -62,7 +37,7 @@ second.
 ## `src/core/` — the node side
 
 | Module                                  | What it owns                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- |
 | `types.ts`                              | The `MaestroConfigV3` model persisted at `<project>/.claude/maestro.json`              |
 | `contracts.ts`                          | Every type that crosses a process boundary. **Renderer-safe** — interfaces only        |
 | `text.ts`                               | Pure string helpers. **Renderer-safe** — the ONE home; `utils/text.ts` re-exports it   |
@@ -100,20 +75,9 @@ second.
 | `commands.ts` / `docs.ts`               | The CLI command table parsed out of `docs/claude-code.md`; the docs reader's node side |
 | `plugin-entries/`                       | esbuild entry points for the plugin's generated CJS libs — see below                   |
 
-The last four came from `apps/help-server` (`docs/plans/m6-help-server-merge.md`) and landed here
-rather than in a package, deliberately: this milestone sits _after_ the core absorption so that
-writing them into `packages/` and moving them a week later never happens. help-server's
-`utils/helpers.ts` did not come across at all — its `PROJECT_ROOT`/`PLUGINS_DIR`/`DOCS_DIR` were
-Docker-mount constants derived from `process.cwd()`, and here every path is joined onto the **open
-project**, which is the only reason these views work against a project that is not this repo.
-
-It was `packages/maestro-core` until it was folded in here (`docs/plans/core-absorption.md`).
-The package existed so "the same code could serve two
-consumers that cannot share a runtime", and that reason expired: the plugin's hook scripts are not
-a runtime consumer — they get **generated bundles**, not imports — so the coupling is at build
-time, and esbuild does not care which directory its entry point sits in. What was left was one
-importing workspace plus a `package.json`, a `tsconfig.json`, a `vitest.config.ts`, a dependency
-edge, an export surface, and a `pnpm install` on every change.
+Every path in these modules is joined onto the **open project**, never `process.cwd()`, which is
+what lets the app's views (`/tools`, `/docs`, `/rules`, …) work against a project that is not this
+repo.
 
 ### Generated plugin libs — **do not hand-edit**
 
@@ -141,29 +105,21 @@ suite. Two of its settings exist for exactly that reason and are not incidental:
 - **`absWorkingDir`** — esbuild stamps a `// <path>` comment above each bundled module, relative
   to its working directory, so the output depends on where the build was launched from.
 - **`tsconfig`** — esbuild walks up from the entry point to find one, and `strict` there is what
-  makes it emit `"use strict";` at the top of a CJS bundle. During the move out of `packages/`
-  that walk started finding `apps/maestro/tsconfig.json` (a solution file: `files: []`, references
-  only) and the bundles silently came out non-strict.
+  makes it emit `"use strict";` at the top of a CJS bundle. `apps/maestro/tsconfig.json` is a
+  solution file (`files: []`, references only), so `absWorkingDir` must resolve to a config that
+  actually sets `strict`, or the bundles silently come out non-strict.
 
 The export surface of each bundle must stay identical to what the hook scripts `require()`;
 `test/core/parity.test.ts` asserts the name lists.
 
-`src/shared/ipc.ts` is the seam that replaces `createServerFn`. Where the web app relied on a
-build step stripping handler bodies out of the client bundle — and on a convention about which
-helpers could be exported (see the old app's "Server-only code and the client bundle" section) —
-the boundary is now the process split. That whole hazard class is gone: an accidental node import
-in the renderer fails the build instead of blanking a route at runtime.
+`src/shared/ipc.ts` is the typed channel contract between the three processes. Types that cross the
+boundary come from `src/core/contracts.ts`, **not** `src/core/index.ts`. The barrel re-exports `fs`
+and `child_process`; importing a type from it pulls all of that into the renderer's type graph.
+`contracts.ts` is interfaces only.
 
-Types that cross the boundary come from `src/core/contracts.ts`, **not** `src/core/index.ts`. The
-barrel re-exports `fs` and `child_process`; importing a type from it pulls all of that into the
-renderer's type graph. `contracts.ts` is interfaces only.
-
-That used to be enforced by a package export — `src/core` was `packages/maestro-core`, and the
-renderer imported `@repo/maestro-core/contracts`, so reaching for the barrel looked different
-enough to catch in review. Both are relative paths now and differ by one word, so the enforcement
-is a test: the **src/core boundary** block in `test/isolation.test.ts` resolves every specifier
-under `src/{shared,preload,renderer}` on the filesystem and fails on anything that lands in
-`src/core` other than `contracts` or `text`. It names the file and the module it found.
+The **src/core boundary** block in `test/isolation.test.ts` resolves every specifier under
+`src/{shared,preload,renderer}` on the filesystem and fails on anything that lands in `src/core`
+other than `contracts` or `text`. It names the file and the module it found.
 
 ## The save path
 
@@ -175,12 +131,11 @@ under `src/{shared,preload,renderer}` on the filesystem and fails on anything th
 3. apply the rule assignments (move project rules, `vibe-rules load` installable ones).
 
 The `SaveResult` carries the rendered success paths and the rule summary, so the toast reports
-what actually changed on disk. Gone: `RESULT_FILE`, `aiToolsAction`, `hookSpecificOutput`,
-`wait-ai-tools-result.sh`, and `/maestro-app` Steps 2–5.
+what actually changed on disk.
 
 ## Form architecture (the four create-\* routes)
 
-All four follow one pattern, inherited from the web app and still accurate:
+All four follow one pattern:
 
 - **State**: `react-hook-form` + `zod` (via `@hookform/resolvers/zod`). The schema lives at the top
   of the route file; the inferred type drives `useForm<T>`.
@@ -211,9 +166,8 @@ All four follow one pattern, inherited from the web app and still accurate:
 5. Write the consuming prompt at `plugins/ai-tools-manager/skills/<name>/SKILL.md`, documenting the
    payload shape and the file(s) Claude should finish.
 
-There is **no hook to register** for a new form. The `UserPromptExpansion` entries that used to
-launch one per route are gone with the container; a route is reached from the top bar's **Create**
-menu, and the prompt reaches Claude through the bridge.
+A route is reached from the top bar's **Create** menu, and its prompt reaches Claude through the
+Claude bridge below.
 
 ## What still requires Claude Code
 
@@ -222,58 +176,50 @@ The **runtime** half — hook scripts that fire inside a session: `maestro-injec
 `maestro-validate-tasks` (PostToolUse), `maestro-session-cleanup` (SessionEnd),
 `maestro-set-session-workflow.cjs`, `bash-validation.sh`.
 
-They still need a session to _run_, but no longer to be **installed**: `/install` copies them into
+They need a session to _run_, but not to be **installed**: `/install` copies them into
 `<project>/.claude/scripts/` and registers them in the project's own `.claude/settings.json`
-(`installRuntime()` in `src/core/install.ts`). Why project-local registration exists at all: the
+(`installRuntime()` in `src/core/install.ts`). Project-local registration exists because the
 plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a version-keyed marketplace cache, so runtime
-fixes shipped without a `plugin.json` bump never reached an installed project.
+fixes shipped without a `plugin.json` bump never reach an installed project.
 
 The split is the one the `maestro-architecture` skill already draws, at `maestro.json`.
 
 ## Routes
 
 | Route                                                                        | Purpose                                                                                                                                                          |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                                                          | Project picker + recent projects. The web app had no such page — a container was launched per-project, so there was nothing to choose.                           |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                                                                          | Project picker + recent projects.                                                                                                                                |
 | `/workflows`                                                                 | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it. |
 | `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                          |
 | `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                        |
-| `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. Also the first consumer of the Claude bridge: **Run with Claude** previews the invocation, confirms it, and streams it.     |
+| `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. **Run with Claude** previews the invocation, confirms it, and streams it.                                                    |
 | `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                           |
 | `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                   |
-| `/tools`                                                                     | help-server's tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).  |
+| `/tools`                                                                     | Tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).                |
 | `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                |
 
 ### The top bar is grouped, not a list
 
 Four top-level links (Workflows, Rules, Session Log, Maestro Tasks) — the things a user came to
 _do_, all of which write — then a divider, then two menus: **Library** (Tools, Docs, Runtime) for
-everything that only reads, and **Create**. Folding `/install` into Library is what kept the bar
-from overflowing when help-server's two sections arrived, and it is safe only because the runtime
-staleness badge moved onto the Library **button**: the badge is the one item in the bar nobody goes
-looking for, so it has to be visible from whatever route the user is already on.
+everything that only reads, and **Create**. The runtime staleness badge lives on the Library
+**button** rather than inside it, because that badge is the one item in the bar nobody goes looking
+for, so it has to be visible from whatever route the user is already on.
 
 ### Adding a tab to `/tools`, or a doc page
-
-Re-homed from `apps/help-server/CLAUDE.md`, which is where these two recipes lived until that app
-was deleted. Both changed shape in the move — a tab is an IPC round trip rather than a
-`createServerFn`, and a doc is read from the **open project** rather than a Docker mount — but the
-work is the same shape.
 
 **A tab.** Four of the five steps are in `src/core/` and `src/main/`; only the last is a component.
 
 1. Write the read in a `src/core/*.ts` module, taking `projectRoot` as an argument — never
-   `process.cwd()`, which under Docker was always this repo and here is wherever the app happened to
-   be launched from. This is what makes the dashboard work against a project that is not this one.
+   `process.cwd()` — so the dashboard works against a project that is not this one.
 2. Put the type it returns in `src/core/contracts.ts` (interfaces only) and widen `ToolsData`.
 3. Fold it into the **existing** `data:tools` handler in `src/main/ipc.ts` rather than adding a
-   channel. help-server's dashboard made one server-fn call per tab; this is one round trip
-   precisely so four tabs cannot each re-walk the project tree.
+   channel, so all tabs share one round trip.
 4. Add the component under `src/renderer/src/components/tabs/` and an entry to `TABS` in
    `routes/tools.tsx`.
 
 Unless the tab **runs something** — then it is not loader data at all, and needs a preview/run
-channel pair and a purpose-tagged token, like Usage Stats above.
+channel pair and a purpose-tagged token, like Usage Stats below.
 
 **A doc page.** Drop a `.md` file into the open project's `docs/`. The slug is the filename;
 `listDocs()` and `searchDocs()` in `src/core/docs.ts` pick it up with no registration anywhere.
@@ -281,14 +227,13 @@ Heading anchors come from `slugifyHeading()`, which the search index and the rea
 sharing — a second slugifier means search hits that scroll nowhere.
 
 **`src/renderer/src/routeTree.gen.ts` is generated** by the router plugin: commit it, never
-hand-edit it. help-server said the same about its own copy; it is the one piece of that app's stack
-that came across unchanged.
+hand-edit it.
 
 ## The create-\* routes
 
-They are the last part of the web app to come across, and the only one where a model is genuinely
-required — not to write files, but to author a **body**: the prose of a `SKILL.md`, an agent's
-system prompt. So each submit is two operations, in this order:
+The only place in the app where a model is genuinely required — not to write files, but to author a
+**body**: the prose of a `SKILL.md`, an agent's system prompt. Each submit is two operations, in
+this order:
 
 1. `create:scaffold` writes everything deterministic — directory, frontmatter, plugin manifest,
    marketplace registration, and for a new marketplace the `git init` and first commit — and returns
@@ -306,21 +251,17 @@ Per-route files are the schema, the fields and the preview. The chrome is shared
 `components/create-shell.tsx` (layout, header, shortcut map, submit row), `utils/create-flow.tsx`
 (the scaffold → preview → dialog path), `components/create-result.tsx` (what landed on disk).
 
-The `target` toggle survived; only its Docker half did not. Marketplace vs. project is a real
-choice about where a skill lives — what went is the path ambiguity that existed _because_ the
-container could not reach outside its mount.
+The `target` toggle (marketplace vs. project) is a real choice about where a skill lives.
 
 ### A new marketplace is a git repository, and the scaffold makes it one
 
-It used to be a sentence in the prompt, so whether the directory ended up a repository depended on
-whether a run happened and did as it was told. It is a step in the same all-or-nothing list now:
-`dir` → `repo` (`git init`) → manifest → README → `plugins/` → `commit`. `planRepo()` decides up
-front which of **three states** applies and reports it as `ScaffoldResult.repo` — created here,
-already inside one, or no `git` on this machine — and the last two are not failures: the marketplace
-on disk is complete and usable in all three. `create-result.tsx` renders the note;
-`create-marketplace/SKILL.md` has a **"Do not run git"** section and reads that field rather than
-probing. Remotes, private-repo credentials and auto-update stay conversational — they need a host,
-an account and secrets the app has not got.
+`dir` → `repo` (`git init`) → manifest → README → `plugins/` → `commit`, one all-or-nothing list.
+`planRepo()` decides up front which of **three states** applies and reports it as
+`ScaffoldResult.repo` — created here, already inside one, or no `git` on this machine — and the
+last two are not failures: the marketplace on disk is complete and usable in all three.
+`create-result.tsx` renders the note; `create-marketplace/SKILL.md` has a **"Do not run git"**
+section and reads that field rather than probing. Remotes, private-repo credentials and
+auto-update stay conversational — they need a host, an account and secrets the app has not got.
 
 Three rules hold it together, and each exists for a reason that is not obvious from the diff:
 
@@ -354,16 +295,15 @@ claude:run      → an Agent SDK session; streams output, resolves with the outc
 claude:cancel   → closes the query, then kills the child's process group
 ```
 
-It was the `claude -p` bridge, and a run **is no longer a `claude -p` spawn**: every run on
-`claude:run` — create-\*, `/maestro-tasks` — is an Agent SDK session
-(`startAgentSession` in `agent-sdk.ts`). Nothing else about the bridge moved: preview still builds
-the prompt and issues the token, and run still accepts a token and nothing else.
+Every run on `claude:run` — create-\*, `/maestro-tasks` — is an Agent SDK session
+(`startAgentSession` in `agent-sdk.ts`): preview builds the prompt and issues the token, and run
+accepts a token and nothing else.
 
 The **`session:*` namespace is a separate surface**, not a fifth bridge channel — a turn carries no
-token because there is no prompt to consent to: the user types every one. The **one exception is
-`session:handoff`** (`022`), which takes a preview token and nothing else, because it is the only
-call in the app that widens what a session may write — the same discipline as `claude:run`, applied
-to paths instead of prompts. See "The session pane" below.
+token because there is no prompt to consent to: the user types every one. The one exception is
+`session:handoff`, which takes a preview token and nothing else, because it is the only call in the
+app that widens what a session may write — the same discipline as `claude:run`, applied to paths
+instead of prompts. See "The session pane" below.
 
 `ClaudeRunDialog` is the user-facing half: what may be **read**, then full prompt (scrollable,
 selectable — never a summary), the **equivalent** command line, working directory, what may be
@@ -400,14 +340,12 @@ disclosure (`compact` changes the type scale, never the content). `ReadScopeInpu
 directories the **app itself** opened get onto that list; they render with `origin: "app"`, which is
 what distinguishes them from the cwd and from anything a settings file contributed.
 
-- **The disclosure narrowed when the run became a session, visibly.** A run loads **no filesystem
-  settings** (`settingSources: []`), so the confirmation no longer lists user-, project- or
-  local-tier directories and rules — there are none to list. `017` made the disclosure honest about
-  the old `claude -p` behaviour first, on purpose, so this landed as a visible narrowing rather than
-  arriving with it. The managed (administrator) policy tier is **not** dropped by `[]`: it is still
-  read from disk, still disclosed, and still applies. **Consequence worth knowing: `CLAUDE.md` files
-  are no longer auto-loaded into a run** — the SDK requires `settingSources` to include `'project'`
-  for that. The model can still `Read` them.
+- **A run loads no filesystem settings** (`settingSources: []`), so the confirmation lists no user-,
+  project- or local-tier directories and rules — there are none to list. The managed
+  (administrator) policy tier is **not** dropped by `[]`: it is still read from disk, still
+  disclosed, and still applies. **Consequence worth knowing: `CLAUDE.md` files are not auto-loaded
+  into a run** — the SDK requires `settingSources` to include `'project'` for that. The model can
+  still `Read` them.
 - **The resolution is a port, not an import** — exactly like `GitPort`. `SettingsPort` is an
   interface in `contracts.ts`, `nodeSettings()` implements it in `agent-sdk.ts`, and `src/main/ipc.ts`
   is the composition root that passes `{ settings: nodeSettings() }`. `claude-preview.ts` must import
@@ -416,8 +354,7 @@ what distinguishes them from the cwd and from anything a settings file contribut
   dialog just starts saying the settings were not consulted — so `test/isolation.test.ts` pins it.
 - **`previewClaudeRun` is `async`** because of this. Every caller must `await`.
 - **The cascade is never reimplemented.** The SDK's `resolveSettings` is the merge engine;
-  re-deriving it here would be a second reader of someone else's format — the same argument as the
-  ccusage decision below.
+  re-deriving it here would be a second reader of someone else's format.
 - **Provenance is never flattened.** Every directory and rule carries its tier and its file. "These
   are the directories" is not the disclosure; "the app chose this one, a file on disk added those"
   is. `RULE_DISPLAY_CAP` lists the first 40 rules and counts the rest.
@@ -429,32 +366,32 @@ what distinguishes them from the cwd and from anything a settings file contribut
 
 ### What a run can write — `canUseTool`, and no pre-acceptance anywhere
 
-Writes are the smaller surface and the sharper one, and since the run became a session the app
-answers for each of them itself. `src/core/write-scope.ts` is the whole decision — `decideWrite` is
-pure path arithmetic, no `fs`, no spawn, no SDK — and `startAgentSession` hands it to the SDK as
-`canUseTool`. **Edit pre-acceptance now exists nowhere in the app**; `test/isolation.test.ts` fails
-if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears under `src/`.
+Writes are the smaller surface and the sharper one — the app answers for each of them itself.
+`src/core/write-scope.ts` is the whole decision — `decideWrite` is pure path arithmetic, no `fs`, no
+spawn, no SDK — and `startAgentSession` hands it to the SDK as `canUseTool`. **Edit pre-acceptance
+exists nowhere in the app**; `test/isolation.test.ts` fails if `acceptEdits`, `bypassPermissions` or
+`dangerouslySkipPermissions` reappears under `src/`.
 
 - **The write scope rides on the token.** `ClaudeInvocation.writable` is the exact list of paths the
   preview resolved and the confirmation displayed (`targets.map(t => t.path)`). The callback reads it
   off the invocation, so it is structurally incapable of being wider than what the user was shown —
-  the argument the token already made about prompts, applied to paths. `runPreviewedClaude` has no
+  the argument the token already makes about prompts, applied to paths. `runPreviewedClaude` has no
   argument by which a caller could widen it; `ccusage.ts` issues its token with `writable: []`.
 - **A directory means "anything under it"; a file means itself.** One `withinDirectory` check covers
   both, which is what `ClaudeWriteTarget.path` already documented.
 - **It bounds writes and does NOT bound reads.** `decideWrite` returns `allow` for
   `Read`/`Glob`/`Grep` without looking at the path, deliberately: reads are auto-approved and never
   raise a prompt, which is why the disclosure above exists at all. Bounding what a session may read
-  is a `PreToolUse` hook, and `019` built it as a **third** scope module — `src/core/session-scope.ts`
-  (`decideBoundary`), described below. Adding a path check to the read-tool branch looks like the fix
-  and is not one; the two layers are wired to different sessions on purpose. `020` added a **fourth**
-  module, `src/core/session-permission.ts`, which decides nothing on its own: it composes these two
-  and adds the branch where the answer comes from a person.
+  is a `PreToolUse` hook, a **third** scope module — `src/core/session-scope.ts` (`decideBoundary`),
+  described below. Adding a path check to the read-tool branch looks like the fix and is not one; the
+  two layers are wired to different sessions on purpose. A **fourth** module,
+  `src/core/session-permission.ts`, decides nothing on its own: it composes these two and adds the
+  branch where the answer comes from a person.
 - **The fall-through is a deny, never `undefined`/`null`.** The SDK reads `null` as "the host
   answered out of band" and the tool call then blocks forever with no timeout. `WriteDecision` is a
-  two-shape union and the `default` branch is a refusal. Since `020` it is an **alias of
-  `PermissionAnswer`** — one union, two producers (`decideWrite` and the pane's Allow/Deny/Stop
-  buttons), so neither can widen the hole back open on its own.
+  two-shape union and the `default` branch is a refusal. It is an **alias of `PermissionAnswer`** —
+  one union, two producers (`decideWrite` and the pane's Allow/Deny/Stop buttons), so neither can
+  widen the hole back open on its own.
 - **Every deny carries a reason the model can act on.** It reads denial messages and adapts; a bare
   "denied" wastes the one channel there is for steering it back to the file it was started for.
   Denials are also pushed onto the output stream as stderr — a run that quietly declined half of
@@ -465,54 +402,44 @@ if `acceptEdits`, `bypassPermissions` or `dangerouslySkipPermissions` reappears 
   tool that was never offered costs nothing; a tool that is offered and denied costs turns to argue
   with. `allowedTools` is the trap — it auto-approves without restricting, so it is not used.
   Withholding `Bash` is what makes the path check meaningful at all: it is the one tool whose
-  filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `016`
-  moved `git init` and the first commit into the deterministic scaffold. `AskUserQuestion` is
-  deliberately **not** in the set for a HEADLESS run: that path has nobody to answer a question.
-  `Skill` **is**, though — `026` moved it out of the pane-only set and into this one, because
-  deleting the create-\* skills' inlined prompt guidance would otherwise have left a headless run
-  reading an instruction with its middle cut out. A headless session only reaches a skill's body
-  when it is handed somewhere to load one from: `AgentSessionRequest` gained `pluginDir?: string |
-null`, and the headless query passes `skills: request.pluginDir ? [...SESSION_SKILLS] : []` and
-  `plugins: request.pluginDir ? [{ type: "local", path: request.pluginDir }] : []` — where
-  `SESSION_SKILLS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"]`. The
-  pane extends the tool constant rather than declaring a second list —
-  `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]`, where `QUESTION_TOOL` (`AskUserQuestion`) arrived
-  with `021` together with its two mechanical preconditions; `Skill` is no longer named a second time
-  here since `026`. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help"]`.
-  The second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed
-  on the pane query and nowhere else: **without it Claude emits no `preview` on any option and the
-  list arrives bare**, which looks like a rendering bug and is not one. If a question never arrives
-  at all, check those two before anything else.
+  filesystem reach cannot be bounded by inspecting `tool_input`. This is only safe because `git init`
+  and the first commit live in the deterministic scaffold rather than a shelled-out prompt.
+  `AskUserQuestion` is deliberately **not** in the set for a HEADLESS run: that path has nobody to
+  answer a question. `Skill` **is**, though — a headless run reads a `create-*` skill's guidance
+  through it rather than having it inlined into the prompt. A headless session only reaches a
+  skill's body when it is handed somewhere to load one from: `AgentSessionRequest` carries
+  `pluginDir?: string | null`, and the headless query passes `skills: request.pluginDir ?
+  [...SESSION_SKILLS] : []` and `plugins: request.pluginDir ? [{ type: "local", path:
+  request.pluginDir }] : []` — where `SESSION_SKILLS = ["create-skill", "create-subagent",
+  "create-plugin", "create-marketplace"]`. The pane extends the tool constant rather than declaring
+  a second list — `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]`, where `QUESTION_TOOL`
+  (`AskUserQuestion`) carries its own two mechanical preconditions; `Skill` is not named a second
+  time here. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help"]`. The
+  second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on
+  the pane query and nowhere else: **without it Claude emits no `preview` on any option and the list
+  arrives bare**, which looks like a rendering bug and is not one. If a question never arrives at
+  all, check those two before anything else.
 - **`systemPrompt: { type: "preset", preset: "claude_code" }` is passed explicitly.** The SDK's
   default is a minimal prompt, not Claude Code's, and a create-\* run that lost it would author
   against different defaults than every prompt in this app was written for.
 - **The spawn function stays the app's.** `claude-run.ts` supplies `spawnClaudeCodeProcess` so the
-  child is still a detached process-group leader. `stdio` is three pipes now, not
-  `["ignore","pipe","pipe"]`: the SDK speaks a control protocol to the child over stdin/stdout, and
-  closing stdin closes the conversation.
+  child is still a detached process-group leader. `stdio` is three pipes: the SDK speaks a control
+  protocol to the child over stdin/stdout, and closing stdin closes the conversation.
 - **Teardown is three distinct actions.** Interrupting a turn, aborting the read loop and closing the
   query are not the same thing. `cancelClaudeRun` does `query.close()` — which releases the child the
   SDK is holding — then SIGTERM to the process **group**, which is what reaches the CLI's own
   children, then SIGKILL after a grace.
-- **A fake `claude` on `PATH` can no longer serve as a test double**, because it cannot speak the
-  SDK's private stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`), and
+- **A fake `claude` on `PATH` cannot serve as a test double**, because it cannot speak the SDK's
+  private stdio protocol. Runs are tested through an injected session (`ClaudeRunDeps`), and
   `spawnClaudeChild` is tested directly for the process-group property.
 
 ### The session pane — a live conversation, and still not a second spawn path
 
-`019` deleted the help chat and replaced it. `utils/chat-context.tsx`, `components/chat-panel.tsx`
-and the `{ kind: "help-chat" }` member of `ClaudeRequest` are gone, along with `buildChat` and its
-history caps in `claude-preview.ts`. Two conversational surfaces would have meant two transcripts and
-two consent models, and the chat was strictly the weaker one: it re-sent its own capped history in
-every prompt precisely because it had no session. What the pane inherited is the `super-help`
-dependency, now a **session skill** rather than a name in a prompt string.
-
 **One live, multi-turn session per open project**, in a resizable right-hand pane that _shifts_ the
-layout rather than overlaying it. `019` shipped it **read-only**, which is what made it shippable
-before any permission UI existed; `020` replaced that with the UI — the pane now **asks** rather than
-refusing, and a write it was going to refuse is a question instead of a wall. Both scopes have since
-become mutable mid-session, by two different routes and on purpose: reads through a grant the user
-answers a prompt with (`023`), writes through a create-\* handoff carrying a preview token (`022`).
+layout rather than overlaying it. It asks rather than refusing when it hits a write it can't make —
+a write it can't approve is a question, not a wall. Both scopes are mutable mid-session, by two
+different routes: reads through a grant the user answers a prompt with, writes through a create-\*
+handoff carrying a preview token.
 
 ```
 src/core/session-scope.ts                       the read boundary (pure)
@@ -562,8 +489,8 @@ session:event      ← SessionEvent             the streamed transcript
 - **`session:say` carries user-typed text and nothing else.** The bridge's invariant restated for a
   surface with no per-turn confirmation: the renderer never authors a prompt, the user does. Turns
   are stamped human-authored, so it holds at the SDK boundary and not only in a test.
-- **A session opens with an empty write scope, and exactly one thing can grow it: a create-\* handoff
-  (`022`).** `session:handoff` takes a **preview token and nothing else**, claims it through
+- **A session opens with an empty write scope, and exactly one thing can grow it: a create-\*
+  handoff.** `session:handoff` takes a **preview token and nothing else**, claims it through
   `claimInvocation(token, "claude")`, refuses any preview whose `handoff` is null (a `maestro-task`'s
   write target is the whole project), and appends **one** path — `HandoffContext.writeScope`, the
   artifact's own directory, or the artifact FILE where it has no directory of its own (a
@@ -572,32 +499,30 @@ session:event      ← SessionEvent             the streamed transcript
   Ending the session is how it is withdrawn — there is no `session:revoke` for a write and none is
   owed, because a grant answers a question the session asked and a write scope entry answers a form
   the user submitted.
-- **A write OUTSIDE the scope is still `020`'s prompt, and the reason names which of two states you
-  are in.** `decidePaneCall`'s write-ask branch says "nothing has given this session write access"
-  only while `writable` is empty; once a form has opened a directory it names the scope that exists
+- **A write OUTSIDE the scope is still a prompt, and the reason names which of two states you are
+  in.** `decidePaneCall`'s write-ask branch says "nothing has given this session write access" only
+  while `writable` is empty; once a form has opened a directory it names the scope that exists
   instead, because telling a user nothing was granted while the header lists a directory is the kind
   of wrong that teaches people to stop reading prompts. Allowing still grants nothing further —
   `grantable` stays false for every write — and the scope is unchanged on the next call.
-- **The accumulator lives in `startPaneSession`, and `writable()` is a FUNCTION for `023`'s reason.**
-  `writes` is the array, `writable()` reads it fresh inside `canUseTool` (it replaced the literal
-  `writable: []`), and `allowWrites(paths)` is its only writer. **Anything writable is also
-  readable**: `readable()` includes the write scope, because a session that may write a file it may
-  not read is asked about the read half of every edit — the prompt this whole path exists to remove.
+- **The accumulator lives in `startPaneSession`, and `writable()` is a FUNCTION.** `writes` is the
+  array, `writable()` reads it fresh inside `canUseTool`, and `allowWrites(paths)` is its only
+  writer. **Anything writable is also readable**: `readable()` includes the write scope, because a
+  session that may write a file it may not read is asked about the read half of every edit — the
+  prompt this whole path exists to remove.
 - **Telling the CLI about the directory is LAZY, because the SDK has no control request for it.**
   `updatedPermissions` rides on a permission answer and a handoff has no answer to ride on, so
   `startPaneSession` keeps an `unannounced` set and carries the `addDirectories`
   (`destination: "session"`) on the **first allow that lands inside a newly-opened directory**, once.
-- **The seed costs nothing, and both halves of that were learned in a real window.** `seed(text)`
-  appends the `HandoffContext` as a `shouldQuery: false` message with **no `origin` stamp** (it is
-  not a user turn), and main pushes it as a `{ kind: "context", title, text }` `SessionEvent` — a
-  collapsible transcript entry, because the user is entitled to read what was put in front of the
-  model on their behalf. Two things no unit test would have caught: (a) a `shouldQuery: false`
-  append is answered by its **own zero-cost `result` message**, and reporting that as a `turn`
-  claims something ran and clears the renderer's `busy` — `startPaneSession` counts outstanding user
-  turns and drops a zero-cost result that answers none of them; (b) **seed wording that describes a
-  boundary as absolute makes the model refuse to attempt the call at all**, which silently deletes
-  `020`'s "the user can allow this once", so `session-handoff.ts` says plainly that a write elsewhere
-  asks and can be allowed.
+- **The seed costs nothing.** `seed(text)` appends the `HandoffContext` as a `shouldQuery: false`
+  message with **no `origin` stamp** (it is not a user turn), and main pushes it as a `{ kind:
+  "context", title, text }` `SessionEvent` — a collapsible transcript entry, because the user is
+  entitled to read what was put in front of the model on their behalf. Two things worth knowing: (a)
+  a `shouldQuery: false` append is answered by its **own zero-cost `result` message**, and reporting
+  that as a `turn` claims something ran and clears the renderer's `busy` — `startPaneSession` counts
+  outstanding user turns and drops a zero-cost result that answers none of them; (b) **seed wording
+  that describes a boundary as absolute makes the model refuse to attempt the call at all**, so
+  `session-handoff.ts` says plainly that a write elsewhere asks and can be allowed.
 - **The write scope is on screen beside the grants, not in a second panel.** `WriteScope` in
   `session-pane.tsx` renders `SessionInfo.writes` (`data-testid="session-write-scope"`,
   `data-count`), each entry naming the form that opened it — and deliberately **without** a Revoke
@@ -606,14 +531,13 @@ session:event      ← SessionEvent             the streamed transcript
   inferring them from a click.
 - **A refused write therefore carries two sentences, not one.** `PermissionPrompt.reason` is written
   for the person reading the dialog; `PermissionPrompt.denyReason` is `decideWrite`'s model-facing
-  message verbatim, sent only if the user denies without typing anything. That split is how "a
-  refused write still carries `decideWrite`'s reason" survived the write becoming a question.
+  message verbatim, sent only if the user denies without typing anything.
 - **Reads are bounded by a `PreToolUse` hook, and that is a third scope module.** `read-scope.ts`
   _discloses_, `write-scope.ts` _bounds writes_, and `src/core/session-scope.ts` bounds **reads** —
   `decideBoundary` / `boundaryTargetOf` / `BOUNDED_TOOLS` / `UNBOUNDED_TOOLS`, pure, exhaustively
   tested in `test/core/session-scope.test.ts`. It returns `{ decision: "allow" }` or
   `{ decision: "out-of-scope", path, reason }` — deliberately **not** the word `"deny"`, which is
-  what let `020` route it to `permissionDecision: "ask"` in `agent-sdk.ts` in one word.
+  what lets it route to `permissionDecision: "ask"` in `agent-sdk.ts` in one word.
 - **The hook is not purely `"ask"`, and the exception is load-bearing.** A call the boundary cannot
   check because it carries **no path** still returns `"deny"` — there is nothing there for a person
   to authorise, and a prompt with a blank subject is answered by reflex. That branch also writes its
@@ -632,16 +556,16 @@ session:event      ← SessionEvent             the streamed transcript
   contents of the project the session can read leave the machine. The prompt shows the **complete**
   URL, query string included.
 - **Five refusal routes exist, and the transcript says which one fired.** `SessionEvent`'s `refusal`
-  carries `source: "write-scope" | "read-boundary" | "user" | "auto" | "question"` plus `decidedBy` (the SDK's
-  own `decision_reason_type`: `rule`, `mode`, `classifier`, `asyncAgent`). They share no code, which
-  is why the discriminator is a field and not a comment. `autoRefusal` is pure and lives in
-  `session-permission.ts` rather than inline in the read loop precisely because the `rule`/`mode`
+  carries `source: "write-scope" | "read-boundary" | "user" | "auto" | "question"` plus `decidedBy`
+  (the SDK's own `decision_reason_type`: `rule`, `mode`, `classifier`, `asyncAgent`). They share no
+  code, which is why the discriminator is a field and not a comment. `autoRefusal` is pure and lives
+  in `session-permission.ts` rather than inline in the read loop precisely because the `rule`/`mode`
   branch **cannot be provoked from a window**: with `settingSources: []` only the machine-wide
   `/etc/claude-code/managed-settings.json` tier survives, and writing one needs root. It is covered
   by unit tests over the pure function plus an isolation pin, and that is the honest extent of it.
-  The fifth is `021`'s and is the narrowest: an `AskUserQuestion` call carrying nothing the pane can
-  render as a choice is refused outright rather than parked, because an unanswerable card is a
-  promise only teardown will ever resolve.
+  The narrowest is an `AskUserQuestion` call carrying nothing the pane can render as a choice, which
+  is refused outright rather than parked, because an unanswerable card is a promise only teardown
+  will ever resolve.
 - **The parked promises are their own module.** `createPermissionRegistry()` in
   `src/core/permission-registry.ts` → `{ request, answer, pending, denyAll }`, idempotent per
   `requestId` (a redelivered request re-attaches to the parked promise, or replays the answer it
@@ -654,12 +578,12 @@ session:event      ← SessionEvent             the streamed transcript
   SDK-shaped answer. Deny and Stop are two controls because they are two intents: a plain denial
   refuses the call and lets the model adapt, `interrupt` ends the turn. The wire shape exists
   because `PermissionAnswer`'s allow arm carries `updatedPermissions`, which can add blanket allow
-  rules or flip the session to `bypassPermissions`. `023` EXTENDED that union rather than replacing
-  it: a fourth arm, `{ choice: "grant", scope: "file" | "directory" }`, carrying a scope word **and
-  no path** — main holds the prompt being answered and resolves the path from the
-  `SessionGrantOption` it published with it, which is `scaffold.ts`'s "a renderer describes an
-  artifact and never nominates a directory" applied to the permission wire.
-- **A QUESTION IS THE OTHER KIND OF ASK — same wire, same registry, nothing else in common** (`021`).
+  rules or flip the session to `bypassPermissions`. A fourth arm, `{ choice: "grant", scope: "file" |
+  "directory" }`, carries a scope word **and no path** — main holds the prompt being answered and
+  resolves the path from the `SessionGrantOption` it published with it, which mirrors
+  `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied to the
+  permission wire.
+- **A QUESTION IS THE OTHER KIND OF ASK — same wire, same registry, nothing else in common.**
   `AskUserQuestion` reaches `canUseTool` like everything else, and `startPaneSession` branches on the
   tool name **before** `decidePaneCall`: "Claude wants to use a tool — Allow / Deny" is the wrong
   sentence for "which of these three frontmatter shapes do you want". What it hands to is
@@ -682,51 +606,48 @@ session:event      ← SessionEvent             the streamed transcript
     `test/isolation.test.ts` pins `updatedInput` to exactly two files — `contracts.ts` declares it,
     `agent-sdk.ts` fills it in.
   - **One registry, so teardown drains a question too.** `PermissionAnswer` was widened to
-    `ParkedAnswer` (`| { behavior: "allow"; updatedInput }`) rather than a second registry being
-    added beside it: a second one is a second thing to remember to drain on exit, and the forgotten
-    one wedges the session exactly as hard. `PermissionOutcome` gained `answered` — a question is
-    never allowed or denied — and the pane's badge counts asks of either kind.
+    `ParkedAnswer` (`| { behavior: "allow"; updatedInput }`) rather than adding a second registry: a
+    second one is a second thing to remember to drain on exit, and the forgotten one wedges the
+    session exactly as hard. `PermissionOutcome` gained `answered` — a question is never allowed or
+    denied — and the pane's badge counts asks of either kind.
   - **The refusal comes back from the pure module fully formed** (`QUESTION_REFUSAL`), because
-    `startPaneSession` authors no decision of its own. The isolation test that pins that property
-    caught the first draft doing it.
+    `startPaneSession` authors no decision of its own.
   - **Measured in the window, on the packaged build**: previews arrive on every option (so the
     `toolConfig` opt-in is doing its job), a single-select question replaces its pick on a second
     click while a multi-select accumulates, Send stays disabled until every question is answered, and
-    the model reads back exactly the labels picked — `Full`, `Overview + Traps`. **The freeform arm
-    works too, and that was the open question**: `response` on `updatedInput` is honoured by the CLI,
-    verified by a reply the model could only have produced from the typed text. Closing the pane
-    leaves the question parked and the badge lit; ending the session or switching projects resolves
-    it — the card and badge clear, no error, and the next session answers a turn.
+    the model reads back exactly the labels picked — `Full`, `Overview + Traps`. The freeform arm
+    works too: `response` on `updatedInput` is honoured by the CLI, verified by a reply the model
+    could only have produced from the typed text. Closing the pane leaves the question parked and the
+    badge lit; ending the session or switching projects resolves it — the card and badge clear, no
+    error, and the next session answers a turn.
 - **The boundary hook runs only on the read-only tools**, by design. Letting it answer for
-  `Write`/`Edit` too would have replaced `decideWrite`'s reason with a new one, and the requirement
-  is that a refused write still carries the original. `session-scope.ts` knows how to check write
-  tools all the same, so `023` could not widen reads by accident when it widens writes — and did
-  not: `PaneVerdict`'s `grantable` is true only in the read-boundary branch, so a refused **write**
-  never grows a grant button.
+  `Write`/`Edit` too would replace `decideWrite`'s reason with a new one, and the requirement is that
+  a refused write still carries the original. `session-scope.ts` knows how to check write tools all
+  the same, so widening reads cannot widen writes by accident: `PaneVerdict`'s `grantable` is true
+  only in the read-boundary branch, so a refused **write** never grows a grant button.
 - **The readable set is the open project plus EVERY local marketplace**, not "the resolved
   marketplace" — the pane starts before any form is submitted, so there is no single marketplace to
-  name. (`022`'s handoff widens it further only when it has to: `describeSession` lists the
-  handed-off directory in the read scope as `origin: "app"` **only when nothing already in scope
-  contains it**, which for a marketplace-targeted create is usually already true.) Main
-  resolves them itself with `listMarketplaces()` (the `source: "directory"` entries of
-  `~/.claude/plugins/known_marketplaces.json`); **no name and no path crosses the process boundary**,
-  which is `scaffold.ts`'s "a renderer describes an artifact and never nominates a directory" applied
-  one layer up. They reach the SDK as `additionalDirectories` and the disclosure as `origin: "app"`.
+  name. (A handoff widens it further only when it has to: `describeSession` lists the handed-off
+  directory in the read scope as `origin: "app"` **only when nothing already in scope contains it**,
+  which for a marketplace-targeted create is usually already true.) Main resolves them itself with
+  `listMarketplaces()` (the `source: "directory"` entries of `~/.claude/plugins/known_marketplaces.json`);
+  **no name and no path crosses the process boundary**, which is `scaffold.ts`'s "a renderer
+  describes an artifact and never nominates a directory" applied one layer up. They reach the SDK as
+  `additionalDirectories` and the disclosure as `origin: "app"`.
 - **`skills` alone does not load a skill — the plugin has to be loaded too.** Measured in the window:
   with `settingSources: []`, `skills: ['super-help', …]` on its own makes the `Skill` tool answer
   _"Unknown skill"_ for every name, because no installed plugin reaches the session. The fix is
   `plugins: [{ type: "local", path: bundledPluginDir() }]` (`src/main/bundled-assets.ts`), after
   which the session reports exactly `ai-tools-manager:create-marketplace`, `:create-plugin`,
-  `:create-skill`, `:create-subagent`, `:super-help` and nothing else. Note **which** copy that is:
-  the plugin **bundled with the app** (`plugins/ai-tools-manager/`), never the user's installed
-  marketplace cache — so a `SKILL.md` edit in this repo reaches the pane with no version bump and no
-  marketplace update, unlike every other delivery path the `updating-maestro` skill describes.
+  `:create-skill`, `:create-subagent`, `:super-help` and nothing else. It is the plugin **bundled
+  with the app** (`plugins/ai-tools-manager/`), never the user's installed marketplace cache — so a
+  `SKILL.md` edit in this repo reaches the pane with no version bump and no marketplace update.
 - **The plugin's `hooks.json` does NOT fire in a pane session.** Also measured: a turn that read a
   file inside a fixture project _with_ a `maestro.json` wrote no `maestro_session.log.jsonl`. So the
   `/session-log` pollution that loading project `settingSources` would cause does not arrive with
   `plugins`, and the pane's tool calls stay out of a view built for orchestrator runs.
-- **A session grant is the first thing that makes the read scope MUTABLE mid-session** (`023`).
-  `020` resolved `readable` once at session start and handed the same array to the hook and the
+- **A session grant is the first thing that makes the read scope MUTABLE mid-session.** `readable`
+  used to be resolved once at session start and handed the same array to the hook and the
   disclosure; it is a function now (`readable()`), read fresh on every call, because a grant has to
   reach **both** or the header and the boundary start disagreeing with nothing failing.
   - **Three things happen on a grant, and dropping any one is invisible.** `session.grant([path])`
@@ -749,8 +670,8 @@ session:event      ← SessionEvent             the streamed transcript
     something already in scope, is flagged `broad` and rendered in amber with what it would swallow.
   - **Only a read is grantable.** `PaneVerdict.grantable` is true in the read-boundary branch and
     nowhere else: a refused write keeps Allow once / Deny / Stop, and a `WebFetch` has no path to
-    grant. That did **not** change when `022` shipped — writes widen through `session:handoff` and a
-    claimed preview token, never through an answered prompt.
+    grant. Writes widen only through `session:handoff` and a claimed preview token, never through an
+    answered prompt.
   - **Visible and revocable, or it is not optional — it is gone.** Grants render in the pane's scope
     panel with a Revoke button, and inside `ReadScope` as `origin: "session"` (the fourth origin,
     dotted amber). `session:revoke` takes a path and can only ever REMOVE an entry main is already
@@ -765,7 +686,7 @@ session:event      ← SessionEvent             the streamed transcript
     the pane; the boundary stays anchored to `request.cwd` and does not follow a working directory
     that moves. `test/isolation.test.ts` pins both handlers and the anchoring.
 - **The session runs under three ceilings, and they are three different mechanisms rather than one
-  written three ways** (`024`). `maxBudgetUsd` is the hard stop, enforced by the CLI against its own
+  written three ways.** `maxBudgetUsd` is the hard stop, enforced by the CLI against its own
   client-side estimate; `taskBudget` is the opposite kind of thing — the **model** is told how much
   room is left so it wraps up instead of being cut off mid-write; `maxTurns` is the brake for the
   loop neither catches, cheap per turn and never converging. The policy, the arithmetic and every
@@ -797,10 +718,10 @@ session:event      ← SessionEvent             the streamed transcript
     conclude the option is broken.
   - **`total_cost_usd` is CUMULATIVE for the query**, not the price of a turn (0.00196, 0.00351,
     0.00529, 0.00726 over four one-word turns), so `accrueTurn` takes the latest with `Math.max`
-    rather than summing. It is fed from the `result` branch behind `022`'s outstanding-turn guard, or
-    a seeded append that cost nothing counts as a turn that did. And a pane turn is **not** cheap:
-    the first costs ≈ $0.01–$0.10 depending on cache state — the tool set, the plugin's skills and
-    the preset prompt are uncached — so the $0.50 default is tens of turns, not hundreds.
+    rather than summing. It is fed from the `result` branch behind the outstanding-turn guard, or a
+    seeded append that cost nothing counts as a turn that did. And a pane turn is **not** cheap: the
+    first costs ≈ $0.01–$0.10 depending on cache state — the tool set, the plugin's skills and the
+    preset prompt are uncached — so the $0.50 default is tens of turns, not hundreds.
   - **The figure is an ESTIMATE and the markup says so itself.** `data-testid="session-spend"` renders
     `≈ $x / $y` with the word "estimate" and the subscription sentence in its title text. It is the
     same client-side figure the ceiling is compared against, which is exactly why it must not look
@@ -822,16 +743,16 @@ session:event      ← SessionEvent             the streamed transcript
     effort levels the **current** model accepts; a CLI too old to answer leaves the list empty and the
     header still states what is in force.
   - **The ceiling is demonstrable for cents.** `sessionBudget()` reads `MAESTRO_SESSION_CEILING_USD`
-    and `MAESTRO_SESSION_MAX_TURNS` from the launching process's environment **only** — the
-    `MAESTRO_AGENT_SDK_SMOKE` precedent — because proving the CLI really stops at $0.50 costs $0.50 of
-    somebody's subscription each time, and that is a check people run once. Nothing on any channel
-    reaches it, and `paneBudget` clamps a nonsense value back to the default.
-- **The pane can pick up a conversation it did not start, and it does so by FORKING** (`025`). The
-  History control in the header opens a picker of the conversations the CLI's own store holds for the
-  open project; choosing one shows what that transcript already read and what replaying it will cost,
-  and only then attaches. `resumeSession` is the **fourth** caller of `openSession`, so a resumed
-  session gets `PANE_TOOLS`, the `PreToolUse` boundary, `settingSources: []` and the preset prompt by
-  construction — `CarriedSession` gained one field, `fork`, and `startPaneSession` turns it into
+    and `MAESTRO_SESSION_MAX_TURNS` from the launching process's environment **only**, because
+    proving the CLI really stops at $0.50 costs $0.50 of somebody's subscription each time, and that
+    is a check people run once. Nothing on any channel reaches it, and `paneBudget` clamps a nonsense
+    value back to the default.
+- **The pane can pick up a conversation it did not start, and it does so by FORKING.** The History
+  control in the header opens a picker of the conversations the CLI's own store holds for the open
+  project; choosing one shows what that transcript already read and what replaying it will cost, and
+  only then attaches. `resumeSession` is the **fourth** caller of `openSession`, so a resumed session
+  gets `PANE_TOOLS`, the `PreToolUse` boundary, `settingSources: []` and the preset prompt by
+  construction — `CarriedSession` has one field, `fork`, and `startPaneSession` turns it into
   `forkSession: true`, only ever together with `resume`. The policy, the arithmetic and every sentence
   the user reads live in `src/core/session-resume.ts` (pure, the sixth module beside the four scope
   ones and `session-budget.ts`); it reads nothing itself.
@@ -860,9 +781,8 @@ session:event      ← SessionEvent             the streamed transcript
     conversation read freely raises a prompt on its first turn in the pane.
   - **The store is read through the SDK, never walked.** `listStoredSessions(dir)` and
     `readStoredMessages(id, dir)` in `agent-sdk.ts` wrap the SDK's `listSessions` /
-    `getSessionMessages`; `~/.claude/projects/<slug>/` is private layout with a lossy slug encoding,
-    and this is `ccusage.ts`'s "do not become a second reader of someone else's format" applied
-    again. **Neither throws** — a store that cannot be read is an empty picker, not a broken pane.
+    `getSessionMessages`; `~/.claude/projects/<slug>/` is private layout with a lossy slug encoding.
+    **Neither throws** — a store that cannot be read is an empty picker, not a broken pane.
     `forkSession: true` is a query option, so the SDK's separate `forkSession()` helper is unused.
   - **The filter is the recorded `cwd`, not "started in a terminal", and that is a measured
     divergence.** `listSessions({ includeProgrammatic: false })` gives parity with the terminal's
@@ -872,18 +792,16 @@ session:event      ← SessionEvent             the streamed transcript
     Yesterday's pane conversation is as resumable as yesterday's terminal one.
   - **An id crosses only if main published it.** `session:resume` names a session main has **no entry
     for**, so `claude-session.ts` keeps a per-`webContents.id` `offered` set of the ids it put in the
-    last list and refuses anything else — the same discipline as `session:model` choosing from
-    `supportedModels()` and `session:handoff` taking a token, applied to a wire that would otherwise
-    let a renderer nominate an arbitrary transcript.
+    last list and refuses anything else.
   - **The replay cost is quoted at a NAMED rate.** `REPLAY_USD_PER_MTOK = 3`, written into the
-    sentence, alongside `024`'s "an estimate, not a bill" — the pane's model is selectable, so a bare
-    dollar figure would be trusted for something it cannot be.
+    sentence, alongside "an estimate, not a bill" — the pane's model is selectable, so a bare dollar
+    figure would be trusted for something it cannot be.
   - **A resumed session's earlier turns are NOT re-rendered in the scrollback** — they are in the
     model's context. The pane clears the transcript and posts one `resumedNotice` saying what was
     picked up, what it cost and that it forked.
 - **`interrupt()`'s receipt is surfaced.** `stop()` returns `{ stillQueued }` off the
   `query.interrupt()` receipt and `stopSession` emits a `notice` when the interrupt left messages
-  queued. `020` picked this up; `024` no longer owns it.
+  queued.
 - **A pending prompt is visible from every route.** `session-context.tsx` tracks `pending` and
   `outcomes` and auto-opens the pane on a `permission` event; `top-nav.tsx` carries an amber pending
   badge (`data-testid="session-toggle-pending"`) that **outranks** the busy dot, because a parked
@@ -892,17 +810,14 @@ session:event      ← SessionEvent             the streamed transcript
 - **The layout is a root-level flex row, and the pane is not rendered by `TopNav`.** `__root.tsx`
   puts the route column and the pane side by side; `top-nav.tsx` carries only the toggle
   (`data-session-toggle`), because the top bar remounts on every navigation and a transcript owned
-  there would be discarded the moment the user opened another route — the same argument that put the
-  chat's state in a provider, now applied to the pane. `create-shell.tsx` drops its 460px
-  `FilePreview` column while the pane is open, so the create grid goes `936px 460px` → one column.
+  there would be discarded the moment the user opened another route. `create-shell.tsx` drops its
+  460px `FilePreview` column while the pane is open, so the create grid goes `936px 460px` → one
+  column.
 
 ### Running a tool from the network — the usage-stats decision
 
 `/tools`' Usage Stats tab is the one feature whose tool may be **fetched from npm and executed**.
-help-server ran `npx --yes ccusage@latest <view> --json` on every view of it, silently. Under
-Docker that was already true; on a desktop app pointed at the user's own machine it is a more
-pointed choice, so it did not survive the move unchanged. `src/core/ccusage.ts` carries the
-argument in full; the shape of it:
+`src/core/ccusage.ts` carries the argument in full; the shape of it:
 
 1. **A local copy wins.** The open project's `node_modules/.bin` first (a repo that pinned ccusage
    has already made this decision), then the same expanded directory list `claude` is resolved
@@ -930,22 +845,20 @@ never opens this tab should not carry it.
   route cannot also use the URL fragment.** The whole route already lives in `location.hash`, so a
   second `#` in it is not something the router or `querySelector` can be trusted to split — which
   is why the docs reader carries the heading to scroll to as the `at` SEARCH param and scrolls by
-  element id, where help-server read `window.location.hash`. For the same reason `/docs/$slug`
-  intercepts in-page `#anchor` links in rendered markdown: left alone, one would rewrite the route
-  and throw the reader out of the app.
+  element id. For the same reason `/docs/$slug` intercepts in-page `#anchor` links in rendered
+  markdown: left alone, one would rewrite the route and throw the reader out of the app.
 - **`components={{ text: … }}` in react-markdown highlights nothing.** `components` is keyed by
   ELEMENT name, and `text` is the **SVG** `<text>` element, not a markdown text node. It
   type-checks (it is a real JSX intrinsic), it renders, and the body highlight silently never
-  happens — help-server shipped it that way, and the port inherited it until a window probe counted
-  zero `<mark>` elements in an article opened from a search hit. Text nodes are reachable from a
-  rehype plugin, so `utils/highlight.ts` marks the hast tree instead; that also means a term inside
-  a link, a list item or a table cell lights up, which the per-element approach could not do.
+  happens — a window probe counting zero `<mark>` elements in an article opened from a search hit is
+  what caught it. Text nodes are reachable from a rehype plugin, so `utils/highlight.ts` marks the
+  hast tree instead; that also means a term inside a link, a list item or a table cell lights up,
+  which the per-element approach could not do.
 - **A doc slug is renderer input, and the reader treats it as such.** `isValidDocSlug` in
   `src/core/docs.ts` rejects anything containing `/`, `\` or `.` _before_ the path is joined. The
   slug arrives as a route param, so `../../../etc/passwd` is a file `readDoc` would otherwise be
-  perfectly happy to open and render. help-server validated it with a regex for exactly this
-  reason — keep the check if you touch that function, and keep it before the `path.join`, not
-  after.
+  perfectly happy to open and render. Keep the check if you touch that function, and keep it before
+  the `path.join`, not after.
 - **Two functions answer to "get the rules", and they are not the same set.**
   `discoverRuleLibrary` reads `<project>/rules/*.md` — what the project publishes, shown on
   `/tools`. `discoverProjectRules` reads every `.claude/rules/` in the tree — what is assigned to a
@@ -963,27 +876,25 @@ never opens this tab should not carry it.
   renderer allowed to touch `window.maestro.session` — single-owner, exactly like
   `SessionLogProvider` and the log tail, and for the same reason: main keeps one session per
   `webContents.id`, so a second subscriber steals it.
-- **Clear the transcript BEFORE a resume round trip, never after** (`025`). Main pushes the resumed
+- **Clear the transcript BEFORE a resume round trip, never after.** Main pushes the resumed
   session's notice **during** the `session:resume` call, so `setEntries([])` after the `await`
   deletes the one thing that says what was picked up, what it cost and that it forked — and the pane
-  then looks as though it started a session silently. Nothing errors, no test caught it, and it was
+  then looks as though it started a session silently. Nothing errors, no test catches it, and it is
   only visible in a real window. The same ordering applies to any channel where main streams an event
   while the handler is still resolving.
-- **`__root.tsx` has no `shellComponent`.** TanStack Start rendered the whole `<html>` document,
-  so the root route owned `<head>`/`<body>`/`<Scripts>` and the theme bootstrap. Those live in
-  `src/renderer/index.html` now, along with the renderer CSP.
+- **`__root.tsx` has no `shellComponent`.** The root route owns no `<html>` document — `<head>`,
+  `<body>` and the theme bootstrap live in `src/renderer/index.html`, along with the renderer CSP.
 - **`@repo/claude-fs` must be bundled into main, not externalized.** It's a workspace _source_
   package with no build artifact, so `require` can't resolve it at runtime — hence the
-  `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`. The node-side Maestro
-  logic used to be a second such package; it is `src/core/` now, ordinary app source that gets
-  bundled without anyone having to ask.
+  `externalizeDepsPlugin({ exclude: [...] })` in `electron.vite.config.ts`. `src/core/` is ordinary
+  app source that gets bundled without anyone having to ask.
 - **`externalizeDepsPlugin` does not externalize anything here, and the app's runtime
   `dependencies` are externalized by hand.** The plugin computes its list from package.json
-  `dependencies` and then assigns `config.build` from inside the `config` hook — the same vite 8 /
-  electron-vite 4 breakage already documented in that file for its `include` option, and it costs
-  the whole plugin. This was invisible for as long as the app had **no `dependencies` block at
-  all** (every entry was a devDependency), because an empty external list and an ignored one look
-  identical. Measured when the first real dependency arrived: `@anthropic-ai/claude-agent-sdk` in
+  `dependencies` and then assigns `config.build` from inside the `config` hook — a vite / electron-vite
+  breakage documented in `electron.vite.config.ts` for its `include` option, and it costs the whole
+  plugin. This was invisible for as long as the app had **no `dependencies` block at all** (every
+  entry was a devDependency), because an empty external list and an ignored one look identical.
+  Measured when the first real dependency arrived: `@anthropic-ai/claude-agent-sdk` in
   `dependencies` and only the plugin to externalize it put **1.34 MB of SDK into
   `out/main/chunks/`**. `EXTERNAL` in `electron.vite.config.ts` now derives from the manifest and
   goes into `rollupOptions.external`, where it actually takes effect — including a regex for
@@ -993,7 +904,7 @@ never opens this tab should not carry it.
   `@anthropic-ai/claude-agent-sdk` (see `src/core/agent-sdk.ts`) is a real runtime dependency: it
   spawns the `claude` binary the user is logged into. Inlined into the bundle, its own
   `require.resolve` runs against `out/main/` and throws `Native CLI binary for <platform> not
-found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not sufficient. A
+  found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not sufficient. A
   packaged app also needs `asar: { unpack: "**/node_modules/@anthropic-ai/**" }` plus rewriting
   `app.asar` → `app.asar.unpacked` on the resolved path — the single most reported
   Agent-SDK-in-Electron failure. It is **not actionable yet**: there is no electron-builder config
@@ -1003,8 +914,7 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   runs a bundled `cli.js` through a JS runtime, and a GUI-launched Electron app has a PATH with no
   `node` on it — `spawn node ENOENT`, and it never reproduces from a terminal. So
   `pathToClaudeCodeExecutable` gets `resolveClaudeCli().bin`, which `claude-cli.ts` decides with
-  `fs`. Same bug the app already fixed once for `claude -p`; the SDK is a second place to
-  re-acquire it.
+  `fs`.
 - **The SDK's `env` option REPLACES the child environment rather than merging it.** So the naive
   way to withhold an `ANTHROPIC_API_KEY` — which would silently bill the API instead of the user's
   subscription — also drops `PATH`, and the CLI shells out to git and to hooks. `agentChildEnv()`
@@ -1013,26 +923,23 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   second door, a key in `~/.claude/settings.json`, which would override the environment anyway.
   `test/core/agent-sdk.test.ts` pins both halves.
 - **`settingSources: []` appears FOUR times in `agent-sdk.ts`, and they must stay in lockstep.** The
-  smoke query, the run's own session, the **pane session** (`019`), and `resolveEffectiveSettings(cwd)`
-  — the last of which backs the read disclosure. The first three are so nothing on disk can redirect
+  smoke query, the run's own session, the pane session, and `resolveEffectiveSettings(cwd)` — the
+  last of which backs the read disclosure. The first three are so nothing on disk can redirect
   billing or widen permissions; the fourth is so the confirmation describes **the session that
   actually exists**. The pane inherits the consequence in full: **a pane session auto-loads no
-  `CLAUDE.md`**, so the model should be expected to be told to `Read` one.
-  `resolveEffectiveSettings` used to leave it unset (loading every tier), because that is what a
-  `claude -p` run got; when the run became a session it had to move with it. Configure the run one
-  way and resolve the other and the disclosure silently becomes a lie — it keeps describing a
-  session that is gone, and **nothing fails**. `test/isolation.test.ts` counts the four occurrences
-  for exactly that reason (it counted three until `019` added the pane). Note `[]` does not drop the managed (administrator) policy tier: it is
-  still read from disk and still applies. `defaultMode` goes through the SDK's
+  `CLAUDE.md`**, so the model should be expected to be told to `Read` one. Configure the run one way
+  and resolve the other and the disclosure silently becomes a lie — it keeps describing a session
+  that is gone, and **nothing fails**. `test/isolation.test.ts` counts the four occurrences for
+  exactly that reason. Note `[]` does not drop the managed (administrator) policy tier: it is still
+  read from disk and still applies. `defaultMode` goes through the SDK's
   `filterEscalatingDefaultMode`, since the raw cascade reports an escalating mode from a
   repo-committed file as though it applied.
 - **The Agent SDK is now user-facing, and it is what a run IS.** `nodeSettings()` backs the read
-  disclosure in both confirmations and `startAgentSession()` is every run on `claude:run`, so
-  `agent-sdk.ts` is no longer a module whose only consumer is a smoke test — but it is still the
-  **only** module in the app that imports the SDK. Everything else reaches it through interfaces in
-  `contracts.ts` (`SettingsPort`) or through `agent-sdk.ts`'s own exports — including the SDK's
-  `SpawnOptions`/`SpawnedProcess` **types**, which it re-exports so `claude-run.ts` can type its
-  spawn function without importing the SDK itself.
+  disclosure in both confirmations and `startAgentSession()` is every run on `claude:run`, but
+  `agent-sdk.ts` is still the **only** module in the app that imports the SDK. Everything else
+  reaches it through interfaces in `contracts.ts` (`SettingsPort`) or through `agent-sdk.ts`'s own
+  exports — including the SDK's `SpawnOptions`/`SpawnedProcess` **types**, which it re-exports so
+  `claude-run.ts` can type its spawn function without importing the SDK itself.
 - **Project switches invalidate the router.** Every route loader reads the _current_ project from
   main-process state, so `ProjectProvider` calls `router.invalidate()` on the `project:changed`
   broadcast. Without it a switch leaves stale data on screen.
@@ -1063,10 +970,9 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   `src/renderer/public/theme-bootstrap.js` and is loaded as a parser-blocking `<script src>`.
   Inlining it back "because it's four lines" silently reintroduces a theme flash: the browser
   blocks it, and the theme is then applied only when `ThemeToggle`'s effect runs. The same policy
-  blocked `@repo/styles`' Google Fonts `@import` on every load, which is why the fonts are now
-  vendored into that package and served same-origin — do not restore the CDN `@import`, and see
-  `packages/styles/README.md` before changing a weight. `test/isolation.test.ts` asserts the built
-  renderer CSS references nothing off-origin.
+  blocks a Google Fonts `@import`, which is why fonts are vendored into `packages/styles` and served
+  same-origin — do not restore a CDN `@import`, and see `packages/styles/README.md` before changing
+  a weight. `test/isolation.test.ts` asserts the built renderer CSS references nothing off-origin.
 - **React Flow does not inherit the app's theme.** It picks between its own `--xy-*` palettes from
   its `colorMode` prop. Unset, its Controls render a near-white icon on a near-white button in
   dark mode — invisible, and invisible to every test that isn't a screenshot. `workflow-canvas.tsx`
@@ -1095,14 +1001,13 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
   the runtime manifest. A `git clone` rewrites every mtime, so an mtime comparison would report a
   fresh checkout as stale and make the badge noise the user learns to ignore.
 - **The seeded chain is detected, and only proposed while nothing is on disk.** `data:workflows`
-  calls `detectImplAgents()` (in `src/core/detect.ts`) instead of the old hardcoded
-  `defaultV3Config(["backend"])`, and returns the `RepoDetection` on the same payload as the seed —
-  one round trip, so the evidence cannot describe a different chain than the canvas is showing.
-  `DetectedChain` renders only when `seeded`: once `maestro.json` exists the chain is the user's
-  saved answer, and re-proposing a detected one over a graph they built would be offering to
-  overwrite their work. Correcting the chain goes back to main (`data:reseed`) to rebuild the seed
-  with the _same_ `defaultV3Config`, rather than duplicating the builder in the renderer — it is
-  pure, but it lives behind the barrel that re-exports `fs`. The round trip is why
+  calls `detectImplAgents()` (in `src/core/detect.ts`) and returns the `RepoDetection` on the same
+  payload as the seed — one round trip, so the evidence cannot describe a different chain than the
+  canvas is showing. `DetectedChain` renders only when `seeded`: once `maestro.json` exists the
+  chain is the user's saved answer, and re-proposing a detected one over a graph they built would be
+  offering to overwrite their work. Correcting the chain goes back to main (`data:reseed`) to
+  rebuild the seed with the _same_ `defaultV3Config`, rather than duplicating the builder in the
+  renderer — it is pure, but it lives behind the barrel that re-exports `fs`. The round trip is why
   `replaceConfig()` takes a project root and drops a result whose root no longer matches: a
   re-seed in flight across a project switch would otherwise land project A's starter graph on B's
   canvas, the same failure `seedWorkflowStore`'s guard exists for.
@@ -1121,24 +1026,19 @@ found`. **NOTE FOR WHOEVER ADDS PACKAGING:** externalizing is necessary and not 
 - **A create-\* run's working directory is not always the open project.** A skill written into a
   marketplace repo, or a brand-new marketplace, lives outside it. `claude-preview.ts` derives the cwd
   from the same resolution that chose the path; the dialog shows it. Verified in the window: a
-  marketplace-target skill runs in the marketplace. This used to matter because
-  `--permission-mode acceptEdits` only auto-accepted edits under the cwd; it now matters the other
-  way round — the cwd bounds nothing, `writable` does, and a write to the run's **own** working
-  directory is refused unless the preview listed it. Verified live: a `README.md` the model tried to
-  write beside its target — exactly what `acceptEdits` used to permit — was denied, and the file does
-  not exist.
-- **The prompt is prose, never `/create-skill`.** Historically a slash command in a headless run
-  fired the plugin's `UserPromptExpansion` hook, which launched the Docker app and blocked on a form
-  submission that could never arrive. That hook is gone, but the rule stands: a slash command
-  re-enters the skill from the top instead of finishing the scaffold, and re-derives fields the
-  payload already carries. **The reason changed under `026`, though.** The prompt used to carry its
-  own inlined copy of the skill's finishing instructions; now `buildCreate` states facts only — the
-  scaffold already wrote the target with its frontmatter complete, do not recreate or move it — plus
-  the name of the `plugins/ai-tools-manager/skills/<kind>/SKILL.md` that holds the guidance, and the
-  session loads that guidance itself with the `Skill` tool rather than reading it pre-pasted into the
-  prompt. A slash command is still wrong for the same underlying reason: it re-enters the skill's
-  "gather everything from scratch" entry instead of the one written for an already-scaffolded
-  artifact. A test asserts no create prompt contains a slash command.
+  marketplace-target skill runs in the marketplace. The cwd bounds nothing here — `writable` does —
+  so a write to the run's **own** working directory is refused unless the preview listed it.
+  Verified live: a `README.md` the model tried to write beside its target was denied, and the file
+  does not exist.
+- **The prompt is prose, never `/create-skill`.** A slash command in a headless run re-enters the
+  skill from the top instead of finishing the scaffold, and re-derives fields the payload already
+  carries. `buildCreate` states facts only — the scaffold already wrote the target with its
+  frontmatter complete, do not recreate or move it — plus the name of the
+  `plugins/ai-tools-manager/skills/<kind>/SKILL.md` that holds the guidance, and the session loads
+  that guidance itself with the `Skill` tool rather than reading it pre-pasted into the prompt. A
+  slash command is still wrong for the same underlying reason: it re-enters the skill's "gather
+  everything from scratch" entry instead of the one written for an already-scaffolded artifact. A
+  test asserts no create prompt contains a slash command.
 - **`claude:run` takes a token and nothing else, and the preload must keep it that way.** The
   bridge's guarantee — the only executable prompts are ones the user was shown — comes from the
   run channel having no argument that could describe a different run. A preload that "helpfully"
@@ -1164,14 +1064,10 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   reproduce from a terminal, and no unit test in this app can see it. Verified by launching from a
   desktop entry; see `src/core/claude-cli.ts`. `git` is resolved the same way and for the same
   reason, through the `resolveOnPath(names, opts)` that `resolveClaudeCli` is now a one-line call to.
-- **`src/core/git.ts` is a _sixth_ entry on the reviewed spawner list in `test/isolation.test.ts`,
-  and that list got wider on purpose.** The marketplace repository task was framed as removing the
-  last shell from the create-\* system; what it removed is the shell from the **session** — the app
-  runs `git` itself, `execFileSync` with an argument vector and no shell interpretation, so a
-  marketplace name with a quote in it cannot become syntax. The trade was one more module that can
-  spawn, in exchange for taking `Bash` out of the create-marketplace conversation. Whoever narrows
-  that list next should read this as a decision, not an oversight. It is also **not** a path to
-  Claude: the neighbouring comment about the `resolveClaudeCli` caller list is a different list.
+- **`src/core/git.ts` runs its own spawner, reviewed like every other one in `test/isolation.test.ts`.**
+  The app runs `git` itself, `execFileSync` with an argument vector and no shell interpretation, so a
+  marketplace name with a quote in it cannot become syntax. It is also **not** a path to Claude — it
+  is a separate reviewed spawner, unrelated to the `resolveClaudeCli` caller list.
 - **The log tail is retargeted on a project switch**, in `main/ipc.ts`. Otherwise a window keeps
   streaming the previously-opened repo's session log.
 - **`window.maestro.log.subscribe` is single-owner.** Main keeps one tail per `webContents.id`
@@ -1192,70 +1088,62 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   no node builtins in the built renderer bundle, and — outside `src/main/` — no import of the
   `src/core/index.ts` barrel, `@repo/claude-fs`, or any `node:` builtin. These are configuration
   and convention properties: they'd all regress silently without assertions. It also pins the
-  permission model, for the same reason: **"pre-accepts edits nowhere in the app"** fails if
+  permission model: **"pre-accepts edits nowhere in the app"** fails if
   `acceptEdits`/`bypassPermissions`/`dangerouslySkipPermissions` reappears under `src/`; **"bounds a
   session's writes by what the preview displayed, and offers it no shell"** pins `canUseTool`,
   `decideWrite`, `permissionMode: "default"`, `spawnClaudeCodeProcess`, the two tool lists and
   `writable: inv.writable`; and **"loads no filesystem settings for a run, and discloses the same
   resolution"** counts the four `settingSources: []` so the run and the disclosure cannot drift.
-  `019` replaced its three help-chat blocks with a **"the session pane"** describe, which pins the
-  pane's own properties: `session:say` carries only user-typed text, `session-context.tsx` is the
-  single owner of `window.maestro.session`, and the pane is not rendered by `top-nav.tsx`. `020`
-  added three more to that describe — **"asks a person instead of deciding, and resolves every ask on
-  every exit"**, **"lets the renderer send a permission CHOICE and never a permission result"**, and
-  **"writes down a refusal whichever of the four routes it arrived by"**. The last one is the only
+  The session-pane describe pins: `session:say` carries only user-typed text,
+  `session-context.tsx` is the single owner of `window.maestro.session`, and the pane is not
+  rendered by `top-nav.tsx`; that "asks a person instead of deciding, and resolves every ask on
+  every exit", "lets the renderer send a permission CHOICE and never a permission result", and
+  "writes down a refusal whichever of the four routes it arrived by" — the last one is the only
   coverage the `rule`/`mode` auto-denial has outside a unit test, since provoking it live needs a
-  machine-wide managed-settings file. `023` **widened** the CHOICE block rather than writing a
-  second one — it now also pins that a grant carries no path, that `SessionPermissionUpdate` cannot
-  name a disk destination or a rule, that no such literal exists anywhere under `src/`, and that a
-  grant reaches the hook as well as the SDK — and added two of its own: **"lets a grant die with the
-  session, and writes it nowhere"** and **"watches the other doors into the read scope, and does not
-  follow any of them"**. `022` **replaced** one block and added one: _"gives the pane an empty write
-  scope with no channel that could widen it"_ became **"grows the pane's write scope only from a
-  claimed preview token, and never from the renderer"** (it pins `writable()`, the single
-  `allowWrites` call site, the `claimInvocation` claim, and the token-only wire), and **"seeds a
-  handoff's context without spending a turn, and says so in the transcript"** pins `shouldQuery:
-false`, the absence of an `origin` stamp on the seeded message, the zero-cost-result guard, and one
-  seed string reaching the model and the transcript both. `021` added a SIBLING of the CHOICE block
-  rather than widening it — **"lets the renderer send a question SELECTION and never the answer
-  payload"** — because the field it defends is a different one: it pins the `session:question` call
-  shape, that `QuestionChoice`'s two arms cannot express an answers map, that `updatedInput` appears
-  in exactly two files (`contracts.ts` declares it, `agent-sdk.ts` fills it in) and in nothing under
-  `src/renderer` or `src/main`, that the labels are validated **before** anything is answered, that
-  `AskUserQuestion` is in `PANE_TOOLS` with the `toolConfig` opt-in and never in `allowedTools`, and
-  that there is still exactly one registry behind both kinds of ask. `024` added two more:
-  **"stops a session at a spend ceiling and gives the ending a door"** pins the three limits,
-  `persistSession: true`, both halves of the ceiling exit (the latch read in the `catch` **and** the
-  `break` the streaming pump needs), that the spend figure is fed behind `022`'s zero-cost-result
+  machine-wide managed-settings file; that a grant carries no path, that
+  `SessionPermissionUpdate` cannot name a disk destination or a rule, that no such literal exists
+  anywhere under `src/`, and that a grant reaches the hook as well as the SDK, plus "lets a grant
+  die with the session, and writes it nowhere" and "watches the other doors into the read scope,
+  and does not follow any of them"; that the pane's write scope grows only from a claimed preview
+  token and never from the renderer (pinning `writable()`, the single `allowWrites` call site, the
+  `claimInvocation` claim, and the token-only wire), and that a handoff's seed context spends no
+  turn and says so in the transcript (`shouldQuery: false`, no `origin` stamp on the seeded
+  message, the zero-cost-result guard, one seed string reaching the model and the transcript both);
+  "lets the renderer send a question SELECTION and never the answer payload" — it pins the
+  `session:question` call shape, that `QuestionChoice`'s two arms cannot express an answers map,
+  that `updatedInput` appears in exactly two files (`contracts.ts` declares it, `agent-sdk.ts`
+  fills it in) and in nothing under `src/renderer` or `src/main`, that the labels are validated
+  **before** anything is answered, that `AskUserQuestion` is in `PANE_TOOLS` with the `toolConfig`
+  opt-in and never in `allowedTools`, and that there is exactly one registry behind both kinds of
+  ask; "stops a session at a spend ceiling and gives the ending a door" pins the three limits,
+  `persistSession: true`, both halves of the ceiling exit (the latch read in the `catch` **and**
+  the `break` the streaming pump needs), that the spend figure is fed behind the zero-cost-result
   guard, that the exhausted entry is kept only for a ceiling, that `session:continue` carries an id
   and nothing else, and that `startPaneSession` is called from **exactly one** place in
   `claude-session.ts` — a second builder is how a resumed session quietly gets a different tool set;
-  and **"changes effort and model on a live session, from lists main published"** pins that both are
-  checked against something this process produced (`isEffortLevel`, `entry.models.some`), which is the
-  permission wire's discipline applied to a header control. `025` added one more —
-  **"picks up a foreign conversation only from a list main published, and forks when it does"** —
-  which pins the `offered` set (an id main did not publish is refused), that `fork` reaches the query
-  as `forkSession: true` and only ever alongside `resume`, that `resumeSession` goes through the same
-  single `openSession` builder as the other three callers, and that the store is read through
-  `listStoredSessions` / `readStoredMessages` rather than by walking `~/.claude/projects/`.
+  "changes effort and model on a live session, from lists main published" pins that both are
+  checked against something this process produced (`isEffortLevel`, `entry.models.some`), which is
+  the permission wire's discipline applied to a header control; and "picks up a foreign
+  conversation only from a list main published, and forks when it does" pins the `offered` set (an
+  id main did not publish is refused), that `fork` reaches the query as `forkSession: true` and
+  only ever alongside `resume`, that `resumeSession` goes through the same single `openSession`
+  builder as the other three callers, and that the store is read through `listStoredSessions` /
+  `readStoredMessages` rather than by walking `~/.claude/projects/`.
 - **The renderer bundle is code-split** (`autoCodeSplitting: true`). Measured 2026-07-31: unsplit
   was one 2,346 kB chunk; split is 593 kB shared + 772 kB `/workflows` (React Flow + dagre) +
   802 kB `/maestro-tasks` (react-markdown) + ~26 kB for the rest. The landing route is `/`, the
   project picker, which needs none of that — so startup parse drops by roughly 75%.
-  Re-measured 2026-08-04 after help-server was folded in, by counting the chunks the packaged app
-  actually requests (CDP `Network.requestWillBeSent`; `file://` module loads produce no
-  `PerformanceResourceTiming` entries, so the obvious way to measure this returns an empty array
-  and reads as "nothing loaded"): the landing route pulls 14 chunks / 1,107 kB and **none of the
-  new code**; `/tools` adds 117 kB; `/docs/$slug` adds 558 kB, of which 555 kB is the react-markdown
-  chunk now SHARED with `/maestro-tasks` rather than duplicated into it. help-server's
-  `@tanstack/react-table`, `react-highlight-words` and `highlight.js` were deliberately not carried
-  across — the tables filter with a `useMemo` and the highlighter is `utils/highlight.ts` — so the
-  fold-in added no runtime dependency. What makes
-  this safe over the packaged `file://` load is that assets resolve relatively (`base: "./"`);
-  anything that regresses that leaves routes blank in a packaged build while `dev` — served over
-  `http://localhost:5173` — stays perfectly happy. **`dev` does not exercise the `file://` path
-  at all**: `main/index.ts` only calls `loadFile()` when `ELECTRON_RENDERER_URL` is unset. Verify
-  route navigation with `build` + `start`, never with `dev` alone.
+  Re-measured 2026-08-04, by counting the chunks the packaged app actually requests (CDP
+  `Network.requestWillBeSent`; `file://` module loads produce no `PerformanceResourceTiming`
+  entries, so the obvious way to measure this returns an empty array and reads as "nothing
+  loaded"): the landing route pulls 14 chunks / 1,107 kB; `/tools` adds 117 kB; `/docs/$slug` adds
+  558 kB, of which 555 kB is the react-markdown chunk SHARED with `/maestro-tasks` rather than
+  duplicated into it. What makes this safe over the packaged `file://` load is that assets resolve
+  relatively (`base: "./"`); anything that regresses that leaves routes blank in a packaged build
+  while `dev` — served over `http://localhost:5173` — stays perfectly happy. **`dev` does not
+  exercise the `file://` path at all**: `main/index.ts` only calls `loadFile()` when
+  `ELECTRON_RENDERER_URL` is unset. Verify route navigation with `build` + `start`, never with
+  `dev` alone.
 
 ## Dev
 
@@ -1281,11 +1169,11 @@ pnpm --filter maestro test       # test/ and test/core/ as one suite
 pnpm --filter maestro build:plugin-libs   # after ANY edit under src/core/plugin-entries' graph
 ```
 
-`test/core/` is the former `packages/maestro-core/test/`, and it is where the differential tests
-live: parity against the last hand-written `.cjs` implementations (snapshotted under
-`test/core/fixtures/legacy/`, deliberately _not_ read from `plugins/…/scripts/lib/`, which
-`build:plugin-libs` overwrites — that comparison would be tautological), a byte-identity check on
-the rendered `SKILL.md`, and the import-graph walk that proves `claude-preview.ts` cannot spawn.
+`test/core/` is where the differential tests live: parity against the last hand-written `.cjs`
+implementations (snapshotted under `test/core/fixtures/legacy/`, deliberately _not_ read from
+`plugins/…/scripts/lib/`, which `build:plugin-libs` overwrites — that comparison would be
+tautological), a byte-identity check on the rendered `SKILL.md`, and the import-graph walk that
+proves `claude-preview.ts` cannot spawn.
 
 ### Driving the window (canvas interactions, screenshots)
 
@@ -1307,7 +1195,9 @@ speaks the protocol with no dependency added to the repo. `Runtime.evaluate` rea
 exposed to the renderer, so a probe can switch projects without the native folder dialog.
 
 Use `electron .` rather than `pnpm start`, and never `dev`: `dev` serves the renderer over
-`http://localhost:5173` and skips the `file://` path that ships.
+`http://localhost:5173` and skips the `file://` path that ships. The project's own
+`test-maestro` skill (`.claude/skills/test-maestro/`) wraps this workflow with scripts and fixture
+rules — prefer it over hand-rolling CDP calls.
 
 ### Checking the Agent SDK from a real launch
 
