@@ -9,8 +9,15 @@
 //      - predates the markers → backed up to SKILL.md.bak and replaced with the
 //        template (there is no safe way to locate the managed regions in it);
 //        reported as `migratedOrchestratorSkill` so the skill can tell the user.
-//   2. copies runtime scripts        → <project>/.claude/scripts/        (always refreshed)
-//   3. merges the bash-validation PreToolUse hook → <project>/.claude/settings.json (preserves other keys)
+//   2. copies runtime scripts + handoff templates → <project>/.claude/scripts/ and
+//      <project>/.claude/templates/handoffs/ (always refreshed). Includes the hook scripts
+//      (maestro-inject-agent-context, maestro-subagent-log, maestro-session-log,
+//      maestro-validate-tasks — copied as .cjs) and maestro-session-cleanup.cjs, so every hook
+//      this install registers runs from a project-local copy rather than
+//      ${CLAUDE_PLUGIN_ROOT} — see apps/maestro/src/core/install.ts's header for why.
+//   3. merges the full Maestro hook set into <project>/.claude/settings.json (preserves other
+//      keys): the bash-validation PreToolUse guard plus SubagentStart/SubagentStop/PreToolUse/
+//      PostToolUse/SessionEnd, mirroring plugins/ai-tools-manager/hooks/hooks.json one-for-one.
 //   4. adds an `# Maestro` section to the repo-root .gitignore ignoring every nested
 //      .claude/maestro_session*.{json,jsonl} across the repo / monorepo (the `**/` glob covers
 //      root-level .claude/ too, so no per-package .gitignore is needed)
@@ -20,6 +27,11 @@
 // It does NOT render the orchestrator skill's managed region: rendering consumes maestro.json,
 // so it runs afterwards via maestro-render-orchestrator.cjs (the /maestro-install and
 // /maestro-update skills both do this as their next step).
+//
+// This manifest (STATIC_ASSETS / HOOK_SCRIPTS / handoffAssets / HOOK_REGISTRATIONS below) mirrors
+// apps/maestro/src/core/install.ts's one-for-one. If this list and that one ever diverge again,
+// that's a bug in one of them — see that file's `RuntimeAsset`/`HOOK_REGISTRATIONS` for the
+// reasoning behind each entry.
 //
 //   node maestro-install.js [projectDir] [--impl-agents backend,frontend] [--skill-map '{"frontend":["react"]}']
 //
@@ -143,27 +155,73 @@ function ensureRepoRootGitignore(repoRoot) {
   ]);
 }
 
-const BASH_VALIDATION_COMMAND = "$CLAUDE_PROJECT_DIR/.claude/scripts/bash-validation.sh";
+const SCRIPTS_VAR = "$CLAUDE_PROJECT_DIR/.claude/scripts";
 
-// Register the .env-read guard as a PreToolUse hook on the Bash tool. Reuses an
-// existing Bash matcher when present so we don't clobber user-defined hooks.
-function ensureBashValidationHook(settings) {
-  settings.hooks = settings.hooks || {};
-  const pre = settings.hooks.PreToolUse || (settings.hooks.PreToolUse = []);
-  const hasHook = pre.some(
-    (e) => e && Array.isArray(e.hooks) && e.hooks.some((h) => h && h.command === BASH_VALIDATION_COMMAND)
-  );
-  if (hasHook) return false;
-  let bashEntry = pre.find((e) => e && e.matcher === "Bash" && Array.isArray(e.hooks));
-  if (!bashEntry) {
-    bashEntry = { matcher: "Bash", hooks: [] };
-    pre.push(bashEntry);
-  }
-  bashEntry.hooks.push({ type: "command", command: BASH_VALIDATION_COMMAND });
-  return true;
+// Byte-for-byte as the legacy installer wrote it — unquoted and un-prefixed. Unlike the node
+// hooks below, this one predates project-local hooks entirely, so re-quoting it here would
+// duplicate the entry on every project the old skill already installed and orphan it on uninstall
+// (which removes it by exact string match). Kept as its own constant for that reason.
+const BASH_VALIDATION_COMMAND = `${SCRIPTS_VAR}/bash-validation.sh`;
+
+function nodeHook(event, matcher, script) {
+  return { event, matcher, script, command: `node "${SCRIPTS_VAR}/${script}"`, id: `${event}:${script}` };
 }
 
-// Merge the bash-validation hook into settings.json, preserving all other keys.
+// What this install registers in the project's `.claude/settings.json`. Mirrors
+// plugins/ai-tools-manager/hooks/hooks.json one-for-one (see apps/maestro/src/core/install.ts's
+// HOOK_REGISTRATIONS, which this list is kept in lockstep with) — every hook the plugin would
+// otherwise run from ${CLAUDE_PLUGIN_ROOT}, plus the bash-validation guard.
+const HOOK_REGISTRATIONS = [
+  nodeHook("SubagentStart", ".*", "maestro-inject-agent-context.cjs"),
+  nodeHook("SubagentStart", ".*", "maestro-subagent-log.cjs"),
+  nodeHook("SubagentStop", ".*", "maestro-subagent-log.cjs"),
+  nodeHook("PreToolUse", ".*", "maestro-session-log.cjs"),
+  {
+    event: "PreToolUse",
+    matcher: "Bash",
+    script: "bash-validation.sh",
+    command: BASH_VALIDATION_COMMAND,
+    id: "PreToolUse:bash-validation.sh",
+  },
+  nodeHook("PostToolUse", "TaskCreate", "maestro-validate-tasks.cjs"),
+  nodeHook("SessionEnd", "", "maestro-session-cleanup.cjs"),
+];
+
+// Is `reg` already registered in `settings`? Keyed on the script's basename appearing anywhere in
+// a command string for the same event, not on an exact match — a user who re-quoted the command by
+// hand shouldn't get a duplicate that fires the hook twice.
+function hasHook(settings, reg) {
+  const entries = settings.hooks && settings.hooks[reg.event];
+  if (!Array.isArray(entries)) return false;
+  return entries.some(
+    (e) =>
+      e &&
+      Array.isArray(e.hooks) &&
+      e.hooks.some((h) => h && typeof h.command === "string" && h.command.includes(reg.script))
+  );
+}
+
+// Add every missing registration to `settings` in place. Returns the ids added.
+function addMissingHooks(settings) {
+  const added = [];
+  for (const reg of HOOK_REGISTRATIONS) {
+    if (hasHook(settings, reg)) continue;
+    settings.hooks = settings.hooks || {};
+    const list = settings.hooks[reg.event] || (settings.hooks[reg.event] = []);
+    // Reuse an existing entry for the same matcher rather than adding a second one, so a user's
+    // own hook and ours live side by side under one matcher — as the legacy installer did for Bash.
+    let entry = list.find((e) => e && e.matcher === reg.matcher && Array.isArray(e.hooks));
+    if (!entry) {
+      entry = { matcher: reg.matcher, hooks: [] };
+      list.push(entry);
+    }
+    entry.hooks.push({ type: "command", command: reg.command });
+    added.push(reg.id);
+  }
+  return added;
+}
+
+// Merge every missing hook registration into settings.json, preserving all other keys.
 function mergeSettings(settingsPath) {
   let settings = {};
   if (fs.existsSync(settingsPath)) {
@@ -173,12 +231,63 @@ function mergeSettings(settingsPath) {
       settings = {};
     }
   }
-  const setBashHook = ensureBashValidationHook(settings);
-  if (setBashHook) {
+  const hooksAdded = addMissingHooks(settings);
+  if (hooksAdded.length > 0) {
     ensureDir(path.dirname(settingsPath));
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   }
-  return { setBashHook };
+  return { hooksAdded, setBashHook: hooksAdded.includes("PreToolUse:bash-validation.sh") };
+}
+
+// The hook scripts the plugin runs as `.js`, copied into the project as `.cjs` — see
+// apps/maestro/src/core/install.ts's HOOK_SCRIPTS comment for why the extension changes.
+const HOOK_SCRIPTS = [
+  "maestro-inject-agent-context",
+  "maestro-subagent-log",
+  "maestro-session-log",
+  "maestro-validate-tasks",
+];
+
+// Every file this install copies into a project, `{ src, dest, executable? }` relative to the
+// plugin root / project root respectively.
+const STATIC_ASSETS = [
+  { src: "scripts/maestro-set-session-workflow.cjs", dest: ".claude/scripts/maestro-set-session-workflow.cjs" },
+  { src: "scripts/maestro-render-orchestrator.cjs", dest: ".claude/scripts/maestro-render-orchestrator.cjs" },
+  { src: "scripts/maestro-task-status.cjs", dest: ".claude/scripts/maestro-task-status.cjs" },
+  { src: "scripts/lib/maestro-session.cjs", dest: ".claude/scripts/lib/maestro-session.cjs" },
+  { src: "scripts/lib/maestro-tasks.cjs", dest: ".claude/scripts/lib/maestro-tasks.cjs" },
+  { src: "scripts/lib/maestro-skill-regions.cjs", dest: ".claude/scripts/lib/maestro-skill-regions.cjs" },
+  { src: "scripts/bash-validation.sh", dest: ".claude/scripts/bash-validation.sh", executable: true },
+  // SessionEnd cleanup. NOT the plugin's maestro-session-cleanup.sh — that one also tears down the
+  // per-project web-app container, which is the plugin's business and not a project-local install's.
+  { src: "scripts/maestro-session-cleanup.cjs", dest: ".claude/scripts/maestro-session-cleanup.cjs" },
+  ...HOOK_SCRIPTS.map((name) => ({ src: `scripts/${name}.js`, dest: `.claude/scripts/${name}.cjs` })),
+];
+
+// Handoff-protocol templates, installed to `.claude/templates/handoffs/`. See
+// apps/maestro/src/core/install.ts's handoffAssets() for why that destination (not
+// `.claude/handoffs/`, which is left free as the user's override).
+function handoffAssets(pluginRoot) {
+  const base = path.join(pluginRoot, "templates", "handoffs");
+  if (!fs.existsSync(base)) return [];
+  const out = [];
+  const walk = (rel) => {
+    for (const entry of fs
+      .readdirSync(path.join(base, rel), { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))) {
+      const next = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(next);
+      else if (entry.name.endsWith(".md")) {
+        out.push({ src: `templates/handoffs/${next}`, dest: `.claude/templates/handoffs/${next}` });
+      }
+    }
+  };
+  walk("");
+  return out;
+}
+
+function runtimeAssets(pluginRoot) {
+  return [...STATIC_ASSETS, ...handoffAssets(pluginRoot)];
 }
 
 try {
@@ -194,42 +303,23 @@ try {
     path.join(orchestratorSkillDir, "SKILL.md")
   );
 
-  // Runtime scripts the orchestrator / repo invoke via $CLAUDE_PROJECT_DIR.
-  // They run in-place inside the project, whose package.json may declare
-  // "type": "module" — so they must be .cjs to stay CommonJS regardless.
-  // Always refreshed so projects pick up plugin fixes.
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "maestro-set-session-workflow.cjs"),
-    path.join(scriptsDir, "maestro-set-session-workflow.cjs")
-  );
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "maestro-render-orchestrator.cjs"),
-    path.join(scriptsDir, "maestro-render-orchestrator.cjs")
-  );
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "lib", "maestro-session.cjs"),
-    path.join(scriptsDir, "lib", "maestro-session.cjs")
-  );
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "maestro-task-status.cjs"),
-    path.join(scriptsDir, "maestro-task-status.cjs")
-  );
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "lib", "maestro-tasks.cjs"),
-    path.join(scriptsDir, "lib", "maestro-tasks.cjs")
-  );
-  fs.copyFileSync(
-    path.join(pluginRoot, "scripts", "lib", "maestro-skill-regions.cjs"),
-    path.join(scriptsDir, "lib", "maestro-skill-regions.cjs")
-  );
+  // Runtime scripts + handoff templates the orchestrator / hooks invoke via $CLAUDE_PROJECT_DIR.
+  // They run in-place inside the project, whose package.json may declare "type": "module" — so
+  // hook scripts are copied as .cjs to stay CommonJS regardless. Only files that differ are
+  // rewritten, so a second run reports nothing left to do.
+  const scriptsWritten = [];
+  for (const asset of runtimeAssets(pluginRoot)) {
+    const from = path.join(pluginRoot, ...asset.src.split("/"));
+    const to = path.join(projectDir, ...asset.dest.split("/"));
+    const source = fs.readFileSync(from);
+    if (fs.existsSync(to) && fs.readFileSync(to).equals(source)) continue;
+    ensureDir(path.dirname(to));
+    fs.writeFileSync(to, source);
+    if (asset.executable) fs.chmodSync(to, 0o755);
+    scriptsWritten.push(asset.dest);
+  }
 
-  // PreToolUse Bash guard that blocks reading .env secret files. Copied with its
-  // executable bit so the hook can run it directly.
-  const bashValidationDest = path.join(scriptsDir, "bash-validation.sh");
-  fs.copyFileSync(path.join(pluginRoot, "scripts", "bash-validation.sh"), bashValidationDest);
-  fs.chmodSync(bashValidationDest, 0o755);
-
-  const { setBashHook } = mergeSettings(path.join(claudeDir, "settings.json"));
+  const { setBashHook, hooksAdded } = mergeSettings(path.join(claudeDir, "settings.json"));
   const wroteRepoGitignore = ensureRepoRootGitignore(findRepoRoot(projectDir));
 
   // Seed maestro.json only when there isn't one. An existing config is the user's own graph —
@@ -248,7 +338,9 @@ try {
       ok: true,
       installedOrchestratorSkill: orchestratorSkill.action === "installed",
       orchestratorSkill,
+      scriptsWritten,
       setBashHook,
+      hooksAdded,
       wroteRepoGitignore,
       seededConfig,
       implAgents: seededConfig ? implAgents : undefined,
