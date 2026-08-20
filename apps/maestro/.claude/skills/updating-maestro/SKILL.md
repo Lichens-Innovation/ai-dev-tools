@@ -1,6 +1,6 @@
 ---
 name: updating-maestro
-description: "How a change to Maestro's runtime actually reaches a project — there are now two delivery paths with different failure modes. Hooks registered project-locally (by the desktop app's /install or /maestro-install) run from copies in <project>/.claude/scripts/ and are stale until someone re-installs. Hooks registered by the ai-tools-manager plugin run from a per-VERSION marketplace cache that autoUpdate only re-pulls when plugin.json `version` changes, so any edit to hooks/ or scripts/ shipped without a version bump is invisible. Use when a hook or script change isn't taking effect in another project, a SubagentStart/PreToolUse hook 'isn't firing', both copies seem to be firing at once, or before shipping any plugin change."
+description: "How a change to Maestro's runtime actually reaches a project — there are now two delivery paths with different failure modes. Hooks registered project-locally (by the desktop app's /maestro route or /maestro-install) run from copies in <project>/.claude/scripts/ and are stale until someone re-installs. Hooks registered by the ai-tools-manager plugin run from a per-VERSION marketplace cache that autoUpdate only re-pulls when plugin.json `version` changes, so any edit to hooks/ or scripts/ shipped without a version bump is invisible. Use when a hook or script change isn't taking effect in another project, a SubagentStart/PreToolUse hook 'isn't firing', both copies seem to be firing at once, or before shipping any plugin change."
 ---
 
 # Getting a Maestro runtime change to actually land
@@ -18,7 +18,7 @@ project-local (preferred)                     plugin-global (legacy / no-install
   refreshed by: re-running either                refreshed by: a plugin.json VERSION bump
 ```
 
-`InstallStatus.pluginHooksActive` (the app's `/install` route) tells you when **both** are live.
+`InstallStatus.pluginHooksActive` (the app's `/maestro` route) tells you when **both** are live.
 That is a real bug, not a redundancy: every tool call gets logged twice and every subagent gets its
 context injected twice. The app reports it rather than fixing it, because the fix is in the user's
 global configuration and the app does not write there.
@@ -33,7 +33,7 @@ runtime fixes shipped without a version bump never reached an installed project.
 The trade is that a copy is a snapshot. A project picks up a newer runtime only when someone
 re-runs the install:
 
-- desktop app → `/install` route → **Update** (the badge is driven by
+- desktop app → `/maestro` route → **Update** (the badge is driven by
   `installedRuntimeId` vs `shippedRuntimeId`, both sha-256 over the runtime manifest — **content,
   never mtime**, because a `git clone` rewrites every mtime and an mtime comparison would report a
   fresh checkout as stale),
@@ -103,7 +103,7 @@ installs them by file copy, so they must exist in the repo.
 | Check                                     | Command                                                                                               |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Which path is this project on?            | `cat <project>/.claude/settings.json` — Maestro hooks present ⇒ project-local; absent ⇒ plugin-global |
-| Project-local and stale?                  | the `/install` route's badge, or just re-run `/maestro-update`                                        |
+| Project-local and stale?                  | the `/maestro` route's badge, or just re-run `/maestro-update`                                        |
 | What plugin version is installed?         | `cat ~/.claude/plugins/installed_plugins.json` (`installPath` + `version` + `installedAt`)            |
 | Does the cached copy even have the files? | `ls ~/.claude/plugins/cache/lichens-ai-dev-tools/<plugin>/<version>/{hooks,scripts}`                  |
 | Is the cache older than the change?       | compare `installedAt` / dir mtime against the commit that added the file                              |

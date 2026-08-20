@@ -13,7 +13,7 @@ SDK session**, not a `claude -p` spawn.
 ## End-to-end pipeline
 
 ```
-User opens the Maestro desktop app → top bar Create ▾ → Skill
+User opens the Maestro desktop app → /tools → Skills tab → Create (link at the bottom)
         │
         ▼
 src/renderer/src/routes/create-skill.tsx
@@ -240,7 +240,7 @@ Three rules hold it together:
 | Change the description algorithm | `text.ts` in `src/core` — affects skill & subagent, preview and file, at once                                                                                             |
 | Change keyboard shortcuts        | the route's `SHORTCUT_SECTIONS` and `create-shell.tsx`                                                                                                                    |
 | Add a new shared UI primitive    | new file in `packages/ui/src/`, then an export in `packages/ui/package.json`                                                                                              |
-| Add a new create-\* flow         | new route + a `scaffold*` function + a preview builder + a `SKILL.md`; wire it into the Create menu in `top-nav.tsx`                                                      |
+| Add a new create-\* flow         | new route + a `scaffold*` function + a preview builder + a `SKILL.md`; wire it in as a **Create** link at the bottom of the matching `/tools` tab (`components/tabs/create-link.tsx`), not into a top-bar menu |
 
 ## Things that bite
 

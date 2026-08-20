@@ -56,7 +56,7 @@ The ephemeral `maestro_session_tasks.json` the script always deletes is neither 
 
 ## Notes
 
-- **The desktop app does this without a session.** `apps/maestro`'s `/install` route has both
+- **The desktop app does this without a session.** `apps/maestro`'s `/maestro` route (formerly `/install`) has both
   levels: **Uninstall** (hooks + session files, keeps `maestro.json`) and **Delete everything**,
   which names every file in a confirmation before deleting it. That path is `uninstallRuntime()`
   in `apps/maestro/src/core`, and it is the one to prefer — it removes files the manifest knows about

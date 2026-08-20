@@ -66,7 +66,8 @@ second.
 | `session-resume.ts`                     | Which stored conversations may be offered, and what picking one up costs. Pure         |
 | `agent-sdk.ts`                          | The ONLY importer of the Agent SDK: child env, the session, and the `SettingsPort`     |
 | `ccusage.ts`                            | Usage stats — resolve `ccusage`, preview the command, run the previewed one            |
-| `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time              |
+| `marketplaces.ts`                       | The user's local plugin marketplaces, read from `~/.claude/` at call time (`{includeRemote: true}` widens to every globally-registered marketplace, for `/tools`' Marketplace tab) |
+| `global-docs.ts`                        | The two fixed doc corpora for the global `/docs` reader — the Maestro app's own end-user docs and the repo's Claude Code concept docs — regardless of which project is open |
 | `scaffold.ts`                           | The deterministic half of the four create-\* flows, all-or-nothing                     |
 | `git.ts`                                | `git init` + the first commit, via `execFile` and never a shell. A `GitPort`           |
 | `repo.ts`                               | Is a directory inside a repository? Asked with `fs`, so it holds with no `git`         |
@@ -166,8 +167,9 @@ All four follow one pattern:
 5. Write the consuming prompt at `plugins/ai-tools-manager/skills/<name>/SKILL.md`, documenting the
    payload shape and the file(s) Claude should finish.
 
-A route is reached from the top bar's **Create** menu, and its prompt reaches Claude through the
-Claude bridge below.
+A create-\* route is reached from the **Create** link at the bottom of its matching `/tools` tab
+(`components/tabs/create-link.tsx`), not from a top-bar menu, and its prompt reaches Claude through
+the Claude bridge below.
 
 ## What still requires Claude Code
 
@@ -176,8 +178,9 @@ The **runtime** half — hook scripts that fire inside a session: `maestro-injec
 `maestro-validate-tasks` (PostToolUse), `maestro-session-cleanup` (SessionEnd),
 `maestro-set-session-workflow.cjs`, `bash-validation.sh`.
 
-They need a session to _run_, but not to be **installed**: `/install` copies them into
-`<project>/.claude/scripts/` and registers them in the project's own `.claude/settings.json`
+They need a session to _run_, but not to be **installed**: `/maestro` (the desktop app route,
+formerly `/install`) copies them into `<project>/.claude/scripts/` and registers them in the
+project's own `.claude/settings.json`
 (`installRuntime()` in `src/core/install.ts`). Project-local registration exists because the
 plugin's `${CLAUDE_PLUGIN_ROOT}` hooks resolve into a version-keyed marketplace cache, so runtime
 fixes shipped without a `plugin.json` bump never reach an installed project.
@@ -193,18 +196,23 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 | `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                          |
 | `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                        |
 | `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. **Run with Claude** previews the invocation, confirms it, and streams it.                                                    |
-| `/install`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk.                                                                           |
-| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, behind the top bar's **Create** menu. Split-pane: form left, live file preview right.                                                   |
-| `/tools`                                                                     | Tabbed dashboard. Three tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below).                |
-| `/docs`, `/docs/$slug`                                                       | The documentation reader over the open project's `docs/`, with per-heading search that deep-links and highlights.                                                |
+| `/maestro`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk. Also carries a `ProjectSelect` dropdown to view another recent project's status without switching the app's current project. |
+| `/project-docs`, `/project-docs/$slug`                                      | The documentation reader over the open project's own `docs/`, with per-heading search that deep-links and highlights. (Formerly `/docs`.)                        |
+| `/docs`, `/docs/$group/$slug`                                                | A **global** documentation reader, unrelated to the open project: `group` is `"app"` (Maestro's own end-user docs, `apps/maestro/docs/app/*.md`) or `"claude-code"` (the repo-root `docs/*.md`, synced into a packaged build by `scripts/sync-claude-docs.mjs`). Carries a "Discuss with Claude" action that opens the session pane with the `maestro-help` skill loaded. |
+| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, reached from the **Create** link at the bottom of the matching `/tools` tab (Skills/Agents/Plugins/Marketplace), not from a top-bar menu. Split-pane: form left, live file preview right. |
+| `/tools`                                                                     | Tabbed dashboard: **Plugins**, **Marketplace** (globally-registered marketplaces, plus the project's own as a secondary section), **Usage Stats**, **Curated Tools**, **Rules** (local-only, no global tier), **Skills**, **Agents** (the last two grouped by source: local/project, global/user, bundled, from-plugin). Most tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below). Also carries the `ProjectSelect` dropdown. |
 
 ### The top bar is grouped, not a list
 
-Four top-level links (Workflows, Rules, Session Log, Maestro Tasks) — the things a user came to
-_do_, all of which write — then a divider, then two menus: **Library** (Tools, Docs, Runtime) for
-everything that only reads, and **Create**. The runtime staleness badge lives on the Library
-**button** rather than inside it, because that badge is the one item in the bar nobody goes looking
-for, so it has to be visible from whatever route the user is already on.
+A **hamburger menu** (`components/hamburger-menu.tsx`) is the first element in the nav: links to
+`/maestro`, `/docs`, `/tools`, a recent-projects list, and "+ Add project…". It carries the runtime
+staleness badge dot — the one item in the bar nobody goes looking for, so it has to be visible from
+whatever route the user is already on. Then, shown whenever a project is open, direct links in this
+order: **Project Docs**, Workflows, Rules, Session Log, Maestro Tasks — the things a user came to
+_do_ in this project, all of which write (Project Docs is the exception, but it's project-scoped
+like the rest). There is no longer a Library menu or a Create menu — both were removed along with
+the `NavMenu` component they were built on; the four create-\* routes are now reached from the
+bottom of their matching `/tools` tab.
 
 ### Adding a tab to `/tools`, or a doc page
 
@@ -221,10 +229,15 @@ for, so it has to be visible from whatever route the user is already on.
 Unless the tab **runs something** — then it is not loader data at all, and needs a preview/run
 channel pair and a purpose-tagged token, like Usage Stats below.
 
-**A doc page.** Drop a `.md` file into the open project's `docs/`. The slug is the filename;
+**A doc page — two different ways, depending on which reader.** For `/project-docs` (the open
+project's own docs): drop a `.md` file into the open project's `docs/`. The slug is the filename;
 `listDocs()` and `searchDocs()` in `src/core/docs.ts` pick it up with no registration anywhere.
 Heading anchors come from `slugifyHeading()`, which the search index and the reader must go on
-sharing — a second slugifier means search hits that scroll nowhere.
+sharing — a second slugifier means search hits that scroll nowhere. For the global `/docs` reader
+(unrelated to the open project): drop a `.md` file into `apps/maestro/docs/app/` for the `"app"`
+group, or the repo-root `docs/` for the `"claude-code"` group (synced into a packaged build by
+`scripts/sync-claude-docs.mjs`) — `globalDocsData()`/`readGlobalDoc()` in `src/core/global-docs.ts`
+pick it up the same way, with no registration.
 
 **`src/renderer/src/routeTree.gen.ts` is generated** by the router plugin: commit it, never
 hand-edit it.
@@ -414,8 +427,10 @@ exists nowhere in the app**; `test/isolation.test.ts` fails if `acceptEdits`, `b
   "create-plugin", "create-marketplace"]`. The pane extends the tool constant rather than declaring
   a second list — `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]`, where `QUESTION_TOOL`
   (`AskUserQuestion`) carries its own two mechanical preconditions; `Skill` is not named a second
-  time here. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help"]`. The
-  second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on
+  time here. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help",
+  "maestro-help"]` — the latter loaded so the global `/docs` page's "Discuss with Claude" action can
+  answer questions about `apps/maestro/docs/app/*.md` and the Claude Code concept docs the same way
+  `super-help` does. The second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on
   the pane query and nowhere else: **without it Claude emits no `preview` on any option and the list
   arrives bare**, which looks like a rendering bug and is not one. If a question never arrives at
   all, check those two before anything else.
@@ -639,7 +654,7 @@ session:event      ← SessionEvent             the streamed transcript
   _"Unknown skill"_ for every name, because no installed plugin reaches the session. The fix is
   `plugins: [{ type: "local", path: bundledPluginDir() }]` (`src/main/bundled-assets.ts`), after
   which the session reports exactly `ai-tools-manager:create-marketplace`, `:create-plugin`,
-  `:create-skill`, `:create-subagent`, `:super-help` and nothing else. It is the plugin **bundled
+  `:create-skill`, `:create-subagent`, `:super-help`, `:maestro-help` and nothing else. It is the plugin **bundled
   with the app** (`plugins/ai-tools-manager/`), never the user's installed marketplace cache — so a
   `SKILL.md` edit in this repo reaches the pane with no version bump and no marketplace update.
 - **The plugin's `hooks.json` does NOT fire in a pane session.** Also measured: a turn that read a
@@ -984,7 +999,7 @@ never opens this tab should not carry it.
   tool call_ with "require is not defined in ES module scope". Nothing catches this but running a
   copied script from inside such a project, which `test/install.test.ts` does.
 - **Two things can register Maestro's hooks, and both firing is a visible bug.** A project
-  installed from `/install` has them in its own settings; the `ai-tools-manager` plugin registers
+  installed from `/maestro` (formerly `/install`) has them in its own settings; the `ai-tools-manager` plugin registers
   the same ones globally from its `hooks.json`. With both, every tool call is logged twice and
   every subagent gets its context injected twice. `InstallStatus.pluginHooksActive` detects it and
   the route says so — it does not "fix" it, because the fix is in the user's global configuration

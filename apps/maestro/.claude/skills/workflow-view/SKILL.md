@@ -82,7 +82,7 @@ Paths are relative to `apps/maestro/`.
 | The canvas (React Flow nodes/edges, all interactions)                  | `src/renderer/src/components/workflow-canvas.tsx`                                                             |
 | Reuse/create instance picker + skill pickers (shared by canvas modals) | `src/renderer/src/components/instance-picker.tsx`, `.../instance-skill-picker.tsx` (loaded/referenced toggle) |
 | Detected-chain banner + correction chips                               | `src/renderer/src/components/detected-chain.tsx`, `.../seeded-banner.tsx`                                     |
-| Top bar — nav links, workflow selector, Create menu                    | `src/renderer/src/components/top-nav.tsx`                                                                     |
+| Top bar — hamburger menu, direct links, workflow selector              | `src/renderer/src/components/top-nav.tsx`, `.../hamburger-menu.tsx`                                            |
 | Renderer-side loader + save wrappers over the IPC bridge               | `src/renderer/src/utils/maestro.ts`                                                                           |
 | The typed channel contract                                             | `src/shared/ipc.ts` (`data:workflows`, `data:reseed`, `config:save`)                                          |
 | Main-process handlers (the only side that touches `fs`)                | `src/main/ipc.ts`                                                                                             |
