@@ -4,9 +4,9 @@
 // the wire with the doc list (`data:docs`), so matching it is a pure function of data the renderer
 // holds, and a round trip per keystroke would buy nothing but latency.
 
-import type { DocContent, DocSection, DocsData } from "../../../shared/ipc";
+import type { DocContent, DocSection, DocsData, GlobalDocsData } from "../../../shared/ipc";
 
-export type { DocContent, DocMeta, DocSection, DocsData } from "../../../shared/ipc";
+export type { DocContent, DocMeta, DocSection, DocsData, GlobalDocsData } from "../../../shared/ipc";
 
 export function getDocsData(): Promise<DocsData> {
   return window.maestro.data.docs();
@@ -15,6 +15,16 @@ export function getDocsData(): Promise<DocsData> {
 /** Rejects on a bad slug or an unreadable file — call it through `callMain`. */
 export function getDoc(slug: string): Promise<DocContent> {
   return window.maestro.data.doc(slug);
+}
+
+/** The global Docs page's landing data — NOT gated on an open project. */
+export function getGlobalDocsData(): Promise<GlobalDocsData> {
+  return window.maestro.data.globalDocs();
+}
+
+/** Rejects on a bad slug/group or an unreadable file — call it through `callMain`. */
+export function getGlobalDoc(group: "app" | "claude-code", slug: string): Promise<DocContent> {
+  return window.maestro.data.globalDoc(group, slug);
 }
 
 /** How many hits the dropdown shows before it stops. Ported from help-server's search store. */

@@ -746,7 +746,7 @@ export const TEARDOWN_DENIAL = "The session ended before this could be answered,
  * `026`; what is added here is `super-help`, the one thing the pane inherits from the deleted help
  * chat — a declared session skill now, rather than a name pasted into a generated prompt.
  */
-export const PANE_SKILLS = [...SESSION_SKILLS, "super-help"] as const;
+export const PANE_SKILLS = [...SESSION_SKILLS, "super-help", "maestro-help"] as const;
 
 /** What the pane can say about the CLI before a session exists. Resolved here, never in main. */
 export interface PaneSessionTarget {

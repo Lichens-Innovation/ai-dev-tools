@@ -28,6 +28,16 @@ export type { MarketplaceEntry };
 export interface MarketplaceOptions {
   /** Home directory to read `.claude/` under. Defaults to the real one. */
   home?: string;
+  /**
+   * Include non-`directory`-sourced entries (GitHub, etc.) too.
+   *
+   * Defaults to false, which is the create-forms' own requirement: writing into a GitHub-sourced
+   * marketplace would write into the plugin cache, which the next `claude plugin marketplace
+   * update` overwrites. The global Marketplace tab has no such requirement — it only ever
+   * reads — so it opts in to see the marketplaces `known_marketplaces.json` actually holds,
+   * rather than silently dropping every one that isn't a local directory.
+   */
+  includeRemote?: boolean;
 }
 
 /** One entry of `~/.claude/plugins/known_marketplaces.json`. */
@@ -57,11 +67,16 @@ export function marketplacePlugins(marketplacePath: string): string[] {
 }
 
 /**
- * The marketplaces a create form can write into: `source: "directory"` entries only.
+ * The user's local plugin marketplaces.
  *
+ * By default, only `source: "directory"` entries — the ones a create form can write into.
  * GitHub-sourced marketplaces are excluded because writing into one would write into the plugin
  * cache — a directory the next `claude plugin marketplace update` overwrites, so the user's new
  * skill would vanish without ever having been anywhere they could commit it.
+ *
+ * `opts.includeRemote: true` lifts that filter for a caller that only reads — the global
+ * Marketplace tab — so a GitHub-sourced marketplace isn't silently missing from "marketplaces
+ * I've added."
  */
 export function listMarketplaces(opts: MarketplaceOptions = {}): MarketplaceEntry[] {
   const known =
@@ -70,7 +85,7 @@ export function listMarketplaces(opts: MarketplaceOptions = {}): MarketplaceEntr
     ) ?? {};
 
   return Object.entries(known)
-    .filter(([, m]) => m?.source?.source === "directory" && !!m.installLocation)
+    .filter(([, m]) => (opts.includeRemote || m?.source?.source === "directory") && !!m.installLocation)
     .map(([name, m]) => ({
       name,
       path: m.installLocation!,

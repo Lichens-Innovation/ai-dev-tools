@@ -35,7 +35,7 @@ export default function DocsPanel({
           {docs.map((doc) => (
             <li key={doc.slug}>
               <Link
-                to="/docs/$slug"
+                to="/project-docs/$slug"
                 params={{ slug: doc.slug }}
                 search={{ q: "", at: "" }}
                 onClick={onClose}

@@ -12,56 +12,35 @@ import {
   ChevronDown,
   Trash2,
   FolderOpen,
-  Download,
-  Sparkles,
-  Bot,
-  Package,
-  Store,
-  LayoutGrid,
-  BookOpen,
-  Library,
   MessagesSquare,
+  BookOpen,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "../utils/session-context";
 import { useSessionLog } from "../utils/session-log-context";
 import { useProject } from "../utils/project-context";
 import { installBadge, useInstall } from "../utils/install-context";
+import HamburgerMenu from "./hamburger-menu";
 
 /**
  * THE BAR IS GROUPED, NOT APPENDED TO.
  *
- * Before help-server was folded in, this was five top-level links (Workflows, Rules, Session Log,
- * Maestro Tasks, Runtime) plus a Create menu, a 20em workflow selector, the project button and the
- * theme toggle — already at the width of the app's 960px minimum. Hanging Tools and Docs off the
- * end would have overflowed it, and the first thing to fall off the end is the Runtime badge,
- * which is the one item here nobody goes looking for.
+ * The hamburger menu (leftmost) separates APP-WIDE concerns — the Maestro runtime page, the
+ * global Docs page, the /tools dashboard, and project switching — from what stays as direct
+ * top-nav links: things that need the CURRENT project open and that a user came here to DO. The
+ * runtime staleness badge rides on the hamburger button itself, because that badge is the one
+ * item here nobody goes looking for, so it has to be visible from whatever route the user is on.
  *
- * So the bar now says what kind of thing each item is. The four project links stay top-level —
- * they are what a user came to the app to do, and they all write. Everything that only READS —
- * help-server's dashboard, the docs, and the runtime page — is one **Library** menu, which is a
- * net REDUCTION in top-level items even after adding two sections. The runtime badge is promoted
- * onto that menu's button so a stale runtime is still visible from whatever route the user is on.
+ * The old top-of-file `Library`/`Create` dropdowns are gone: Library's three destinations moved
+ * into the hamburger menu, and Create's four routes are reached instead from buttons at the
+ * bottom of the Marketplace/Plugins/Agents/Skills tabs on /tools.
  */
-const LIBRARY_ROUTES = [
-  { to: "/tools", label: "Tools", Icon: LayoutGrid },
-  { to: "/docs", label: "Docs", Icon: BookOpen },
-  { to: "/install", label: "Runtime", Icon: Download },
-] as const;
-
-const CREATE_ROUTES = [
-  { to: "/create-skill", label: "Skill", Icon: Sparkles },
-  { to: "/create-subagent", label: "Subagent", Icon: Bot },
-  { to: "/create-plugin", label: "Plugin", Icon: Package },
-  { to: "/create-marketplace", label: "Marketplace", Icon: Store },
-] as const;
-
 const NAV_LINK = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)";
-const MENU_ITEM =
+export const MENU_ITEM =
   "flex items-center gap-2 px-3 py-1.5 text-[13px] text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink)";
 
-/** Close on an outside click — shared by both menus and by the workflow selector's own copy. */
-function useOutsideClose(open: boolean, close: () => void) {
+/** Close on an outside click — shared by the workflow selector and the hamburger/project menus. */
+export function useOutsideClose(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -72,55 +51,6 @@ function useOutsideClose(open: boolean, close: () => void) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open, close]);
   return ref;
-}
-
-/** One dropdown of routes. Two of them now, so the behaviour is written once. */
-function NavMenu({
-  label,
-  Icon,
-  testId,
-  routes,
-  children,
-}: {
-  label: string;
-  Icon: typeof Plus;
-  testId: string;
-  routes: readonly { to: string; label: string; Icon: typeof Plus }[];
-  /** Rendered on the button, after the label — the Library menu's runtime badge. */
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutsideClose(open, () => setOpen(false));
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        data-testid={testId}
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none bg-transparent border-0"
-      >
-        <Icon size={13} /> {label}
-        {children}
-        <ChevronDown size={12} className="text-(--ink-3)" />
-      </button>
-      {open && (
-        <div className="absolute left-0 top-8 z-50 w-44 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
-          {routes.map(({ to, label: itemLabel, Icon: ItemIcon }) => (
-            <Link
-              key={to}
-              to={to}
-              onClick={() => setOpen(false)}
-              activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
-              className={MENU_ITEM}
-            >
-              <ItemIcon size={13} /> {itemLabel}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 interface WorkflowSelectorProps {
@@ -197,6 +127,14 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
 
   return (
     <nav className="h-11 border-b border-(--line) bg-(--bg) flex items-center px-4 gap-1 shrink-0">
+      <HamburgerMenu badge={badge} />
+
+      {/* Where the hamburger's app-wide items end and "what I'm editing in this project" begins. */}
+      <span className="w-px h-4 bg-(--line) mx-1.5 shrink-0" aria-hidden />
+
+      <Link to="/project-docs" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
+        <BookOpen size={13} /> Project Docs
+      </Link>
       <Link to="/workflows" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
         <Workflow size={13} /> Workflows
       </Link>
@@ -215,37 +153,6 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
       <Link to="/maestro-tasks" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
         <ListChecks size={13} /> Maestro Tasks
       </Link>
-
-      {/* Where "what I'm editing" ends and "what I'm looking things up in" begins. */}
-      <span className="w-px h-4 bg-(--line) mx-1.5 shrink-0" aria-hidden />
-
-      {/*
-        The read-only sections — help-server's dashboard, the docs, and the runtime page. The
-        runtime BADGE rides on this button: a project running an older runtime than the app ships
-        is precisely the thing a user never goes looking for, so it has to stay visible from
-        whatever route they are already on, menu or not.
-      */}
-      <NavMenu label="Library" Icon={Library} testId="library-menu" routes={LIBRARY_ROUTES}>
-        {badge !== "none" && (
-          <span
-            title={
-              badge === "missing"
-                ? "Maestro is not installed in this project"
-                : "The app ships a newer runtime than this project has"
-            }
-            className="text-[7px] leading-none text-amber-500"
-          >
-            ●
-          </span>
-        )}
-      </NavMenu>
-
-      {/*
-        The four create-* routes, behind one menu rather than four more top-level links: they are
-        the things a user does occasionally, and four more items would push the runtime badge —
-        which is the one thing here they never go looking for — off the end of a narrow window.
-      */}
-      <NavMenu label="Create" Icon={Plus} testId="create-menu" routes={CREATE_ROUTES} />
 
       {/* Centered workflow selector */}
       <div className="flex-1 flex items-center justify-center">

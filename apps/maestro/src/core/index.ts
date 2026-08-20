@@ -92,6 +92,7 @@ export { listInstalledPlugins, readProjectMarketplace, projectMarketplacePath } 
 export { listCuratedPlugins, CURATED_MARKETPLACES } from "./curated.js";
 export { readClaudeCommands, claudeCommandsDocPath } from "./commands.js";
 export { listDocs, readDoc, docSections, docsDir, isValidDocSlug, slugifyHeading } from "./docs.js";
+export { globalDocsData, readGlobalDoc, type DocGroup, type GlobalDocsDirs } from "./global-docs.js";
 
 export { applyRules, targetDirFor, type ApplyRulesSummary } from "./rules.js";
 

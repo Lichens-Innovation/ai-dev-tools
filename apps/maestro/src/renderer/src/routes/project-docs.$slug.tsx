@@ -1,6 +1,8 @@
-// /docs/$slug — the documentation reader.
+// /project-docs/$slug — the documentation reader, over the OPEN PROJECT's own `docs/`.
 //
-// PORTED FROM apps/help-server/src/routes/docs/$slug.tsx. The rendering stack is unchanged and
+// Moved from `/docs/$slug` — that path now belongs to the global reader (routes/docs.$group.$slug.tsx)
+// — with no other behavior change. PORTED FROM apps/help-server/src/routes/docs/$slug.tsx. The
+// rendering stack is unchanged and
 // deliberately so: `react-markdown` + `remark-gfm` + `prose prose-neutral` is exactly what
 // /maestro-tasks already renders task files with, so there was nothing to reconcile.
 //
@@ -21,7 +23,7 @@ import { callMain } from "../utils/call-main";
 import { getDoc, getDocsData } from "../utils/docs";
 import { rehypeHighlightTerms } from "../utils/highlight";
 
-export const Route = createFileRoute("/docs/$slug")({
+export const Route = createFileRoute("/project-docs/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({
     /** The term to highlight, carried from search so a hit is visible in the body it matched. */
     q: typeof search.q === "string" ? search.q : "",
@@ -115,7 +117,7 @@ function DocPage() {
       const sibling = href?.match(/^\.?\/?([\w-]+)\.md$/);
       if (sibling) {
         return (
-          <Link to="/docs/$slug" params={{ slug: sibling[1] }} search={{ q: "", at: "" }}>
+          <Link to="/project-docs/$slug" params={{ slug: sibling[1] }} search={{ q: "", at: "" }}>
             {children}
           </Link>
         );
@@ -142,7 +144,7 @@ function DocPage() {
           <PanelLeft size={13} /> All docs
         </button>
         <Link
-          to="/docs"
+          to="/project-docs"
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] text-(--ink-2) hover:text-(--ink)"
         >
           <ArrowLeft size={13} /> Search
@@ -152,7 +154,7 @@ function DocPage() {
         {q.trim() && (
           <button
             type="button"
-            onClick={() => void navigate({ to: "/docs/$slug", params: { slug }, search: { q: "", at: "" } })}
+            onClick={() => void navigate({ to: "/project-docs/$slug", params: { slug }, search: { q: "", at: "" } })}
             className="px-2 py-0.5 rounded-md text-[11px] text-primary bg-(--primary-dim) border border-ring cursor-pointer focus:outline-none"
           >
             highlighting “{q.trim()}” — clear

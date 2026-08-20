@@ -2,7 +2,7 @@
 // Uninstalls / disables the Maestro orchestrator in a project. The inverse of
 // maestro-install.js. Idempotent — safe to re-run.
 //
-//   node maestro-uninstall.js [projectDir] [--purge]
+//   node maestro-uninstall.js [projectDir] [--purge] [--delete-maestro-tasks]
 //
 // Default: removes every Maestro hook registered against .claude/scripts/ from
 //   <project>/.claude/settings.json (only the keys Maestro added; all other keys
@@ -15,16 +15,31 @@
 //   i.e. everything the install pipeline produced. Keep this list in sync with the
 //   files maestro-install.js copies into .claude/scripts/.
 //
-// Default (no --purge): never touches maestro.json — that is the user-authored
-// config and is kept so a later /maestro-install or /maestro-update can restore things.
+//   In --purge mode, this also *reports* on the file-based task queue at
+//   .claude/maestro-tasks/ but never deletes it here — it's user-authored
+//   content, not an install artifact. The caller shows the report to the user
+//   and only passes --delete-maestro-tasks on a follow-up run if they agree.
+// --delete-maestro-tasks: requires --purge. Deletes .claude/maestro-tasks/.
+//   Pass only after the user has explicitly agreed — this script doesn't
+//   prompt; the calling skill owns that confirmation.
+//
+// Default (no --purge): never touches maestro.json or maestro-tasks/ — those
+// are user-authored and kept so a later /maestro-install can restore things.
 // Prints a JSON summary to stdout.
 
 const fs = require("fs");
 const path = require("path");
+const { tasksDir, listTaskFiles, statusPath } = require("./lib/maestro-tasks.cjs");
 
 const args = process.argv.slice(2);
 const purge = args.includes("--purge");
+const deleteMaestroTasks = args.includes("--delete-maestro-tasks");
 const projectDir = args.find((a) => !a.startsWith("--")) || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+
+if (deleteMaestroTasks && !purge) {
+  process.stderr.write("maestro-uninstall: --delete-maestro-tasks requires --purge\n");
+  process.exit(1);
+}
 
 // Every runtime script the install path registers a hook for. Keep in sync with
 // HOOK_REGISTRATIONS in apps/maestro/src/core/install.ts — the desktop app's
@@ -144,6 +159,26 @@ try {
     for (const t of targets) if (removeIfPresent(t)) purged.push(path.relative(projectDir, t));
   }
 
+  // Report-only by default — .claude/maestro-tasks/ is user-authored content,
+  // not an install artifact, so it's never deleted just because --purge ran.
+  let maestroTasks = null;
+  if (purge) {
+    const files = listTaskFiles(projectDir);
+    const hasStatusJson = fs.existsSync(statusPath(projectDir));
+    let deleted = false;
+    if (deleteMaestroTasks && (files.length > 0 || hasStatusJson)) {
+      deleted = removeIfPresent(tasksDir(projectDir));
+      if (deleted) purged.push(path.relative(projectDir, tasksDir(projectDir)));
+    }
+    maestroTasks = {
+      dir: path.relative(projectDir, tasksDir(projectDir)),
+      fileCount: files.length,
+      files,
+      hasStatusJson,
+      deleted,
+    };
+  }
+
   process.stdout.write(
     JSON.stringify({
       ok: true,
@@ -151,6 +186,7 @@ try {
       removedHooks,
       removedSession,
       purged: purge ? purged : null,
+      maestroTasks,
       keptConfig: !purge,
     }) + "\n"
   );

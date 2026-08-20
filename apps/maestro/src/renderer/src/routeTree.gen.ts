@@ -14,14 +14,16 @@ import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as SessionLogRouteImport } from './routes/session-log'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
-import { Route as InstallRouteImport } from './routes/install'
+import { Route as MaestroRouteImport } from './routes/maestro'
 import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProjectDocsIndexRouteImport } from './routes/project-docs.index'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
-import { Route as DocsSlugRouteImport } from './routes/docs.$slug'
+import { Route as ProjectDocsSlugRouteImport } from './routes/project-docs.$slug'
+import { Route as DocsGroupSlugRouteImport } from './routes/docs.$group.$slug'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
   id: '/workflows',
@@ -48,9 +50,9 @@ const MaestroTasksRoute = MaestroTasksRouteImport.update({
   path: '/maestro-tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InstallRoute = InstallRouteImport.update({
-  id: '/install',
-  path: '/install',
+const MaestroRoute = MaestroRouteImport.update({
+  id: '/maestro',
+  path: '/maestro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateSubagentRoute = CreateSubagentRouteImport.update({
@@ -78,14 +80,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectDocsIndexRoute = ProjectDocsIndexRouteImport.update({
+  id: '/project-docs/',
+  path: '/project-docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/docs/',
   path: '/docs/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DocsSlugRoute = DocsSlugRouteImport.update({
-  id: '/docs/$slug',
-  path: '/docs/$slug',
+const ProjectDocsSlugRoute = ProjectDocsSlugRouteImport.update({
+  id: '/project-docs/$slug',
+  path: '/project-docs/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGroupSlugRoute = DocsGroupSlugRouteImport.update({
+  id: '/docs/$group/$slug',
+  path: '/docs/$group/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -95,14 +107,16 @@ export interface FileRoutesByFullPath {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
-  '/install': typeof InstallRoute
+  '/maestro': typeof MaestroRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
   '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
-  '/docs/$slug': typeof DocsSlugRoute
+  '/project-docs/$slug': typeof ProjectDocsSlugRoute
   '/docs/': typeof DocsIndexRoute
+  '/project-docs/': typeof ProjectDocsIndexRoute
+  '/docs/$group/$slug': typeof DocsGroupSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,14 +124,16 @@ export interface FileRoutesByTo {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
-  '/install': typeof InstallRoute
+  '/maestro': typeof MaestroRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
   '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
-  '/docs/$slug': typeof DocsSlugRoute
+  '/project-docs/$slug': typeof ProjectDocsSlugRoute
   '/docs': typeof DocsIndexRoute
+  '/project-docs': typeof ProjectDocsIndexRoute
+  '/docs/$group/$slug': typeof DocsGroupSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,14 +142,16 @@ export interface FileRoutesById {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
-  '/install': typeof InstallRoute
+  '/maestro': typeof MaestroRoute
   '/maestro-tasks': typeof MaestroTasksRoute
   '/rules': typeof RulesRoute
   '/session-log': typeof SessionLogRoute
   '/tools': typeof ToolsRoute
   '/workflows': typeof WorkflowsRoute
-  '/docs/$slug': typeof DocsSlugRoute
+  '/project-docs/$slug': typeof ProjectDocsSlugRoute
   '/docs/': typeof DocsIndexRoute
+  '/project-docs/': typeof ProjectDocsIndexRoute
+  '/docs/$group/$slug': typeof DocsGroupSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,14 +161,16 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
-    | '/install'
+    | '/maestro'
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
     | '/tools'
     | '/workflows'
-    | '/docs/$slug'
+    | '/project-docs/$slug'
     | '/docs/'
+    | '/project-docs/'
+    | '/docs/$group/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -158,14 +178,16 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
-    | '/install'
+    | '/maestro'
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
     | '/tools'
     | '/workflows'
-    | '/docs/$slug'
+    | '/project-docs/$slug'
     | '/docs'
+    | '/project-docs'
+    | '/docs/$group/$slug'
   id:
     | '__root__'
     | '/'
@@ -173,14 +195,16 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
-    | '/install'
+    | '/maestro'
     | '/maestro-tasks'
     | '/rules'
     | '/session-log'
     | '/tools'
     | '/workflows'
-    | '/docs/$slug'
+    | '/project-docs/$slug'
     | '/docs/'
+    | '/project-docs/'
+    | '/docs/$group/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -189,14 +213,16 @@ export interface RootRouteChildren {
   CreatePluginRoute: typeof CreatePluginRoute
   CreateSkillRoute: typeof CreateSkillRoute
   CreateSubagentRoute: typeof CreateSubagentRoute
-  InstallRoute: typeof InstallRoute
+  MaestroRoute: typeof MaestroRoute
   MaestroTasksRoute: typeof MaestroTasksRoute
   RulesRoute: typeof RulesRoute
   SessionLogRoute: typeof SessionLogRoute
   ToolsRoute: typeof ToolsRoute
   WorkflowsRoute: typeof WorkflowsRoute
-  DocsSlugRoute: typeof DocsSlugRoute
+  ProjectDocsSlugRoute: typeof ProjectDocsSlugRoute
   DocsIndexRoute: typeof DocsIndexRoute
+  ProjectDocsIndexRoute: typeof ProjectDocsIndexRoute
+  DocsGroupSlugRoute: typeof DocsGroupSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -236,11 +262,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MaestroTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/install': {
-      id: '/install'
-      path: '/install'
-      fullPath: '/install'
-      preLoaderRoute: typeof InstallRouteImport
+    '/maestro': {
+      id: '/maestro'
+      path: '/maestro'
+      fullPath: '/maestro'
+      preLoaderRoute: typeof MaestroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create-subagent': {
@@ -278,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/project-docs/': {
+      id: '/project-docs/'
+      path: '/project-docs'
+      fullPath: '/project-docs/'
+      preLoaderRoute: typeof ProjectDocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/': {
       id: '/docs/'
       path: '/docs'
@@ -285,11 +318,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/docs/$slug': {
-      id: '/docs/$slug'
-      path: '/docs/$slug'
-      fullPath: '/docs/$slug'
-      preLoaderRoute: typeof DocsSlugRouteImport
+    '/project-docs/$slug': {
+      id: '/project-docs/$slug'
+      path: '/project-docs/$slug'
+      fullPath: '/project-docs/$slug'
+      preLoaderRoute: typeof ProjectDocsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$group/$slug': {
+      id: '/docs/$group/$slug'
+      path: '/docs/$group/$slug'
+      fullPath: '/docs/$group/$slug'
+      preLoaderRoute: typeof DocsGroupSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -301,14 +341,16 @@ const rootRouteChildren: RootRouteChildren = {
   CreatePluginRoute: CreatePluginRoute,
   CreateSkillRoute: CreateSkillRoute,
   CreateSubagentRoute: CreateSubagentRoute,
-  InstallRoute: InstallRoute,
+  MaestroRoute: MaestroRoute,
   MaestroTasksRoute: MaestroTasksRoute,
   RulesRoute: RulesRoute,
   SessionLogRoute: SessionLogRoute,
   ToolsRoute: ToolsRoute,
   WorkflowsRoute: WorkflowsRoute,
-  DocsSlugRoute: DocsSlugRoute,
+  ProjectDocsSlugRoute: ProjectDocsSlugRoute,
   DocsIndexRoute: DocsIndexRoute,
+  ProjectDocsIndexRoute: ProjectDocsIndexRoute,
+  DocsGroupSlugRoute: DocsGroupSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

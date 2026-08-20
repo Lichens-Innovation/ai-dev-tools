@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import CopyableText from "@repo/ui/copyable-text";
+import CreateLink from "./create-link";
 import type { ClaudeCommand, InstalledPluginInfo } from "../../utils/tools";
 
 const TH =
@@ -156,6 +157,8 @@ export default function CommandCenter({
           </div>
         )}
       </section>
+
+      <CreateLink to="/create-plugin" label="Create a plugin" />
     </div>
   );
 }

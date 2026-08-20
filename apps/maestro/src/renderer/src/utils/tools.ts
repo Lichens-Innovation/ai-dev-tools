@@ -13,8 +13,11 @@ export type {
   CuratedPlugin,
   RuleLibraryEntry,
   ClaudeCommand,
+  MarketplaceEntry,
+  ProjectRule,
+  DiscoveredDefinition,
 } from "../../../shared/ipc";
 
-export function getToolsData(): Promise<ToolsData> {
-  return window.maestro.data.tools();
+export function getToolsData(projectRoot?: string): Promise<ToolsData> {
+  return window.maestro.data.tools(projectRoot);
 }

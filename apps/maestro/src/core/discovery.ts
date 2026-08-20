@@ -65,6 +65,26 @@ export function findUpBundledAgents(start: string): string | null {
 }
 
 /**
+ * Walk up from `start` looking for the monorepo root's `docs/` — the Claude Code concept docs.
+ *
+ * Same shape as `findUpBundledAgents`, and the same reason to search rather than fix a depth: the
+ * repo root sits at a different distance from `apps/maestro` in a packaged tree than it does here.
+ * The extra `plugins.md` check is the disambiguator `findUpBundledAgents` doesn't need — a plain
+ * `docs` test would stop at `apps/maestro/docs` (this app's own end-user docs, see
+ * `maestroAppDocsDir`) on the very first hop, never reaching the repo root at all.
+ */
+export function findUpDocsRoot(start: string): string | null {
+  let dir = start;
+  for (;;) {
+    const candidate = path.join(dir, "docs");
+    if (fs.existsSync(path.join(candidate, "plugins.md"))) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
  * All agents the user can choose from: project-scoped, global (~/.claude), the bundled Maestro
  * subagents, and every installed plugin's agents — each tagged with its `source`.
  *

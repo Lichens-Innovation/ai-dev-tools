@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
-import { BUNDLED_AGENTS_REL, findUpBundledAgents } from "../core/discovery.js";
+import { BUNDLED_AGENTS_REL, findUpBundledAgents, findUpDocsRoot } from "../core/discovery.js";
 
 /**
  * The Maestro plugin's bundled subagents, or null if this build does not ship them.
@@ -70,4 +70,50 @@ export function bundledAgentsDir(): string | null {
 export function bundledPluginDir(): string | null {
   const agents = bundledAgentsDir();
   return agents ? path.dirname(agents) : null;
+}
+
+/**
+ * The global Docs page's Maestro-app corpus — `apps/maestro/docs/app/*.md`.
+ *
+ * Simpler than `bundledAgentsDir()` because there is nothing to search up for: the directory is
+ * physically inside `apps/maestro`'s own tree, so `app.getAppPath()` (`apps/maestro` in dev/build,
+ * `…/resources/app.asar` when packaged) already resolves onto it in every mode with zero extra
+ * packaging config — same fixed point `bundledAgentsDir()` uses, one join away.
+ *
+ * Null (rather than a directory that doesn't exist) until the docs themselves are authored — see
+ * `apps/maestro/docs/app/`. Every caller degrades gracefully on null; see `global-docs.ts`.
+ */
+export function maestroAppDocsDir(): string | null {
+  const fromEnv = process.env.MAESTRO_APP_DOCS_DIR;
+  if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
+
+  const dir = path.join(app.getAppPath(), "docs", "app");
+  return fs.existsSync(dir) ? dir : null;
+}
+
+/**
+ * The global Docs page's Claude Code concept corpus — the monorepo root's `docs/*.md`.
+ *
+ * Three sources, in the same order and for the same reasons as `bundledAgentsDir()`:
+ *
+ * 1. `MAESTRO_CLAUDE_DOCS_DIR` — the explicit override, so a test can point this at a fixture.
+ * 2. The packaged app's unpacked resources, mirroring `bundledAgentsDir()`'s packaged branch:
+ *    `resources/claude-code-docs`, populated at build time by `scripts/sync-claude-docs.mjs`
+ *    (read with `fs.readdirSync`, so — like `plugins/` — it has to ship beside `app.asar` rather
+ *    than inside it).
+ * 3. A search upward from the app path for the monorepo root's own `docs/`, which is what finds
+ *    it two levels above `apps/maestro` when running from this repo. Never throws — a dev
+ *    checkout with a different layout, or a packaged build that hasn't run the sync step yet,
+ *    just gets an empty Claude Code Concepts section rather than a crash.
+ */
+export function claudeCodeDocsDir(): string | null {
+  const fromEnv = process.env.MAESTRO_CLAUDE_DOCS_DIR;
+  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
+
+  if (app.isPackaged) {
+    const packaged = path.join(process.resourcesPath, "claude-code-docs");
+    if (fs.existsSync(packaged)) return packaged;
+  }
+
+  return findUpDocsRoot(app.getAppPath());
 }

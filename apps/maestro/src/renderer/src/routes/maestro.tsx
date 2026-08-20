@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Button from "@repo/ui/button";
 import { toast } from "@repo/ui/toast";
 import { AlertTriangle, Check, Download, FolderOpen, PowerOff, RefreshCw, Trash2, X } from "lucide-react";
 import TopNav from "../components/top-nav";
-import { useInstall } from "../utils/install-context";
+import ProjectSelect from "../components/project-select";
+import { callMain, type CallResult } from "../utils/call-main";
 import { useProject } from "../utils/project-context";
 import type { InstallReport, InstallStatus, UninstallPlan, UninstallReport } from "../../../shared/ipc";
 
-export const Route = createFileRoute("/install")({
+export const Route = createFileRoute("/maestro")({
   component: InstallPage,
 });
 
@@ -143,6 +144,12 @@ function RemovalCard({ report }: { report: UninstallReport }) {
               </span>
             </li>
           )}
+          {report.maestroTasksDeleted && (
+            <li>
+              The task queue at <span className="font-mono text-(--ink)">.claude/maestro-tasks/</span> was deleted too —
+              you opted into that separately.
+            </li>
+          )}
         </ul>
       )}
       {/* The half that makes the two levels legible: say what is still there. */}
@@ -180,8 +187,14 @@ function PurgeDialog({
   plan: UninstallPlan;
   busy: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (opts: { deleteMaestroTasks: boolean }) => void;
 }) {
+  // Opt-in, unchecked by default: ticking this box IS the "explicit permission" that
+  // .claude/maestro-tasks/ needs on top of purge. Kept out of `plan.purgeFiles` on purpose, so
+  // the two consents — purge, and delete-the-task-queue — can't be conflated into one click.
+  const [deleteMaestroTasks, setDeleteMaestroTasks] = useState(false);
+  const hasTasks = plan.maestroTasks.files.length > 0 || plan.maestroTasks.hasStatusJson;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onCancel();
     window.addEventListener("keydown", onKey);
@@ -216,6 +229,22 @@ function PurgeDialog({
             </span>
           </div>
         )}
+        {hasTasks && (
+          <label className="flex items-start gap-2 px-3 py-2 rounded-lg text-[12px] bg-amber-500/10 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deleteMaestroTasks}
+              onChange={(e) => setDeleteMaestroTasks(e.target.checked)}
+              disabled={busy}
+              className="mt-0.5 shrink-0 cursor-pointer"
+            />
+            <span className="text-(--ink-2)">
+              Also delete <span className="font-mono text-(--ink)">{plan.maestroTasks.dir}/</span> —{" "}
+              {plan.maestroTasks.files.length} task file{plan.maestroTasks.files.length === 1 ? "" : "s"} written by{" "}
+              <span className="font-mono">/to-maestro-tasks</span>. Unchecked, this purge leaves it alone.
+            </span>
+          </label>
+        )}
         <div className="max-h-60 overflow-y-auto rounded-lg border border-(--line) bg-(--bg-elev) p-2">
           <ul className="list-none p-0 m-0 flex flex-col">
             {plan.purgeFiles.map((file) => (
@@ -243,10 +272,14 @@ function PurgeDialog({
           <button
             type="button"
             disabled={busy}
-            onClick={onConfirm}
+            onClick={() => onConfirm({ deleteMaestroTasks })}
             className="px-3 py-1.5 text-[12px] rounded-lg bg-red-500 text-white cursor-pointer focus:outline-none hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {busy ? "Deleting…" : `Delete ${plan.purgeFiles.length} file${plan.purgeFiles.length === 1 ? "" : "s"}`}
+            {busy
+              ? "Deleting…"
+              : `Delete ${plan.purgeFiles.length + (deleteMaestroTasks ? plan.maestroTasks.files.length : 0)} file${
+                  plan.purgeFiles.length + (deleteMaestroTasks ? plan.maestroTasks.files.length : 0) === 1 ? "" : "s"
+                }`}
           </button>
         </div>
       </div>
@@ -309,18 +342,55 @@ function StatusCard({ status }: { status: InstallStatus }) {
 }
 
 /**
- * Install / update Maestro's runtime in the open project.
+ * Install / update Maestro's runtime in a project.
  *
  * The whole page exists because the runtime used to be installed by `/maestro-install` inside a
  * Claude session — a model acting as transport for a file copy. Everything here is one IPC call.
+ *
+ * `viewedRoot` is the project this page shows, which is not necessarily the app's CURRENT
+ * project — `ProjectSelect` lets a user peek at another recent project's runtime status without
+ * ending the live session or retargeting every other route. It defaults to the current project
+ * and is threaded through every `window.maestro.install.*` call as the optional viewing
+ * `projectRoot` argument; main falls back to the open project when it is omitted.
  */
 function InstallPage() {
-  const { current } = useProject();
-  const { status, error, install, refresh, uninstall, uninstallPlan } = useInstall();
+  const { current, recent } = useProject();
+  const [viewedRoot, setViewedRoot] = useState<string | null>(current?.root ?? null);
+  const [status, setStatus] = useState<InstallStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   /** Non-null while the purge confirmation is open — and it is the only way to reach a purge. */
   const [purgePlan, setPurgePlan] = useState<UninstallPlan | null>(null);
+
+  // If the currently-viewed root is no longer known (e.g. forgotten, or nothing was ever open),
+  // fall back to whatever the app now considers current — mirrors the default the plan calls for.
+  useEffect(() => {
+    if (viewedRoot && ![current?.root, ...recent.map((r) => r.root)].includes(viewedRoot)) {
+      setViewedRoot(current?.root ?? null);
+    }
+  }, [viewedRoot, current, recent]);
+
+  const refreshStatus = useCallback(async () => {
+    if (!viewedRoot) {
+      setStatus(null);
+      setStatusError(null);
+      return;
+    }
+    const res = await callMain(() => window.maestro.install.status(viewedRoot));
+    if (res.ok) {
+      setStatus(res.value);
+      setStatusError(null);
+    } else {
+      setStatus(null);
+      setStatusError(res.error);
+    }
+  }, [viewedRoot]);
+
+  useEffect(() => {
+    setOutcome(null);
+    void refreshStatus();
+  }, [refreshStatus]);
 
   const run = async () => {
     setPhase("installing");
@@ -328,11 +398,12 @@ function InstallPage() {
     // try/finally, not a bare reset after the await: a rejected install must still return the
     // button to its resting state rather than spinning forever.
     try {
-      const res = await install();
+      const res = await callMain(() => window.maestro.install.run(viewedRoot ?? undefined));
       if (!res.ok) {
         toast(<>Could not install the runtime: {res.error}</>, { variant: "error" });
         return;
       }
+      setStatus(res.value.status);
       setOutcome({ kind: "install", report: res.value });
       for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "error" });
       if (!res.value.unchanged && res.value.warnings.length === 0) {
@@ -343,15 +414,18 @@ function InstallPage() {
     }
   };
 
-  const runUninstall = async (purge: boolean) => {
+  const runUninstall = async (purge: boolean, deleteMaestroTasks = false) => {
     setPhase(purge ? "purging" : "uninstalling");
     setOutcome(null);
     try {
-      const res = await uninstall(purge);
+      const res: CallResult<UninstallReport> = await callMain(() =>
+        window.maestro.install.uninstall({ purge, deleteMaestroTasks }, viewedRoot ?? undefined)
+      );
       if (!res.ok) {
         toast(<>Could not uninstall: {res.error}</>, { variant: "error" });
         return;
       }
+      setStatus(res.value.status);
       setPurgePlan(null);
       setOutcome({ kind: "uninstall", report: res.value });
       for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "error" });
@@ -373,12 +447,15 @@ function InstallPage() {
 
   /** Fetch the plan, then open the confirmation — the dialog never renders an unnamed file list. */
   const openPurge = async () => {
-    const res = await uninstallPlan();
+    const res = await callMain(() => window.maestro.install.uninstallPlan(viewedRoot ?? undefined));
     if (!res.ok) {
       toast(<>Could not work out what to delete: {res.error}</>, { variant: "error" });
       return;
     }
-    if (res.value.purgeFiles.length === 0) {
+    // The dialog is also how the maestro-tasks opt-in is offered, so it still has to open when
+    // purgeFiles is empty but the task queue isn't — otherwise that queue has no route to deletion.
+    const hasTasks = res.value.maestroTasks.files.length > 0 || res.value.maestroTasks.hasStatusJson;
+    if (res.value.purgeFiles.length === 0 && !hasTasks) {
       toast(<>No Maestro files to delete — this project has none left.</>);
       return;
     }
@@ -387,6 +464,7 @@ function InstallPage() {
 
   const action = !status || !status.installed ? "install" : status.stale ? "update" : "reinstall";
   const busy = phase !== "idle";
+  const error = statusError;
 
   return (
     <div className="w-full h-screen bg-(--bg) font-sans text-(--ink) overflow-hidden flex flex-col">
@@ -394,18 +472,21 @@ function InstallPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto p-8 flex flex-col gap-4">
-          <div>
-            <h1 className="text-[15px] font-semibold m-0">Maestro runtime</h1>
-            <p className="text-[12px] text-(--ink-3) m-0 mt-1">
-              The hook scripts that run inside a Claude Code session, installed into{" "}
-              <span className="font-mono">
-                {current ? `${current.root.replace(/\/+$/, "")}/.claude/` : "the open project"}
-              </span>
-              . Registered in this project&rsquo;s own settings — your global Claude configuration is never touched.
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[15px] font-semibold m-0">Maestro runtime</h1>
+              <p className="text-[12px] text-(--ink-3) m-0 mt-1">
+                The hook scripts that run inside a Claude Code session, installed into{" "}
+                <span className="font-mono">
+                  {viewedRoot ? `${viewedRoot.replace(/\/+$/, "")}/.claude/` : "the open project"}
+                </span>
+                . Registered in that project&rsquo;s own settings — your global Claude configuration is never touched.
+              </p>
+            </div>
+            <ProjectSelect value={viewedRoot} onChange={setViewedRoot} />
           </div>
 
-          {!current && <Note variant="warn">No project is open. Choose one from the top bar first.</Note>}
+          {!viewedRoot && <Note variant="warn">No project is open. Choose one from the top bar first.</Note>}
 
           {error && <Note variant="error">Could not read the install status: {error}</Note>}
 
@@ -431,7 +512,7 @@ function InstallPage() {
               variant={action === "reinstall" ? "secondary" : "primary"}
               icon={action === "update" ? <RefreshCw size={14} /> : <Download size={14} />}
               loading={phase === "installing"}
-              disabled={!current || busy}
+              disabled={!viewedRoot || busy}
               onClick={() => void run()}
             >
               {phase === "installing"
@@ -442,7 +523,7 @@ function InstallPage() {
                     ? "Update runtime"
                     : "Reinstall"}
             </Button>
-            <Button variant="ghost" icon={<RefreshCw size={13} />} onClick={() => void refresh()}>
+            <Button variant="ghost" icon={<RefreshCw size={13} />} onClick={() => void refreshStatus()}>
               Re-check
             </Button>
             {status && !status.stale && status.installed && (
@@ -468,7 +549,7 @@ function InstallPage() {
                   variant="secondary"
                   icon={<PowerOff size={14} />}
                   loading={phase === "uninstalling"}
-                  disabled={!current || busy}
+                  disabled={!viewedRoot || busy}
                   onClick={() => void runUninstall(false)}
                 >
                   Uninstall
@@ -485,7 +566,7 @@ function InstallPage() {
               <div>
                 <button
                   type="button"
-                  disabled={!current || busy}
+                  disabled={!viewedRoot || busy}
                   onClick={() => void openPurge()}
                   className="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-[13px] font-semibold border box-border transition-all duration-150 border-red-500/40 text-red-500 hover:bg-red-500/10 cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 >
@@ -496,7 +577,9 @@ function InstallPage() {
               <p className="text-[12px] text-(--ink-3) m-0">
                 Everything above, plus the orchestrator skill, the copied scripts and{" "}
                 <span className="font-mono">.claude/maestro.json</span> — your workflow graph and rule assignments. You
-                will see the exact list of files before anything is deleted.
+                will see the exact list of files before anything is deleted.{" "}
+                <span className="font-mono">.claude/maestro-tasks/</span> is a separate opt-in inside that confirmation
+                — purging never takes it unless you tick the box.
               </p>
             </div>
           </div>
@@ -508,7 +591,7 @@ function InstallPage() {
           plan={purgePlan}
           busy={phase === "purging"}
           onCancel={() => setPurgePlan(null)}
-          onConfirm={() => void runUninstall(true)}
+          onConfirm={({ deleteMaestroTasks }) => void runUninstall(true, deleteMaestroTasks)}
         />
       )}
     </div>

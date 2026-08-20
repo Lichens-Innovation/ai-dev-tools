@@ -29,6 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { maestroJsonPath } from "./config.js";
 import { orchestratorSkillPath } from "./render.js";
+import { tasksDirFor } from "./tasks.js";
 import {
   HOOK_REGISTRATIONS,
   installStatus,
@@ -40,7 +41,7 @@ import {
   writeJsonAtomic,
   type Settings,
 } from "./install.js";
-import type { UninstallPlan, UninstallReport } from "./contracts.js";
+import type { MaestroTasksFinding, UninstallPlan, UninstallReport } from "./contracts.js";
 
 export type { UninstallPlan, UninstallReport };
 
@@ -50,8 +51,35 @@ export interface UninstallOptions {
    * protocols and `maestro.json`. Destructive and irreversible — never default it to true.
    */
   purge?: boolean;
+  /**
+   * Also delete `.claude/maestro-tasks/` — the file-based task queue `/to-maestro-tasks` writes.
+   * A second, independent opt-in on top of `purge` (an error without it): that queue is
+   * user-authored content, not an install artifact, and a purge alone must never take it.
+   */
+  deleteMaestroTasks?: boolean;
   /** Where the app's runtime files live. Defaults to the same lookup install uses. */
   pluginRoot?: string;
+}
+
+const MAESTRO_TASKS_REL = ".claude/maestro-tasks";
+
+/**
+ * What's in the file-based task queue right now, independent of which uninstall level runs — the
+ * read that fills the plan's `maestroTasks`, so the UI can show the user what a follow-up
+ * `deleteMaestroTasks` purge would take before they opt into it.
+ */
+function findMaestroTasks(projectRoot: string): MaestroTasksFinding {
+  const dir = tasksDirFor(projectRoot);
+  let files: string[] = [];
+  try {
+    files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .sort((a, b) => a.localeCompare(b));
+  } catch {
+    files = [];
+  }
+  return { dir: MAESTRO_TASKS_REL, files, hasStatusJson: fs.existsSync(path.join(dir, "status.json")) };
 }
 
 /**
@@ -267,6 +295,7 @@ export function uninstallPlan(projectRoot: string, pluginRoot?: string): Uninsta
     legacyAgentSetting,
     purgeFiles,
     purgeRemovesConfig: fs.existsSync(maestroJsonPath(projectRoot)),
+    maestroTasks: findMaestroTasks(projectRoot),
     empty: hooks.length === 0 && sessionFiles.length === 0 && !legacyAgentSetting && purgeFiles.length === 0,
     settingsUnreadable,
   };
@@ -284,9 +313,10 @@ export function uninstallPlan(projectRoot: string, pluginRoot?: string): Uninsta
  * that no longer exist.
  */
 export async function uninstallRuntime(projectRoot: string, options: UninstallOptions = {}): Promise<UninstallReport> {
-  const { purge = false } = options;
+  const { purge = false, deleteMaestroTasks = false } = options;
   if (!projectRoot) throw new Error("No project is open.");
   if (!fs.existsSync(projectRoot)) throw new Error(`${projectRoot} does not exist.`);
+  if (deleteMaestroTasks && !purge) throw new Error("deleteMaestroTasks requires purge.");
 
   // Preflight, all of it before the first deletion: the runtime manifest (which both the purge
   // targets and the closing status read) and the settings file. Either can refuse; neither may
@@ -325,6 +355,18 @@ export async function uninstallRuntime(projectRoot: string, options: UninstallOp
     purged.push(target);
   }
 
+  // Independent of the loop above on purpose: .claude/maestro-tasks/ is never in `targets`, so a
+  // plain purge can't take it — only a purge that also opted into deleteMaestroTasks does.
+  let maestroTasksDeleted = false;
+  if (purge && deleteMaestroTasks) {
+    const tasksDir = projectPath(projectRoot, MAESTRO_TASKS_REL);
+    if (fs.existsSync(tasksDir)) {
+      fs.rmSync(tasksDir, { recursive: true, force: true });
+      purged.push(MAESTRO_TASKS_REL);
+      maestroTasksDeleted = true;
+    }
+  }
+
   const dirsPruned = pruneEmptyDirs(projectRoot, [...purged, ...sessionFilesRemoved]);
 
   const status = await installStatus(projectRoot, pluginRoot);
@@ -346,6 +388,7 @@ export async function uninstallRuntime(projectRoot: string, options: UninstallOp
     sessionFilesRemoved,
     legacyAgentSettingRemoved,
     purged,
+    maestroTasksDeleted,
     dirsPruned,
     configKept: fs.existsSync(maestroJsonPath(projectRoot)),
     noop:

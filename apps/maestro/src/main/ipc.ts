@@ -35,6 +35,8 @@ import {
   listDocs,
   readDoc,
   docSections,
+  globalDocsData,
+  readGlobalDoc,
   previewClaudeRun,
   nodeSettings,
   runPreviewedClaude,
@@ -58,6 +60,7 @@ import type {
   CreateRequest,
   DocContent,
   DocsData,
+  GlobalDocsData,
   ScaffoldResult,
   ClaudeRunResult,
   MaestroConfigV3,
@@ -74,7 +77,7 @@ import type {
   UsageStatsView,
   WorkflowsData,
 } from "../shared/ipc.js";
-import { bundledAgentsDir, bundledPluginDir } from "./bundled-assets.js";
+import { bundledAgentsDir, bundledPluginDir, claudeCodeDocsDir, maestroAppDocsDir } from "./bundled-assets.js";
 import {
   answerPermission,
   answerQuestion,
@@ -147,6 +150,24 @@ function startTail(webContentsId: number): void {
       reset: () => !wc.isDestroyed() && wc.send(IPC_EVENTS.logReset),
     })
   );
+}
+
+/**
+ * Resolve the project root a "viewing" channel should read, when the renderer names one.
+ *
+ * `projectRoot` is a renderer-side VIEWING parameter, never a switch — see the plan's §6. It is
+ * honoured only when it names the currently open project or one from the recent list; anything
+ * else (stale, forged, a path that was since forgotten) degrades silently to the open project
+ * rather than throwing, so a renderer bug here can only ever narrow back to today's behaviour, not
+ * read an arbitrary directory on disk.
+ */
+function resolveProjectRoot(projectRoot?: string): string {
+  if (!projectRoot) return currentRoot();
+  const state = getState();
+  const allowed = state.current ? [state.current.root, ...state.recent.map((r) => r.root)] : state.recent.map((r) => r.root);
+  if (allowed.includes(projectRoot)) return projectRoot;
+  console.warn(`[ipc] ignoring unrecognised projectRoot "${projectRoot}"; falling back to the open project`);
+  return currentRoot();
 }
 
 function announce(state: ProjectState): ProjectState {
@@ -253,12 +274,14 @@ export function registerIpc(): void {
   // Neither of these rejects. Every part is optional in a real project — no `.claude-plugin/`, no
   // `rules/`, no `docs/` — so an absent directory is an empty section, and the route says which
   // parts are empty. `data:doc` below is the exception, and deliberately so.
-  ipcMain.handle(IPC.toolsData, async (): Promise<ToolsData> => {
-    const projectRoot = currentRoot() ?? "";
-    const [installedPlugins, projectMarketplace, curated] = await Promise.all([
+  ipcMain.handle(IPC.toolsData, async (_e, viewingRoot?: string): Promise<ToolsData> => {
+    const projectRoot = resolveProjectRoot(viewingRoot);
+    const [installedPlugins, projectMarketplace, curated, agents, skills] = await Promise.all([
       listInstalledPlugins(),
       readProjectMarketplace(projectRoot),
       listCuratedPlugins(),
+      discoverAgents(projectRoot, bundledAgentsDir()),
+      discoverSkills(projectRoot),
     ]);
     return {
       projectRoot,
@@ -267,6 +290,10 @@ export function registerIpc(): void {
       curated,
       ruleLibrary: discoverRuleLibrary(projectRoot),
       commands: readClaudeCommands(projectRoot),
+      marketplaces: listMarketplaces({ includeRemote: true }),
+      projectRules: discoverProjectRules(projectRoot),
+      agents,
+      skills,
     };
   });
 
@@ -283,6 +310,20 @@ export function registerIpc(): void {
     const root = currentRoot();
     if (!root) throw new Error("No project is open.");
     return readDoc(root, slug);
+  });
+
+  // ── the global docs page ────────────────────────────────────────────
+  // NOT gated on `currentRoot()` — both corpora are read from directories the app SHIPS, resolved
+  // fresh on every call (never cached at module load) so an env override set between calls, e.g. in
+  // a test, is honoured immediately.
+  ipcMain.handle(IPC.globalDocsData, (): GlobalDocsData => {
+    return globalDocsData({ app: maestroAppDocsDir(), claudeCode: claudeCodeDocsDir() });
+  });
+
+  // Throws on an invalid slug, a missing file, an unreadable one, and on a group whose directory
+  // hasn't resolved in this build — same discipline as `data:doc` above.
+  ipcMain.handle(IPC.globalDocContent, (_e, group: "app" | "claude-code", slug: string): DocContent => {
+    return readGlobalDoc(group, slug, { app: maestroAppDocsDir(), claudeCode: claudeCodeDocsDir() });
   });
 
   // ── save ─────────────────────────────────────────────────────────────
@@ -334,32 +375,39 @@ export function registerIpc(): void {
   // The other half of the milestone: a project's Maestro runtime — the orchestrator skill, the
   // hook scripts, and the hook registrations in the project's OWN .claude/settings.json — is
   // installed and updated from here rather than by /maestro-install in a Claude session.
-  ipcMain.handle(IPC.installStatus, async (): Promise<InstallStatus> => {
-    const root = currentRoot();
+  ipcMain.handle(IPC.installStatus, async (_e, viewingRoot?: string): Promise<InstallStatus> => {
+    const root = resolveProjectRoot(viewingRoot);
     if (!root) throw new Error("No project is open.");
     return installStatus(root);
   });
 
-  ipcMain.handle(IPC.installRun, async (): Promise<InstallReport> => {
-    const root = currentRoot();
+  ipcMain.handle(IPC.installRun, async (_e, viewingRoot?: string): Promise<InstallReport> => {
+    const root = resolveProjectRoot(viewingRoot);
     if (!root) throw new Error("No project is open.");
     return installRuntime(root);
   });
 
-  ipcMain.handle(IPC.installUninstallPlan, (): UninstallPlan => {
-    const root = currentRoot();
+  ipcMain.handle(IPC.installUninstallPlan, (_e, viewingRoot?: string): UninstallPlan => {
+    const root = resolveProjectRoot(viewingRoot);
     if (!root) throw new Error("No project is open.");
     return uninstallPlan(root);
   });
 
   // Two levels, and the destructive one is opt-in on this side of the boundary as well: `purge`
-  // comes off the payload with an explicit `=== true`, so a malformed or absent argument can only
-  // ever produce the level that keeps maestro.json.
-  ipcMain.handle(IPC.installUninstall, async (_e, opts?: { purge?: boolean }): Promise<UninstallReport> => {
-    const root = currentRoot();
-    if (!root) throw new Error("No project is open.");
-    return uninstallRuntime(root, { purge: opts?.purge === true });
-  });
+  // and `deleteMaestroTasks` both come off the payload with an explicit `=== true`, so a malformed
+  // or absent argument can only ever produce the level that keeps maestro.json and the task queue.
+  ipcMain.handle(
+    IPC.installUninstall,
+    async (
+      _e,
+      opts?: { purge?: boolean; deleteMaestroTasks?: boolean },
+      viewingRoot?: string
+    ): Promise<UninstallReport> => {
+      const root = resolveProjectRoot(viewingRoot);
+      if (!root) throw new Error("No project is open.");
+      return uninstallRuntime(root, { purge: opts?.purge === true, deleteMaestroTasks: opts?.deleteMaestroTasks === true });
+    }
+  );
 
   // ── the claude -p bridge ─────────────────────────────────────────────
   // Two handlers, and which one can spawn is the point. `previewClaudeRun` comes from a module

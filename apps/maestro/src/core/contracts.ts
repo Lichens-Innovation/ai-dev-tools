@@ -180,6 +180,21 @@ export interface InstallReport {
 }
 
 /**
+ * What's in the file-based task queue at `.claude/maestro-tasks/` (written by `/to-maestro-tasks`)
+ * right now — reported at every level, but actionable only at purge: it's user-authored, often
+ * git-tracked content, not an install artifact, so deleting it needs its own explicit opt-in
+ * (`deleteMaestroTasks`) on top of `purge` rather than riding along with the rest of the purge list.
+ */
+export interface MaestroTasksFinding {
+  /** Project-relative path to the queue directory, e.g. `.claude/maestro-tasks`. */
+  dir: string;
+  /** Task prompt filenames (`NNN-*.md`) found in the queue, sorted. Empty if the dir is absent. */
+  files: string[];
+  /** `status.json` exists — the tracker has been synced at least once. */
+  hasStatusJson: boolean;
+}
+
+/**
  * What each level of an uninstall would remove from the project, as it stands right now.
  *
  * This exists so the UI can NAME the files before it deletes them. "Are you sure?" is not informed
@@ -197,11 +212,14 @@ export interface UninstallPlan {
   /**
    * Project-relative paths a purge would delete ON TOP of the default — the orchestrator skill,
    * the copied runtime scripts, the installed handoff protocols, and `maestro.json`. Only paths
-   * that exist are listed, so the confirmation never names a file the user doesn't have.
+   * that exist are listed, so the confirmation never names a file the user doesn't have. Deliberately
+   * excludes `.claude/maestro-tasks/` — see `maestroTasks` below.
    */
   purgeFiles: string[];
   /** True when `maestro.json` exists — i.e. when purge has something irreplaceable to delete. */
   purgeRemovesConfig: boolean;
+  /** The file-based task queue, reported separately from `purgeFiles` — see `MaestroTasksFinding`. */
+  maestroTasks: MaestroTasksFinding;
   /** Neither level has anything to do: uninstalling would be a no-op. */
   empty: boolean;
   /** `.claude/settings.json` exists but is not valid JSON — uninstall would refuse to touch it. */
@@ -220,6 +238,11 @@ export interface UninstallReport {
   legacyAgentSettingRemoved: boolean;
   /** Project-relative paths deleted by a purge — empty on a default uninstall. */
   purged: string[];
+  /**
+   * `.claude/maestro-tasks/` was deleted. Only ever true when both `purge` and the request's
+   * `deleteMaestroTasks` were true — see `MaestroTasksFinding`.
+   */
+  maestroTasksDeleted: boolean;
   /** Directories left empty by the deletions and pruned. Never `.claude` itself. */
   dirsPruned: string[];
   /**
@@ -1540,10 +1563,16 @@ export interface ClaudeCommand {
   description: string;
 }
 
-/** A markdown file under `<project>/docs/`. */
+/** A markdown file under `<project>/docs/`, or under one of the global doc corpora. */
 export interface DocMeta {
   slug: string;
   title: string;
+  /**
+   * Which global doc corpus this came from — set only by `global-docs.ts`. Absent (never `""`)
+   * for the per-project docs reader, whose one corpus has no need to disambiguate itself. Exists
+   * so `app/overview.md` and a same-named Claude Code doc cannot collide in the merged list.
+   */
+  group?: "app" | "claude-code";
 }
 
 /**
@@ -1559,6 +1588,8 @@ export interface DocSection {
   headingId: string;
   headingText: string;
   bodyText: string;
+  /** Same meaning as `DocMeta.group` — set only when this section came from the global reader. */
+  group?: "app" | "claude-code";
 }
 
 /** A doc's rendered body, as `data:doc` returns it. */
@@ -1566,6 +1597,22 @@ export interface DocContent {
   slug: string;
   title: string;
   content: string;
+}
+
+/**
+ * The global docs page's two corpora, and the combined search index over both.
+ *
+ * NOT gated on an open project — `app` is this app's own end-user docs, `claudeCode` is the
+ * Claude Code concept docs, and both are read from directories the app ships rather than from
+ * anything under a project root. Either array is empty rather than the call failing when its
+ * directory doesn't resolve (see `maestroAppDocsDir`/`claudeCodeDocsDir`) — a dev checkout missing
+ * one doc tree should not break the other.
+ */
+export interface GlobalDocsData {
+  app: DocMeta[];
+  claudeCode: DocMeta[];
+  /** Every section from both corpora, each tagged with its `group` — the combined search index. */
+  sections: DocSection[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

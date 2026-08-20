@@ -138,3 +138,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .DS_Store
+
+# Maestro: Claude Code concept docs, copied at build time by
+# apps/maestro/scripts/sync-claude-docs.mjs so a packaged build can ship them.
+apps/maestro/resources/claude-code-docs/

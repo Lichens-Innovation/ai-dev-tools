@@ -15,9 +15,11 @@ interface InstallContextValue {
   /**
    * Remove the runtime. `purge` is a required argument, not an option with a default: every call
    * site has to state which of the two levels it means, and the destructive one cannot be reached
-   * by leaving something out.
+   * by leaving something out. `deleteMaestroTasks` is a second, independent opt-in — it only takes
+   * effect together with `purge: true` — for `.claude/maestro-tasks/`, the user-authored task
+   * queue, which a purge alone must never take.
    */
-  uninstall(purge: boolean): Promise<CallResult<UninstallReport>>;
+  uninstall(purge: boolean, deleteMaestroTasks?: boolean): Promise<CallResult<UninstallReport>>;
 }
 
 const noProject = { ok: false, error: "No project is open." } as const;
@@ -83,8 +85,8 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const uninstall = useCallback(
-    async (purge: boolean): Promise<CallResult<UninstallReport>> => {
-      const res = await callMain(() => window.maestro.install.uninstall({ purge }));
+    async (purge: boolean, deleteMaestroTasks?: boolean): Promise<CallResult<UninstallReport>> => {
+      const res = await callMain(() => window.maestro.install.uninstall({ purge, deleteMaestroTasks }));
       if (res.ok) setStatus(res.value.status);
       else await refresh();
       return res;

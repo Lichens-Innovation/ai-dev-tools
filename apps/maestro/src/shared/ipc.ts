@@ -85,6 +85,7 @@ import type {
   DocMeta,
   DocSection,
   DocContent,
+  GlobalDocsData,
   CcusageSource,
   UsageStats,
   UsageStatsPreview,
@@ -166,6 +167,7 @@ export type {
   DocMeta,
   DocSection,
   DocContent,
+  GlobalDocsData,
   CcusageSource,
   UsageStats,
   UsageStatsPreview,
@@ -237,6 +239,12 @@ export interface ToolsData {
   curated: CuratedPlugin[];
   ruleLibrary: RuleLibraryEntry[];
   commands: ClaudeCommand[];
+  /** The global Marketplace tab's primary content — every marketplace known to this machine. */
+  marketplaces: MarketplaceEntry[];
+  /** The new Rules tab: local-only, since no global rule tier exists anywhere in this codebase. */
+  projectRules: ProjectRule[];
+  agents: DiscoveredDefinition[];
+  skills: DiscoveredDefinition[];
 }
 
 /** The doc list and the search corpus — both of which every docs view needs at once. */
@@ -267,6 +275,12 @@ export const IPC = {
   toolsData: "data:tools",
   docsData: "data:docs",
   docContent: "data:doc",
+  // The global Docs page's two corpora, NOT gated on an open project — see `src/core/global-docs.ts`.
+  // A separate pair from `docsData`/`docContent` rather than the same channel widened, because the
+  // per-project reader's slug space and the global one's are different files on disk; a single
+  // channel would have to smuggle "which corpus" into what is otherwise the same shape.
+  globalDocsData: "data:global-docs",
+  globalDocContent: "data:global-doc",
   configSave: "config:save",
 
   tasksList: "tasks:list",
@@ -373,8 +387,15 @@ export interface MaestroApi {
      */
     reseed(implAgents: string[]): Promise<MaestroConfigV3>;
     rules(): Promise<RulesData>;
-    /** The /tools dashboard's four tabs. Never rejects: an absent file is an empty section. */
-    tools(): Promise<ToolsData>;
+    /**
+     * The /tools dashboard's four tabs. Never rejects: an absent file is an empty section.
+     *
+     * `projectRoot`, when given, must name the CURRENT project or one from the recent list — main
+     * validates it against that allowlist and falls back to the open project on anything else. It
+     * is how a view-without-switching UI asks about a project other than the one this window has
+     * open; omit it and this behaves exactly as before.
+     */
+    tools(projectRoot?: string): Promise<ToolsData>;
     /** The doc list plus the search corpus. Never rejects; a project with no docs/ returns []. */
     docs(): Promise<DocsData>;
     /**
@@ -383,6 +404,18 @@ export interface MaestroApi {
      * `callMain` and show the reason.
      */
     doc(slug: string): Promise<DocContent>;
+    /**
+     * The global Docs page's landing data: both corpora's doc lists plus the combined search
+     * index. NOT gated on an open project — see `GlobalDocsData`. Never rejects; a corpus whose
+     * directory hasn't resolved in this build contributes an empty list rather than failing the
+     * whole page.
+     */
+    globalDocs(): Promise<GlobalDocsData>;
+    /**
+     * One doc's body from either global corpus. REJECTS on an invalid slug, a missing file, or an
+     * unreadable one — same discipline as `doc` above, and for the same reason.
+     */
+    globalDoc(group: "app" | "claude-code", slug: string): Promise<DocContent>;
   };
   config: {
     save(input: SaveInput): Promise<SaveResult>;
@@ -415,23 +448,37 @@ export interface MaestroApi {
     scaffold(request: CreateRequest): Promise<ScaffoldResult>;
   };
   install: {
-    status(): Promise<InstallStatus>;
+    /**
+     * `projectRoot`, when given on any of these four, must name the CURRENT project or one from
+     * the recent list — main validates it against that allowlist and falls back to the open
+     * project on anything else, never throwing over a bad or stale one. Omit it and every one of
+     * these behaves exactly as before, against the open project.
+     */
+    status(projectRoot?: string): Promise<InstallStatus>;
     /**
      * Install or update Maestro's runtime in the open project. Idempotent, and rejects (rather
      * than half-writing) when it cannot proceed — so the caller must go through `callMain`.
      */
-    run(): Promise<InstallReport>;
+    run(projectRoot?: string): Promise<InstallReport>;
     /**
      * What each level of an uninstall would remove, right now. Reads only — this is what fills
      * the purge confirmation, so it can name the files before anything is deleted.
      */
-    uninstallPlan(): Promise<UninstallPlan>;
+    uninstallPlan(projectRoot?: string): Promise<UninstallPlan>;
     /**
      * Remove the runtime. `purge` is the destructive level: it also deletes the orchestrator
-     * skill, the copied scripts and `maestro.json`. It defaults to false ON THE MAIN SIDE too —
-     * the renderer has to ask for it explicitly, so no call can turn into a purge by accident.
+     * skill, the copied scripts and `maestro.json`. `deleteMaestroTasks` is a second, independent
+     * opt-in on top of that — it takes `.claude/maestro-tasks/` too, and only if `purge` is also
+     * true. Both default to false ON THE MAIN SIDE too — the renderer has to ask for each
+     * explicitly, so no call can turn into a purge, or take the task queue, by accident.
+     *
+     * `projectRoot` trails `opts` here rather than leading, so the existing
+     * `uninstall({ purge, deleteMaestroTasks })` call sites keep type-checking untouched.
      */
-    uninstall(opts?: { purge?: boolean }): Promise<UninstallReport>;
+    uninstall(
+      opts?: { purge?: boolean; deleteMaestroTasks?: boolean },
+      projectRoot?: string
+    ): Promise<UninstallReport>;
   };
   /**
    * The `claude -p` bridge. Two operations, and the split is the security design.

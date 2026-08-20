@@ -351,6 +351,72 @@ describe("purge", () => {
   });
 });
 
+describe("the file-based task queue (.claude/maestro-tasks/)", () => {
+  function seedTasks(root: string): void {
+    const dir = path.join(root, ".claude", "maestro-tasks");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "001-foo.md"), "# Foo\n");
+    fs.writeFileSync(path.join(dir, "status.json"), '{"001-foo.md":{"status":"ready","blockedBy":[]}}\n');
+  }
+
+  it("is reported at every level, but purgeFiles never carries it", async () => {
+    const root = await installed();
+    seedTasks(root);
+
+    for (const purge of [false, true]) {
+      const plan = uninstallPlan(root, PLUGIN_ROOT);
+      expect(plan.maestroTasks).toEqual({ dir: ".claude/maestro-tasks", files: ["001-foo.md"], hasStatusJson: true });
+      expect(plan.purgeFiles).not.toContain(".claude/maestro-tasks");
+      expect(plan.purgeFiles.some((f) => f.startsWith(".claude/maestro-tasks/"))).toBe(false);
+      void purge; // same plan either way — the report doesn't depend on which level is chosen
+    }
+  });
+
+  it("a plain purge leaves it alone", async () => {
+    const root = await installed();
+    seedTasks(root);
+
+    const report = await uninstallRuntime(root, { purge: true, pluginRoot: PLUGIN_ROOT });
+
+    expect(report.maestroTasksDeleted).toBe(false);
+    expect(report.purged).not.toContain(".claude/maestro-tasks");
+    expect(fs.existsSync(path.join(root, ".claude", "maestro-tasks", "001-foo.md"))).toBe(true);
+  });
+
+  it("deleteMaestroTasks without purge is rejected rather than silently ignored", async () => {
+    const root = await installed();
+    seedTasks(root);
+
+    await expect(
+      uninstallRuntime(root, { deleteMaestroTasks: true, pluginRoot: PLUGIN_ROOT })
+    ).rejects.toThrow(/deleteMaestroTasks requires purge/);
+    // Nothing touched — the rejection happens before any deletion.
+    expect(fs.existsSync(path.join(root, ".claude", "maestro-tasks", "001-foo.md"))).toBe(true);
+  });
+
+  it("purge + deleteMaestroTasks deletes the whole queue in one pass", async () => {
+    const root = await installed();
+    seedTasks(root);
+
+    const report = await uninstallRuntime(root, { purge: true, deleteMaestroTasks: true, pluginRoot: PLUGIN_ROOT });
+
+    expect(report.maestroTasksDeleted).toBe(true);
+    expect(report.purged).toContain(".claude/maestro-tasks");
+    expect(fs.existsSync(path.join(root, ".claude", "maestro-tasks"))).toBe(false);
+  });
+
+  it("a project with no task queue reports it as empty, and deleteMaestroTasks is a no-op", async () => {
+    const root = await installed();
+
+    const plan = uninstallPlan(root, PLUGIN_ROOT);
+    expect(plan.maestroTasks).toEqual({ dir: ".claude/maestro-tasks", files: [], hasStatusJson: false });
+
+    const report = await uninstallRuntime(root, { purge: true, deleteMaestroTasks: true, pluginRoot: PLUGIN_ROOT });
+    expect(report.maestroTasksDeleted).toBe(false);
+    expect(report.purged).not.toContain(".claude/maestro-tasks");
+  });
+});
+
 describe("a project with nothing installed", () => {
   it("is a no-op that says so, at either level, and writes nothing", async () => {
     const root = makeProject("p");

@@ -1,28 +1,37 @@
 // Usage stats — the one place in this app where the tool that answers a question may be
 // DOWNLOADED FROM THE NETWORK, and the decision about that.
 //
-// ┌─ THE DECISION ─────────────────────────────────────────────────────────────────────────────┐
-// │ help-server ran `npx --yes ccusage@latest <view> --json` on every view of its Stats tab.    │
-// │ Three properties of that survived the move only after being changed:                        │
-// │                                                                                             │
-// │  1. **A local copy wins.** `ccusage` on PATH, in the open project's `node_modules/.bin`, or  │
-// │     in any of the directories a GUI-launched app cannot see from PATH alone, is used as-is.  │
-// │     Most machines that care about token spend already have it, and the fast path is also     │
-// │     the one that touches no network at all.                                                  │
-// │  2. **A remote fetch is PINNED.** `@latest` means the app's behaviour changes without the    │
-// │     app changing: a release published this afternoon runs on the user's machine tonight,     │
-// │     with output this code has never seen and a supply chain nobody reviewed. The version is  │
-// │     a constant in this file, so upgrading it is a diff.                                      │
-// │  3. **It is shown first.** `previewUsageStats` spawns nothing and returns the exact argv     │
-// │     plus `network: true/false`; `runUsageStats` accepts only a token that preview issued.    │
-// │     So "the user was told a package would be fetched and executed" is a property of the      │
-// │     wiring, not of the UI remembering to mention it.                                         │
-// │                                                                                             │
-// │ What was NOT done, and why: the fetch was not removed outright. ccusage reads `~/.claude`'s  │
-// │ own JSONL and reimplementing it here would be a second parser of someone else's file format, │
-// │ drifting silently. It was also not vendored — a dependency of the app is a dependency the    │
-// │ app ships, and a user who does not open this tab should not carry it.                        │
-// └─────────────────────────────────────────────────────────────────────────────────────────────┘
+// THE DECISION, UPDATED. help-server ran `npx --yes ccusage@latest <view> --json` on every view
+// of its Stats tab; several properties of that survived the move to this app, one of them since
+// reversed:
+//
+//  1. THE APP NOW VENDORS `ccusage`. It is a real `dependencies` entry (pinned to the same
+//     version `PINNED_CCUSAGE_VERSION` names below), so a user who never opens this tab installs
+//     it anyway — the opposite trade from the one this file used to document. That earlier
+//     reasoning was "a dependency of the app is one the app ships, and a user who never opens
+//     this tab should not carry it"; it is reversed here because the "unavailable"/npx-download
+//     banner this tab kept showing on a machine with no local `ccusage` was worse than the bytes
+//     saved. `resolveVendoredCcusage()` below finds it via `require.resolve`, the same "ask
+//     Node's own resolver, never assume a layout" move `agent-sdk.ts` makes for the CLI binary.
+//  2. THE VENDORED COPY IS CHECKED FIRST. `resolveCcusage()` tries it ahead of the project's own
+//     `node_modules/.bin`, PATH, and the rest of the fallback directories — which is what makes
+//     point 3 true in practice: on a build where vendoring resolved, nothing after it ever runs.
+//     A project or a user who wants their OWN version still can: install it anywhere already
+//     searched below and it exists there too, this just means "no ccusage anywhere" no longer
+//     happens on a build that ships one.
+//  3. A REMOTE FETCH IS STILL PINNED, and still a real code path — not deleted by this change.
+//     `@latest` would mean the app's behaviour changes without the app changing, so the version
+//     is a constant here regardless. With vendoring in place this branch should be unreachable in
+//     a normal packaged build; it stays as the safety net for a layout this file hasn't met yet,
+//     and removing it is explicitly a follow-up for once that is verified, not a step taken now.
+//  4. IT IS SHOWN FIRST, either way. `previewUsageStats` spawns nothing and returns the exact
+//     argv plus `network: true/false`; `runUsageStats` accepts only a token that preview issued.
+//     So "the user was told a package would be fetched and executed" is a property of the
+//     wiring, not of the UI remembering to mention it.
+//
+// What was NOT done, and why: the fetch was not removed outright. ccusage reads `~/.claude`'s
+// own JSONL, and reimplementing that here would be a second parser of someone else's file
+// format, drifting silently.
 //
 // The preview/run split mirrors the `claude -p` bridge and shares its token store, with one
 // difference worth knowing: `claude-preview.ts` is provably unable to spawn (its import graph is
@@ -32,8 +41,11 @@
 
 import { execFile } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { claudeChildPath, claudeSearchDirs, type ResolveOptions } from "./claude-cli.js";
+
+const nodeRequire = createRequire(import.meta.url);
 import { claimInvocation, issueInvocation } from "./claude-tokens.js";
 import type {
   CcusageSource,
@@ -45,6 +57,18 @@ import type {
 } from "./contracts.js";
 
 export type { CcusageSource, UsageStats, UsageStatsPreview, UsageStatsResult, UsageStatsView };
+
+/**
+ * `ResolveOptions`, widened the way `claude-preview.ts`'s `PreviewOptions` widens it for its own
+ * module — plus `skipVendored`, which exists for exactly one caller: `test/core/ccusage.test.ts`'s
+ * fallback-chain coverage. The app itself never sets it. Vendoring resolves via `require.resolve`
+ * against THIS MODULE's real location on disk, not against a fixture's fake PATH/home, so a test
+ * built to exercise "not found" or "npx fallback" behavior would otherwise always observe the real
+ * vendored copy regardless of the environment it constructed.
+ */
+export interface CcusageResolveOptions extends ResolveOptions {
+  skipVendored?: boolean;
+}
 
 /**
  * The version fetched when no local copy exists. **Pinned deliberately — never `@latest`.**
@@ -114,23 +138,61 @@ function findIn(dirs: string[], base: string, platform: NodeJS.Platform): string
 }
 
 /**
+ * The app's OWN copy of `ccusage` — `"ccusage"` in this package's `dependencies` — resolved with
+ * `require.resolve` rather than assumed to sit at some fixed relative path.
+ *
+ * `require.resolve` is the right tool for the same reason `agent-sdk.ts` hands the Agent SDK a
+ * resolved CLI path instead of letting it guess: this module is bundled by electron-vite into
+ * `out/main/`, so a path written relative to this FILE's own location would point at the build
+ * output rather than any real `node_modules` tree, in exactly the way `bundled-assets.ts`'s
+ * top-of-file comment describes for `import.meta.dirname`. `require.resolve` instead asks Node's
+ * own module resolution to do the walk, which finds the right `node_modules/ccusage` in dev,
+ * `build`, and packaged alike — and `ccusage` is a `dependencies` entry precisely so
+ * `electron.vite.config.ts`'s `EXTERNAL` (derived from that manifest) keeps it a real,
+ * `require`-able package on disk rather than inlining it into the bundle.
+ *
+ * Reads `ccusage`'s own `package.json` for its `bin` entry rather than guessing
+ * `node_modules/.bin/ccusage`, because the latter is a package-manager-created symlink whose
+ * existence and permissions vary by installer; the `bin` field is the one place the package
+ * itself says what to run.
+ */
+function resolveVendoredCcusage(platform: NodeJS.Platform): string | null {
+  try {
+    const pkgJsonPath = nodeRequire.resolve("ccusage/package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8")) as { bin?: string | Record<string, string> };
+    const binField = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.ccusage;
+    if (!binField) return null;
+    const bin = path.join(path.dirname(pkgJsonPath), binField);
+    return isExecutable(bin, platform) ? bin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where a usable `ccusage` is, in preference order, or the list of places it isn't.
  *
- * The project's own `node_modules/.bin` comes first: a repo that has pinned ccusage as a
- * devDependency has already made this decision, and its pin should beat both PATH and ours. After
- * that it is the same expanded directory list the `claude` CLI is resolved against — a
- * GUI-launched app's PATH is not the user's PATH, and `~/.local/bin` and the version managers are
- * invisible to it (see `claude-cli.ts`, which explains the failure in full).
+ * The app's own vendored copy is tried FIRST (see `resolveVendoredCcusage`) — this app ships
+ * `ccusage` as a real dependency now, so "not found" and the npx download it used to trigger
+ * should not happen on a normal build at all. The rest of the chain is kept, unpruned, as the
+ * fallback for whatever that resolution doesn't cover: the project's own `node_modules/.bin`
+ * (a repo that pinned its own `ccusage` should still get that one), then the same expanded
+ * directory list the `claude` CLI is resolved against — a GUI-launched app's PATH is not the
+ * user's PATH, and `~/.local/bin` and the version managers are invisible to it (see
+ * `claude-cli.ts`, which explains the failure in full) — and finally `npx`, pinned.
  *
  * NOTHING HERE SPAWNS. Availability is `fs`, so the "not installed" message can be written while
  * the Run button is still un-pressed rather than recovered from an ENOENT.
  */
-export function resolveCcusage(projectRoot: string, opts: ResolveOptions = {}): CcusageCli {
+export function resolveCcusage(projectRoot: string, opts: CcusageResolveOptions = {}): CcusageCli {
   const platform = opts.platform ?? process.platform;
   const searched = [
     ...(projectRoot ? [path.join(projectRoot, "node_modules", ".bin")] : []),
     ...claudeSearchDirs(opts),
   ];
+
+  const vendored = opts.skipVendored ? null : resolveVendoredCcusage(platform);
+  if (vendored) return { source: "local", bin: vendored, searched: [vendored, ...searched] };
 
   const local = findIn(searched, "ccusage", platform);
   if (local) return { source: "local", bin: local, searched };
@@ -171,7 +233,7 @@ export function ccusageNotFoundMessage(cli: CcusageCli): string {
 export function previewUsageStats(
   projectRoot: string,
   view: UsageStatsView,
-  opts: ResolveOptions = {}
+  opts: CcusageResolveOptions = {}
 ): UsageStatsPreview {
   const cli = resolveCcusage(projectRoot, opts);
   const argv = ccusageArgv(cli, view);

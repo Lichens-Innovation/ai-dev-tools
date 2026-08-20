@@ -470,10 +470,20 @@ describe("the create-* routes", () => {
   const routeSrc = (name: string) => read(`src/renderer/src/routes/${name}.tsx`);
 
   it("are reachable from the app's navigation", () => {
-    // Every other route in the app is a link in the top bar; a route with no way in is a route
-    // nobody finds. The four live behind the Create menu there.
-    const nav = read("src/renderer/src/components/top-nav.tsx");
-    for (const route of routes) expect(nav, `no nav entry for /${route}`).toContain(`"/${route}"`);
+    // The top-nav `Create` dropdown that used to hold these four is gone (the hamburger-menu
+    // refactor removed it along with `Library`). Each route is reached instead from a `CreateLink`
+    // at the bottom of the one /tools tab it belongs to — a route with no way in is still a route
+    // nobody finds, just from a different component now.
+    const tabFor: Record<(typeof routes)[number], string> = {
+      "create-skill": "src/renderer/src/components/tabs/skills-tab.tsx",
+      "create-subagent": "src/renderer/src/components/tabs/agents-tab.tsx",
+      "create-plugin": "src/renderer/src/components/tabs/command-center.tsx",
+      "create-marketplace": "src/renderer/src/components/tabs/marketplace.tsx",
+    };
+    for (const route of routes) {
+      const src = read(tabFor[route]);
+      expect(src, `no CreateLink to /${route}`).toContain(`"/${route}"`);
+    }
   });
 
   it("reach a model only through the bridge, never through a spawn of their own", () => {
@@ -541,11 +551,13 @@ describe("the create-* routes", () => {
 
 describe("the surface folded in from help-server", () => {
   const nav = read("src/renderer/src/components/top-nav.tsx");
+  const hamburger = read("src/renderer/src/components/hamburger-menu.tsx");
 
   it("is reachable from the app's navigation", () => {
-    // Same reason as the create-* routes below: a route with no way in is a route nobody finds.
-    // These two live behind the Library menu, alongside /install.
-    for (const route of ["/tools", "/docs"]) expect(nav, `no nav entry for ${route}`).toContain(`"${route}"`);
+    // Same reason as the create-* routes above: a route with no way in is a route nobody finds.
+    // These two live behind the hamburger menu now — the old `Library` dropdown (and `Create`
+    // alongside it) is gone from top-nav entirely.
+    for (const route of ["/tools", "/docs"]) expect(hamburger, `no nav entry for ${route}`).toContain(`"${route}"`);
   });
 
   it("leaves the project picker as the landing page", () => {
@@ -556,11 +568,12 @@ describe("the surface folded in from help-server", () => {
     expect(landing).not.toMatch(/CommandCenter|CuratedTools|ProjectMarketplace/);
   });
 
-  it("keeps the runtime badge visible now that /install sits inside a menu", () => {
+  it("keeps the runtime badge visible now that /maestro sits inside a menu", () => {
     // The badge is the one thing in the bar a user never goes looking for. Moving the link into
-    // the Library menu is only acceptable because the dot moved onto the menu's own button.
-    const menu = nav.slice(nav.indexOf('label="Library"'), nav.indexOf('label="Create"'));
-    expect(menu).toContain('badge !== "none"');
+    // the hamburger menu is only acceptable because the dot moved onto the menu's own button —
+    // `top-nav.tsx` computes it and hands it to `HamburgerMenu`, which renders the dot itself.
+    expect(nav).toMatch(/<HamburgerMenu badge=\{badge\}\s*\/>/);
+    expect(hamburger).toContain('badge !== "none"');
   });
 
   it("has no help chat left to run, and one conversational surface in its place", () => {
@@ -625,7 +638,7 @@ describe("the surface folded in from help-server", () => {
     // reject on anything unforeseen. A loader that let one through hands TanStack an error
     // boundary carrying Electron's "Error invoking remote method" framing, which tells a user
     // nothing — the same failure `callMain` was written for.
-    for (const route of ["tools", "docs.index", "docs.$slug"]) {
+    for (const route of ["tools", "docs.index", "docs.$group.$slug", "project-docs.index", "project-docs.$slug"]) {
       const src = read(`src/renderer/src/routes/${route}.tsx`);
       expect(src, `${route} does not use callMain`).toContain("callMain(");
       expect(src, `${route} awaits a channel directly`).not.toMatch(/await\s+window\.maestro\./);

@@ -32,9 +32,9 @@ const SECTIONS = [
     blurb: "Live view of the running Claude Code session.",
   },
   { path: "/maestro-tasks", label: "Tasks", icon: ListChecks, blurb: "The queue /to-maestro-tasks wrote." },
-  { path: "/install", label: "Runtime", icon: Download, blurb: "Install or update Maestro's hooks in this project." },
+  { path: "/maestro", label: "Runtime", icon: Download, blurb: "Install or update Maestro's hooks in this project." },
   { path: "/tools", label: "Tools", icon: LayoutGrid, blurb: "Installed plugins, CLI commands, marketplaces." },
-  { path: "/docs", label: "Docs", icon: BookOpen, blurb: "Read and search the project's docs/." },
+  { path: "/project-docs", label: "Project Docs", icon: BookOpen, blurb: "Read and search the project's docs/." },
 ] as const;
 
 /**

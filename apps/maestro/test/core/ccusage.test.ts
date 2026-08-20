@@ -8,6 +8,14 @@
 //
 // The runs execute a FAKE `ccusage`: a shell script in a temp directory the resolver is pointed
 // at. Against the real one these tests would be slow, non-deterministic, and would go to npm.
+//
+// The app now VENDORS `ccusage` as a real dependency, and `resolveCcusage()` checks it first via
+// `require.resolve` — which walks `node_modules` from THIS MODULE's real location, not from the
+// fake PATH/home a test builds below. Every test in this file that means to exercise the fallback
+// chain (PATH lookup, project pin, npx, "nothing found") therefore has to opt out of vendoring
+// with `skipVendored: true`, or it would observe the real vendored copy no matter what fake
+// environment it constructed. `only()` does that for every test that uses it; the one test that
+// means to observe vendoring — "the vendored dependency" below — deliberately omits it.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
@@ -41,12 +49,40 @@ function fakeBin(name: string, body: string): { dir: string; bin: string } {
 /** A home directory with nothing installed, so fallbacks can't find the developer's own tools. */
 const emptyHome = () => fs.mkdtempSync(path.join(tmp, "home-"));
 
-/** Resolver options that see exactly these directories and no real machine. */
+/**
+ * Resolver options that see exactly these directories and no real machine — and skip the app's
+ * own vendored `ccusage`, or `resolveVendoredCcusage()` would find the real one via
+ * `require.resolve` regardless of the fake PATH/home given here.
+ */
 const only = (dirs: string[], home: string) => ({
   env: { PATH: dirs.join(":") },
   home,
   platform: "linux" as const,
+  skipVendored: true,
 });
+
+/**
+ * Pre-existing, unrelated to vendoring: `claude-cli.ts`'s search list (shared by `resolveCcusage`
+ * via `claudeSearchDirs`) always includes a few hardcoded system directories — `/usr/local/bin`,
+ * `/opt/homebrew/bin`, `/usr/bin`, `/bin` — regardless of the fake `home`/`PATH` a test builds,
+ * because a real install can sit there. On a machine that actually has `npx` in one of those
+ * (e.g. Homebrew's `/opt/homebrew/bin/npx`), a test meaning to build a machine with NOTHING
+ * installed would otherwise observe the real one. Only the two tests that assert `source: "none"`
+ * need this; every other test in this file wants its fake bin found regardless of what else the
+ * search list turns up.
+ */
+function isolateFromRealMachine() {
+  const real = fs.statSync;
+  vi.spyOn(fs, "statSync").mockImplementation(((p: fs.PathOrFileDescriptor, opts?: unknown) => {
+    if (typeof p === "string" && !p.startsWith(tmp)) {
+      const err = new Error(`ENOENT: no such file or directory, stat '${p}'`) as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      throw err;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (real as any)(p, opts);
+  }) as typeof fs.statSync);
+}
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ccusage-"));
@@ -56,6 +92,7 @@ beforeEach(() => {
 afterEach(() => {
   clearInvocations();
   vi.useRealTimers();
+  vi.restoreAllMocks();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -76,6 +113,23 @@ describe("the version pin", () => {
     expect(preview.pinnedVersion).toBe(PINNED_CCUSAGE_VERSION);
     expect(preview.argv).toContain(`ccusage@${PINNED_CCUSAGE_VERSION}`);
     expect(preview.argv.join(" ")).not.toContain("@latest");
+  });
+});
+
+describe("the vendored dependency", () => {
+  it("is found ahead of everything else by default, with nothing faked", () => {
+    // No `skipVendored`, and no fake PATH/home either — this is what a real caller gets. The app
+    // ships `ccusage` as a real `dependencies` entry, so on a normal build the fallback chain
+    // below never runs at all.
+    const cli = resolveCcusage("");
+    expect(cli.source).toBe("local");
+    expect(cli.bin).toMatch(/ccusage/);
+  });
+
+  it("is skipped only when a caller asks, which is what lets the fallback chain be tested at all", () => {
+    const { dir } = fakeBin("npx", "true");
+    const cli = resolveCcusage("", { env: { PATH: dir }, home: emptyHome(), platform: "linux", skipVendored: true });
+    expect(cli.source).toBe("npx");
   });
 });
 
@@ -126,6 +180,7 @@ describe("resolution", () => {
   });
 
   it("does not treat a non-executable file as an install", () => {
+    isolateFromRealMachine();
     const home = emptyHome();
     const dir = fs.mkdtempSync(path.join(tmp, "bad-"));
     fs.writeFileSync(path.join(dir, "ccusage"), "#!/bin/sh\ntrue\n"); // no +x
@@ -136,6 +191,7 @@ describe("resolution", () => {
 describe("a machine with neither ccusage nor npx", () => {
   it("degrades in the preview, with nothing to run and nothing authorised", () => {
     // The acceptance criterion: a clear message BEFORE a spawn, not an ENOENT after one.
+    isolateFromRealMachine();
     const empty = fs.mkdtempSync(path.join(tmp, "nothing-"));
     const preview = previewUsageStats("", "daily", only([empty], emptyHome()));
 

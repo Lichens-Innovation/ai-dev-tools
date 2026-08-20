@@ -32,11 +32,23 @@ export default function DocsSearch({
     // `at`, not a URL fragment. The app runs on hash history (a packaged build loads over
     // file://), so the whole route already lives in `location.hash` and a second `#` in it is
     // ambiguous. A search param survives that, and the reader scrolls to it by element id.
-    void navigate({
-      to: "/docs/$slug",
-      params: { slug: section.slug },
-      search: { q: query.trim(), at: section.headingId },
-    });
+    //
+    // A section carries `group` only when it came from the GLOBAL reader's combined corpus
+    // (`/docs`); a project-scoped section (from `/project-docs`) has none, since its one corpus
+    // has no need to disambiguate itself. The two readers therefore live at different routes.
+    if (section.group) {
+      void navigate({
+        to: "/docs/$group/$slug",
+        params: { group: section.group, slug: section.slug },
+        search: { q: query.trim(), at: section.headingId },
+      });
+    } else {
+      void navigate({
+        to: "/project-docs/$slug",
+        params: { slug: section.slug },
+        search: { q: query.trim(), at: section.headingId },
+      });
+    }
     onNavigate?.();
   };
 
@@ -84,7 +96,14 @@ export default function DocsSearch({
                   <span className="text-[13px] text-(--ink) truncate">
                     <HighlightText text={section.headingText} terms={terms} />
                   </span>
-                  <span className="font-mono text-[10px] text-(--ink-3) shrink-0">{section.docTitle}</span>
+                  <span className="flex items-center gap-1.5 shrink-0">
+                    {section.group && (
+                      <span className="rounded-md border border-(--line) bg-(--bg-elev) px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-subtle">
+                        {section.group === "app" ? "Maestro" : "Claude Code"}
+                      </span>
+                    )}
+                    <span className="font-mono text-[10px] text-(--ink-3)">{section.docTitle}</span>
+                  </span>
                 </div>
                 <p className="text-[12px] text-(--ink-2) m-0 mt-0.5 line-clamp-2">
                   <HighlightText text={excerptAround(section.bodyText, query)} terms={terms} />

@@ -5,6 +5,12 @@
 // Docker-mounted `/docs`, and `readDoc` throws instead of returning a sentinel so the route can
 // say WHY a doc did not open — a reader that silently rendered an empty page for both "no such
 // file" and "unreadable file" is the failure `callMain` exists to prevent.
+//
+// `listDocsIn`/`readDocIn`/`docSectionsIn` take a directory directly, so the SAME parsing/slugging
+// implementation backs both the per-project docs reader (`listDocs`/`readDoc`/`docSections`,
+// adapters over `docsDir(projectRoot)`) and the global docs aggregator (`global-docs.ts`), which
+// reads the app's own bundled doc trees. A second implementation for the global case would be a
+// second heading-slugifier to keep in sync with the search index.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -45,18 +51,17 @@ function markdownFilesIn(dir: string): string[] {
 }
 
 /**
- * A slug names ONE file directly inside `docs/`, so anything that could steer the read elsewhere
- * is refused rather than normalised: no separators, no dots (which rules out `..` and extensions),
- * nothing empty. The slug arrives from a route param, and a route param is renderer input.
+ * A slug names ONE file directly inside the docs directory, so anything that could steer the read
+ * elsewhere is refused rather than normalised: no separators, no dots (which rules out `..` and
+ * extensions), nothing empty. The slug arrives from a route param, and a route param is renderer
+ * input.
  */
 export function isValidDocSlug(slug: unknown): slug is string {
   return typeof slug === "string" && slug.length > 0 && !/[/\\.]/.test(slug);
 }
 
-/** Every doc under `<project>/docs`, title-sorted. Empty when the project has no docs directory. */
-export function listDocs(projectRoot: string): DocMeta[] {
-  if (!projectRoot) return [];
-  const dir = docsDir(projectRoot);
+/** Every `.md` file directly inside `dir`, title-sorted. Empty when `dir` doesn't exist. */
+export function listDocsIn(dir: string): DocMeta[] {
   return markdownFilesIn(dir)
     .map((file) => {
       const slug = file.replace(/\.md$/, "");
@@ -71,30 +76,27 @@ export function listDocs(projectRoot: string): DocMeta[] {
     .sort((a, b) => a.title.localeCompare(b.title));
 }
 
-/** One doc's body. Throws — for an invalid slug, a missing file, or an unreadable one. */
-export function readDoc(projectRoot: string, slug: string): DocContent {
-  if (!projectRoot) throw new Error("No project is open.");
+/** One doc's body under `dir`. Throws — for an invalid slug, a missing file, or an unreadable one. */
+export function readDocIn(dir: string, slug: string): DocContent {
   if (!isValidDocSlug(slug)) throw new Error(`Invalid document name: ${String(slug)}`);
-  const file = path.join(docsDir(projectRoot), `${slug}.md`);
+  const file = path.join(dir, `${slug}.md`);
   let content: string;
   try {
     content = fs.readFileSync(file, "utf8");
   } catch {
-    throw new Error(`Could not read docs/${slug}.md`);
+    throw new Error(`Could not read ${path.basename(dir)}/${slug}.md`);
   }
   return { slug, title: extractTitle(content, slug), content };
 }
 
 /**
- * Every doc split at its headings — the corpus docs search filters.
+ * Every doc under `dir` split at its headings — the corpus docs search filters.
  *
  * Split per heading rather than per file because a hit has to deep-link: the reader navigates to
  * `#headingId` and highlights the term there. Matching whole files could only ever name the file
  * and drop the user at the top of it.
  */
-export function docSections(projectRoot: string): DocSection[] {
-  if (!projectRoot) return [];
-  const dir = docsDir(projectRoot);
+export function docSectionsIn(dir: string): DocSection[] {
   const sections: DocSection[] = [];
 
   for (const file of markdownFilesIn(dir)) {
@@ -137,4 +139,28 @@ export function docSections(projectRoot: string): DocSection[] {
   }
 
   return sections;
+}
+
+/** Every doc under `<project>/docs`, title-sorted. Empty when the project has no docs directory. */
+export function listDocs(projectRoot: string): DocMeta[] {
+  if (!projectRoot) return [];
+  return listDocsIn(docsDir(projectRoot));
+}
+
+/** One doc's body. Throws — for an invalid slug, a missing file, or an unreadable one. */
+export function readDoc(projectRoot: string, slug: string): DocContent {
+  if (!projectRoot) throw new Error("No project is open.");
+  return readDocIn(docsDir(projectRoot), slug);
+}
+
+/**
+ * Every doc split at its headings — the corpus docs search filters.
+ *
+ * Split per heading rather than per file because a hit has to deep-link: the reader navigates to
+ * `#headingId` and highlights the term there. Matching whole files could only ever name the file
+ * and drop the user at the top of it.
+ */
+export function docSections(projectRoot: string): DocSection[] {
+  if (!projectRoot) return [];
+  return docSectionsIn(docsDir(projectRoot));
 }

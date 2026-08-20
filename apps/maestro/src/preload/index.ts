@@ -30,11 +30,18 @@ const api: MaestroApi = {
     workflows: () => ipcRenderer.invoke(IPC.workflowsData),
     reseed: (implAgents) => ipcRenderer.invoke(IPC.workflowsReseed, implAgents),
     rules: () => ipcRenderer.invoke(IPC.rulesData),
-    tools: () => ipcRenderer.invoke(IPC.toolsData),
+    // `projectRoot` is a VIEWING parameter, forwarded as-is; main validates it against the current
+    // + recent project list and falls back to the open project on anything else, so this cannot be
+    // steered at an arbitrary directory.
+    tools: (projectRoot) => ipcRenderer.invoke(IPC.toolsData, projectRoot),
     docs: () => ipcRenderer.invoke(IPC.docsData),
     // A slug, never a path: main joins it onto the open project's docs directory and refuses
     // anything with a separator or a dot in it, so this cannot be steered at another file.
     doc: (slug) => ipcRenderer.invoke(IPC.docContent, slug),
+    // NOT gated on an open project — both read from directories the app ships. See
+    // `src/core/global-docs.ts`.
+    globalDocs: () => ipcRenderer.invoke(IPC.globalDocsData),
+    globalDoc: (group, slug) => ipcRenderer.invoke(IPC.globalDocContent, group, slug),
   },
   config: {
     save: (input: SaveInput) => ipcRenderer.invoke(IPC.configSave, input),
@@ -50,10 +57,12 @@ const api: MaestroApi = {
     scaffold: (request) => ipcRenderer.invoke(IPC.createScaffold, request),
   },
   install: {
-    status: () => ipcRenderer.invoke(IPC.installStatus),
-    run: () => ipcRenderer.invoke(IPC.installRun),
-    uninstallPlan: () => ipcRenderer.invoke(IPC.installUninstallPlan),
-    uninstall: (opts) => ipcRenderer.invoke(IPC.installUninstall, opts),
+    // `projectRoot` on each of these four is the same VIEWING parameter as `data.tools` above —
+    // forwarded as-is, validated on the main side against the current + recent project list.
+    status: (projectRoot) => ipcRenderer.invoke(IPC.installStatus, projectRoot),
+    run: (projectRoot) => ipcRenderer.invoke(IPC.installRun, projectRoot),
+    uninstallPlan: (projectRoot) => ipcRenderer.invoke(IPC.installUninstallPlan, projectRoot),
+    uninstall: (opts, projectRoot) => ipcRenderer.invoke(IPC.installUninstall, opts, projectRoot),
   },
   claude: {
     preview: (request) => ipcRenderer.invoke(IPC.claudePreview, request),
