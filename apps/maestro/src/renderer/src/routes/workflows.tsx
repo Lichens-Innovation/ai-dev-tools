@@ -8,6 +8,7 @@ import TopNav from "../components/top-nav";
 import WorkflowCanvas from "../components/workflow-canvas";
 import SeededBanner from "../components/seeded-banner";
 import DetectedChain from "../components/detected-chain";
+import { groupBySource, sourceLabel, CollapsibleGroup } from "../components/source-group";
 import { callMain } from "../utils/call-main";
 import {
   getMaestroConfig,
@@ -152,7 +153,10 @@ function WorkflowsPage() {
           <>
             Saved to <span className="font-mono text-(--ink)">{result.configPath}</span>. {result.warnings.join(" ")}
           </>,
-          { variant: "error" }
+          // The save succeeded (res.ok is true) — a warning here is a caveat, not a failure, so it
+          // gets the amber "warning" toast rather than red "error", which read as though the save
+          // itself had failed.
+          { variant: "warning" }
         );
         return;
       }
@@ -202,125 +206,145 @@ function WorkflowsPage() {
         </SeededBanner>
       )}
 
-      {/*
-        Only while seeded. Once maestro.json exists the chain is the user's saved answer, and
-        re-proposing a detected one — over a graph they may have spent an afternoon on — would be
-        offering to overwrite their work.
-      */}
-      {loaderData.seeded && loaderData.detection && (
-        <DetectedChain
-          detection={loaderData.detection}
-          selected={implChain}
-          candidates={implCandidates}
-          busy={reseeding}
-          onChange={(agents) => void changeImplAgents(agents)}
-        />
-      )}
-
       <div className="flex-1 grid overflow-hidden" style={{ gridTemplateColumns: "280px 1fr" }}>
-        {/* Left pane */}
-        <div className="border-r border-(--line) overflow-y-auto flex flex-col p-4 gap-4">
-          {/* Agents */}
-          <div>
-            <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">Agents</div>
-            <div className="flex flex-col gap-0.5">
-              {allAgents.map((agent) => {
-                const checked = config.agents_available.includes(agent.id);
-                return (
-                  <label
-                    key={agent.id}
-                    title={agent.description}
-                    className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
+        {/* Left pane. Split into a scrollable body and a footer that never scrolls out of view —
+            Save used to sit at the end of the same scroll region as Agents/Skills, so a project
+            with enough of either pushed it below the fold. */}
+        <div className="border-r border-(--line) flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto flex flex-col p-4 gap-4">
+            {/*
+              Only while seeded, and only for the default (first) workflow — every other seeded
+              workflow is a variation someone already added on top of the detected one, not the
+              thing detection itself produced. Once maestro.json exists the chain is the user's
+              saved answer, and re-proposing a detected one — over a graph they may have spent an
+              afternoon on — would be offering to overwrite their work.
+            */}
+            {loaderData.seeded && loaderData.detection && activeWorkflowIdx === 0 && (
+              <DetectedChain
+                detection={loaderData.detection}
+                selected={implChain}
+                candidates={implCandidates}
+                busy={reseeding}
+                onChange={(agents) => void changeImplAgents(agents)}
+              />
+            )}
+
+            {/* Agents — grouped by source (this repo, ~/.claude, bundled, per-plugin), each group
+                collapsible so a project with many plugins doesn't turn this into a wall of rows.
+                Collapsed by default except the repository's own agents and the bundled ones. */}
+            <div>
+              <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">Agents</div>
+              <div className="flex flex-col gap-1">
+                {groupBySource(allAgents).map((group) => (
+                  <CollapsibleGroup
+                    key={group.source}
+                    title={sourceLabel(group.source)}
+                    count={group.items.length}
+                    defaultOpen={group.source === "project" || group.source === "ai-tools-manager"}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        storeSetAgentsAvailable(
-                          checked
-                            ? config.agents_available.filter((a) => a !== agent.id)
-                            : [...config.agents_available, agent.id]
-                        )
-                      }
-                      className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                    />
-                    <span className="font-mono text-[13px] text-(--ink) truncate">{agent.id}</span>
-                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">
-                      {agent.source}
-                    </span>
-                  </label>
-                );
-              })}
-              {allAgents.length === 0 && <p className="text-[12px] text-subtle">No agents found.</p>}
+                    {group.items.map((agent) => {
+                      const checked = config.agents_available.includes(agent.id);
+                      return (
+                        <label
+                          key={agent.id}
+                          title={agent.description}
+                          className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              storeSetAgentsAvailable(
+                                checked
+                                  ? config.agents_available.filter((a) => a !== agent.id)
+                                  : [...config.agents_available, agent.id]
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-primary cursor-pointer"
+                          />
+                          <span className="font-mono text-[13px] text-(--ink) truncate">{agent.id}</span>
+                        </label>
+                      );
+                    })}
+                  </CollapsibleGroup>
+                ))}
+                {allAgents.length === 0 && <p className="text-[12px] text-subtle">No agents found.</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt("Agent ID:");
+                  if (name?.trim()) storeSetAgentsAvailable([...config.agents_available, name.trim()]);
+                }}
+                className="mt-1.5 flex items-center gap-1 text-[11px] text-(--ink-3) hover:text-(--ink) cursor-pointer py-0.5 px-1 rounded focus:outline-none"
+              >
+                <Plus size={10} /> Agent
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt("Agent ID:");
-                if (name?.trim()) storeSetAgentsAvailable([...config.agents_available, name.trim()]);
-              }}
-              className="mt-1.5 flex items-center gap-1 text-[11px] text-(--ink-3) hover:text-(--ink) cursor-pointer py-0.5 px-1 rounded focus:outline-none"
-            >
-              <Plus size={10} /> Agent
-            </button>
+
+            {/* Skills — same grouping/collapse rule as Agents above. */}
+            <div>
+              <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">Skills</div>
+              <div className="flex flex-col gap-1">
+                {groupBySource(allSkills).map((group) => (
+                  <CollapsibleGroup
+                    key={group.source}
+                    title={sourceLabel(group.source)}
+                    count={group.items.length}
+                    defaultOpen={group.source === "project"}
+                  >
+                    {group.items.map((skill) => {
+                      const checked = config.skills_available.includes(skill.id);
+                      return (
+                        <label
+                          key={skill.id}
+                          title={skill.description}
+                          className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              storeSetSkillsAvailable(
+                                checked
+                                  ? config.skills_available.filter((s) => s !== skill.id)
+                                  : [...config.skills_available, skill.id]
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-primary cursor-pointer"
+                          />
+                          <span className="font-mono text-[13px] text-(--ink) truncate">{skill.id}</span>
+                        </label>
+                      );
+                    })}
+                  </CollapsibleGroup>
+                ))}
+                {allSkills.length === 0 && <p className="text-[12px] text-subtle">No skills found.</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const name = window.prompt("Skill ID:");
+                  if (name?.trim()) storeSetSkillsAvailable([...config.skills_available, name.trim()]);
+                }}
+                className="mt-1.5 flex items-center gap-1 text-[11px] text-(--ink-3) hover:text-(--ink) cursor-pointer py-0.5 px-1 rounded focus:outline-none"
+              >
+                <Plus size={10} /> Skill
+              </button>
+            </div>
           </div>
 
-          {/* Skills */}
-          <div>
-            <div className="text-[11px] font-semibold text-subtle uppercase tracking-wide mb-2">Skills</div>
-            <div className="flex flex-col gap-0.5">
-              {allSkills.map((skill) => {
-                const checked = config.skills_available.includes(skill.id);
-                return (
-                  <label
-                    key={skill.id}
-                    title={skill.description}
-                    className="flex items-center gap-2 py-1 px-1 rounded hover:bg-(--bg-elev) cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        storeSetSkillsAvailable(
-                          checked
-                            ? config.skills_available.filter((s) => s !== skill.id)
-                            : [...config.skills_available, skill.id]
-                        )
-                      }
-                      className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                    />
-                    <span className="font-mono text-[13px] text-(--ink) truncate">{skill.id}</span>
-                    <span className="ml-auto shrink-0 text-[9px] text-subtle uppercase tracking-wide">
-                      {skill.source}
-                    </span>
-                  </label>
-                );
-              })}
-              {allSkills.length === 0 && <p className="text-[12px] text-subtle">No skills found.</p>}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt("Skill ID:");
-                if (name?.trim()) storeSetSkillsAvailable([...config.skills_available, name.trim()]);
-              }}
-              className="mt-1.5 flex items-center gap-1 text-[11px] text-(--ink-3) hover:text-(--ink) cursor-pointer py-0.5 px-1 rounded focus:outline-none"
+          {/* Footer — outside the scroll region, so Save is always visible. */}
+          <div className="shrink-0 border-t border-(--line) p-4">
+            <Button
+              variant="primary"
+              icon={phase === "idle" ? <Sparkles size={14} /> : undefined}
+              loading={phase === "saving"}
+              onClick={() => void handleSubmit()}
             >
-              <Plus size={10} /> Skill
-            </button>
+              {phase === "saving" ? "Saving…" : "Save workflows"}
+            </Button>
           </div>
-
-          <div className="flex-1" />
-
-          {/* Submit */}
-          <Button
-            variant="primary"
-            icon={phase === "idle" ? <Sparkles size={14} /> : undefined}
-            loading={phase === "saving"}
-            onClick={() => void handleSubmit()}
-          >
-            {phase === "saving" ? "Saving…" : "Save workflows"}
-          </Button>
         </div>
 
         {/* Center — canvas or create form */}

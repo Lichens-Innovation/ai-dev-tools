@@ -5,7 +5,8 @@ import InstancePicker, {
   resolveInstanceFromPicker,
   type InstancePickerValue,
 } from "./instance-picker";
-import InstanceSkillPicker, { emptySelection, type SkillSelection } from "./instance-skill-picker";
+import InstanceSkillPicker from "./instance-skill-picker";
+import { Check } from "lucide-react";
 
 import {
   ReactFlow,
@@ -242,33 +243,21 @@ function MainSessionNode({
 
 function AgentNodeComponent({
   data,
-  selected,
 }: NodeProps & {
   data: {
     maestroNode: MaestroNodeV3;
     instanceData?: MaestroInstanceV3;
-    onDelete?: (id: string) => void;
-    onEditInstance?: (instanceName: string) => void;
     onAddConditionEdge?: (id: string) => void;
     onAddNext?: (id: string) => void;
     isPickingConditionSource?: boolean;
     isTerminal?: boolean;
+    isSelectedInstance?: boolean;
   };
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const maestro = data.maestroNode;
   const inst = data.instanceData;
   const term = !!data.isTerminal;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as globalThis.Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
+  const selected = !!data.isSelectedInstance;
 
   const sideButtonClass = `w-5 h-5 rounded-full bg-white border-2 text-orange-500 text-[11px] font-bold flex items-center justify-center cursor-pointer z-10 shadow-sm focus:outline-none transition-all ${
     data.isPickingConditionSource
@@ -282,7 +271,6 @@ function AgentNodeComponent({
     : `bg-orange-50 text-orange-900 ${selected ? "border-orange-500" : "border-orange-200"}`;
   const nameClass = term ? "text-green-900" : "text-orange-900";
   const subClass = term ? "text-green-600" : "text-orange-500";
-  const kebabClass = term ? "text-green-500 hover:bg-green-100" : "text-orange-400 hover:bg-orange-100";
   const chipClass = term
     ? "bg-green-100 border-green-300 text-green-700"
     : "bg-orange-100 border-orange-200 text-orange-700";
@@ -330,42 +318,6 @@ function AgentNodeComponent({
               </span>
               {/* Agent name (secondary) */}
               {inst && <span className={`text-[10px] truncate font-mono ${subClass}`}>@{inst.agent}</span>}
-            </div>
-            <div className="relative ml-1 shrink-0" ref={menuRef}>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen((v) => !v);
-                }}
-                className={`w-5 h-5 flex items-center justify-center rounded cursor-pointer focus:outline-none ${kebabClass}`}
-              >
-                ⋮
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-6 z-50 w-40 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-1.5 text-[12px] text-(--ink-2) hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => {
-                      data.onEditInstance?.(maestro.instance ?? maestro.id);
-                      setMenuOpen(false);
-                    }}
-                  >
-                    Edit instance
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-(--bg-elev) cursor-pointer"
-                    onClick={() => {
-                      data.onDelete?.(maestro.id);
-                      setMenuOpen(false);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
             </div>
           </div>
           {/* Skill chips from instance: loaded (solid) auto-load at start; referenced (dashed) are available on demand. */}
@@ -646,14 +598,25 @@ function ConditionEdge({
   });
   const typedData = data as
     | {
-        onEditLabel?: (id: string) => void;
         onLabelMove?: (id: string, offset: { x: number; y: number }) => void;
         maestroEdge?: MaestroEdgeV3;
+        // Set when an instance is selected in the side panel and this edge doesn't touch it —
+        // dims the edge + its label so the selected instance's own conditions stand out.
+        dimmed?: boolean;
+        // Set when this edge itself was clicked directly (rather than via an instance) — puts
+        // it "in evidence" the same way a selected instance's own conditions are.
+        isSelectedEdge?: boolean;
+        // 1-based position of this edge among the currently-selected instance's conditions —
+        // shown as a matching badge here and in the side panel so the two are easy to correlate.
+        conditionIndex?: number;
       }
     | undefined;
-  const onEditLabel = typedData?.onEditLabel;
   const onLabelMove = typedData?.onLabelMove;
   const storedOffset = typedData?.maestroEdge?.label_offset;
+  const dimmed = !!typedData?.dimmed;
+  const isSelectedEdge = !!typedData?.isSelectedEdge;
+  const conditionIndex = typedData?.conditionIndex;
+  const fadedOpacity = dimmed ? 0.08 : 1;
 
   const { getViewport } = useReactFlow();
   const localOffsetRef = useRef<{ x: number; y: number }>(storedOffset ?? { x: 0, y: 0 });
@@ -720,7 +683,13 @@ function ConditionEdge({
         id={id}
         path={activePath}
         markerEnd={markerEnd}
-        style={{ stroke: "#f97316", strokeWidth: 1.5, strokeDasharray: "5 4" }}
+        style={{
+          stroke: "#f97316",
+          strokeWidth: isSelectedEdge ? 3 : 1.5,
+          strokeDasharray: "5 4",
+          opacity: fadedOpacity,
+          transition: "opacity 150ms, stroke-width 150ms",
+        }}
       />
       <EdgeLabelRenderer>
         <div
@@ -730,12 +699,21 @@ function ConditionEdge({
             pointerEvents: "all",
             cursor: isDragging ? "grabbing" : "grab",
             userSelect: "none",
+            opacity: fadedOpacity,
+            transition: "opacity 150ms, box-shadow 150ms",
+            borderRadius: 4,
+            boxShadow: isSelectedEdge ? "0 0 0 2px #f97316" : undefined,
           }}
           className="flex items-center gap-1 nodrag nopan"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
+          {typeof conditionIndex === "number" && (
+            <span className="w-4 h-4 rounded-full bg-orange-500 text-white text-[9px] font-semibold flex items-center justify-center shrink-0">
+              {conditionIndex}
+            </span>
+          )}
           {hasLabel ? (
             <span
               className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-50 border border-orange-300 text-orange-700 block max-w-[140px] truncate"
@@ -748,18 +726,6 @@ function ConditionEdge({
               no label
             </span>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditLabel?.(id);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="w-4 h-4 flex items-center justify-center rounded bg-white border border-orange-300 text-orange-500 text-[9px] leading-none hover:bg-orange-50 cursor-pointer focus:outline-none shadow-sm"
-            title="Edit label"
-          >
-            ✎
-          </button>
         </div>
       </EdgeLabelRenderer>
     </>
@@ -842,14 +808,14 @@ export default function WorkflowCanvas({
   const [conditionTargetNodeId, setConditionTargetNodeId] = useState("");
   const [conditionPicker, setConditionPicker] = useState<InstancePickerValue>(blankInstancePicker());
 
-  // Edit instance modal
-  const [editInstanceName, setEditInstanceName] = useState<string | null>(null);
-  const [editInstanceAgent, setEditInstanceAgent] = useState("");
-  const [editInstanceSkills, setEditInstanceSkills] = useState<SkillSelection>(emptySelection());
-
-  // Edit condition-edge label modal
-  const [editLabelEdgeId, setEditLabelEdgeId] = useState<string | null>(null);
-  const [editLabelValue, setEditLabelValue] = useState("");
+  // Selected instance — clicking an agent node opens the right-side edit panel in place of the
+  // old kebab-menu "Edit instance" modal. Edits apply live (no separate Save/Cancel), since the
+  // panel is an inspector rather than a confirmation dialog. Selecting an instance and selecting
+  // a condition edge are mutually exclusive — only one side panel shows at a time.
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  // Selected condition edge — clicking a condition directly on the canvas behaves like clicking
+  // an instance: it's put "in evidence" (full opacity while others dim) and shown/edited here.
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   // Change-skill modal (skill nodes)
   const [changeSkillNodeId, setChangeSkillNodeId] = useState<string | null>(null);
@@ -868,7 +834,11 @@ export default function WorkflowCanvas({
     // Skip if this is the echo of our own pushChange — but always rebuild on a workflow switch
     if (!switched && workflow === lastEmittedRef.current) return;
     // Clear the last-emitted ref on switch so subsequent edits don't stale-match the old workflow
-    if (switched) lastEmittedRef.current = null;
+    if (switched) {
+      lastEmittedRef.current = null;
+      setSelectedInstanceId(null);
+      setSelectedEdgeId(null);
+    }
     let nodes = workflowToRfNodes(workflow, instances);
     const edges = workflowToRfEdges(workflow);
     const hasPositions = workflow.nodes.length > 0 && workflow.nodes.every((n) => n.position != null);
@@ -965,6 +935,40 @@ export default function WorkflowCanvas({
       setRfNodes(nextNodes);
       setRfEdges(nextEdges);
       pushChange(nextNodes, nextEdges);
+      setSelectedInstanceId((cur) => (cur === nodeId ? null : cur));
+      setSelectedEdgeId((cur) => (cur && nextEdges.some((e) => e.id === cur) ? cur : null));
+    },
+    [pushChange]
+  );
+
+  // Delete one or more condition edges at once — surfaced in the side panel now that conditions
+  // no longer carry their own delete affordance on the canvas.
+  const deleteEdges = useCallback(
+    (edgeIds: Iterable<string>) => {
+      const ids = new Set(edgeIds);
+      if (ids.size === 0) return;
+      const nextEdges = rfEdgesRef.current.filter((e) => !ids.has(e.id));
+      setRfEdges(nextEdges);
+      pushChange(rfNodesRef.current, nextEdges);
+      setSelectedEdgeId((cur) => (cur && ids.has(cur) ? null : cur));
+    },
+    [pushChange]
+  );
+
+  const deleteEdge = useCallback((edgeId: string) => deleteEdges([edgeId]), [deleteEdges]);
+
+  // Live-edit a condition edge's label — from either the instance panel's Conditions list or
+  // the standalone condition panel. Keeps `edge.label` and `maestroEdge.label` in sync, same as
+  // the modal this replaces used to.
+  const updateEdgeLabel = useCallback(
+    (edgeId: string, label: string) => {
+      const next = rfEdgesRef.current.map((e) => {
+        if (e.id !== edgeId) return e;
+        const maestro = e.data?.maestroEdge as MaestroEdgeV3 | undefined;
+        return { ...e, label, data: { ...e.data, maestroEdge: { ...(maestro as MaestroEdgeV3), label } } };
+      });
+      setRfEdges(next);
+      pushChange(rfNodesRef.current, next);
     },
     [pushChange]
   );
@@ -989,62 +993,24 @@ export default function WorkflowCanvas({
     [pushChange]
   );
 
-  // ── Edit instance modal ──────────────────────────────────────────
+  // ── Instance edit panel (right side, opened by clicking an agent node) ──────
 
-  const openEditInstance = useCallback(
-    (instanceName: string) => {
-      const inst = instances.find((i) => i.name === instanceName);
-      if (!inst) return;
-      setEditInstanceName(instanceName);
-      setEditInstanceAgent(inst.agent);
-      setEditInstanceSkills({ loaded: inst.loaded_skills, referenced: inst.referenced_skills });
+  const selectedInstance = selectedInstanceId ? instances.find((i) => i.name === selectedInstanceId) ?? null : null;
+  // The node id backing the selected instance — usually equal to the instance name (see
+  // workflow-view skill), but resolved defensively rather than assumed, same as handleNodeClick.
+  const selectedInstanceNodeId = selectedInstanceId
+    ? rfNodes.find((n) => (n.data.maestroNode as MaestroNodeV3 | undefined)?.instance === selectedInstanceId)?.id ??
+      selectedInstanceId
+    : null;
+  const selectedEdge = selectedEdgeId ? rfEdges.find((e) => e.id === selectedEdgeId) ?? null : null;
+
+  const updateSelectedInstance = useCallback(
+    (patch: Partial<MaestroInstanceV3>) => {
+      if (!selectedInstanceId) return;
+      onInstancesChange(instances.map((i) => (i.name === selectedInstanceId ? { ...i, ...patch } : i)));
     },
-    [instances]
+    [selectedInstanceId, instances, onInstancesChange]
   );
-
-  const confirmEditInstance = useCallback(() => {
-    if (!editInstanceName) return;
-    onInstancesChange(
-      instances.map((i) =>
-        i.name === editInstanceName
-          ? {
-              ...i,
-              agent: editInstanceAgent,
-              loaded_skills: editInstanceSkills.loaded,
-              referenced_skills: editInstanceSkills.referenced,
-            }
-          : i
-      )
-    );
-    setEditInstanceName(null);
-  }, [editInstanceName, editInstanceAgent, editInstanceSkills, instances, onInstancesChange]);
-
-  // ── Edit condition-edge label ────────────────────────────────────
-
-  const openEditLabel = useCallback((edgeId: string) => {
-    const edge = rfEdgesRef.current.find((e) => e.id === edgeId);
-    setEditLabelEdgeId(edgeId);
-    setEditLabelValue(typeof edge?.label === "string" ? edge.label : "");
-  }, []);
-
-  const confirmEditLabel = useCallback(() => {
-    if (!editLabelEdgeId) return;
-    const trimmed = editLabelValue.trim();
-    const next = rfEdgesRef.current.map((e) => {
-      if (e.id !== editLabelEdgeId) return e;
-      const maestro = e.data?.maestroEdge as MaestroEdgeV3 | undefined;
-      // Keep `e.label` and `maestroEdge.label` in sync — rfEdgesToMaestroEdges reads `e.label`
-      // first but falls back to maestro.label, so both must be cleared when emptied.
-      return {
-        ...e,
-        label: trimmed || undefined,
-        data: { ...e.data, maestroEdge: { ...(maestro as MaestroEdgeV3), label: trimmed || undefined } },
-      };
-    });
-    setRfEdges(next);
-    pushChange(rfNodesRef.current, next);
-    setEditLabelEdgeId(null);
-  }, [editLabelEdgeId, editLabelValue, pushChange]);
 
   // ── Change-skill modal (skill nodes) ────────────────────────────
 
@@ -1127,12 +1093,38 @@ export default function WorkflowCanvas({
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      if (conditionSourceNodeId === "__picking__" && node.id !== "main-session") {
-        openConditionModal(node.id);
+      if (conditionSourceNodeId === "__picking__") {
+        if (node.id !== "main-session") openConditionModal(node.id);
+        return;
+      }
+      // Clicking an agent node opens (or, on a second click, closes) the right-side edit panel —
+      // this replaces the kebab menu's old "Edit instance" modal. Instances are keyed by name,
+      // not node id — the two are the same by convention (see workflow-view skill) but resolve
+      // through `instance` rather than assume it, same fallback the old kebab handler used.
+      const maestroNode = node.data.maestroNode as MaestroNodeV3 | undefined;
+      if (maestroNode?.type === "agent") {
+        const instanceName = maestroNode.instance ?? node.id;
+        setSelectedEdgeId(null);
+        setSelectedInstanceId((cur) => (cur === instanceName ? null : instanceName));
       }
     },
     [conditionSourceNodeId, openConditionModal]
   );
+
+  // Clicking a condition edge behaves the same way clicking an instance does: it's selected,
+  // put "in evidence" on the canvas (other conditions dim), and shown/edited in the side panel.
+  const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    if (edge.type !== "conditionEdge") return;
+    setSelectedInstanceId(null);
+    setSelectedEdgeId((cur) => (cur === edge.id ? null : edge.id));
+  }, []);
+
+  // Clicking empty canvas closes whichever side panel is open, the same way it deselects RF's
+  // own nodes.
+  const handlePaneClick = useCallback(() => {
+    setSelectedInstanceId(null);
+    setSelectedEdgeId(null);
+  }, []);
 
   const confirmAddCondition = useCallback(() => {
     if (!conditionSourceNodeId || conditionSourceNodeId === "__picking__") return;
@@ -1336,7 +1328,7 @@ export default function WorkflowCanvas({
           };
         }
         const maestroNode = n.data.maestroNode as MaestroNodeV3;
-        // Always resolve instanceData fresh from the instances prop so edit-instance updates are reflected immediately
+        // Always resolve instanceData fresh from the instances prop so edit-panel updates are reflected immediately
         const instanceData =
           maestroNode.type === "agent" ? instances.find((i) => i.name === maestroNode.instance) : undefined;
         return {
@@ -1345,37 +1337,90 @@ export default function WorkflowCanvas({
             ...n.data,
             instanceData,
             onDelete: deleteNode,
-            onEditInstance: openEditInstance,
             onChangeSkill: openChangeSkill,
             onAddConditionEdge: openConditionModal,
             onAddNext: openAddStep,
             isPickingConditionSource: conditionSourceNodeId === "__picking__",
             isTerminal: n.id === terminalId,
+            isSelectedInstance: n.id === selectedInstanceId,
           },
         };
       }),
-    [
-      rfNodes,
-      instances,
-      deleteNode,
-      openEditInstance,
-      openChangeSkill,
-      openConditionModal,
-      openAddStep,
-      conditionSourceNodeId,
-      terminalId,
-    ]
+    [rfNodes, instances, deleteNode, openChangeSkill, openConditionModal, openAddStep, conditionSourceNodeId, terminalId, selectedInstanceId]
   );
 
-  // Thread the label editor and label-move handler into condition edges.
+  // Condition edges touching the selected instance, in canvas order — indexed 1, 2, 3… so the
+  // same numbers can badge each edge on the canvas and its row in the side panel.
+  const relatedConditionEdges = useMemo(
+    () =>
+      selectedInstanceId
+        ? rfEdges.filter(
+            (e) => e.type === "conditionEdge" && (e.source === selectedInstanceId || e.target === selectedInstanceId)
+          )
+        : [],
+    [rfEdges, selectedInstanceId]
+  );
+  const conditionIndexByEdgeId = useMemo(() => {
+    const m = new Map<string, number>();
+    relatedConditionEdges.forEach((e, i) => m.set(e.id, i + 1));
+    return m;
+  }, [relatedConditionEdges]);
+
+  // Which of the selected instance's conditions are checked for bulk deletion — a checklist
+  // rather than single-row selection, so several conditions can be removed in one go.
+  const [checkedConditionIds, setCheckedConditionIds] = useState<Set<string>>(new Set());
+
+  // Clear the checklist whenever the instance panel switches to a different instance.
+  useEffect(() => {
+    setCheckedConditionIds(new Set());
+  }, [selectedInstanceId]);
+
+  // Drop any checked id whose edge no longer exists (deleted elsewhere — e.g. via the
+  // standalone condition panel, or the instance itself being removed).
+  useEffect(() => {
+    setCheckedConditionIds((prev) => {
+      const live = new Set(relatedConditionEdges.map((e) => e.id));
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [relatedConditionEdges]);
+
+  const toggleConditionChecked = useCallback((edgeId: string) => {
+    setCheckedConditionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(edgeId)) next.delete(edgeId);
+      else next.add(edgeId);
+      return next;
+    });
+  }, []);
+
+  const deleteCheckedConditions = useCallback(() => {
+    deleteEdges(checkedConditionIds);
+    setCheckedConditionIds(new Set());
+  }, [checkedConditionIds, deleteEdges]);
+
+  // Thread the label-move handler into every condition edge, and dim the ones unrelated to the
+  // current selection (instance or edge) so whatever is being edited in the side panel stands out.
   const enrichedEdges = useMemo(
     () =>
-      rfEdges.map((e) =>
-        e.type === "conditionEdge"
-          ? { ...e, data: { ...e.data, onEditLabel: openEditLabel, onLabelMove: moveLabelOffset } }
-          : e
-      ),
-    [rfEdges, openEditLabel, moveLabelOffset]
+      rfEdges.map((e) => {
+        if (e.type !== "conditionEdge") return e;
+        const relatedToInstance = e.source === selectedInstanceId || e.target === selectedInstanceId;
+        const isSelectedEdge = e.id === selectedEdgeId;
+        const anySelection = selectedInstanceId != null || selectedEdgeId != null;
+        const dimmed = anySelection && !relatedToInstance && !isSelectedEdge;
+        return {
+          ...e,
+          data: {
+            ...e.data,
+            onLabelMove: moveLabelOffset,
+            dimmed,
+            isSelectedEdge,
+            conditionIndex: conditionIndexByEdgeId.get(e.id),
+          },
+        };
+      }),
+    [rfEdges, moveLabelOffset, selectedInstanceId, selectedEdgeId, conditionIndexByEdgeId]
   );
 
   const isPicking = conditionSourceNodeId === "__picking__";
@@ -1385,12 +1430,11 @@ export default function WorkflowCanvas({
   // Subagents still selectable when creating a new node here.
   const availableAgentsForNew = availableAgents.filter((a) => !placedAgentTypes.has(a));
   const existingInstanceNames = instances.map((i) => i.name);
-  // When editing an instance, keep its own subagent selectable but hide subagents
-  // already taken by other instances in this workflow.
-  const editInstanceOrigAgent = editInstanceName
-    ? instances.find((i) => i.name === editInstanceName)?.agent
-    : undefined;
-  const editAvailableAgents = availableAgents.filter((a) => a === editInstanceOrigAgent || !placedAgentTypes.has(a));
+  // When editing an instance in the side panel, keep its own subagent selectable but hide
+  // subagents already taken by other instances in this workflow.
+  const panelAvailableAgents = availableAgents.filter(
+    (a) => a === selectedInstance?.agent || !placedAgentTypes.has(a)
+  );
 
   return (
     <div
@@ -1410,6 +1454,8 @@ export default function WorkflowCanvas({
           onEdgesChange={handleEdgesChange}
           onConnect={handleConnect}
           onNodeClick={handleNodeClick}
+          onEdgeClick={handleEdgeClick}
+          onPaneClick={handlePaneClick}
           fitView
           fitViewOptions={{ padding: 0.4 }}
           className="bg-(--bg)"
@@ -1620,57 +1666,166 @@ export default function WorkflowCanvas({
         </div>
       )}
 
-      {/* Edit instance modal */}
-      {editInstanceName && (
-        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
-          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-80 flex flex-col gap-3">
-            <div className="text-[13px] font-semibold text-(--ink)">
-              Edit instance: <span className="font-mono">{editInstanceName}</span>
+      {/* Instance edit panel — right side, opened by clicking an agent node on the canvas.
+          Edits apply live via updateSelectedInstance; there's no separate Save/Cancel because
+          this is an inspector docked beside the canvas, not a confirmation dialog. */}
+      {selectedInstance && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-(--bg) border-l border-(--line) shadow-xl z-20 flex flex-col overflow-y-auto">
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-(--line)">
+            <div className="flex flex-col min-w-0">
+              <span className="font-mono text-[13px] font-semibold text-(--ink) truncate">
+                {selectedInstance.name}
+              </span>
+              <span className="text-[11px] text-subtle">Instance</span>
             </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => selectedInstanceNodeId && deleteNode(selectedInstanceNodeId)}
+                className="w-6 h-6 flex items-center justify-center rounded text-red-500 hover:bg-red-50 cursor-pointer focus:outline-none"
+                title="Delete instance"
+              >
+                🗑
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedInstanceId(null)}
+                className="w-6 h-6 flex items-center justify-center rounded text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink) cursor-pointer focus:outline-none"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
 
+          <div className="flex flex-col gap-3 p-4">
             <div>
               <div className="text-[10px] text-subtle uppercase tracking-wide mb-1">Subagent</div>
               <select
-                value={editInstanceAgent}
-                onChange={(e) => setEditInstanceAgent(e.target.value)}
+                value={selectedInstance.agent}
+                onChange={(e) => updateSelectedInstance({ agent: e.target.value })}
                 className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary"
               >
-                {editAvailableAgents.map((a) => (
+                {panelAvailableAgents.map((a) => (
                   <option key={a} value={a}>
                     {a}
                   </option>
                 ))}
                 {/* Keep current agent even if not in availableAgents */}
-                {editInstanceAgent && !availableAgents.includes(editInstanceAgent) && (
-                  <option value={editInstanceAgent}>{editInstanceAgent} (not in list)</option>
+                {selectedInstance.agent && !availableAgents.includes(selectedInstance.agent) && (
+                  <option value={selectedInstance.agent}>{selectedInstance.agent} (not in list)</option>
                 )}
               </select>
             </div>
 
             <InstanceSkillPicker
               skills={availableSkills}
-              value={editInstanceSkills}
-              onChange={setEditInstanceSkills}
-              maxHeight="max-h-48"
+              value={{ loaded: selectedInstance.loaded_skills, referenced: selectedInstance.referenced_skills }}
+              onChange={(sel) => updateSelectedInstance({ loaded_skills: sel.loaded, referenced_skills: sel.referenced })}
+              maxHeight="max-h-none"
               size="md"
-              emptyHint="No skills available. Add skills from the left panel first, then reopen this instance to assign them."
+              emptyHint="No skills available. Add skills from the left panel first."
             />
 
-            <div className="flex gap-2 justify-end">
+            {relatedConditionEdges.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[10px] text-subtle uppercase tracking-wide">Conditions</div>
+                  {/* A checklist + single delete button — check one or more conditions, then
+                      delete them together. Replaces the old per-row ✕ button, which was too
+                      easy to hit by accident while scrolling. */}
+                  <button
+                    type="button"
+                    disabled={checkedConditionIds.size === 0}
+                    onClick={deleteCheckedConditions}
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-red-400 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-50 cursor-pointer focus:outline-none"
+                  >
+                    Delete{checkedConditionIds.size > 1 ? ` (${checkedConditionIds.size})` : ""}
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {relatedConditionEdges.map((e, i) => {
+                    const direction = e.source === selectedInstanceId ? `→ ${e.target}` : `← ${e.source}`;
+                    const checked = checkedConditionIds.has(e.id);
+                    return (
+                      <div key={e.id} className="flex items-start gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleConditionChecked(e.id)}
+                          aria-pressed={checked}
+                          title={checked ? "Checked for deletion" : "Check for deletion"}
+                          className={`mt-8 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center cursor-pointer focus:outline-none transition-colors ${
+                            checked
+                              ? "bg-orange-500 border-orange-500 text-white"
+                              : "bg-(--bg) border-orange-300 text-transparent hover:border-orange-500"
+                          }`}
+                        >
+                          <Check size={10} strokeWidth={3} />
+                        </button>
+                        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                          <span className="text-[10px] font-mono text-subtle truncate pl-[9px]">
+                            <span className="font-semibold text-orange-600">{i + 1}.</span> {direction}
+                          </span>
+                          <textarea
+                            value={typeof e.label === "string" ? e.label : ""}
+                            onChange={(ev) => updateEdgeLabel(e.id, ev.target.value)}
+                            placeholder="Condition label"
+                            rows={2}
+                            className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1 text-(--ink) focus:outline-none focus:border-primary resize-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Condition edit panel — right side, opened by clicking a condition edge directly on the
+          canvas (mutually exclusive with the instance panel above). Edits apply live, same as
+          the instance panel — there's no separate edit-label modal any more. */}
+      {!selectedInstance && selectedEdge && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-(--bg) border-l border-(--line) shadow-xl z-20 flex flex-col overflow-y-auto">
+          <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-(--line)">
+            <div className="flex flex-col min-w-0">
+              <span className="font-mono text-[13px] font-semibold text-(--ink) truncate">
+                {selectedEdge.source} → {selectedEdge.target}
+              </span>
+              <span className="text-[11px] text-subtle">Condition</span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => setEditInstanceName(null)}
-                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
+                onClick={() => deleteEdge(selectedEdge.id)}
+                className="w-6 h-6 flex items-center justify-center rounded text-red-500 hover:bg-red-50 cursor-pointer focus:outline-none"
+                title="Delete condition"
               >
-                Cancel
+                🗑
               </button>
               <button
                 type="button"
-                onClick={confirmEditInstance}
-                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
+                onClick={() => setSelectedEdgeId(null)}
+                className="w-6 h-6 flex items-center justify-center rounded text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink) cursor-pointer focus:outline-none"
+                title="Close"
               >
-                Save
+                ✕
               </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 p-4">
+            <div>
+              <div className="text-[10px] text-subtle uppercase tracking-wide mb-1">Label</div>
+              <textarea
+                value={typeof selectedEdge.label === "string" ? selectedEdge.label : ""}
+                onChange={(ev) => updateEdgeLabel(selectedEdge.id, ev.target.value)}
+                placeholder="Condition label (e.g. needs revision)"
+                rows={4}
+                className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary resize-none"
+              />
             </div>
           </div>
         </div>
@@ -1721,42 +1876,6 @@ export default function WorkflowCanvas({
         </div>
       )}
 
-      {/* Edit condition-label modal */}
-      {editLabelEdgeId && (
-        <div className="absolute inset-0 bg-black/30 z-20 flex items-center justify-center">
-          <div className="bg-(--bg) border border-(--line) rounded-xl p-5 shadow-xl w-[40rem] flex flex-col gap-3">
-            <div className="text-[13px] font-semibold text-(--ink)">Edit condition label</div>
-            <textarea
-              placeholder="Condition label (e.g. needs revision)"
-              value={editLabelValue}
-              autoFocus
-              rows={4}
-              onChange={(e) => setEditLabelValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setEditLabelEdgeId(null);
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) confirmEditLabel();
-              }}
-              className="w-full text-[12px] bg-(--bg-elev) border border-(--line) rounded px-2 py-1.5 text-(--ink) focus:outline-none focus:border-primary resize-none"
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setEditLabelEdgeId(null)}
-                className="px-3 py-1.5 text-[12px] rounded-lg bg-(--bg-elev) border border-(--line) text-(--ink-2) hover:text-(--ink) cursor-pointer focus:outline-none"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmEditLabel}
-                className="px-3 py-1.5 text-[12px] rounded-lg bg-primary text-white cursor-pointer focus:outline-none hover:opacity-90"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
