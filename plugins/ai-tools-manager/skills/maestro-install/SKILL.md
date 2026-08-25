@@ -40,19 +40,32 @@ $ARGUMENTS
      ls -1 "${CLAUDE_PROJECT_DIR:-.}/.claude/skills" 2>/dev/null
      ```
 
-   - **Best-fit map** each skill to the single seeded agent it most helps, choosing among the seeded agents only: the detected `implAgents` plus `test`, `reviewer`, `refactor`, `scribe`. **Drop** any skill that isn't clearly relevant to one of them (don't force a match). Example: a `react`/`styling`/`gantt-render` skill → `frontend`; a `react-testing-library` skill → `test`; a `changelog` skill → `scribe`.
+   - **Drop any skill already tagged** in the Maestro desktop app's Skills tab — `maestro-install.js` reads `~/.claude/maestro-skill-tags.sqlite` itself and wires a tagged skill to its matching agent(s) with no `AskUserQuestion` at all, *regardless* of what `--skill-map` in step 3 carries, so best-fit-guessing one is wasted work. Check which discovered skills are already covered before asking about any of them:
+
+     ```bash
+     node -e "
+       try {
+         const { readAllSkillTags } = require('${CLAUDE_SKILL_DIR}/../../scripts/lib/maestro-skill-tags.cjs');
+         console.log(JSON.stringify(readAllSkillTags()));
+       } catch { console.log('{}'); }
+     "
+     ```
+
+     This never fails the install — an older `node` with no `node:sqlite`, or a store that's never been written to, just prints `{}` and every discovered skill falls through to best-fit below. A skill counts as covered only if at least one of its tags matches a seeded agent (the detected `implAgents` plus `test`/`reviewer`/`refactor`/`scribe`) — a `mobile` tag on a backend-only repo isn't a route anywhere and doesn't cover the skill.
+   - **Best-fit map** the *remaining* (untagged, or tagged with nothing that matches a seeded agent) skills to the single seeded agent each most helps, choosing among the seeded agents only: the detected `implAgents` plus `test`, `reviewer`, `refactor`, `scribe`. **Drop** any skill that isn't clearly relevant to one of them (don't force a match). Example: a `react`/`styling`/`gantt-render` skill → `frontend`; a `react-testing-library` skill → `test`; a `changelog` skill → `scribe`.
    - Attached skills seed as **referenced** (available; the agent loads one only if the task calls for it), never as loaded. Promoting a skill to auto-loaded is a canvas edit.
-   - **Confirm with the user.** First print the proposed mapping as a plain written list grouped by agent, one line per skill with a short why, e.g.:
+   - **Confirm with the user.** First print the proposed mapping as a plain written list grouped by agent, one line per skill with a short why — **including** the already-tagged skills, so the user sees the whole picture even though they need no consent (the store already has one). Say so explicitly, e.g.:
 
      ```
      @frontend ← react, styling, gantt-render, shift-logic, workorder-store
      @test     ← react-testing-library
+     @backend  ← db-migrations (already tagged; nothing to confirm)
      ```
 
-     Then ask a **single `AskUserQuestion`** for consent (do **not** put individual skills as the options — `AskUserQuestion` requires 2–4 options per question, so a per-skill checklist breaks the moment an agent has 1 or 5+ skills). Use coarse options like: `Attach all (Recommended)`, `Let me drop some`, `Skip — I'll assign on the canvas`. If the user picks "drop some", let them reply in plain text with the skill ids (or skill→agent pairs) to remove, and drop those. If **no** project skills exist or none are relevant, skip the question silently. This prompt only needs coarse consent — the desktop app's canvas is the fine-grained editor afterwards, and a hand-edit to `maestro.json` works too.
-   - **Assemble the skill map**: a JSON object of `{ "<agent>": ["<skillId>", …] }` from the confirmed mapping, omitting agents with no skills. Example: `{"frontend":["react","styling"],"test":["react-testing-library"]}`. If empty, there's nothing to pass. Each `skillId` is the skill's canonical id from the discover step (frontmatter `name` if present, else the directory name) so it lines up with what the canvas lists.
+     Then ask a **single `AskUserQuestion`** for consent on the best-fit-guessed skills only (do **not** put individual skills as the options — `AskUserQuestion` requires 2–4 options per question, so a per-skill checklist breaks the moment an agent has 1 or 5+ skills). Use coarse options like: `Attach all (Recommended)`, `Let me drop some`, `Skip — I'll assign on the canvas`. If the user picks "drop some", let them reply in plain text with the skill ids (or skill→agent pairs) to remove, and drop those. If **every** discovered skill was already tagged, or none of the untagged ones are relevant, skip the question silently — there's nothing left to ask about. This prompt only needs coarse consent — the desktop app's canvas is the fine-grained editor afterwards, and a hand-edit to `maestro.json` works too.
+   - **Assemble the skill map**: a JSON object of `{ "<agent>": ["<skillId>", …] }` from the CONFIRMED best-fit mapping only — omit the already-tagged skills; `maestro-install.js` adds those itself from the tags store regardless of what this flag carries, so repeating them here would just be redundant, not wrong. Omit agents with no (best-fit) skills. Example: `{"frontend":["react","styling"],"test":["react-testing-library"]}`. If empty (nothing left after dropping the tagged ones), there's nothing to pass. Each `skillId` is the skill's canonical id from the discover step (frontmatter `name` if present, else the directory name) so it lines up with what the canvas lists.
 
-3. **Scaffold and seed.** Run the installer, passing the detected implementation agents and (when non-empty) the skill map:
+3. **Scaffold and seed.** Run the installer, passing the detected implementation agents and (when non-empty) the best-fit skill map:
 
    ```bash
    node "${CLAUDE_SKILL_DIR}/../../scripts/maestro-install.js" "${CLAUDE_PROJECT_DIR:-.}" \
@@ -60,7 +73,7 @@ $ARGUMENTS
      --skill-map '{"frontend":["react"],"test":["react-testing-library"]}'
    ```
 
-   Both flags are optional and affect only a **fresh** seed. Omit `--skill-map` when the map is empty; omit `--impl-agents` only if step 1 genuinely couldn't decide (the seed then falls back to `backend`).
+   Both flags are optional and affect only a **fresh** seed. Omit `--skill-map` when the map is empty; omit `--impl-agents` only if step 1 genuinely couldn't decide (the seed then falls back to `backend`). The installer unions this map with whatever it reads from the tags store itself — the two sources add up, they don't override each other.
 
    This is idempotent and:
    - installs the `maestro` skill at `<projectPath>/.claude/skills/maestro/SKILL.md` — copied whole if absent, otherwise its plugin-owned managed regions (`Maestro:STEPS`, `Maestro:PRINCIPLES`) are re-synced from the template while everything outside them, plus the rendered `Maestro:HANDOFFS` table, is preserved,

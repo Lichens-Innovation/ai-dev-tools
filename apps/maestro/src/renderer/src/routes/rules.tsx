@@ -129,7 +129,9 @@ function RulesEditor({ loaderData }: { loaderData: RulesLoaderData }) {
       const result = res.value;
       const placed = result.rules.moved.length + result.rules.installed.length;
       if (result.warnings.length > 0) {
-        toast(<>Saved, but: {result.warnings.join(" ")}</>, { variant: "error" });
+        // The save succeeded — a warning is a caveat, not a failure. See workflows.tsx's matching
+        // save toast for the same reasoning.
+        toast(<>Saved, but: {result.warnings.join(" ")}</>, { variant: "warning" });
         return;
       }
       toast(

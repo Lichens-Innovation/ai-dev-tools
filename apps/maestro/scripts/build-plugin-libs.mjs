@@ -51,6 +51,7 @@ const entries = [
   { name: "maestro-session", entry: "src/core/plugin-entries/maestro-session.ts" },
   { name: "maestro-skill-regions", entry: "src/core/plugin-entries/maestro-skill-regions.ts" },
   { name: "maestro-seed", entry: "src/core/plugin-entries/maestro-seed.ts" },
+  { name: "maestro-skill-tags", entry: "src/core/plugin-entries/maestro-skill-tags.ts" },
 ];
 
 for (const { name, entry } of entries) {
@@ -63,8 +64,12 @@ for (const { name, entry } of entries) {
     platform: "node",
     target: "node22",
     format: "cjs",
-    // Node built-ins stay external: the bundle must not inline a shim for fs/path.
-    external: ["node:fs", "node:path", "fs", "path"],
+    // Node built-ins stay external: the bundle must not inline a shim for fs/path/os/sqlite.
+    // node:sqlite is what makes maestro-skill-tags.cjs degrade gracefully on an older `node` on
+    // the session's PATH — externalizing it means the require() that can throw stays a require()
+    // in the output, for the script's own try/catch to catch, rather than an inlined shim that
+    // would throw at a different, harder-to-catch point.
+    external: ["node:fs", "node:path", "node:os", "node:sqlite", "fs", "path", "os"],
     banner: { js: BANNER.replace("%NAME%", name) },
     legalComments: "none",
   });

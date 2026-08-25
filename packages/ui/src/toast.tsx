@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 export interface ToastOptions {
-  variant?: "success" | "error";
+  variant?: "success" | "error" | "warning";
   /** Auto-dismiss delay in ms. 0 keeps it until manually closed. Default 4000. */
   duration?: number;
 }
@@ -11,7 +11,7 @@ export interface ToastOptions {
 interface ToastItem {
   id: number;
   message: ReactNode;
-  variant: "success" | "error";
+  variant: "success" | "error" | "warning";
 }
 
 // ── Module-level store ─────────────────────────────────────────────
@@ -59,6 +59,7 @@ function getServerSnapshot() {
 // ── Components ─────────────────────────────────────────────────────
 function ToastCard({ item }: { item: ToastItem }) {
   const isError = item.variant === "error";
+  const isWarning = item.variant === "warning";
   return (
     <div
       role="status"
@@ -66,7 +67,11 @@ function ToastCard({ item }: { item: ToastItem }) {
     >
       <div
         className={`mt-px shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-          isError ? "bg-red-500/15 text-red-500" : "bg-(--primary-dim) text-(--primary)"
+          isError
+            ? "bg-red-500/15 text-red-500"
+            : isWarning
+              ? "bg-amber-500/15 text-amber-500"
+              : "bg-(--primary-dim) text-(--primary)"
         }`}
       >
         <svg
@@ -80,7 +85,9 @@ function ToastCard({ item }: { item: ToastItem }) {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {isError ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M5 12l5 5L20 7" />}
+          {isError && <path d="M6 6l12 12M18 6L6 18" />}
+          {isWarning && <path d="M12 9v4m0 3.5h.01M10.3 4.3 2.6 18a1.5 1.5 0 0 0 1.3 2.2h16.2a1.5 1.5 0 0 0 1.3-2.2L13.7 4.3a1.5 1.5 0 0 0-2.6 0Z" />}
+          {!isError && !isWarning && <path d="M5 12l5 5L20 7" />}
         </svg>
       </div>
       <p className="m-0 text-[13px] leading-snug text-(--ink-2) flex-1">{item.message}</p>

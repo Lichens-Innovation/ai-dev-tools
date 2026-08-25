@@ -229,13 +229,13 @@ describe("the token contract", () => {
   });
 
   it("refuses a replayed token — a preview authorises exactly one run", async () => {
-    const preview = previewLocal("echo '{\"sessions\":[]}'");
+    const preview = previewLocal("echo '{\"session\":[]}'");
     await expect(runUsageStats(preview.token, "session")).resolves.toMatchObject({ ok: true });
     await expect(runUsageStats(preview.token, "session")).rejects.toThrow(TokenRefused);
   });
 
   it("refuses an expired token", async () => {
-    const preview = previewLocal("echo '{\"sessions\":[]}'");
+    const preview = previewLocal("echo '{\"session\":[]}'");
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + TOKEN_TTL_MS + 1000);
     await expect(runUsageStats(preview.token, "session")).rejects.toThrow(/expired/i);
@@ -269,7 +269,7 @@ describe("the token contract", () => {
 
   it("runs exactly the argv the preview returned", async () => {
     const argvFile = path.join(tmp, "argv.txt");
-    const { dir } = fakeBin("ccusage", `printf '%s\\n' "$@" > ${argvFile}\necho '{"sessions":[]}'`);
+    const { dir } = fakeBin("ccusage", `printf '%s\\n' "$@" > ${argvFile}\necho '{"blocks":[]}'`);
     const preview = previewUsageStats("", "blocks", only([dir], emptyHome()));
 
     // The view the run is asked to file the result under cannot change what executes: that comes
@@ -288,12 +288,15 @@ describe("running", () => {
   };
 
   it("reduces a session payload to the numbers the tab renders", async () => {
+    // Matches ccusage 20.0.19/20.0.20's real `session --json` shape: the array key is `session`
+    // (singular), the id is `period`, and the timestamp is nested under `metadata.lastActivity`
+    // — confirmed by running the vendored binary directly. See rowsFor()'s comment in ccusage.ts.
     const result = await runWith(
       "session",
       `cat <<'JSON'
-{"sessions":[
-  {"sessionId":"old","inputTokens":1,"outputTokens":2,"totalTokens":3,"totalCost":0.5,"lastActivity":"2026-08-01T10:00:00Z"},
-  {"sessionId":"new","inputTokens":10,"outputTokens":20,"totalTokens":30,"totalCost":1.5,"lastActivity":"2026-08-03T10:00:00Z"}
+{"session":[
+  {"period":"old","inputTokens":1,"outputTokens":2,"totalTokens":3,"totalCost":0.5,"metadata":{"lastActivity":"2026-08-01T10:00:00Z"}},
+  {"period":"new","inputTokens":10,"outputTokens":20,"totalTokens":30,"totalCost":1.5,"metadata":{"lastActivity":"2026-08-03T10:00:00Z"}}
 ]}
 JSON`
     );
@@ -312,7 +315,7 @@ JSON`
 
   it("adds a seven-row window for the daily view, and only for it", async () => {
     const days = Array.from({ length: 9 }, (_, i) => ({
-      date: `2026-08-${String(i + 1).padStart(2, "0")}`,
+      period: `2026-08-${String(i + 1).padStart(2, "0")}`,
       inputTokens: 1,
       outputTokens: 1,
       totalTokens: 2,
@@ -351,7 +354,7 @@ JSON`
   it("says so when ccusage answers in a shape this app does not read", async () => {
     // What a release that renamed its output array looks like from here. A grid of zeroes would
     // read as "I have spent nothing", which is a worse lie than an error.
-    const result = await runWith("session", `echo '{"usageBySession":[]}'`);
+    const result = await runWith("session", `echo '{"sessions":[]}'`);
     expect(result.ok).toBe(false);
     expect(result.error).toContain(PINNED_CCUSAGE_VERSION);
   });
@@ -373,8 +376,8 @@ describe("reduceUsage", () => {
   it("dates a month so it sorts and reads like every other view", () => {
     const stats = reduceUsage("monthly", {
       monthly: [
-        { month: "2026-07", inputTokens: 1, outputTokens: 1, totalTokens: 2, totalCost: 1 },
-        { month: "2026-08", inputTokens: 3, outputTokens: 3, totalTokens: 6, totalCost: 2 },
+        { period: "2026-07", inputTokens: 1, outputTokens: 1, totalTokens: 2, totalCost: 1 },
+        { period: "2026-08", inputTokens: 3, outputTokens: 3, totalTokens: 6, totalCost: 2 },
       ],
     });
     expect(stats).toMatchObject({ latestLabel: "2026-08", lastUpdated: "2026-08-01" });

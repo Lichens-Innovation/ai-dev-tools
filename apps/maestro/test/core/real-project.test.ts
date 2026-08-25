@@ -31,7 +31,11 @@ beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "maestro-real-"));
   root = path.join(tmp, "project");
   fs.mkdirSync(path.join(root, "src", "backend"), { recursive: true });
-  execFileSync("node", [INSTALLER, root], { encoding: "utf8" });
+  // HOME pointed at this tmp dir: the installer now reads `~/.claude/maestro-skill-tags.sqlite`
+  // (skill-tags.ts) on every run, and without this override that's the DEVELOPER's real one —
+  // this subprocess is the only thing in the suite that runs the live installer for real, so it's
+  // the one place that side effect would otherwise leak.
+  execFileSync("node", [INSTALLER, root], { encoding: "utf8", env: { ...process.env, HOME: tmp } });
 });
 
 afterEach(() => {

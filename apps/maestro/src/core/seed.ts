@@ -24,14 +24,40 @@ const succ = (from: string, to: string): MaestroEdgeV3 => ({
   targetHandle: "top",
 });
 
-const cond = (from: string, to: string, label: string): MaestroEdgeV3 => ({
+const cond = (from: string, to: string, label: string, side: "left" | "right" = "right"): MaestroEdgeV3 => ({
   from,
   to,
   kind: "condition",
   label,
-  sourceHandle: "right",
+  sourceHandle: side,
   targetHandle: "top",
 });
+
+/**
+ * Which side a condition edge should exit from, given the seeded x positions.
+ *
+ * A route into a different column exits toward it — rightward when the target sits to the right
+ * (e.g. into @refactor's side column), leftward when it sits to the left (e.g. out of @refactor
+ * back into the main column). A route within the SAME column — the common case, a
+ * reviewer/refactor FAIL routing back up to an earlier step — has no natural side, and every one
+ * of them used to exit "right" regardless: that's what piled every back-route's bulge, and then
+ * its label, into the same corridor on the right of the canvas. Those alternate left/right per
+ * source node instead, so a source with several same-column conditions splits its curves across
+ * both sides rather than stacking them all on one.
+ */
+function sideTracker(nodes: MaestroNodeV3[]): (from: string, to: string) => "left" | "right" {
+  const xById = new Map(nodes.map((n) => [n.id, n.position?.x ?? 0]));
+  const sameColumnCount = new Map<string, number>();
+  return (from, to) => {
+    const a = xById.get(from) ?? 0;
+    const b = xById.get(to) ?? 0;
+    if (b > a) return "right";
+    if (b < a) return "left";
+    const n = sameColumnCount.get(from) ?? 0;
+    sameColumnCount.set(from, n + 1);
+    return n % 2 === 0 ? "left" : "right";
+  };
+}
 
 // Vertical rhythm for the seeded layout. A skill-less node gets BASE_STEP of room; each
 // attached skill chip wraps onto ~its own row in the canvas, so we add PER_SKILL_STEP per
@@ -85,34 +111,37 @@ export function buildWorkflow(
   const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
 
+  const side = sideTracker(nodes);
+  const c = (from: string, to: string, label: string) => cond(from, to, label, side(from, to));
+
   // Code-issue routes vary by workflow kind and impl-agent count.
   const reviewerCode: MaestroEdgeV3[] = [];
   const refactorCode: MaestroEdgeV3[] = [];
   if (kind === "tdd") {
-    reviewerCode.push(cond("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
-    refactorCode.push(cond("refactor", "test", "finding requires code changes"));
+    reviewerCode.push(c("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(c("refactor", "test", "finding requires code changes"));
   } else if (impl.length === 1) {
-    reviewerCode.push(cond("reviewer", impl[0], "FAIL: style, data layer, error handling, security, or persistence"));
-    refactorCode.push(cond("refactor", impl[0], "finding requires code changes"));
+    reviewerCode.push(c("reviewer", impl[0], "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(c("refactor", impl[0], "finding requires code changes"));
   } else {
     // Fullstack / multi-agent: split the code FAIL and code-change routes per impl agent.
     for (const a of impl) {
       reviewerCode.push(
-        cond("reviewer", a, `FAIL: ${a} code (style, data layer, error handling, security, or persistence)`)
+        c("reviewer", a, `FAIL: ${a} code (style, data layer, error handling, security, or persistence)`)
       );
     }
     for (const a of impl) {
-      refactorCode.push(cond("refactor", a, `finding requires ${a} code changes`));
+      refactorCode.push(c("refactor", a, `finding requires ${a} code changes`));
     }
   }
 
   edges.push(
-    cond("reviewer", "refactor", "FAIL: code pattern violation or code redundancy"),
-    cond("reviewer", "test", "FAIL: a test"),
+    c("reviewer", "refactor", "FAIL: code pattern violation or code redundancy"),
+    c("reviewer", "test", "FAIL: a test"),
     ...reviewerCode,
-    cond("refactor", "scribe", "finding is a recurring pattern an agent should know going forward"),
+    c("refactor", "scribe", "finding is a recurring pattern an agent should know going forward"),
     ...refactorCode,
-    cond(
+    c(
       "refactor",
       "reviewer",
       "triggered by reviewer on a systemic FAIL; notify when delegation is complete so it can re-review"
@@ -125,11 +154,11 @@ export function buildWorkflow(
   // per-agent for fullstack). In tdd the human reviews the test plan before any impl
   // runs, so corrections route to @test.
   if (kind === "tdd") {
-    edges.push(cond("human_review-1", "test", "human requested test corrections"));
+    edges.push(c("human_review-1", "test", "human requested test corrections"));
   } else if (impl.length === 1) {
-    edges.push(cond("human_review-1", impl[0], "human requested code corrections"));
+    edges.push(c("human_review-1", impl[0], "human requested code corrections"));
   } else {
-    for (const a of impl) edges.push(cond("human_review-1", a, `human requested ${a} corrections`));
+    for (const a of impl) edges.push(c("human_review-1", a, `human requested ${a} corrections`));
   }
 
   return placeConditionLabels({ name, nodes, edges }, skillCount);
@@ -187,17 +216,20 @@ export function buildTestsWorkflow(name: string, impl: string[], skillCount: Ski
   const edges: MaestroEdgeV3[] = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
 
+  const side = sideTracker(nodes);
+  const c = (from: string, to: string, label: string) => cond(from, to, label, side(from, to));
+
   // Bigger finding: reviewer delegates to refactor before the impl agent(s) re-do the code.
-  edges.push(cond("reviewer", "refactor", "FAIL: a finding big enough to delegate to the refactor agent"));
+  edges.push(c("reviewer", "refactor", "FAIL: a finding big enough to delegate to the refactor agent"));
 
   if (impl.length === 1) {
-    edges.push(cond("reviewer", impl[0], "FAIL: a simple code fix found while testing"));
-    edges.push(cond("refactor", impl[0], "finding requires code changes"));
-    edges.push(cond(impl[0], "test", "fix applied; re-run the tests"));
+    edges.push(c("reviewer", impl[0], "FAIL: a simple code fix found while testing"));
+    edges.push(c("refactor", impl[0], "finding requires code changes"));
+    edges.push(c(impl[0], "test", "fix applied; re-run the tests"));
   } else {
-    for (const a of impl) edges.push(cond("reviewer", a, `FAIL: a simple ${a} code fix found while testing`));
-    for (const a of impl) edges.push(cond("refactor", a, `finding requires ${a} code changes`));
-    for (const a of impl) edges.push(cond(a, "test", `${a} fix applied; re-run the tests`));
+    for (const a of impl) edges.push(c("reviewer", a, `FAIL: a simple ${a} code fix found while testing`));
+    for (const a of impl) edges.push(c("refactor", a, `finding requires ${a} code changes`));
+    for (const a of impl) edges.push(c(a, "test", `${a} fix applied; re-run the tests`));
   }
 
   return placeConditionLabels({ name, nodes, edges }, skillCount);
@@ -207,6 +239,15 @@ export function buildTestsWorkflow(name: string, impl: string[], skillCount: Ski
 // maestro-install skill (one entry per agent the user checked skills for). Empty when no
 // skills were found/selected.
 export type SkillMap = Record<string, string[]>;
+
+// The full set of agent names a seed for this impl chain will have instances for — the impl
+// agent(s) plus the four CORE_INSTANCES. Exported so a skillMap builder (tags→SkillMap, or the
+// terminal install's best-fit flow) has the same "which agents actually exist in this seed" answer
+// `defaultV3Config` uses, rather than re-deriving `['test','reviewer','refactor','scribe']` itself.
+export function seededAgentNames(implAgents: string[]): string[] {
+  const impl = implAgents.length > 0 ? implAgents : ["backend"];
+  return Array.from(new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
+}
 
 // Returned on first install (no maestro.json yet). Seeds the bundled agents as reusable
 // instances and wires them into two ready-to-use workflows ("default" + "tdd") so the
@@ -222,7 +263,7 @@ export function defaultV3Config(implAgents: string[], skillMap: SkillMap = {}): 
     ...impl.map((a) => ({ name: a, agent: a, loaded_skills: [], referenced_skills: skillsFor(a) })),
     ...CORE_INSTANCES.map((i) => ({ ...i, referenced_skills: skillsFor(i.name) })),
   ];
-  const agentsAvailable = Array.from(new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
+  const agentsAvailable = seededAgentNames(impl);
   // skills_available = the always-present gate skill + every skill assigned to an instance.
   // skills_available = the always-present gate skill + every skill assigned to an instance.
   const skillsAvailable = Array.from(

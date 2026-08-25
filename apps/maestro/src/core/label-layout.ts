@@ -157,26 +157,39 @@ function bezierLabelAnchor(source: Box, target: Box, sourceHandle?: string, targ
 
 /**
  * The node-free vertical corridors of a seeded layout: the gaps between the node columns, plus
- * the open space to the right of the last one. A lane is described by where it starts and where
- * a label centred in it goes.
+ * the open space to the right of the last one and to the left of the first. A lane is described
+ * by where it starts, where it ends, and where a label centred in it goes.
+ *
+ * The left-of-everything lane exists because `seed.ts` no longer routes every condition edge's
+ * exit off the right side of its source — a back-route within one column now alternates left and
+ * right so it doesn't pile every bulge (and then every label) into the same corridor. A label
+ * whose edge exits left needs a lane of its own to land in, on the same side as its curve, rather
+ * than being pushed across the node it was trying to clear.
  *
  * `main-session` is deliberately not counted here. It is 16px wider than the agent cards and
  * sits alone above the column, so letting it define the first lane would narrow a 184px gutter
  * for a node no condition label goes near — and every candidate position is still tested against
  * its box, so nothing can land on it.
  */
-function freeLanes(boxes: Box[]): { start: number; center: number }[] {
+function freeLanes(boxes: Box[]): { start: number; end: number; center: number }[] {
   const spans = boxes.map((b) => ({ from: b.x, to: b.x + b.w })).sort((a, b) => a.from - b.from);
-  const lanes: { start: number; center: number }[] = [];
+  const lanes: { start: number; end: number; center: number }[] = [];
+  const leftMost = spans.length > 0 ? spans[0].from : 0;
+  // The open lane before the leftmost node — the mirror of the one added below for the right.
+  lanes.push({
+    start: leftMost - LANE_MARGIN - LABEL_W,
+    end: leftMost,
+    center: leftMost - LANE_MARGIN - LABEL_W / 2,
+  });
   let edge = spans.length > 0 ? spans[0].to : 0;
   for (const s of spans) {
     if (s.from - edge >= LABEL_W + 2 * LANE_MARGIN) {
-      lanes.push({ start: edge, center: (edge + s.from) / 2 });
+      lanes.push({ start: edge, end: s.from, center: (edge + s.from) / 2 });
     }
     edge = Math.max(edge, s.to);
   }
   // The open lane past the rightmost node — always wide enough.
-  lanes.push({ start: edge, center: edge + LANE_MARGIN + LABEL_W / 2 });
+  lanes.push({ start: edge, end: Infinity, center: edge + LANE_MARGIN + LABEL_W / 2 });
   return lanes;
 }
 
@@ -226,11 +239,16 @@ export function placeConditionLabels(workflow: MaestroWorkflowV3, skillCount: Sk
       return e;
     }
 
+    // Land on the same side the edge actually exits from — the whole point of a left lane is
+    // that a left-exiting edge's label doesn't have to cross back over its own source node to
+    // reach it.
+    const exitsLeft = (e.sourceHandle ?? "right") === "left";
     const sourceRight = source.x + source.w;
+    const sourceLeft = source.x;
+    const candidates = exitsLeft ? lanes.filter((l) => l.end <= sourceLeft) : lanes.filter((l) => l.start >= sourceRight);
     const lane =
-      lanes
-        .filter((l) => l.start >= sourceRight)
-        .sort((a, b) => Math.abs(a.center - anchor.x) - Math.abs(b.center - anchor.x))[0] ?? lanes[lanes.length - 1];
+      candidates.sort((a, b) => Math.abs(a.center - anchor.x) - Math.abs(b.center - anchor.x))[0] ??
+      (exitsLeft ? lanes[0] : lanes[lanes.length - 1]);
 
     // Walk outwards from the anchor's own height so the label stays beside its curve.
     let offset = { x: roundToGrid(lane.center - anchor.x), y: 0 };

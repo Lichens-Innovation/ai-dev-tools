@@ -19,6 +19,7 @@ const ARTIFACT: Record<HandoffContext["kind"], string> = {
   "create-subagent": "subagent",
   "create-plugin": "plugin",
   "create-marketplace": "marketplace",
+  "update-skill-tags": "skill tags",
 };
 
 /** What a `SessionWrite`'s scope means, in the words both the header and the model are given. */
@@ -41,12 +42,20 @@ export function writeScopeNote(scope: HandoffContext["scope"]): string {
  */
 export function handoffSeed(handoff: HandoffContext, prompt: string): string {
   const what = ARTIFACT[handoff.kind] ?? "artifact";
+  const opening =
+    handoff.kind === "update-skill-tags"
+      ? `The user clicked "Update skill tags" on the /skills page. What follows is every project`
+      : `The user submitted the ${handoff.kind} form and the deterministic scaffold has already run, so`;
+  const openingRest =
+    handoff.kind === "update-skill-tags"
+      ? `skill's current description and tags — nothing else about those skills was read.`
+      : `the ${what} is on disk. They chose to finish it here, in conversation, rather than as a headless run.`;
   return [
     `[Context from the Maestro app. No reply is needed: this was appended without starting a turn,`,
     `and the user's next message is the one to answer.]`,
     "",
-    `The user submitted the ${handoff.kind} form and the deterministic scaffold has already run, so`,
-    `the ${what} is on disk. They chose to finish it here, in conversation, rather than as a headless run.`,
+    `${opening}`,
+    `${openingRest}`,
     "",
     `Artifact: ${handoff.artifact}`,
     `Writable without interrupting the user: ${handoff.writeScope} (${writeScopeNote(handoff.scope)}).`,
@@ -60,19 +69,32 @@ export function handoffSeed(handoff: HandoffContext, prompt: string): string {
     `whatever the work needs and let them answer — do not talk yourself out of a tool call.`,
     `Repository: ${handoff.repo}`,
     "",
-    `What the scaffold wrote:`,
+    handoff.kind === "update-skill-tags" ? `The project's skills, as discovered (id — description — tags):` : `What the scaffold wrote:`,
     indent(handoff.state),
     "",
     `What is left to write:`,
     indent(prompt),
     "",
-    `The form captured the name, the description and the triggers above and the user approved them —`,
-    `do not ask for them again, and do not rewrite the frontmatter the scaffold produced.`,
+    handoff.kind === "update-skill-tags"
+      ? `Descriptions were derived from the skill's own id/name only; nothing else about a skill was ` +
+        `read. Only after the user confirms in chat: fix a missing/wrong description with Edit on ` +
+        `that skill's own SKILL.md frontmatter, and report every tag change as one ` +
+        "```update-skill-tags``` " +
+        `JSON block, keyed by skill id, as the last thing in that message.`
+      : `The form captured the name, the description and the triggers above and the user approved them —` +
+        `\ndo not ask for them again, and do not rewrite the frontmatter the scaffold produced.`,
   ].join("\n");
 }
 
 /** The inline transcript line. One sentence, naming the directory and what opened it. */
 export function handoffNotice(handoff: HandoffContext): string {
+  if (handoff.kind === "update-skill-tags") {
+    return (
+      `Opened from "Update skill tags" on the /skills page. This session may now write ${handoff.writeScope} ` +
+      `(${writeScopeNote(handoff.scope)}) — so it can fix a skill's SKILL.md description. Tag changes go through ` +
+      `the app instead, via the fenced block described above.`
+    );
+  }
   const what = ARTIFACT[handoff.kind] ?? "artifact";
   return (
     `Handed off from the ${handoff.kind} form. This session may now write ${handoff.writeScope} ` +
@@ -83,7 +105,9 @@ export function handoffNotice(handoff: HandoffContext): string {
 
 /** The title the transcript's context block carries, so a collapsed entry still says what it is. */
 export function handoffTitle(handoff: HandoffContext): string {
-  return `Context from the ${handoff.kind} form — ${handoff.name}`;
+  return handoff.kind === "update-skill-tags"
+    ? `Context from "Update skill tags"`
+    : `Context from the ${handoff.kind} form — ${handoff.name}`;
 }
 
 function indent(text: string): string {

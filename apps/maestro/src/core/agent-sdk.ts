@@ -745,8 +745,11 @@ export const TEARDOWN_DENIAL = "The session ended before this could be answered,
  * and open the artifact's own directory for writing. They are shared with the headless run since
  * `026`; what is added here is `super-help`, the one thing the pane inherits from the deleted help
  * chat — a declared session skill now, rather than a name pasted into a generated prompt.
+ *
+ * `update-skill-tags` is pane-only, unlike the four create-\* skills — this flow only ever runs
+ * from the `/skills` page's button, handed off straight into the pane, and never headlessly.
  */
-export const PANE_SKILLS = [...SESSION_SKILLS, "super-help", "maestro-help"] as const;
+export const PANE_SKILLS = [...SESSION_SKILLS, "super-help", "maestro-help", "update-skill-tags"] as const;
 
 /** What the pane can say about the CLI before a session exists. Resolved here, never in main. */
 export interface PaneSessionTarget {

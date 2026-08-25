@@ -314,12 +314,18 @@ function rowsFor(view: UsageStatsView, data: Record<string, unknown>): Row[] | n
   };
 
   switch (view) {
+    // ccusage 20.0.19/20.0.20's actual `--json` shape diverges from what an earlier version of
+    // this file assumed, confirmed by running the vendored binary directly against real data:
+    // every row's date/id/month lives under a single `period` field (plus, for `session`,
+    // `metadata.lastActivity`), not the `date`/`sessionId`/`lastActivity`/`month` fields this
+    // reduction used to read. Re-check this switch against `reduceUsage()`'s own doc comment
+    // whenever `PINNED_CCUSAGE_VERSION` is bumped.
     case "daily": {
       const raw = arrayAt("daily");
       return (
         raw?.map((d) => ({
-          label: String(d.date ?? ""),
-          sortKey: String(d.date ?? ""),
+          label: String(d.period ?? ""),
+          sortKey: String(d.period ?? ""),
           active: false,
           totals: {
             inputTokens: num(d.inputTokens),
@@ -331,19 +337,22 @@ function rowsFor(view: UsageStatsView, data: Record<string, unknown>): Row[] | n
       );
     }
     case "session": {
-      const raw = arrayAt("sessions");
+      const raw = arrayAt("session");
       return (
-        raw?.map((s) => ({
-          label: String(s.sessionId ?? ""),
-          sortKey: String(s.lastActivity ?? ""),
-          active: false,
-          totals: {
-            inputTokens: num(s.inputTokens),
-            outputTokens: num(s.outputTokens),
-            totalTokens: num(s.totalTokens),
-            costUsd: num(s.totalCost),
-          },
-        })) ?? null
+        raw?.map((s) => {
+          const metadata = (s.metadata ?? {}) as Record<string, unknown>;
+          return {
+            label: String(s.period ?? ""),
+            sortKey: String(metadata.lastActivity ?? ""),
+            active: false,
+            totals: {
+              inputTokens: num(s.inputTokens),
+              outputTokens: num(s.outputTokens),
+              totalTokens: num(s.totalTokens),
+              costUsd: num(s.totalCost),
+            },
+          };
+        }) ?? null
       );
     }
     case "blocks": {
@@ -369,9 +378,9 @@ function rowsFor(view: UsageStatsView, data: Record<string, unknown>): Row[] | n
       const raw = arrayAt("monthly");
       return (
         raw?.map((m) => ({
-          label: String(m.month ?? ""),
+          label: String(m.period ?? ""),
           // A month is `YYYY-MM`; `-01` makes it sort and read as a date like every other view.
-          sortKey: m.month ? `${String(m.month)}-01` : "",
+          sortKey: m.period ? `${String(m.period)}-01` : "",
           active: false,
           totals: {
             inputTokens: num(m.inputTokens),

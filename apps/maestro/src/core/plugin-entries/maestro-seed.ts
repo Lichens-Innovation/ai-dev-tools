@@ -9,5 +9,5 @@
 // `seed.ts` is pure (no fs, no env), which is what makes it bundleable for a script that runs
 // under bare `node` in a project with no node_modules.
 
-export { defaultV3Config } from "../seed.js";
+export { defaultV3Config, seededAgentNames } from "../seed.js";
 export type { SkillMap } from "../seed.js";

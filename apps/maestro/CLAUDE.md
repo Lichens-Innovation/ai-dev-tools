@@ -49,6 +49,7 @@ second.
 | `seed.ts` / `label-layout.ts`           | The starter workflows an unconfigured project opens with (pure)                        |
 | `detect.ts`                             | Which implementation agent(s) the repo needs, and the evidence for it                  |
 | `discovery.ts` / `fs-scan.ts`           | The agents, skills, rules and directory tree a project can pick from                   |
+| `skill-tags.ts`                         | A skill's backend/frontend/mobile/refactor/reviewer/scribe/test tags — global, keyed by skill id, in `~/.claude/maestro-skill-tags.sqlite` (`node:sqlite`, not a native module). `skillMapFromTags` is the pure tags→`SkillMap` lookup both `data:workflows`/`data:reseed` and `/maestro-install`'s terminal path converge on. `parseSkillTagsBlock`/`applySkillTagsBlock` are the "Update skill tags" pane flow's other half — see `claude-session.ts` |
 | `install.ts` / `uninstall.ts`           | Installs the runtime into a project, reports staleness, removes it                     |
 | `session-runtime.ts` / `session-log.ts` | Ephemeral session file, append-only log, the tail                                      |
 | `claude-cli.ts`                         | Where the `claude` CLI is, decided with `fs` and not with PATH alone                   |
@@ -191,28 +192,33 @@ The split is the one the `maestro-architecture` skill already draws, at `maestro
 
 | Route                                                                        | Purpose                                                                                                                                                          |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/`                                                                          | Project picker + recent projects.                                                                                                                                |
+| `/`                                                                          | Project picker + recent projects. Its own nav bar also links straight to the global `/docs` and `/tools`, alongside the hamburger. Opening or switching to a project here goes straight to `/maestro`. |
 | `/workflows`                                                                 | React Flow canvas. Writes the workflow slice. On an unconfigured project it also shows the detected implementation chain, its evidence, and chips to correct it. |
+| `/skills`                                                                    | Every skill this project, this machine, or an installed plugin makes available, tagged inline (`skill-tags.ts`). **Update skill tags** hands a description-only table off to the session pane, which proposes descriptions/tags and reports tag changes back through a fenced block `claude-session.ts` applies. Split out of `/tools`' old Skills tab. |
 | `/rules`                                                                     | Assign rules to the project root / directories. Writes the rules slice.                                                                                          |
 | `/session-log`                                                               | Live view of `maestro_session.log.jsonl`.                                                                                                                        |
 | `/maestro-tasks`                                                             | The queue `/to-maestro-tasks` wrote. **Run with Claude** previews the invocation, confirms it, and streams it.                                                    |
-| `/maestro`                                                                   | Install / update / remove the project's Maestro runtime, and say what changed on disk. Also carries a `ProjectSelect` dropdown to view another recent project's status without switching the app's current project. |
+| `/maestro`                                                                   | The project's own landing page (opening a project from `/` lands here). Install / update / remove the project's Maestro runtime, and say what changed on disk — always for the app's CURRENT project, with no `ProjectSelect` of its own. |
 | `/project-docs`, `/project-docs/$slug`                                      | The documentation reader over the open project's own `docs/`, with per-heading search that deep-links and highlights. (Formerly `/docs`.)                        |
 | `/docs`, `/docs/$group/$slug`                                                | A **global** documentation reader, unrelated to the open project: `group` is `"app"` (Maestro's own end-user docs, `apps/maestro/docs/app/*.md`) or `"claude-code"` (the repo-root `docs/*.md`, synced into a packaged build by `scripts/sync-claude-docs.mjs`). Carries a "Discuss with Claude" action that opens the session pane with the `maestro-help` skill loaded. |
-| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, reached from the **Create** link at the bottom of the matching `/tools` tab (Skills/Agents/Plugins/Marketplace), not from a top-bar menu. Split-pane: form left, live file preview right. |
-| `/tools`                                                                     | Tabbed dashboard: **Plugins**, **Marketplace** (globally-registered marketplaces, plus the project's own as a secondary section), **Usage Stats**, **Curated Tools**, **Rules** (local-only, no global tier), **Skills**, **Agents** (the last two grouped by source: local/project, global/user, bundled, from-plugin). Most tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below). Also carries the `ProjectSelect` dropdown. |
+| `/create-skill`, `/create-subagent`, `/create-plugin`, `/create-marketplace` | The four creation forms, reached from a **Create** link at the bottom of `/skills` (create-skill) or the matching `/tools` tab (Agents/Plugins/Marketplace), not from a top-bar menu. Split-pane: form left, live file preview right. |
+| `/tools`                                                                     | Tabbed dashboard: **Plugins**, **Marketplace** (globally-registered marketplaces, plus the project's own as a secondary section), **Usage Stats**, **Curated Tools**, **Rules** (local-only, no global tier), **Agents** (grouped by source: local/project, global/user, bundled, from-plugin). Most tabs are one `data:tools` round trip; **Usage Stats** is not — it previews a command and runs it only when asked (below). Also carries the `ProjectSelect` dropdown. |
 
 ### The top bar is grouped, not a list
 
 A **hamburger menu** (`components/hamburger-menu.tsx`) is the first element in the nav: links to
-`/maestro`, `/docs`, `/tools`, a recent-projects list, and "+ Add project…". It carries the runtime
-staleness badge dot — the one item in the bar nobody goes looking for, so it has to be visible from
-whatever route the user is already on. Then, shown whenever a project is open, direct links in this
-order: **Project Docs**, Workflows, Rules, Session Log, Maestro Tasks — the things a user came to
-_do_ in this project, all of which write (Project Docs is the exception, but it's project-scoped
-like the rest). There is no longer a Library menu or a Create menu — both were removed along with
-the `NavMenu` component they were built on; the four create-\* routes are now reached from the
-bottom of their matching `/tools` tab.
+`/docs`, `/tools`, a recent-projects list, and "+ Add project…" — the concerns that don't need the
+CURRENT project open. It carries the runtime staleness badge dot — the one item in the bar nobody
+goes looking for, so it has to be visible from whatever route the user is already on. Then, shown
+whenever a project is open, direct links in this order: **Maestro, Skills**, Project Docs,
+Workflows, Rules, Session Log, Maestro Tasks — the things a user came to _do_ in this project.
+Maestro used to live in the hamburger, back when it carried its own `ProjectSelect` and could be
+viewed with no project open; now that opening a project from `/` lands there directly, it belongs
+beside Workflows/Rules instead. Skills was a `/tools` tab until it got its own inline tag editor and
+"Update skill tags" button, at which point tab-behind-a-hamburger stopped fitting how often it's
+used. There is no longer a Library menu or a Create menu — both were removed along with the
+`NavMenu` component they were built on; the four create-\* routes are now reached from the bottom of
+`/skills` or their matching `/tools` tab.
 
 ### Adding a tab to `/tools`, or a doc page
 
@@ -428,9 +434,18 @@ exists nowhere in the app**; `test/isolation.test.ts` fails if `acceptEdits`, `b
   a second list — `PANE_TOOLS = [...SESSION_TOOLS, QUESTION_TOOL]`, where `QUESTION_TOOL`
   (`AskUserQuestion`) carries its own two mechanical preconditions; `Skill` is not named a second
   time here. Skills extend the same way: `PANE_SKILLS = [...SESSION_SKILLS, "super-help",
-  "maestro-help"]` — the latter loaded so the global `/docs` page's "Discuss with Claude" action can
-  answer questions about `apps/maestro/docs/app/*.md` and the Claude Code concept docs the same way
-  `super-help` does. The second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on
+  "maestro-help", "update-skill-tags"]` — the latter loaded so the global `/docs` page's "Discuss
+  with Claude" action can answer questions about `apps/maestro/docs/app/*.md` and the Claude Code
+  concept docs the same way `super-help` does, and `update-skill-tags` (pane-only — this flow never
+  runs headless) for the `/skills` page's button. That flow's handoff is the fifth `HandoffContext`
+  kind, alongside the four create-\* forms, but built without a scaffold: `claude-preview.ts`'s
+  `buildUpdateSkillTagsHandoff` opens `.claude/skills/` for writing (so `Edit` can fix a
+  description) and seeds a table of every project skill's current description and tags — never a
+  skill's own body. It has no tool to write a tag with, so its last message instead carries one
+  fenced ` ```update-skill-tags ` JSON block, which `claude-session.ts` parses and applies
+  (`parseSkillTagsBlock`/`applySkillTagsBlock` in `skill-tags.ts`) as each assistant message
+  streams past — the one place in the app where main reads a MODEL's own output as an instruction,
+  rather than only ever reacting to a tool call. The second precondition is `toolConfig: { askUserQuestion: { previewFormat: "markdown" } }`, passed on
   the pane query and nowhere else: **without it Claude emits no `preview` on any option and the list
   arrives bare**, which looks like a rendering bug and is not one. If a question never arrives at
   all, check those two before anything else.
@@ -1161,6 +1176,16 @@ token)` for that reason. The same applies to `claude:preview`, which takes a **r
   `dev` alone.
 
 ## Dev
+
+### Node version — `node:sqlite`
+
+`skill-tags.ts` (the Skills tab's tag store) uses Node's built-in `node:sqlite`, not
+`better-sqlite3` — no native module, no Electron-rebuild step. Electron 40 bundles Node 24, where
+it loads fine (just the standard experimental-feature warning); running the test suite or
+`maestro-install.js` under an older system `node` needs at least 22.5 for the module to exist at
+all. `maestro-install.js`'s own `require("./lib/maestro-skill-tags.cjs")` is wrapped in try/catch
+for exactly that case — an older `node` on a session's PATH degrades to the pre-tags, fully
+Claude-driven best-fit flow rather than failing the install.
 
 ### Linux sandbox fix (required after any install that re-extracts Electron)
 

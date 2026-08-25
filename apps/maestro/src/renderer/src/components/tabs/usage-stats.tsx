@@ -34,6 +34,19 @@ const VIEW_NOUN: Record<UsageStatsView, string> = {
 const tokens = (n: number) => n.toLocaleString("en-US");
 const usd = (n: number) => `$${n.toFixed(2)}`;
 
+/**
+ * The last run result per view, held at module scope rather than in `UsageStatsTab`'s own state.
+ *
+ * The component unmounts entirely on every tab switch within `/tools` (it's a conditional render,
+ * not a hidden one) and again on any navigation away from `/tools` and back — so state that lived
+ * only in `useState` was gone the moment either happened, and the fix for "come back and it's
+ * gone" has to live somewhere that outlives the component. `ccusage` reads machine-wide
+ * `~/.claude` data, not anything scoped to the open project, so a cache with no project key is
+ * correct rather than a shortcut. It does NOT survive a reload/restart — there is no channel this
+ * needs one; "since I last ran it in this window" is the right lifetime, not "forever on disk".
+ */
+const statsCache = new Map<UsageStatsView, UsageStats>();
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-(--line) bg-(--bg-elev) px-5 py-4">
@@ -60,7 +73,10 @@ function TotalsGrid({ label, totals }: { label: string; totals: UsageTotals }) {
 export default function UsageStatsTab() {
   const [view, setView] = useState<UsageStatsView>("session");
   const [preview, setPreview] = useState<UsageStatsPreview | null>(null);
-  const [stats, setStats] = useState<UsageStats | null>(null);
+  // Seeded from the cache rather than `null`, so a view that was already run once this window —
+  // including in a previous mount of this whole tab — shows its last result immediately instead
+  // of the "nothing has been run yet" prompt.
+  const [stats, setStats] = useState<UsageStats | null>(() => statsCache.get(view) ?? null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -70,7 +86,6 @@ export default function UsageStatsTab() {
    */
   const refreshPreview = useCallback(async (next: UsageStatsView) => {
     setPreview(null);
-    setStats(null);
     setError(null);
     const res = await callMain(() => previewUsageStats(next));
     if (!res.ok) {
@@ -81,6 +96,9 @@ export default function UsageStatsTab() {
   }, []);
 
   useEffect(() => {
+    // Restore this view's cached result rather than clearing it — the switch above already ran
+    // once and there is no reason to make the user run it again just to look back at it.
+    setStats(statsCache.get(view) ?? null);
     void refreshPreview(view);
   }, [view, refreshPreview]);
 
@@ -99,6 +117,9 @@ export default function UsageStatsTab() {
         return;
       }
       setStats(res.value.stats);
+      // `res.value.ok` is true here, so `stats` is populated — but the field itself is typed
+      // nullable (the same interface backs the `!ok` failure shape), hence the guard.
+      if (res.value.stats) statsCache.set(preview.view, res.value.stats);
     } finally {
       setRunning(false);
       // The token is spent either way — single use, like every other preview in this app — so the

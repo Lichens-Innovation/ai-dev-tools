@@ -19,11 +19,13 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { readSkillsFromDir } from "@repo/claude-fs";
 import { cliNotFoundMessage, resolveClaudeCli, type ResolveOptions } from "./claude-cli.js";
 import { issueInvocation } from "./claude-tokens.js";
 import { buildReadScope } from "./read-scope.js";
 import { enclosingRepo } from "./repo.js";
 import { resolveCreateTarget } from "./scaffold.js";
+import { readAllSkillTags } from "./skill-tags.js";
 import { tasksDirFor } from "./tasks.js";
 import { joinOxford } from "./text.js";
 import type {
@@ -38,7 +40,11 @@ import type {
 
 export type { ClaudePreview, ClaudeReadScope, ClaudeRequest, ClaudeWriteTarget, HandoffContext };
 
-/** The request kinds a session pane can be handed. Every other kind previews with `handoff: null`. */
+/**
+ * The create-\* request kinds a session pane can be handed through `buildHandoff`. `update-skill-tags`
+ * is also handoff-able but built separately (`buildUpdateSkillTagsHandoff`) since it has no scaffold
+ * and no single artifact — see the branch in `previewClaudeRun` below.
+ */
 const HANDOFF_KINDS = ["create-skill", "create-subagent", "create-plugin", "create-marketplace"] as const;
 
 /**
@@ -208,6 +214,75 @@ function buildCreate(projectRoot: string, request: CreateRequest, opts: ResolveO
   }
 }
 
+/**
+ * This project's own skills — `<projectRoot>/.claude/skills/`, the one source `update-skill-tags`
+ * works over — as a description-and-tags-only table.
+ *
+ * Deliberately NOT `discoverSkills()` from `discovery.ts`: that module imports `node:child_process`
+ * (for the `vibe-rules` CLI), and this one may not — see the box at the top of this file. Reading
+ * `readSkillsFromDir` + `readAllSkillTags` directly keeps the same guarantee `claude.test.ts` walks
+ * for, at the cost of duplicating a two-line merge `discoverSkills` also does.
+ */
+async function projectSkillsForTagging(
+  projectRoot: string
+): Promise<Array<{ id: string; description: string; tags: string[] }>> {
+  const skills = await readSkillsFromDir(path.join(projectRoot, ".claude", "skills"));
+  const tagsById = readAllSkillTags();
+  return skills.map((s) => ({ id: s.name, description: s.description, tags: tagsById[s.name] ?? [] })).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** The seeded table's own row format — one line per skill, id/description/tags only. */
+function skillTagsRow(s: { id: string; description: string; tags: string[] }): string {
+  return `| ${s.id} | ${s.description || "(none)"} | ${s.tags.length ? s.tags.join(", ") : "(none)"} |`;
+}
+
+/**
+ * The `update-skill-tags` request: no scaffold, no artifact — a table of this project's skills'
+ * CURRENT descriptions and tags, and nothing else about them (never the skill's own SKILL.md body).
+ * That is the whole point of building the prompt from this table rather than handing the session
+ * `Read` access to every skill file: the context stays small on purpose.
+ */
+async function buildUpdateSkillTags(projectRoot: string): Promise<BuiltRequest> {
+  const skills = await projectSkillsForTagging(projectRoot);
+  const skillsDir = path.join(projectRoot, ".claude", "skills");
+  const table =
+    skills.length > 0
+      ? [`| id | description | tags |`, `| --- | --- | --- |`, ...skills.map(skillTagsRow)].join("\n")
+      : "(no skills found under .claude/skills/)";
+  return {
+    prompt: [
+      `The work: for every row below missing a description, propose one from the skill's id/name`,
+      `alone; for every row with a description but no tags, propose tags from the fixed set`,
+      `(backend, frontend, mobile, refactor, reviewer, scribe, test) derived from the description`,
+      `text; for every already-tagged row, re-derive tags the same way and flag any change. A row`,
+      `with no description and no usable signal in its id may be skipped — say so rather than`,
+      `guessing. Present the full proposed table and wait for the user to confirm before writing`,
+      `anything. Follow the update-skill-tags skill for exactly how to apply what's confirmed.`,
+      "",
+      table,
+    ].join("\n"),
+    targets: [
+      { path: skillsDir, action: "modify", note: "Only a skill's own SKILL.md frontmatter `description:` field." },
+    ],
+  };
+}
+
+function buildUpdateSkillTagsHandoff(projectRoot: string, state: string): HandoffContext {
+  const skillsDir = path.join(projectRoot, ".claude", "skills");
+  const repo = enclosingRepo(skillsDir);
+  return {
+    kind: "update-skill-tags",
+    name: "skill tags",
+    artifact: skillsDir,
+    writeScope: skillsDir,
+    scope: "directory",
+    state: state.length > HANDOFF_STATE_CAP ? `${state.slice(0, HANDOFF_STATE_CAP)}…` : state,
+    repo: repo
+      ? `already inside the git repository at ${repo}.`
+      : `not inside a git repository — this flow never runs git either way.`,
+  };
+}
+
 /** How much of the scaffolded state a handoff carries. A seed is context, not a file viewer. */
 const HANDOFF_STATE_CAP = 1200;
 
@@ -280,8 +355,10 @@ function buildHandoff(projectRoot: string, request: CreateRequest, opts: Resolve
  * Every branch here is a prompt the app can execute; there is no branch that takes prompt text from
  * the caller. Adding a kind means adding a case, which is the review surface this design is for.
  */
-function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions): BuiltRequest {
+async function build(projectRoot: string, request: ClaudeRequest, opts: ResolveOptions): Promise<BuiltRequest> {
   switch (request?.kind) {
+    case "update-skill-tags":
+      return buildUpdateSkillTags(projectRoot);
     case "maestro-task": {
       // basename, not the path as given: a request must not be able to name a file outside the
       // tasks directory, and `filename` crosses a process boundary.
@@ -369,7 +446,7 @@ export async function previewClaudeRun(
   opts: PreviewOptions = {}
 ): Promise<ClaudePreview> {
   if (!projectRoot) throw new Error("No project is open.");
-  const built = build(projectRoot, request, opts);
+  const built = await build(projectRoot, request, opts);
   const { prompt, targets } = built;
   // The open project unless the request resolved somewhere else — a create-* flow writing into a
   // marketplace repo runs there, so its edits are inside the CLI's working directory.
@@ -387,9 +464,12 @@ export async function previewClaudeRun(
   // What continuing in the pane would open, resolved whether or not a CLI exists — the dialog shows
   // it beside the prompt, and a machine with no CLI has no session to hand off into but is still
   // owed an honest account of what the button would have done.
-  const handoff = (HANDOFF_KINDS as readonly string[]).includes(request?.kind)
-    ? buildHandoff(projectRoot, request as CreateRequest, opts)
-    : null;
+  const handoff =
+    request?.kind === "update-skill-tags"
+      ? buildUpdateSkillTagsHandoff(projectRoot, prompt)
+      : (HANDOFF_KINDS as readonly string[]).includes(request?.kind)
+        ? buildHandoff(projectRoot, request as CreateRequest, opts)
+        : null;
 
   if (!cli.available) {
     // No token: there is nothing runnable to authorise. The prompt and argv are still returned in

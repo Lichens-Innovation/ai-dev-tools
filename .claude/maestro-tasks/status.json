@@ -145,5 +145,11 @@
     "blockedBy": [
       "022-hand-off-from-a-create-form-into-the-pane.md"
     ]
+  },
+  "027-auto-update-the-runtime-bundle.md": {
+    "status": "ready",
+    "blockedBy": [
+      "004-install-and-update-the-runtime-from-the-app.md"
+    ]
   }
 }

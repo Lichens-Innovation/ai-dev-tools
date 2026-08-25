@@ -26,6 +26,18 @@ export type {
 import type { MaestroConfigV3 } from "./types.js";
 
 /**
+ * The seven agents a workflow can seed — backend/frontend/mobile are also a project-type
+ * classification, since they name both an implementation stack and the agent that owns it.
+ *
+ * A literal deliberate exception to "contracts.ts is interfaces only": both the renderer's tag
+ * editor and `skillMapFromTags` need the same seven values, and the value has to be a runtime
+ * array, not just a type, for the UI to render one toggle per tag. It's still self-contained (no
+ * import, nothing that touches `fs`), which is what actually makes a value here renderer-safe.
+ */
+export const SKILL_TAGS = ["backend", "frontend", "mobile", "refactor", "reviewer", "scribe", "test"] as const;
+export type SkillTag = (typeof SKILL_TAGS)[number];
+
+/**
  * Where an agent/skill was discovered: "project", "user" (global ~/.claude), the bundled
  * Maestro plugin, or an installed plugin's name.
  */
@@ -33,6 +45,11 @@ export interface DiscoveredDefinition {
   id: string;
   description: string;
   source: string;
+  /**
+   * User-entered tags — which agent(s) this skill belongs to. Always present (empty when
+   * untagged); only skills carry these today, though the type is shared with `discoverAgents`.
+   */
+  tags: SkillTag[];
 }
 
 export interface ProjectRule {
@@ -341,6 +358,13 @@ export type CreateMarketplaceRequest = {
 export type CreateRequest = CreateSkillRequest | CreateSubagentRequest | CreatePluginRequest | CreateMarketplaceRequest;
 
 /**
+ * Update every project skill's description/tags in one pass — the `/skills` page's "Update skill
+ * tags" button. No fields: unlike a create-* form, there is nothing for the renderer to submit —
+ * the set of skills to work on is discovered from the open project, not chosen on screen.
+ */
+export type UpdateSkillTagsRequest = { kind: "update-skill-tags" };
+
+/**
  * What the deterministic scaffold wrote — no model involved in any of it.
  *
  * `scaffolded: false` is not a half-success: a failed scaffold leaves the disk exactly as it was
@@ -441,7 +465,8 @@ export type ClaudeRequest =
       /** Basename of a file in `.claude/maestro-tasks/`. Resolved and existence-checked by preview. */
       filename: string;
     }
-  | CreateRequest;
+  | CreateRequest
+  | UpdateSkillTagsRequest;
 
 /** A path the run may write, and how. Shown in the confirmation before anything is spawned. */
 export interface ClaudeWriteTarget {
@@ -660,13 +685,14 @@ export interface ClaudePreview {
  * takes a token exactly as running headlessly does, and a renderer can no more nominate a writable
  * directory here than it can nominate a scaffold destination.
  *
- * Null on every request kind that is not a create-\* form (`maestro-task` is the other one today):
- * a task decides for itself what it edits, and its write target is the whole project, which is
- * precisely the thing the pane's accumulator must never be able to swallow in one click.
+ * Null on every request kind that is not a create-\* form or `update-skill-tags` (`maestro-task` is
+ * the other one today): a task decides for itself what it edits, and its write target is the whole
+ * project, which is precisely the thing the pane's accumulator must never be able to swallow in one
+ * click.
  */
 export interface HandoffContext {
-  /** Which form was submitted, e.g. `create-skill`. */
-  kind: CreateRequest["kind"];
+  /** Which form was submitted, e.g. `create-skill`, or `update-skill-tags`. */
+  kind: CreateRequest["kind"] | UpdateSkillTagsRequest["kind"];
   /** The kebab-case name the scaffold resolved — not always the one the form held. */
   name: string;
   /** The primary artifact: the file for a skill/agent, the directory for a plugin/marketplace. */

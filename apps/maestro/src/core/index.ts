@@ -380,4 +380,20 @@ export {
   type UsageStatsView,
 } from "./ccusage.js";
 
-export { defaultV3Config, buildWorkflow, linearWorkflow, buildTestsWorkflow, type SkillMap } from "./seed.js";
+export {
+  defaultV3Config,
+  buildWorkflow,
+  linearWorkflow,
+  buildTestsWorkflow,
+  seededAgentNames,
+  type SkillMap,
+} from "./seed.js";
+
+export {
+  readAllSkillTags,
+  setSkillTags,
+  skillMapFromTags,
+  parseSkillTagsBlock,
+  applySkillTagsBlock,
+  DEFAULT_SKILL_TAGS_DB_PATH,
+} from "./skill-tags.js";

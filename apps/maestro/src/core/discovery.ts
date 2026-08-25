@@ -19,6 +19,7 @@ import {
   getInstalledPluginSkills,
 } from "@repo/claude-fs";
 import { IGNORE_DIRS, walkDirs, rulesFilesIn, ruleSearchDirs } from "./fs-scan.js";
+import { readAllSkillTags } from "./skill-tags.js";
 
 import type { DiscoveredDefinition, ProjectRule, RuleLibraryEntry, TreeNode } from "./contracts.js";
 export type { DiscoveredDefinition, ProjectRule, RuleLibraryEntry, TreeNode };
@@ -100,16 +101,17 @@ export async function discoverAgents(projectRoot: string, bundledDir: string | n
     getInstalledPluginAgents(),
   ]);
   return dedupeById([
-    ...project.map((a) => ({ id: a.name, description: a.description, source: "project" })),
-    ...user.map((a) => ({ id: a.name, description: a.description, source: "user" })),
-    ...bundled.map((a) => ({ id: a.name, description: a.description, source: "ai-tools-manager" })),
-    ...plugins.map((a) => ({ id: a.name, description: a.description, source: a.plugin })),
+    ...project.map((a) => ({ id: a.name, description: a.description, source: "project", tags: [] })),
+    ...user.map((a) => ({ id: a.name, description: a.description, source: "user", tags: [] })),
+    ...bundled.map((a) => ({ id: a.name, description: a.description, source: "ai-tools-manager", tags: [] })),
+    ...plugins.map((a) => ({ id: a.name, description: a.description, source: a.plugin, tags: [] })),
   ]).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**
  * All skills the user can choose from: project-scoped, global (~/.claude), and every installed
- * plugin's skills — each tagged with its `source`.
+ * plugin's skills — each tagged with its `source`, plus whatever tags the user has manually set
+ * on it (`skill-tags.ts`, global across every project by skill id).
  */
 export async function discoverSkills(projectRoot: string): Promise<DiscoveredDefinition[]> {
   const [project, user, plugins] = await Promise.all([
@@ -117,11 +119,14 @@ export async function discoverSkills(projectRoot: string): Promise<DiscoveredDef
     getUserSkills(),
     getInstalledPluginSkills(),
   ]);
+  const tagsById = readAllSkillTags();
   return dedupeById([
     ...project.map((s) => ({ id: s.name, description: s.description, source: "project" })),
     ...user.map((s) => ({ id: s.name, description: s.description, source: "user" })),
     ...plugins.map((s) => ({ id: s.name, description: s.description, source: s.plugin })),
-  ]).sort((a, b) => a.id.localeCompare(b.id));
+  ])
+    .map((s) => ({ ...s, tags: tagsById[s.id] ?? [] }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**

@@ -9,10 +9,14 @@ import {
   readConfig,
   blankConfig,
   defaultV3Config,
+  seededAgentNames,
   detectImplAgents,
   saveConfig,
   discoverAgents,
   discoverSkills,
+  readAllSkillTags,
+  setSkillTags,
+  skillMapFromTags,
   discoverProjectRules,
   discoverRuleLibrary,
   discoverProjectTree,
@@ -64,6 +68,8 @@ import type {
   ScaffoldResult,
   ClaudeRunResult,
   MaestroConfigV3,
+  SkillTag,
+  DiscoveredDefinition,
   ToolsData,
   InstallReport,
   InstallStatus,
@@ -170,6 +176,19 @@ function resolveProjectRoot(projectRoot?: string): string {
   return currentRoot();
 }
 
+/**
+ * The `SkillMap` a seed for `implAgents` should carry, built from the global skill-tags store —
+ * deterministic, no Claude session involved. Bounded to `skills` (this project's discovered set)
+ * and to `implAgents`'s seeded agents, per `skillMapFromTags`'s two guards.
+ */
+function skillMapForSeed(implAgents: string[], skills: DiscoveredDefinition[]) {
+  return skillMapFromTags(
+    readAllSkillTags(),
+    skills.map((s) => s.id),
+    seededAgentNames(implAgents)
+  );
+}
+
 function announce(state: ProjectState): ProjectState {
   broadcast(IPC_EVENTS.projectChanged, state);
   retargetTails();
@@ -225,7 +244,7 @@ export function registerIpc(): void {
     const detection = detectImplAgents(projectRoot);
     return {
       projectRoot,
-      config: defaultV3Config(detection.implAgents),
+      config: defaultV3Config(detection.implAgents, skillMapForSeed(detection.implAgents, skills)),
       seeded: true,
       detection,
       agents,
@@ -235,9 +254,11 @@ export function registerIpc(): void {
 
   // The user amending the detection. Pure — nothing is written, so the chain can be corrected as
   // many times as it takes and the project stays unconfigured until Save.
-  ipcMain.handle(IPC.workflowsReseed, (_e, implAgents: string[]): MaestroConfigV3 => {
+  ipcMain.handle(IPC.workflowsReseed, async (_e, implAgents: string[]): Promise<MaestroConfigV3> => {
     const clean = (Array.isArray(implAgents) ? implAgents : []).map((a) => String(a).trim()).filter(Boolean);
-    return defaultV3Config(clean);
+    const projectRoot = currentRoot();
+    const skills = projectRoot ? await discoverSkills(projectRoot) : [];
+    return defaultV3Config(clean, skillMapForSeed(clean, skills));
   });
 
   ipcMain.handle(IPC.rulesData, async (): Promise<RulesData> => {
@@ -333,6 +354,13 @@ export function registerIpc(): void {
     const projectRoot = currentRoot();
     if (!projectRoot) throw new Error("No project is open.");
     return saveConfig(projectRoot, input);
+  });
+
+  // ── skill tags ───────────────────────────────────────────────────────
+  // Global, keyed by skill id — no project involved. Returns the stored (deduped, sorted) tags
+  // back, so the Skills tab renders what's actually on disk rather than its own optimistic guess.
+  ipcMain.handle(IPC.skillTagsSet, (_e, skillId: string, tags: SkillTag[]): SkillTag[] => {
+    return setSkillTags(skillId, tags);
   });
 
   // ── tasks ────────────────────────────────────────────────────────────

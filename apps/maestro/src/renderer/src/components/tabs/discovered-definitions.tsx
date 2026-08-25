@@ -5,7 +5,8 @@
 // "project" (this project's own `.claude/skills|agents/`), "user" (this machine's `~/.claude/`),
 // "ai-tools-manager" (bundled with Maestro itself), or a plugin's name (from a marketplace).
 
-import type { DiscoveredDefinition } from "../../utils/tools";
+import type { DiscoveredDefinition, SkillTag } from "../../utils/tools";
+import SkillTagEditor from "./skill-tag-editor";
 
 const TH =
   "border-b border-(--line) px-4 py-2.5 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-(--ink-2)";
@@ -47,10 +48,16 @@ function groupDefinitions(
 export default function DiscoveredDefinitionsList({
   items,
   emptyLabel,
+  onTagsChange,
 }: {
   items: DiscoveredDefinition[];
   /** e.g. "skills" or "agents" — used only in the empty-state sentence. */
   emptyLabel: string;
+  /**
+   * Only the Skills tab supplies this. Its presence is what turns on the Tags column — Agents
+   * reuses this same list component but has nothing to tag, so it keeps its plain two-column table.
+   */
+  onTagsChange?: (id: string, tags: SkillTag[]) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -76,6 +83,7 @@ export default function DiscoveredDefinitionsList({
                 <tr className="bg-(--bg-elev)">
                   <th className={TH}>Name</th>
                   <th className={TH}>Description</th>
+                  {onTagsChange && <th className={TH}>Tags</th>}
                 </tr>
               </thead>
               <tbody>
@@ -87,6 +95,15 @@ export default function DiscoveredDefinitionsList({
                       </span>
                     </td>
                     <td className="px-4 py-2.5 align-top text-[13px] text-(--ink-2)">{item.description}</td>
+                    {onTagsChange && (
+                      <td className="px-4 py-2.5 align-top">
+                        <SkillTagEditor
+                          skillId={item.id}
+                          tags={item.tags}
+                          onChange={(next) => onTagsChange(item.id, next)}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

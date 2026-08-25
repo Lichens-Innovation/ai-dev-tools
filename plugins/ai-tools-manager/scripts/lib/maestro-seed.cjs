@@ -23,7 +23,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/core/plugin-entries/maestro-seed.ts
 var maestro_seed_exports = {};
 __export(maestro_seed_exports, {
-  defaultV3Config: () => defaultV3Config
+  defaultV3Config: () => defaultV3Config,
+  seededAgentNames: () => seededAgentNames
 });
 module.exports = __toCommonJS(maestro_seed_exports);
 
@@ -95,14 +96,20 @@ function bezierLabelAnchor(source, target, sourceHandle, targetHandle) {
 function freeLanes(boxes) {
   const spans = boxes.map((b) => ({ from: b.x, to: b.x + b.w })).sort((a, b) => a.from - b.from);
   const lanes = [];
+  const leftMost = spans.length > 0 ? spans[0].from : 0;
+  lanes.push({
+    start: leftMost - LANE_MARGIN - LABEL_W,
+    end: leftMost,
+    center: leftMost - LANE_MARGIN - LABEL_W / 2
+  });
   let edge = spans.length > 0 ? spans[0].to : 0;
   for (const s of spans) {
     if (s.from - edge >= LABEL_W + 2 * LANE_MARGIN) {
-      lanes.push({ start: edge, center: (edge + s.from) / 2 });
+      lanes.push({ start: edge, end: s.from, center: (edge + s.from) / 2 });
     }
     edge = Math.max(edge, s.to);
   }
-  lanes.push({ start: edge, center: edge + LANE_MARGIN + LABEL_W / 2 });
+  lanes.push({ start: edge, end: Infinity, center: edge + LANE_MARGIN + LABEL_W / 2 });
   return lanes;
 }
 function labelBox(at) {
@@ -127,8 +134,11 @@ function placeConditionLabels(workflow, skillCount = () => 0) {
       placed.push(labelBox(anchor));
       return e;
     }
+    const exitsLeft = (e.sourceHandle ?? "right") === "left";
     const sourceRight = source.x + source.w;
-    const lane = lanes.filter((l) => l.start >= sourceRight).sort((a, b) => Math.abs(a.center - anchor.x) - Math.abs(b.center - anchor.x))[0] ?? lanes[lanes.length - 1];
+    const sourceLeft = source.x;
+    const candidates = exitsLeft ? lanes.filter((l) => l.end <= sourceLeft) : lanes.filter((l) => l.start >= sourceRight);
+    const lane = candidates.sort((a, b) => Math.abs(a.center - anchor.x) - Math.abs(b.center - anchor.x))[0] ?? (exitsLeft ? lanes[0] : lanes[lanes.length - 1]);
     let offset = { x: roundToGrid(lane.center - anchor.x), y: 0 };
     for (let i = 0; i <= STACK_TRIES; i++) {
       for (const dy of i === 0 ? [0] : [i * STACK_STEP, -i * STACK_STEP]) {
@@ -161,14 +171,27 @@ var succ = (from, to) => ({
   sourceHandle: "bottom",
   targetHandle: "top"
 });
-var cond = (from, to, label) => ({
+var cond = (from, to, label, side = "right") => ({
   from,
   to,
   kind: "condition",
   label,
-  sourceHandle: "right",
+  sourceHandle: side,
   targetHandle: "top"
 });
+function sideTracker(nodes) {
+  const xById = new Map(nodes.map((n) => [n.id, n.position?.x ?? 0]));
+  const sameColumnCount = /* @__PURE__ */ new Map();
+  return (from, to) => {
+    const a = xById.get(from) ?? 0;
+    const b = xById.get(to) ?? 0;
+    if (b > a) return "right";
+    if (b < a) return "left";
+    const n = sameColumnCount.get(from) ?? 0;
+    sameColumnCount.set(from, n + 1);
+    return n % 2 === 0 ? "left" : "right";
+  };
+}
 var BASE_STEP = 140;
 var PER_SKILL_STEP = 30;
 function columnNodes(ids, skillCount = () => 0) {
@@ -192,42 +215,44 @@ function buildWorkflow(name, kind, impl, skillCount = () => 0) {
   const seq = ["main-session", ...column];
   const edges = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
+  const side = sideTracker(nodes);
+  const c = (from, to, label) => cond(from, to, label, side(from, to));
   const reviewerCode = [];
   const refactorCode = [];
   if (kind === "tdd") {
-    reviewerCode.push(cond("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
-    refactorCode.push(cond("refactor", "test", "finding requires code changes"));
+    reviewerCode.push(c("reviewer", "test", "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(c("refactor", "test", "finding requires code changes"));
   } else if (impl.length === 1) {
-    reviewerCode.push(cond("reviewer", impl[0], "FAIL: style, data layer, error handling, security, or persistence"));
-    refactorCode.push(cond("refactor", impl[0], "finding requires code changes"));
+    reviewerCode.push(c("reviewer", impl[0], "FAIL: style, data layer, error handling, security, or persistence"));
+    refactorCode.push(c("refactor", impl[0], "finding requires code changes"));
   } else {
     for (const a of impl) {
       reviewerCode.push(
-        cond("reviewer", a, `FAIL: ${a} code (style, data layer, error handling, security, or persistence)`)
+        c("reviewer", a, `FAIL: ${a} code (style, data layer, error handling, security, or persistence)`)
       );
     }
     for (const a of impl) {
-      refactorCode.push(cond("refactor", a, `finding requires ${a} code changes`));
+      refactorCode.push(c("refactor", a, `finding requires ${a} code changes`));
     }
   }
   edges.push(
-    cond("reviewer", "refactor", "FAIL: code pattern violation or code redundancy"),
-    cond("reviewer", "test", "FAIL: a test"),
+    c("reviewer", "refactor", "FAIL: code pattern violation or code redundancy"),
+    c("reviewer", "test", "FAIL: a test"),
     ...reviewerCode,
-    cond("refactor", "scribe", "finding is a recurring pattern an agent should know going forward"),
+    c("refactor", "scribe", "finding is a recurring pattern an agent should know going forward"),
     ...refactorCode,
-    cond(
+    c(
       "refactor",
       "reviewer",
       "triggered by reviewer on a systemic FAIL; notify when delegation is complete so it can re-review"
     )
   );
   if (kind === "tdd") {
-    edges.push(cond("human_review-1", "test", "human requested test corrections"));
+    edges.push(c("human_review-1", "test", "human requested test corrections"));
   } else if (impl.length === 1) {
-    edges.push(cond("human_review-1", impl[0], "human requested code corrections"));
+    edges.push(c("human_review-1", impl[0], "human requested code corrections"));
   } else {
-    for (const a of impl) edges.push(cond("human_review-1", a, `human requested ${a} corrections`));
+    for (const a of impl) edges.push(c("human_review-1", a, `human requested ${a} corrections`));
   }
   return placeConditionLabels({ name, nodes, edges }, skillCount);
 }
@@ -270,17 +295,23 @@ function buildTestsWorkflow(name, impl, skillCount = () => 0) {
   const seq = ["main-session", ...column];
   const edges = [];
   for (let i = 0; i < seq.length - 1; i++) edges.push(succ(seq[i], seq[i + 1]));
-  edges.push(cond("reviewer", "refactor", "FAIL: a finding big enough to delegate to the refactor agent"));
+  const side = sideTracker(nodes);
+  const c = (from, to, label) => cond(from, to, label, side(from, to));
+  edges.push(c("reviewer", "refactor", "FAIL: a finding big enough to delegate to the refactor agent"));
   if (impl.length === 1) {
-    edges.push(cond("reviewer", impl[0], "FAIL: a simple code fix found while testing"));
-    edges.push(cond("refactor", impl[0], "finding requires code changes"));
-    edges.push(cond(impl[0], "test", "fix applied; re-run the tests"));
+    edges.push(c("reviewer", impl[0], "FAIL: a simple code fix found while testing"));
+    edges.push(c("refactor", impl[0], "finding requires code changes"));
+    edges.push(c(impl[0], "test", "fix applied; re-run the tests"));
   } else {
-    for (const a of impl) edges.push(cond("reviewer", a, `FAIL: a simple ${a} code fix found while testing`));
-    for (const a of impl) edges.push(cond("refactor", a, `finding requires ${a} code changes`));
-    for (const a of impl) edges.push(cond(a, "test", `${a} fix applied; re-run the tests`));
+    for (const a of impl) edges.push(c("reviewer", a, `FAIL: a simple ${a} code fix found while testing`));
+    for (const a of impl) edges.push(c("refactor", a, `finding requires ${a} code changes`));
+    for (const a of impl) edges.push(c(a, "test", `${a} fix applied; re-run the tests`));
   }
   return placeConditionLabels({ name, nodes, edges }, skillCount);
+}
+function seededAgentNames(implAgents) {
+  const impl = implAgents.length > 0 ? implAgents : ["backend"];
+  return Array.from(/* @__PURE__ */ new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
 }
 function defaultV3Config(implAgents, skillMap = {}) {
   const impl = implAgents.length > 0 ? implAgents : ["backend"];
@@ -289,7 +320,7 @@ function defaultV3Config(implAgents, skillMap = {}) {
     ...impl.map((a) => ({ name: a, agent: a, loaded_skills: [], referenced_skills: skillsFor(a) })),
     ...CORE_INSTANCES.map((i) => ({ ...i, referenced_skills: skillsFor(i.name) }))
   ];
-  const agentsAvailable = Array.from(/* @__PURE__ */ new Set([...impl, "test", "reviewer", "refactor", "scribe"])).sort();
+  const agentsAvailable = seededAgentNames(impl);
   const skillsAvailable = Array.from(
     /* @__PURE__ */ new Set(["use-design-check", ...instances.flatMap((i) => [...i.loaded_skills, ...i.referenced_skills])])
   );
@@ -312,5 +343,6 @@ function defaultV3Config(implAgents, skillMap = {}) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  defaultV3Config
+  defaultV3Config,
+  seededAgentNames
 });

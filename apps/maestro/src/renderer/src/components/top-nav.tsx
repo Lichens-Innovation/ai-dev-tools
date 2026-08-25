@@ -14,6 +14,8 @@ import {
   FolderOpen,
   MessagesSquare,
   BookOpen,
+  Sparkles,
+  Tags,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession } from "../utils/session-context";
@@ -25,17 +27,21 @@ import HamburgerMenu from "./hamburger-menu";
 /**
  * THE BAR IS GROUPED, NOT APPENDED TO.
  *
- * The hamburger menu (leftmost) separates APP-WIDE concerns — the Maestro runtime page, the
- * global Docs page, the /tools dashboard, and project switching — from what stays as direct
- * top-nav links: things that need the CURRENT project open and that a user came here to DO. The
- * runtime staleness badge rides on the hamburger button itself, because that badge is the one
- * item here nobody goes looking for, so it has to be visible from whatever route the user is on.
+ * The hamburger menu (leftmost) separates APP-WIDE concerns — the global Docs page, the /tools
+ * dashboard, and project switching — from what stays as direct top-nav links: things that need
+ * the CURRENT project open and that a user came here to DO. Maestro used to live in the
+ * hamburger too, back when it carried a `ProjectSelect` of its own and could be viewed without
+ * one being open; now that it's the project's own landing page (opening a project from `/` goes
+ * straight here), it belongs beside Workflows/Rules/etc, not among the project-agnostic items.
+ * The runtime staleness badge still rides on the hamburger button itself, because that badge is
+ * the one item here nobody goes looking for, so it has to be visible from whatever route the
+ * user is on.
  *
  * The old top-of-file `Library`/`Create` dropdowns are gone: Library's three destinations moved
  * into the hamburger menu, and Create's four routes are reached instead from buttons at the
  * bottom of the Marketplace/Plugins/Agents/Skills tabs on /tools.
  */
-const NAV_LINK = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)";
+export const NAV_LINK = "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[13px] text-(--ink-2) hover:text-(--ink)";
 export const MENU_ITEM =
   "flex items-center gap-2 px-3 py-1.5 text-[13px] text-(--ink-2) hover:bg-(--bg-elev) hover:text-(--ink)";
 
@@ -132,6 +138,12 @@ export default function TopNav({ workflowSelector }: { workflowSelector?: Workfl
       {/* Where the hamburger's app-wide items end and "what I'm editing in this project" begins. */}
       <span className="w-px h-4 bg-(--line) mx-1.5 shrink-0" aria-hidden />
 
+      <Link to="/maestro" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
+        <Sparkles size={13} /> Maestro
+      </Link>
+      <Link to="/skills" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
+        <Tags size={13} /> Skills
+      </Link>
       <Link to="/project-docs" activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }} className={NAV_LINK}>
         <BookOpen size={13} /> Project Docs
       </Link>

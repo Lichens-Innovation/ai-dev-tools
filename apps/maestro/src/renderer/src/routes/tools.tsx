@@ -5,11 +5,16 @@
 // there would be describing a machine and a project the user has not chosen yet. So the dashboard
 // is a route like any other, reached from the top bar's hamburger menu.
 //
-// SEVEN TABS, AND ONE IS NOT LIKE THE OTHERS. Six are pure reads of this machine and the VIEWED
+// SIX TABS, AND ONE IS NOT LIKE THE OTHERS. Five are pure reads of this machine and the VIEWED
 // project (see `ProjectSelect` below), served by one `data:tools` round trip. Usage Stats is a
 // COMMAND — help-server ran `npx ccusage@latest` on every view of it, downloading and executing a
 // package from the network unannounced. It therefore has no loader data at all: it previews what
 // it would run, shows that, and runs only when the user says so. See src/core/ccusage.ts.
+//
+// Skills used to be a seventh tab here; it now lives at its own top-level `/skills` page (frequent
+// enough to tag, especially with "Update skill tags", to earn a nav slot). This route still reads
+// `data.skills` off the shared `data:tools` payload for nothing — see `ToolsData` — that field is
+// unused here and kept only because narrowing the shared payload per-consumer isn't worth it.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -21,7 +26,6 @@ import MarketplaceTab from "../components/tabs/marketplace";
 import CuratedTools from "../components/tabs/curated-tools";
 import UsageStatsTab from "../components/tabs/usage-stats";
 import RulesTab from "../components/tabs/rules-tab";
-import SkillsTab from "../components/tabs/skills-tab";
 import AgentsTab from "../components/tabs/agents-tab";
 import { callMain, type CallResult } from "../utils/call-main";
 import { getToolsData, type ToolsData } from "../utils/tools";
@@ -35,7 +39,10 @@ export const Route = createFileRoute("/tools")({
   component: ToolsPage,
 });
 
-type TabId = "plugins" | "stats" | "marketplace" | "curated" | "rules" | "skills" | "agents";
+// Skills moved to its own top-level /skills page (see routes/skills.tsx) — tagging is frequent
+// enough, especially with the "Update skill tags" button, to earn a place in the project nav
+// rather than staying a tab here.
+type TabId = "plugins" | "stats" | "marketplace" | "curated" | "rules" | "agents";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "plugins", label: "Plugins" },
@@ -43,18 +50,30 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "stats", label: "Usage Stats" },
   { id: "curated", label: "Curated Tools" },
   { id: "rules", label: "Rules" },
-  { id: "skills", label: "Skills" },
   { id: "agents", label: "Agents" },
 ];
 
 function ToolsPage() {
   const loaderResult = Route.useLoaderData();
-  const { current } = useProject();
+  const { current, recent } = useProject();
   const [tab, setTab] = useState<TabId>("plugins");
   const [viewedRoot, setViewedRoot] = useState<string | null>(current?.root ?? null);
   // Seeded from the loader (which read the app's CURRENT project) and re-fetched whenever
   // `viewedRoot` changes to something else — the loader itself cannot react to that local state.
   const [result, setResult] = useState<CallResult<ToolsData>>(loaderResult);
+
+  // Adopt `current` whenever the viewed root is missing or no longer known. "Missing" covers the
+  // mount-time race: `ProjectProvider` starts with `current: null` and only learns the real open
+  // project asynchronously, so a route that renders before that resolves captures `null` here —
+  // and nothing else ever revisits it. The fetched data stays correct either way (the effect below
+  // falls back to the app's own current project when `viewedRoot` is null), but without this,
+  // `ProjectSelect` is stuck showing "No project" even once the real one is known. See the matching
+  // fix in routes/maestro.tsx for the fuller writeup.
+  useEffect(() => {
+    if (!current) return;
+    const known = [current.root, ...recent.map((r) => r.root)];
+    if (!viewedRoot || !known.includes(viewedRoot)) setViewedRoot(current.root);
+  }, [viewedRoot, current, recent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,7 +166,6 @@ function ToolsPage() {
           )}
           {tab === "curated" && <CuratedTools plugins={data.curated} />}
           {tab === "rules" && <RulesTab projectRules={data.projectRules} />}
-          {tab === "skills" && <SkillsTab skills={data.skills} />}
           {tab === "agents" && <AgentsTab agents={data.agents} />}
         </div>
       </div>

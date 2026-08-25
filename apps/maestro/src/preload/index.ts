@@ -46,6 +46,9 @@ const api: MaestroApi = {
   config: {
     save: (input: SaveInput) => ipcRenderer.invoke(IPC.configSave, input),
   },
+  skillTags: {
+    set: (skillId, tags) => ipcRenderer.invoke(IPC.skillTagsSet, skillId, tags),
+  },
   tasks: {
     list: () => ipcRenderer.invoke(IPC.tasksList),
     close: (filename) => ipcRenderer.invoke(IPC.tasksClose, filename),

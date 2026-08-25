@@ -4,7 +4,6 @@ import Button from "@repo/ui/button";
 import { toast } from "@repo/ui/toast";
 import { AlertTriangle, Check, Download, FolderOpen, PowerOff, RefreshCw, Trash2, X } from "lucide-react";
 import TopNav from "../components/top-nav";
-import ProjectSelect from "../components/project-select";
 import { callMain, type CallResult } from "../utils/call-main";
 import { useProject } from "../utils/project-context";
 import type { InstallReport, InstallStatus, UninstallPlan, UninstallReport } from "../../../shared/ipc";
@@ -347,29 +346,21 @@ function StatusCard({ status }: { status: InstallStatus }) {
  * The whole page exists because the runtime used to be installed by `/maestro-install` inside a
  * Claude session — a model acting as transport for a file copy. Everything here is one IPC call.
  *
- * `viewedRoot` is the project this page shows, which is not necessarily the app's CURRENT
- * project — `ProjectSelect` lets a user peek at another recent project's runtime status without
- * ending the live session or retargeting every other route. It defaults to the current project
- * and is threaded through every `window.maestro.install.*` call as the optional viewing
- * `projectRoot` argument; main falls back to the open project when it is omitted.
+ * This is the project's own landing page now — opening a project from `/` comes straight here —
+ * so it shows the runtime for the app's CURRENT project, same as Workflows or Rules, with no
+ * separate "which project am I viewing" picker of its own. Every `window.maestro.install.*` call
+ * still takes an optional `projectRoot`, which is simply `current.root` here; main falls back to
+ * the open project when it is omitted, which only matters for callers that don't have one handy.
  */
 function InstallPage() {
-  const { current, recent } = useProject();
-  const [viewedRoot, setViewedRoot] = useState<string | null>(current?.root ?? null);
+  const { current } = useProject();
+  const viewedRoot = current?.root ?? null;
   const [status, setStatus] = useState<InstallStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   /** Non-null while the purge confirmation is open — and it is the only way to reach a purge. */
   const [purgePlan, setPurgePlan] = useState<UninstallPlan | null>(null);
-
-  // If the currently-viewed root is no longer known (e.g. forgotten, or nothing was ever open),
-  // fall back to whatever the app now considers current — mirrors the default the plan calls for.
-  useEffect(() => {
-    if (viewedRoot && ![current?.root, ...recent.map((r) => r.root)].includes(viewedRoot)) {
-      setViewedRoot(current?.root ?? null);
-    }
-  }, [viewedRoot, current, recent]);
 
   const refreshStatus = useCallback(async () => {
     if (!viewedRoot) {
@@ -405,7 +396,11 @@ function InstallPage() {
       }
       setStatus(res.value.status);
       setOutcome({ kind: "install", report: res.value });
-      for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "error" });
+      // A warning here rides on a SUCCESSFUL install (res.ok is true) — it's a caveat, not a
+      // failure, so it gets the amber "warning" toast rather than the red "error" one the `!res.ok`
+      // branch above uses. Styling it as an error is what made a completed install read as though
+      // it had failed.
+      for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "warning" });
       if (!res.value.unchanged && res.value.warnings.length === 0) {
         toast(<>Maestro&rsquo;s runtime is installed and up to date in this project.</>);
       }
@@ -428,7 +423,9 @@ function InstallPage() {
       setStatus(res.value.status);
       setPurgePlan(null);
       setOutcome({ kind: "uninstall", report: res.value });
-      for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "error" });
+      // Same reasoning as the install path above: a warning on a successful call is a caveat, not
+      // a failure.
+      for (const warning of res.value.warnings) toast(<>{warning}</>, { variant: "warning" });
       if (res.value.noop) {
         toast(<>Nothing to remove — this project has no Maestro runtime installed.</>);
       } else if (res.value.warnings.length === 0) {
@@ -472,18 +469,15 @@ function InstallPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto p-8 flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-[15px] font-semibold m-0">Maestro runtime</h1>
-              <p className="text-[12px] text-(--ink-3) m-0 mt-1">
-                The hook scripts that run inside a Claude Code session, installed into{" "}
-                <span className="font-mono">
-                  {viewedRoot ? `${viewedRoot.replace(/\/+$/, "")}/.claude/` : "the open project"}
-                </span>
-                . Registered in that project&rsquo;s own settings — your global Claude configuration is never touched.
-              </p>
-            </div>
-            <ProjectSelect value={viewedRoot} onChange={setViewedRoot} />
+          <div>
+            <h1 className="text-[15px] font-semibold m-0">Maestro runtime</h1>
+            <p className="text-[12px] text-(--ink-3) m-0 mt-1">
+              The hook scripts that run inside a Claude Code session, installed into{" "}
+              <span className="font-mono">
+                {viewedRoot ? `${viewedRoot.replace(/\/+$/, "")}/.claude/` : "the open project"}
+              </span>
+              . Registered in that project&rsquo;s own settings — your global Claude configuration is never touched.
+            </p>
           </div>
 
           {!viewedRoot && <Note variant="warn">No project is open. Choose one from the top bar first.</Note>}

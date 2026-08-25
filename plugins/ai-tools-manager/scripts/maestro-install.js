@@ -39,13 +39,20 @@
 // analysis; omitted, the seed falls back to ["backend"] with no skills attached. Editing the graph
 // afterwards is the desktop app's job (apps/maestro) — or a hand-edit plus /maestro-update.
 //
+// `--skill-map` is only HALF of what actually gets seeded: this script also reads
+// `~/.claude/maestro-skill-tags.sqlite` (global, keyed by skill id — the Maestro desktop app's
+// Skills tab writes it) and unions a tag-derived skillMap in on top, so a skill the user has
+// already tagged `backend`/`frontend`/`mobile`/`test`/`reviewer`/`refactor`/`scribe` is wired to
+// that agent with no Claude session involved at all — the SKILL.md only needs to best-fit-guess
+// (via AskUserQuestion) whatever `--skill-map` doesn't already cover from tags.
+//
 // Prints a JSON summary to stdout.
 
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const { syncManagedRegions } = require("./lib/maestro-skill-regions.cjs");
-const { defaultV3Config } = require("./lib/maestro-seed.cjs");
+const { defaultV3Config, seededAgentNames } = require("./lib/maestro-seed.cjs");
 
 // argv: [projectDir] [--impl-agents a,b] [--skill-map '{"agent":["skill"]}']
 // Parsed positionally-first so the long-standing `maestro-install.js <dir>` call still works.
@@ -65,15 +72,67 @@ const implAgents = (flags["impl-agents"] || "")
   .map((s) => s.trim())
   .filter(Boolean);
 
-let skillMap = {};
+let claudeSkillMap = {};
 if (flags["skill-map"]) {
   try {
     const parsed = JSON.parse(flags["skill-map"]);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) skillMap = parsed;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) claudeSkillMap = parsed;
   } catch {
     // A malformed skill map seeds an empty one rather than failing the install — the user can
     // still attach skills in the desktop app, and losing the install over a quoting mistake in a
     // prompt-built argument is the worse outcome.
+  }
+}
+
+/**
+ * Project skill ids exactly as `discoverSkills`/the maestro-install SKILL.md compute them:
+ * `.claude/skills/<dir>/SKILL.md`'s frontmatter `name:`, or the directory name.
+ */
+function discoverProjectSkillIds(dir) {
+  const skillsDir = path.join(dir, ".claude", "skills");
+  let entries;
+  try {
+    entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const ids = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    let name = entry.name;
+    try {
+      const text = fs.readFileSync(path.join(skillsDir, entry.name, "SKILL.md"), "utf8");
+      const match = text.match(/^---\s*[\s\S]*?\bname:\s*(\S+)[\s\S]*?---/);
+      if (match) name = match[1];
+    } catch {
+      // No SKILL.md, or unreadable — fall back to the directory name.
+    }
+    ids.push(name);
+  }
+  return ids;
+}
+
+// The tag-derived half of the skillMap — deterministic, no Claude session involved. Read fresh
+// from the global `~/.claude/maestro-skill-tags.sqlite` store REGARDLESS of what `--skill-map`
+// carries, so a skill the user has already tagged in the Maestro desktop app's Skills tab lands in
+// the right agent's referenced_skills even if the SKILL.md step that built `--skill-map` never
+// looked at it. Wrapped in try/catch: an older `node` on this session's PATH (this script runs
+// under whatever `node` invoked it, not Electron's bundled one) or a missing db file just means no
+// tags to add — the install proceeds exactly as it did before this feature existed.
+let tagSkillMap = {};
+try {
+  const { readAllSkillTags, skillMapFromTags } = require("./lib/maestro-skill-tags.cjs");
+  tagSkillMap = skillMapFromTags(readAllSkillTags(), discoverProjectSkillIds(projectDir), seededAgentNames(implAgents));
+} catch {
+  // node:sqlite unavailable, or no tags have ever been set — proceed with Claude's map alone.
+}
+
+// Union, not override: an agent may pick up skills from both sources, deduped by `defaultV3Config`
+// itself (`skillsFor` runs every agent's list through `new Set`).
+const skillMap = {};
+for (const map of [tagSkillMap, claudeSkillMap]) {
+  for (const agent of Object.keys(map)) {
+    (skillMap[agent] ??= []).push(...map[agent]);
   }
 }
 

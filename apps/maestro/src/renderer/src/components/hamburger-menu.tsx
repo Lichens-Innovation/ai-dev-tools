@@ -1,14 +1,15 @@
 // The hamburger menu — app-wide concerns, reachable from every route.
 //
 // Separates "things that don't need the CURRENT project open, or that switch which project is
-// open" (the Maestro runtime page, the global Docs page, /tools, recent projects) from the
-// per-project direct links `TopNav` still renders beside it. Modeled on `NavMenu`'s dropdown
-// pattern in top-nav.tsx, reusing its `useOutsideClose` — the recent-projects list and the "+ Add
-// project…" row don't fit that component's `routes` prop, so this one is its own component
-// rather than a forced NavMenu variant.
+// open" (the global Docs page, /tools, recent projects) from the per-project direct links
+// `TopNav` still renders beside it — which is also where the Maestro runtime page moved once it
+// became a project-scoped landing page rather than something viewable with no project open.
+// Modeled on `NavMenu`'s dropdown pattern in top-nav.tsx, reusing its `useOutsideClose` — the
+// recent-projects list and the "+ Add project…" row don't fit that component's `routes` prop, so
+// this one is its own component rather than a forced NavMenu variant.
 
 import { Link } from "@tanstack/react-router";
-import { Menu, Sparkles, BookOpen, LayoutGrid, Plus } from "lucide-react";
+import { Menu, BookOpen, LayoutGrid, Plus } from "lucide-react";
 import { useState } from "react";
 import { useOutsideClose, MENU_ITEM } from "./top-nav";
 import { useProject } from "../utils/project-context";
@@ -46,14 +47,6 @@ export default function HamburgerMenu({ badge }: { badge: "none" | "missing" | "
 
       {open && (
         <div className="absolute left-0 top-8 z-50 w-64 bg-(--bg) border border-(--line) rounded-lg shadow-lg py-1">
-          <Link
-            to="/maestro"
-            onClick={close}
-            activeProps={{ className: "text-(--ink) bg-(--bg-elev)" }}
-            className={MENU_ITEM}
-          >
-            <Sparkles size={13} /> Maestro
-          </Link>
           <Link
             to="/docs"
             onClick={close}

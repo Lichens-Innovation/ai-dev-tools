@@ -6,7 +6,10 @@
 // the process split rather than by a convention about which helpers may be exported, which is
 // what retires the whole "Server-only code and the client bundle" hazard class.
 //
-// Type-only: no runtime imports, so the renderer can use these types without pulling node in.
+// Mostly type-only, so the renderer can use these types without pulling node in. One deliberate
+// exception: `SKILL_TAGS`, a runtime value re-exported from the renderer-safe `contracts.ts`
+// (see the re-export below) — the renderer needs the actual array, not just its type, to render
+// the skill-tag editor.
 
 // Imported from `../core/contracts.js`, NOT `../core/index.js`. The barrel re-exports fs and
 // child_process; pulling a type from it would drag all of that into the renderer's type graph.
@@ -22,6 +25,7 @@ import type {
   MaestroWorkflowsSlice,
   MaestroRulesSlice,
   DiscoveredDefinition,
+  SkillTag,
   ProjectRule,
   TreeNode,
   MaestroTask,
@@ -94,6 +98,11 @@ import type {
   UsageTotals,
 } from "../core/contracts.js";
 
+// The one runtime (non-type) import in this file. `contracts.ts` is renderer-safe — no fs, no
+// child_process — so a VALUE from it costs the renderer nothing; the tag editor needs the actual
+// seven-entry array to render one toggle per tag, not just the type.
+export { SKILL_TAGS } from "../core/contracts.js";
+
 export type {
   MaestroConfigV3,
   MaestroInstanceV3,
@@ -104,6 +113,7 @@ export type {
   MaestroWorkflowsSlice,
   MaestroRulesSlice,
   DiscoveredDefinition,
+  SkillTag,
   ProjectRule,
   TreeNode,
   MaestroTask,
@@ -283,6 +293,10 @@ export const IPC = {
   globalDocContent: "data:global-doc",
   configSave: "config:save",
 
+  // Set one skill's tags in the global (`~/.claude/maestro-skill-tags.sqlite`) store — see
+  // `src/core/skill-tags.ts`. No project involved: a skill's tags are the same in every project.
+  skillTagsSet: "skill-tags:set",
+
   tasksList: "tasks:list",
   tasksClose: "tasks:close",
 
@@ -419,6 +433,13 @@ export interface MaestroApi {
   };
   config: {
     save(input: SaveInput): Promise<SaveResult>;
+  };
+  /**
+   * Skill tags — global, keyed by skill id, edited from the /tools Skills tab. `set` returns the
+   * stored (deduped, sorted) tags back, so the tab trusts the store's echo over its own click.
+   */
+  skillTags: {
+    set(skillId: string, tags: SkillTag[]): Promise<SkillTag[]>;
   };
   tasks: {
     list(): Promise<MaestroTask[]>;

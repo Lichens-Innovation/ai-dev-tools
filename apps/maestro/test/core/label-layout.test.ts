@@ -66,11 +66,15 @@ function labelBoxes(wf: MaestroWorkflowV3, skills: Skills, height: Height): { la
     const s = boxes.get(e.from);
     const t = boxes.get(e.to);
     if (!s || !t) continue;
-    // Every seeded condition edge runs right-handle → top-handle.
-    expect([e.sourceHandle, e.targetHandle]).toEqual(["right", "top"]);
-    const sp = { x: s.x + s.w, y: s.y + s.h / 2 };
+    // Every seeded condition edge exits left or right and arrives at the top handle. Which side
+    // it exits from now varies deliberately — see the `sideTracker` note in seed.ts — so this
+    // computes the curve for whichever side this edge actually got, rather than assuming "right".
+    const side = e.sourceHandle ?? "right";
+    expect(["left", "right"]).toContain(side);
+    expect(e.targetHandle).toBe("top");
+    const sp = side === "left" ? { x: s.x, y: s.y + s.h / 2 } : { x: s.x + s.w, y: s.y + s.h / 2 };
     const tp = { x: t.x + t.w / 2, y: t.y };
-    const sc = { x: sp.x + ctrl(tp.x - sp.x), y: sp.y };
+    const sc = side === "left" ? { x: sp.x - ctrl(sp.x - tp.x), y: sp.y } : { x: sp.x + ctrl(tp.x - sp.x), y: sp.y };
     const tc = { x: tp.x, y: tp.y - ctrl(tp.y - sp.y) };
     const cx = 0.125 * sp.x + 0.375 * sc.x + 0.375 * tc.x + 0.125 * tp.x + (e.label_offset?.x ?? 0);
     const cy = 0.125 * sp.y + 0.375 * sc.y + 0.375 * tc.y + 0.125 * tp.y + (e.label_offset?.y ?? 0);
