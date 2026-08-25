@@ -19,33 +19,23 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 
 1. If you are new to Claude Code, start by reading the [Claude Code](./docs/claude-code.md)
 2. Install the `ai-tools-manager` plugin following the [plugin installation](#plugin)
-3. Browse what you now have installed — plugins, commands, rules, usage and these docs — from the
-   **Library** menu of the [Maestro desktop app](./apps/maestro) (see below), or ask the
-   `/super-help` skill from any Claude Code session
+3. Ask the `/super-help` skill from any Claude Code session for guidance on any of these docs
 
 ## Maestro
 
-**Maestro** turns a project into a multi-agent workflow: an orchestrator skill that classifies each
-request, picks a configured workflow, and dispatches subagents whose skills and handoff rules are
-injected at runtime from `.claude/maestro.json`. It has two halves that meet at that file:
+**Maestro** — the multi-agent orchestrator that turns a project into a Claude Code workflow — has
+moved to its own repository and marketplace: **[sdaigle-lichens/maestro](https://github.com/sdaigle-lichens/maestro)**.
+It's still a monorepo (the desktop app, its runtime plugin, and their shared packages), just no
+longer part of this one.
 
-- **Authoring** — the [Maestro desktop app](./apps/maestro), an Electron app. Open a project folder
-  and edit the workflow graph, the rule assignments, and the runtime install; watch the session log
-  live; run the four create-\* forms. No Claude session is involved in a save, and there is no
-  server, container or browser to start.
+```bash
+claude plugin marketplace add sdaigle-lichens/maestro
+claude plugin install maestro@maestro
+```
 
-  ```bash
-  pnpm install
-  pnpm --filter maestro build && pnpm --filter maestro start
-  ```
-
-- **Runtime** — hook scripts in the `ai-tools-manager` plugin that fire inside a Claude session
-  (`SubagentStart`, `PreToolUse`, `SubagentStop`, `PostToolUse`, `SessionEnd`). These need a
-  session to run, but not to be installed.
-
-Without the desktop app you can still set a project up entirely from a session: `/maestro-install`
-scaffolds the orchestrator, seeds `maestro.json` and renders the handoff table; `/maestro-update`
-refreshes it; `/maestro-uninstall` removes it.
+See that repo's README for the desktop app and the `/maestro-install` / `/maestro-update` /
+`/maestro-uninstall` skills. `ai-tools-manager` in this repo keeps `/super-help` and the
+create-\*/`manage-marketplace` skills used for scaffolding ai-dev-tools' own plugins.
 
 ## Installation
 
