@@ -93,7 +93,7 @@ Claude Code can install marketplaces and plugins from private git repositories.
 
 **Manual install/update** uses your existing git credential helpers:
 
-- HTTPS: works with `gh auth login`, macOS Keychain, `git-credential-store`.
+- HTTPS: works with macOS Keychain, `git-credential-store`, or the `gh` CLI. For `gh`, you must run `gh auth setup-git` to install it as a git credential helper — `gh auth login` on its own authenticates the CLI but does not configure git.
 - SSH: works as long as the host is in `known_hosts` and the key is loaded in `ssh-agent`. Claude Code suppresses interactive SSH prompts for the host fingerprint and key passphrase, so unconfigured keys will fail silently.
 
 **Background auto-updates** at startup do **not** use credential helpers (interactive prompts would block startup). To allow auto-update for a private marketplace, set the right token in your environment:
@@ -110,7 +110,32 @@ Set the token in your shell config (`.bashrc`, `.zshrc`) or pass it when running
 export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 ```
 
-> For CI/CD, configure the token as a secret env var. GitHub Actions automatically provides `GITHUB_TOKEN` for repos in the same organization.
+The variable names above are fixed — Claude Code looks them up by name, so you cannot point it at a differently-named variable.
+
+> ⚠️ **`GITHUB_TOKEN` is also read by the `gh` CLI**, and an environment variable takes precedence over `gh`'s stored credentials. Exporting it globally in `.zshrc` makes `gh auth status` report the environment token as active and drops your keyring account to `Active account: false` — so a token scoped narrowly for the marketplace will break unrelated `gh` commands.
+>
+> Either grant the token enough scope to cover your everyday `gh` usage, or scope the variable to Claude Code alone (for example an `alias claude='GITHUB_TOKEN=... claude'`). It must be set when `claude` starts, since the auto-update runs at startup.
+
+### Generating a GitHub token
+
+GitHub offers two kinds of personal access token, and the choice determines how much you expose.
+
+**Fine-grained token — preferred.** Scoped to a single repository, read-only:
+
+1. Go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens** ([direct link](https://github.com/settings/personal-access-tokens/new)).
+2. Name it, and set an expiration.
+3. **Resource owner**: select the organization that owns the marketplace — not your personal account.
+4. **Repository access**: _Only select repositories_ → the marketplace repository.
+5. **Permissions → Repository permissions → Contents**: _Read-only_.
+6. Generate and copy the token.
+
+For a marketplace owned by an **organization**, the organization must opt in first: an owner enables _Allow access via fine-grained personal access tokens_ under **Organization Settings → Third-party Access → Personal access tokens**. Until that is done the organization does not appear in the _Resource owner_ dropdown at step 3, which is the usual reason only personal repositories are listed. The organization can also require owner approval before a token becomes usable.
+
+**Classic token — fallback only.** For a private repository the minimum scope is `repo`, which grants read **and write** on every repository you can reach, not just the marketplace. There is no read-only classic scope for private repos, so prefer fine-grained whenever the organization allows it.
+
+> For CI/CD, store the token as a repository secret and map it to the environment variable explicitly (`GITHUB_TOKEN: ${{ secrets.YOUR_SECRET }}`) — secrets are not exposed as environment variables automatically.
+>
+> The `GITHUB_TOKEN` that GitHub Actions provides out of the box is scoped to the **current repository only**. It cannot read a marketplace hosted in a different private repository, even inside the same organization — that requires a PAT or a GitHub App token.
 
 ## Creating a Marketplace
 
@@ -170,12 +195,27 @@ export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 
    > Note: some marketplace names are reserved for Anthropic (e.g. `anthropic-marketplace`, `claude-code-plugins`, `agent-skills`). Pick a unique kebab-case name.
 
-4. Register your marketplace with `/plugin marketplace add ./path/to/my-marketplace`
-5. Install a plugin from it with `/plugin install plugin-a@my-marketplace`
-6. Before publishing, validate the JSON and test installation locally: `claude plugin validate .` or inside Claude Code: `/plugin validate .`. The validator checks `marketplace.json`, every plugin's `plugin.json`, skill/agent/command frontmatter, and `hooks/hooks.json` for syntax and schema errors.
-7. To publish, push the marketplace directory to a Git host and add it with `/plugin marketplace add owner/repo`.
-8. See [Private Repositories](https://code.claude.com/docs/en/plugin-marketplaces#private-repositories) for accessing a marketplace that you published in a private repository.
-9. You can now reference your marketplace in any of your projects so other developpers are prompted to install it when they clone one of your project, see [Auto-register for a team](#auto-register-for-a-team) .
+4. Validate the manifests before going further: `claude plugin validate .`, or `/plugin validate .` inside Claude Code. The validator checks `marketplace.json`, every plugin's `plugin.json`, skill/agent/command frontmatter, and `hooks/hooks.json` for syntax and schema errors.
+
+5. Register the marketplace **locally** to test it, by path — nothing is published yet, so the `owner/repo` shorthand is not available:
+
+   ```bash
+   claude plugin marketplace add .
+   ```
+
+6. Install a plugin from it with `claude plugin install my-plugin@my-marketplace`, where `my-marketplace` is the `name` field of your `marketplace.json` — **not** the name of your git repository. The two are frequently different: the repository `Lichens-Innovation/ai-dev-tools` registers as the marketplace `lichens-ai-dev-tools`. Run `claude plugin marketplace list` to see the registered name.
+
+7. To publish, push the marketplace directory to a Git host, then register it by repository:
+
+   ```bash
+   claude plugin marketplace add owner/repo
+   ```
+
+   Note the separator: `add` takes `owner/repo` with a slash. The `@` form (`plugin@marketplace`) belongs to `install`, not to `add`.
+
+8. See [Private Repositories](#private-repositories) for accessing a marketplace published in a private repository.
+
+9. You can now reference your marketplace in any of your projects so other developers are prompted to install it when they clone one of your projects — see [Auto-register for a team](#auto-register-for-a-team).
 
 ### Plugin Sources
 
@@ -197,10 +237,22 @@ Each command below is available both as `/plugin marketplace <cmd>` inside a ses
 
 | Command                                   | Action          | Notes                                                                                                                                                  |
 | ----------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `claude plugin marketplace list`          | List registered | Add `--json` for machine-readable output.                                                                                                              |
+| `claude plugin marketplace add <source>`  | Register        | Takes `owner/repo`, a git URL, or a local path. `--scope user\|project\|local` sets where it is declared; `--sparse <paths...>` limits the checkout for monorepos. |
+| `claude plugin marketplace list`          | List registered | Add `--json` for machine-readable output. Shows the registered name, which comes from `marketplace.json` and may differ from the repository name.       |
 | `claude plugin marketplace update`        | Update all      | Re-pulls catalogs, picks up new plugins and version bumps. Auto-runs at startup for marketplaces reachable without interactive credentials.            |
 | `claude plugin marketplace update <name>` | Update one      | Refresh a single marketplace by name.                                                                                                                  |
 | `claude plugin marketplace remove <name>` | Remove          | **Warning:** also uninstalls every plugin installed from this marketplace. To refresh without losing plugins, use `update` instead of remove + re-add. |
+
+### Renaming a plugin
+
+A plugin's name appears in several places that must stay in sync. Renaming means updating all of them:
+
+1. The directory under `plugins/`.
+2. `marketplace.json`: the entry's `name` **and** its `source` path, if the plugin is stored by relative path.
+3. The plugin's own `plugin.json`: `name`, plus `homepage` if it points at the plugin directory.
+4. Any references in READMEs or docs, including `install` commands, which use the `plugin@marketplace` form.
+
+A plugin exists for Claude Code only when it is both on disk under `plugins/` and listed in `marketplace.json`. Renaming the directory without updating the manifest publishes nothing, and the mismatch is silent — no error is raised. Run `claude plugin validate .` afterwards to confirm the manifests still agree.
 
 ### Versioning and release channels
 
