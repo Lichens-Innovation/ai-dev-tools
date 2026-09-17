@@ -32,7 +32,8 @@ This is the full config this skill applies:
   "disableClaudeAiConnectors": true,
   "disableWorkflows": true,
   "disableBundledSkills": true,
-  "disableArtifact": true
+  "disableArtifact": true,
+  "autoMemoryEnabled": false
 }
 ```
 
@@ -47,6 +48,7 @@ Write to `.claude/settings.local.json` in the current project's working director
 2. **Detect conflicts.** Compare each top-level key in the target configuration against what's already present:
    - `autoCompactWindow` — conflict if it's already set to a different number.
    - `disableClaudeAiConnectors`, `disableWorkflows`, `disableBundledSkills`, `disableArtifact` — conflict if any is already set to `false` (already `true` is not a conflict).
+   - `autoMemoryEnabled` — conflict if it's already set to `true` (already `false` is not a conflict).
    - `permissions.deny` — conflict only if the existing array already contains entries **not** in the target list (i.e. the user has their own deny rules that would need reconciling). If the existing array is a subset of the target list, no conflict — just union them.
    - Any other existing top-level keys (e.g. `permissions.allow`, `permissions.ask`, `model`, `statusLine`, ...) are untouched and never a conflict — always preserved as-is.
 
