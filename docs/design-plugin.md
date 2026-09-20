@@ -38,11 +38,12 @@ The plugin ships in the `lichens-ai-dev-tools` marketplace.
 ### From the marketplace (recommended)
 
 ```bash
-# Register the marketplace once (GitHub shorthand)
-/plugin marketplace add lichens-ai/ai-dev-tools
+# Clone and register the marketplace once
+git clone https://github.com/Lichens-Innovation/ai-dev-tools.git
+claude plugin marketplace add ./ai-dev-tools
 
 # Install the plugin
-/plugin install design@lichens-ai-dev-tools
+claude plugin install design@lichens-ai-dev-tools
 ```
 
 Then invoke its skills as usual: `/design-init`, `/design-loop`, etc.

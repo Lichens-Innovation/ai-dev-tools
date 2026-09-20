@@ -5,6 +5,7 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 ## Table Of Content
 
   - [Claude Code](./docs/claude-code.md)
+  - [Design Plugin](./docs/design-plugin.md)
   - [Hooks](./docs/hooks.md)
   - [Marketplace](./docs/marketplace.md)
   - [MCP](./docs/mcp.md)
