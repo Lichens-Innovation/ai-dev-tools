@@ -1,6 +1,7 @@
 ---
 name: super-help
 description: "Answer questions about the Claude Code AI Dev Tools ecosystem — plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, and CLI commands. Use when the user asks how something works, wants to understand a concept, or needs guidance on any Claude Code tooling topic."
+disable-model-invocation: true
 ---
 
 # Help
