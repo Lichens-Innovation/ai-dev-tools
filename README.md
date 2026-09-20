@@ -19,7 +19,7 @@ Lichens Innovation repository for **AI-assisted development tools** — a single
 ## Getting Started
 
 1. If you are new to Claude Code, start by reading the [Claude Code](./docs/claude-code.md)
-2. Install the `ai-tools-manager` plugin following the [plugin installation](#plugin)
+2. Install the `claude-tools` plugin following the [plugin installation](#plugin)
 3. Start a claude code session and launch the help server using the `/help-server`
 
 ## Installation

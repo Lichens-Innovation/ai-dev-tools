@@ -6,6 +6,5 @@
     "name": "Samuel Daigle",
     "email": "daigles@lichens.ai"
   },
-  "keywords": ["scaffold", "marketplace", "plugin", "skill", "create", "generator"],
-  "commands": "./commands"
+  "keywords": ["scaffold", "marketplace", "plugin", "skill", "create", "generator"]
 }

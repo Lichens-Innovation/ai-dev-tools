@@ -55,7 +55,7 @@ async function clearHistoryFile() {
 }
 
 async function isSuperHelpAvailable(): Promise<boolean> {
-  return isPluginInstalled('ai-tools-manager@lichens-ai-dev-tools')
+  return isPluginInstalled('claude-tools@lichens-ai-dev-tools')
 }
 
 function buildPrompt(message: string, history: ChatHistoryEntry[]): string {
@@ -93,7 +93,7 @@ export const sendChatMessage = createServerFn({ method: 'POST' })
       return {
         response: '',
         error:
-          'The /super-help skill is not available. Install it with: claude plugin install ai-tools-manager@lichens-ai-dev-tools',
+          'The /super-help skill is not available. Install it with: claude plugin install claude-tools@lichens-ai-dev-tools',
         skillAvailable: false,
       }
     }
