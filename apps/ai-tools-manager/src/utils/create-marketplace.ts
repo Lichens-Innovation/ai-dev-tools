@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import fs from "fs";
+import { scaffoldMarketplace } from "./scaffold";
+import { writeCreateResult, writeCancelResult } from "./create-result";
 
 interface FormPayload {
   name: string;
@@ -14,7 +15,6 @@ interface FormPayload {
 export const submitMarketplaceForm = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => data as FormPayload)
   .handler(async ({ data }) => {
-    const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
     const payload: Record<string, unknown> = {
       name: data.name.trim(),
       description: data.description.trim(),
@@ -24,17 +24,28 @@ export const submitMarketplaceForm = createServerFn({ method: "POST" })
       privateRepo: data.privateRepo,
     };
     if (data.homepage.trim()) payload.homepage = data.homepage.trim();
-    fs.writeFileSync(resultFile, JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "UserPromptExpansion",
-        additionalContext: `Marketplace form data: ${JSON.stringify(payload)}`,
-      },
-    }));
+
+    // Deterministic pre-scaffold: write the marketplace.json manifest + README (when the target
+    // dir is reachable — a brand-new external dir under Docker degrades to dispatcher-side).
+    const scaffold = scaffoldMarketplace({
+      name: data.name.trim(),
+      description: data.description.trim(),
+      ownerName: data.ownerName.trim(),
+      ownerEmail: data.ownerEmail.trim(),
+      homepage: data.homepage.trim() || undefined,
+      targetDir: data.targetDir.trim(),
+    });
+
+    writeCreateResult({
+      action: "create-marketplace",
+      label: "Marketplace",
+      formData: JSON.stringify(payload),
+      scaffold,
+    });
     return { ok: true };
   });
 
 export const cancelMarketplaceForm = createServerFn({ method: "POST" }).handler(async () => {
-  const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-  fs.writeFileSync(resultFile, JSON.stringify({ decision: "block", reason: "Marketplace creation cancelled." }));
+  writeCancelResult("create-marketplace", "Marketplace creation cancelled.");
   return { ok: true };
 });

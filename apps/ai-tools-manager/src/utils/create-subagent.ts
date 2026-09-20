@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import fs from "fs";
 import { getKnownMarketplaces } from "@repo/claude-fs";
+import { scaffoldSubagent } from "./scaffold";
+import { writeCreateResult, writeCancelResult } from "./create-result";
+import { titleFromName } from "./text";
 
 interface FormPayload {
   mode: "auto" | "manual";
@@ -18,7 +20,6 @@ interface FormPayload {
 export const submitSubagentForm = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => data as FormPayload)
   .handler(async ({ data }) => {
-    const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
     const destination =
       data.target === "project"
         ? { projectPath: data.cwd }
@@ -27,6 +28,8 @@ export const submitSubagentForm = createServerFn({ method: "POST" })
               (await getKnownMarketplaces())[data.marketplace]?.installLocation ?? "",
             plugin: data.plugin,
           };
+    const ideaOrDesc = (data.mode === "auto" ? data.idea : data.description)?.trim() ?? "";
+    const name = data.name?.trim() || titleFromName(ideaOrDesc).split(" ")[0]?.toLowerCase() || "new-agent";
     const formData = JSON.stringify({
       mode: data.mode,
       target: data.target,
@@ -38,17 +41,25 @@ export const submitSubagentForm = createServerFn({ method: "POST" })
       tools: data.tools ?? [],
       ...destination,
     });
-    fs.writeFileSync(resultFile, JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "UserPromptExpansion",
-        additionalContext: `Subagent form data: ${formData}`,
-      },
-    }));
+
+    // Deterministic pre-scaffold: write the agent file frontmatter (+ skeleton for manual mode).
+    const scaffold = scaffoldSubagent({
+      target: data.target,
+      name,
+      mode: data.mode,
+      idea: ideaOrDesc,
+      triggers: data.triggers ?? [],
+      tools: data.tools ?? [],
+      projectPath: "projectPath" in destination ? destination.projectPath : undefined,
+      marketplacePath: "marketplacePath" in destination ? destination.marketplacePath : undefined,
+      plugin: "plugin" in destination ? destination.plugin : undefined,
+    });
+
+    writeCreateResult({ action: "create-subagent", label: "Subagent", formData, scaffold });
     return { ok: true };
   });
 
 export const cancelSubagentForm = createServerFn({ method: "POST" }).handler(async () => {
-  const resultFile = process.env.RESULT_FILE ?? "/tmp/result.json";
-  fs.writeFileSync(resultFile, JSON.stringify({ decision: "block", reason: "Subagent creation cancelled." }));
+  writeCancelResult("create-subagent", "Subagent creation cancelled.");
   return { ok: true };
 });

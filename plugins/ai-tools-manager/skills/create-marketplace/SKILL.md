@@ -11,24 +11,15 @@ Scaffold a new plugin marketplace with a valid manifest, then guide the user thr
 
 $ARGUMENTS
 
-## References
+## References & shared contract
 
-Consult the relevant doc(s) before making structural decisions:
-
-- [`docs/marketplace.md`](${CLAUDE_SKILL_DIR}/../../../../docs/marketplace.md) — marketplace structure, registration, publishing, versioning, auto-updates
-- [`docs/plugins.md`](${CLAUDE_SKILL_DIR}/../../../../docs/plugins.md) — plugin structure, manifest, hooks and relative paths
-- [`docs/skills.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills.md) — skill format, popular repositories, skills CLI
-- [`docs/subagents.md`](${CLAUDE_SKILL_DIR}/../../../../docs/subagents.md) — subagent usage, AGENTS.md format, coordination tips
-- [`docs/hooks.md`](${CLAUDE_SKILL_DIR}/../../../../docs/hooks.md) — hook lifecycle, PreToolUse / PostToolUse, hook scripts
-- [`docs/rules.md`](${CLAUDE_SKILL_DIR}/../../../../docs/rules.md) — rules format and scope
-- [`docs/mcp.md`](${CLAUDE_SKILL_DIR}/../../../../docs/mcp.md) — MCP server configuration
-- [`docs/memory.md`](${CLAUDE_SKILL_DIR}/../../../../docs/memory.md) — memory system, persistent memory for subagents
-- [`docs/skills-cli.md`](${CLAUDE_SKILL_DIR}/../../../../docs/skills-cli.md) — skills CLI commands
-- [`docs/claude-code.md`](${CLAUDE_SKILL_DIR}/../../../../docs/claude-code.md) — Claude Code settings, commands, IDE integrations
+See [`docs/ai-tools-create-shared.md`](${CLAUDE_SKILL_DIR}/../../../../docs/ai-tools-create-shared.md) for the reference docs (marketplace, plugins, skills, …), where the form payload comes from, and the **scaffold-finishing contract**.
 
 ## Workflow
 
-The form data submitted by the user was injected into your context as `additionalContext` by the `UserPromptExpansion` hook. Parse the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` and proceed:
+Parse the form payload — the JSON object `{ name, description, ownerName, ownerEmail, homepage?, targetDir, privateRepo }` (see the shared contract above for its source) — and proceed.
+
+**Applying the scaffold contract here:** when `scaffolded: true`, the `marketplace.json` manifest and a starter `README.md` already exist under `targetDir` — verify them and skip recreating; focus on the remaining work (CLAUDE.md, enriching the README, local test + private-repo/auto-update setup). A brand-new marketplace dir is usually **outside** the mounted repo, so under Docker the scaffold typically reports `scaffolded: false` — in that case do every step below from scratch.
 
 1. **Create marketplace directory structure**
    ```

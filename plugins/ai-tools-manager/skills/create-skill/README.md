@@ -5,7 +5,7 @@ Scaffolds a new Claude Code skill — either inside a marketplace plugin or dire
 ## How it works
 
 1. User invokes `/create-skill`.
-2. `hooks.json` matches and runs `scripts/gather-info.sh create-skill`, which opens the web form at `http://localhost:3009/create-skill`.
+2. `hooks.json` matches and runs `scripts/launch-ai-tools-manager-app.sh create-skill`, which opens the web form at `http://localhost:3009/create-skill`.
 3. User fills the form (auto/manual mode, marketplace/project target, name, idea, triggers, etc.) and submits.
 4. The form writes a JSON payload to `/tmp/result.json`.
 5. The hook unblocks and returns the payload to Claude as `additionalContext`. This file (`SKILL.md`) reads it and writes the new skill file.

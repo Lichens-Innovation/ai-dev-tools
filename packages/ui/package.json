@@ -6,6 +6,7 @@
   "exports": {
     "./theme-toggle": "./src/theme-toggle.tsx",
     "./copyable-text": "./src/copyable-text.tsx",
+    "./resizable-panel": "./src/resizable-panel.tsx",
     "./slide-panel": "./src/slide-panel.tsx",
     "./button": "./src/button.tsx",
     "./field": "./src/field.tsx",
@@ -13,7 +14,7 @@
     "./select": "./src/select.tsx",
     "./dialog": "./src/dialog.tsx",
     "./mode-pill": "./src/mode-pill.tsx",
-    "./success-state": "./src/success-state.tsx",
+    "./toast": "./src/toast.tsx",
     "./shortcuts-dialog": "./src/shortcuts-dialog.tsx",
     "./file-preview": "./src/file-preview.tsx",
     "./syntax-line": "./src/syntax-line.tsx"
@@ -22,7 +23,7 @@
     "@base-ui/react": "1.0.0"
   },
   "devDependencies": {
-    "@repo/typescript-config": "*",
+    "@repo/typescript-config": "workspace:*",
     "@types/react": "19.2.0",
     "react": "19.2.0",
     "typescript": "6.0.2"

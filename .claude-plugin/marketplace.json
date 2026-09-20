@@ -29,6 +29,11 @@
       "name": "ai-tools-manager",
       "source": "./plugins/ai-tools-manager",
       "description": "Skills for managing the ai-dev-tools marketplace: create new skills and plugins"
+    },
+    {
+      "name": "claude-tools",
+      "source": "./plugins/claude-tools",
+      "description": "General-purpose tools and skills for Claude Code"
     }
   ]
 }

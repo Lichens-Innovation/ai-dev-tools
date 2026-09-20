@@ -9,12 +9,43 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as SessionLogRouteImport } from './routes/session-log'
+import { Route as RulesRouteImport } from './routes/rules'
+import { Route as MaestroTasksRouteImport } from './routes/maestro-tasks'
+import { Route as MaestroRouteImport } from './routes/maestro'
 import { Route as CreateSubagentRouteImport } from './routes/create-subagent'
 import { Route as CreateSkillRouteImport } from './routes/create-skill'
 import { Route as CreatePluginRouteImport } from './routes/create-plugin'
 import { Route as CreateMarketplaceRouteImport } from './routes/create-marketplace'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSessionLogStreamRouteImport } from './routes/api/session-log-stream'
 
+const WorkflowsRoute = WorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionLogRoute = SessionLogRouteImport.update({
+  id: '/session-log',
+  path: '/session-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RulesRoute = RulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaestroTasksRoute = MaestroTasksRouteImport.update({
+  id: '/maestro-tasks',
+  path: '/maestro-tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaestroRoute = MaestroRouteImport.update({
+  id: '/maestro',
+  path: '/maestro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateSubagentRoute = CreateSubagentRouteImport.update({
   id: '/create-subagent',
   path: '/create-subagent',
@@ -40,6 +71,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionLogStreamRoute = ApiSessionLogStreamRouteImport.update({
+  id: '/api/session-log-stream',
+  path: '/api/session-log-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +83,12 @@ export interface FileRoutesByFullPath {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/maestro': typeof MaestroRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
+  '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +96,12 @@ export interface FileRoutesByTo {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/maestro': typeof MaestroRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
+  '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,6 +110,12 @@ export interface FileRoutesById {
   '/create-plugin': typeof CreatePluginRoute
   '/create-skill': typeof CreateSkillRoute
   '/create-subagent': typeof CreateSubagentRoute
+  '/maestro': typeof MaestroRoute
+  '/maestro-tasks': typeof MaestroTasksRoute
+  '/rules': typeof RulesRoute
+  '/session-log': typeof SessionLogRoute
+  '/workflows': typeof WorkflowsRoute
+  '/api/session-log-stream': typeof ApiSessionLogStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,6 +125,12 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/maestro'
+    | '/maestro-tasks'
+    | '/rules'
+    | '/session-log'
+    | '/workflows'
+    | '/api/session-log-stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -78,6 +138,12 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/maestro'
+    | '/maestro-tasks'
+    | '/rules'
+    | '/session-log'
+    | '/workflows'
+    | '/api/session-log-stream'
   id:
     | '__root__'
     | '/'
@@ -85,6 +151,12 @@ export interface FileRouteTypes {
     | '/create-plugin'
     | '/create-skill'
     | '/create-subagent'
+    | '/maestro'
+    | '/maestro-tasks'
+    | '/rules'
+    | '/session-log'
+    | '/workflows'
+    | '/api/session-log-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -93,10 +165,51 @@ export interface RootRouteChildren {
   CreatePluginRoute: typeof CreatePluginRoute
   CreateSkillRoute: typeof CreateSkillRoute
   CreateSubagentRoute: typeof CreateSubagentRoute
+  MaestroRoute: typeof MaestroRoute
+  MaestroTasksRoute: typeof MaestroTasksRoute
+  RulesRoute: typeof RulesRoute
+  SessionLogRoute: typeof SessionLogRoute
+  WorkflowsRoute: typeof WorkflowsRoute
+  ApiSessionLogStreamRoute: typeof ApiSessionLogStreamRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workflows': {
+      id: '/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session-log': {
+      id: '/session-log'
+      path: '/session-log'
+      fullPath: '/session-log'
+      preLoaderRoute: typeof SessionLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rules': {
+      id: '/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/maestro-tasks': {
+      id: '/maestro-tasks'
+      path: '/maestro-tasks'
+      fullPath: '/maestro-tasks'
+      preLoaderRoute: typeof MaestroTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/maestro': {
+      id: '/maestro'
+      path: '/maestro'
+      fullPath: '/maestro'
+      preLoaderRoute: typeof MaestroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/create-subagent': {
       id: '/create-subagent'
       path: '/create-subagent'
@@ -132,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session-log-stream': {
+      id: '/api/session-log-stream'
+      path: '/api/session-log-stream'
+      fullPath: '/api/session-log-stream'
+      preLoaderRoute: typeof ApiSessionLogStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -141,6 +261,12 @@ const rootRouteChildren: RootRouteChildren = {
   CreatePluginRoute: CreatePluginRoute,
   CreateSkillRoute: CreateSkillRoute,
   CreateSubagentRoute: CreateSubagentRoute,
+  MaestroRoute: MaestroRoute,
+  MaestroTasksRoute: MaestroTasksRoute,
+  RulesRoute: RulesRoute,
+  SessionLogRoute: SessionLogRoute,
+  WorkflowsRoute: WorkflowsRoute,
+  ApiSessionLogStreamRoute: ApiSessionLogStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

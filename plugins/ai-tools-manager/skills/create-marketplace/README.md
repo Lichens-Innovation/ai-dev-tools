@@ -5,12 +5,12 @@ Scaffolds a new plugin marketplace: creates the directory structure, `marketplac
 ## How it works
 
 1. User invokes `/create-marketplace`.
-2. `hooks.json` matches and runs `scripts/gather-info.sh create-marketplace`, which opens the web form at `http://localhost:3009/create-marketplace`.
+2. `hooks.json` matches and runs `scripts/launch-ai-tools-manager-app.sh create-marketplace`, which opens the web form at `http://localhost:3009/create-marketplace`.
 3. User fills the form (name, description, owner name/email, optional homepage, target directory, private-repo flag) and submits.
 4. The form writes a JSON payload to `/tmp/result.json`.
 5. The hook unblocks and returns the payload to Claude as `additionalContext`. This file (`SKILL.md`) reads it and scaffolds the new marketplace at `<targetDir>`.
 
-The `targetDir` field defaults to the user's `cwd` (captured by `gather-info.sh` before launching the container).
+The `targetDir` field defaults to the user's `cwd` (captured by `launch-ai-tools-manager-app.sh` before launching the container).
 
 See the project-local skill `apps/ai-tools-manager/.claude/skills/create-skills-architecture/` for the full architecture.
 

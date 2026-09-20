@@ -1,0 +1,12 @@
+{
+  "name": "claude-tools",
+  "version": "0.1.0",
+  "description": "General-purpose tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "homepage": "https://github.com/lichens-ai/ai-dev-tools",
+  "keywords": ["claude", "tools", "utilities"],
+  "commands": "./commands"
+}

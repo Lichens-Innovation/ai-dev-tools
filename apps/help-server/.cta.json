@@ -3,7 +3,7 @@
   "mode": "file-router",
   "typescript": true,
   "tailwind": true,
-  "packageManager": "yarn",
+  "packageManager": "pnpm",
   "git": true,
   "install": true,
   "intent": true,
