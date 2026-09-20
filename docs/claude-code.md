@@ -60,6 +60,39 @@ To understand their different roles, you can compare Claude Code to a restaurant
 | `/theme`                       | Change color theme                                                       |
 | `/usage`                       | Show plan limits and rate limit status                                   |
 
+## Keyboard Shortcuts
+
+Line editing shortcuts in the prompt (readline-style):
+
+| Shortcut                      | Description                                                       |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `Ctrl+A`                       | Move cursor to start of line                                      |
+| `Ctrl+E`                       | Move cursor to end of line                                        |
+| `Alt+Left` / `Alt+B`           | Move cursor back one word                                         |
+| `Alt+Right` / `Alt+F`          | Move cursor forward one word                                      |
+| `Alt+D`                        | Delete to end of current/next word                                |
+| `Ctrl+K`                       | Delete to end of line                                              |
+| `Ctrl+U`                       | Delete from cursor to start of line                                |
+| `Ctrl+W`                       | Delete back to previous whitespace (whole `--flag=value` at once) |
+| `Ctrl+Y`                       | Paste last deleted text                                            |
+
+On macOS, `Alt`/Option-key shortcuts require enabling "Option as Meta" in your terminal (Terminal.app, iTerm2, etc.).
+
+Other useful session shortcuts:
+
+| Shortcut               | Description                                              |
+| ------------------------ | ---------------------------------------------------------- |
+| `Ctrl+R`                | Reverse search command history                            |
+| `Ctrl+C`                | Interrupt / clear input (press twice to exit)              |
+| `Ctrl+D`                | Exit session (press twice within 800ms)                    |
+| `Esc` then `Esc`        | Clear input draft, or open rewind menu on an empty prompt |
+| `Ctrl+O`                | Toggle transcript viewer                                   |
+| `Ctrl+B`                | Background the running task                                |
+| `Shift+Tab`             | Cycle permission modes                                     |
+| `\` + `Enter`           | Insert a newline in the prompt (works in all terminals)   |
+
+See the [official interactive mode docs](https://code.claude.com/docs/en/interactive-mode) for the full list.
+
 ## Custom Statusline
 
 In `.claude/settings.json`

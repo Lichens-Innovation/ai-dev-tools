@@ -50,6 +50,12 @@ web_modules/
 # Optional npm cache directory
 .npm
 
+# pnpm content-addressable store
+.pnpm-store/
+
+# Turborepo cache
+.turbo/
+
 # Optional eslint cache
 .eslintcache
 
