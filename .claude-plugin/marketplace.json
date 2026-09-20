@@ -34,6 +34,11 @@
       "name": "claude-tools",
       "source": "./plugins/claude-tools",
       "description": "General-purpose tools and skills for Claude Code"
+    },
+    {
+      "name": "design",
+      "source": "./plugins/design",
+      "description": "Claude Design <-> Storybook/Chromatic iteration loop: sync a design-system catalog to Claude Design, iterate look-and-feel there, then implement and visually validate the result in a React codebase."
     }
   ]
 }
