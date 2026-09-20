@@ -1,6 +1,7 @@
 ---
 name: design-init
 description: "One-time setup for running the design loop in an existing React project. Detects what's already present, then orchestrates the palette and Storybook/Chromatic/MCP setup sub-skills and writes the initial design.manifest.json. Use when the user wants to set up a React project for the Claude Design loop, onboard an existing project, or asks how to get started with the design plugin."
+disable-model-invocation: true
 ---
 
 # Design Init

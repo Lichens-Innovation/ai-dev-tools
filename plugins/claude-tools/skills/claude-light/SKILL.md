@@ -1,6 +1,7 @@
 ---
 name: claude-light
 description: "Applies a lightweight local Claude Code configuration to the current project's .claude/settings.local.json — shrinking the auto-compact window and disabling connectors, workflows, bundled skills, artifacts, and a set of noisy/expensive tools. Use when the user asks to make Claude lighter/leaner for this project, run in a stripped-down or minimal mode, or invokes /claude-light."
+disable-model-invocation: true
 ---
 
 # Claude Light

@@ -1,6 +1,7 @@
 ---
 name: design-loop
 description: "Runs the Claude Design -> React implementation loop: reads an approved design target from a Claude Design project, implements it in the mapped component using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component (or the palette) is ready to implement, asks to sync approved Claude Design changes into code, or wants to run the design loop."
+disable-model-invocation: true
 ---
 
 # Design Loop

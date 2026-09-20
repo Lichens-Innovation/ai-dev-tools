@@ -1,6 +1,7 @@
 ---
 name: design-palette
 description: "Creates or normalizes a CSS theme palette file that is the canonical source of truth for a project's design tokens, preserving raw-scale vs semantic-token structure. Used by design-init, or directly when the user wants to generate/consolidate a color/token theme file or restructure existing CSS variables into a palette. Use when the user asks to create a theme palette, set up design tokens, or normalize their CSS variables."
+disable-model-invocation: true
 ---
 
 # Design Palette

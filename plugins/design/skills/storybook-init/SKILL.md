@@ -1,6 +1,7 @@
 ---
 name: storybook-init
 description: "Installs and configures Storybook in a React project, wires up the Storybook MCP server, and confirms Playwright can screenshot a running Storybook - the render + knowledge half of the design loop. Used by design-init, or directly when the user wants to add Storybook or configure the Storybook MCP. Use when the user asks to add Storybook, set up component stories, or configure the Storybook MCP."
+disable-model-invocation: true
 ---
 
 # Storybook Init

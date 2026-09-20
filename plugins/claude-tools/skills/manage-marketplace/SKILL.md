@@ -1,6 +1,7 @@
 ---
 name: manage-marketplace
 description: "Reference for managing Claude Code plugins and marketplaces: install, update, remove plugins; add, update, remove marketplaces. Use when the user asks how to install a plugin, remove a marketplace, update plugins, or manage their Claude Code plugin setup."
+disable-model-invocation: true
 ---
 
 # Manage Marketplace
