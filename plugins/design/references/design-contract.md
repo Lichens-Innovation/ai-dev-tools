@@ -19,13 +19,13 @@ Change this doc first; then bring the skills into line with it.
   3. APPROVE    you flip a component (or the palette) to `status: approved` in the manifest
   ── IMPLEMENT (design-loop, in a Claude Code session) ───────────────────────────────
      a. READ TARGET   DesignSync get_file → exact HTML/CSS values from the Design project
-     b. READ SYSTEM   Storybook MCP get-documentation → real props / stories / token usage
+     b. READ SYSTEM   Storybook MCP docs-show → real props / stories / token usage
      c. RECONCILE     apply new values to the CANONICAL CSS (tokens = source of truth)
      d. EDIT          update component code to consume the tokens
-     e. SCOPE         Storybook MCP get-changed-stories → which stories changed
+     e. SCOPE         Storybook MCP stories-changed → which stories changed
      f. SEE           Playwright screenshots the changed stories → compare to the target
      g. CONVERGE      loop d→f until pixels match
-     h. VALIDATE      Storybook MCP run-story-tests → a11y + interaction pass
+     h. VALIDATE      Storybook MCP test-run → a11y + interaction pass
   4. PUBLISH   push to Chromatic → team visual diff / approval
   5. RESTART   back to step 2 for the next change
 ```
@@ -86,6 +86,39 @@ queries. None exist yet — YAGNI.)
 `design-sync` writes/updates the mapping when it pushes cards up. `design-loop` writes
 `lastImplementedHash` (and never downgrades `status`) after a successful publish.
 
+### Storybook targets (`storybooks`, optional)
+
+A repo can run more than one Storybook — typically a monorepo with one per UI app (web + mobile).
+Each is a **target**, described once at the top level and referenced by key from components:
+
+```json
+{
+  "storybooks": {
+    "web":    { "dir": "apps/frontend", "url": "http://localhost:6006", "mcpServer": "storybook-web",    "runCommand": "just storybook-frontend", "chromaticTokenEnv": "CHROMATIC_PROJECT_TOKEN_WEB" },
+    "mobile": { "dir": "apps/mobile",   "url": "http://localhost:6007", "mcpServer": "storybook-mobile", "runCommand": "just storybook-mobile",   "chromaticTokenEnv": "CHROMATIC_PROJECT_TOKEN_MOBILE" }
+  },
+  "components": [
+    { "name": "Button", "storybook": "mobile", "localPath": "apps/mobile/src/components/button/index.tsx", "...": "..." }
+  ]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `storybooks.<key>.dir` | Directory holding that target's `.storybook/` (repo-relative; `.` for the root). |
+| `storybooks.<key>.url` | Dev-server URL — the base for Playwright iframe URLs. |
+| `storybooks.<key>.mcpServer` | Name of the Storybook MCP server entry serving this target (`<url>/mcp`). |
+| `storybooks.<key>.runCommand` | How to start it. |
+| `storybooks.<key>.chromaticTokenEnv` | Env var holding this target's Chromatic project token. |
+| `components[].storybook` | Key of the target the component's stories live in. |
+
+**Defaults (single-Storybook repos).** Both fields are optional. With no `storybooks` map, every
+component uses one implicit target `default` = `{ dir: ".", url: "http://localhost:6006",
+mcpServer: "storybook", runCommand: "<pm> run storybook", chromaticTokenEnv: "CHROMATIC_PROJECT_TOKEN" }`,
+where `<pm>` is the repo's package manager (from its lockfile: npm, pnpm or yarn).
+A component without `storybook` uses the only target, and is an error when there are several.
+Skills always resolve a component's target through these rules — never hardcode a port.
+
 ---
 
 ## 3. Claude Design ↔ local mapping (answers the three contract questions)
@@ -142,10 +175,11 @@ references it. Never flatten semantic tokens into raw hex.
 ## 6. Preconditions design-loop assumes (set up by design-init)
 
 - A canonical CSS theme palette exists (`design-palette`).
-- Storybook runs locally and each mapped component has at least one story.
-- The Storybook MCP server is configured and reachable.
+- Every Storybook target (§2) referenced by an approved component runs locally, and each mapped
+  component has at least one story in its target.
+- Each of those targets' Storybook MCP server is configured and reachable.
 - Playwright is installed and can screenshot a running Storybook.
-- Chromatic is wired for publish.
+- Chromatic is wired for publish, one project per target.
 - `design.manifest.json` exists and its `designProjectId` resolves via `DesignSync`.
 
 If a precondition is missing, `design-loop` stops and points the user at `design-init` rather

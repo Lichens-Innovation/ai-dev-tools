@@ -15,6 +15,15 @@ loop (contract §1, step 4). Runs after Storybook exists (`storybook-init`). Usu
 Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) — Chromatic is
 the PUBLISH stage; `design-loop` calls it once a component's render has converged and tests pass.
 
+## Targets
+
+Chromatic is set up **once per Storybook target** (contract §2): one Chromatic project, one
+token, one publish script per target. A single-Storybook repo has one target at the root using
+`CHROMATIC_PROJECT_TOKEN` — steps 1–7 as written. With several targets (a monorepo), run steps
+1–7 once per target, inside the target's `dir`, and name each token env var after the target
+(`CHROMATIC_PROJECT_TOKEN_<KEY>`). Separate projects keep each target's baselines and review
+queue independent.
+
 ## Prerequisites
 
 - **Storybook 6.5+** already installed and building (`storybook-init` first).
@@ -39,7 +48,8 @@ the PUBLISH stage; `design-loop` calls it once a component's render has converge
    **not** hard-code it. Recommend the `CHROMATIC_PROJECT_TOKEN` env var (local `.env` that is
    gitignored, and a CI secret). Never commit the token.
 
-4. **Add the publish script.** Add to `package.json` so the token is read from the env var:
+4. **Add the publish script.** Add to the target's `package.json` so the token is read from the
+   env var:
 
    ```json
    { "scripts": { "chromatic": "chromatic" } }
@@ -53,13 +63,17 @@ the PUBLISH stage; `design-loop` calls it once a component's render has converge
 
    Confirm the build succeeds and the Storybook is published; report the build URL.
 
-6. **CI integration.** Set `CHROMATIC_PROJECT_TOKEN` as a CI secret and run `npm run chromatic` in
-   the pipeline (ensure `git` is available and history is fetched, as Chromatic needs it to
-   associate commits with PRs/MRs). If the repo already has a CI config, add a job/step; otherwise
-   note it as a follow-up rather than inventing pipeline files.
+6. **CI integration.** Set the token as a CI secret and run `npm run chromatic` in the pipeline
+   (ensure `git` is available and history is fetched, as Chromatic needs it to associate commits
+   with PRs/MRs). With several targets, add one job per target, working in its `dir`, and limit
+   each to changes that affect it (the target and the workspace packages it consumes) when the CI
+   supports path filters. If the repo already has a CI config, add a job/step; otherwise note it
+   as a follow-up rather than inventing pipeline files.
 
 7. **Report.**
    - `chromatic` package + script added; where the token is read from; baseline build URL.
+   - Record `chromaticTokenEnv` on the target in `design.manifest.json#storybooks` (not needed for
+     a single target using `CHROMATIC_PROJECT_TOKEN`).
    - Confirm this satisfies the PUBLISH precondition in contract §6.
 
 ## Notes
