@@ -26,7 +26,8 @@ this skill produces must satisfy the preconditions in §6.
 
 3. **Storybook + MCP + Playwright (sub-skill).** If Storybook, the Storybook MCP, or Playwright
    are missing, invoke **`storybook-init`** to install and wire them, and to confirm Playwright
-   can screenshot a running Storybook.
+   can screenshot a running Storybook. In a monorepo it may produce several **Storybook targets**
+   (one per UI app, contract §2) — keep the list for step 5.
 
 3b. **Chromatic (sub-skill).** Once Storybook exists, invoke **`chromatic-init`** to add the
    publish/approval gate (package, token, script, baseline build). Runs after `storybook-init`.
@@ -37,7 +38,9 @@ this skill produces must satisfy the preconditions in §6.
 5. **Write the manifest.** Create `design.manifest.json` at the repo root per the contract §2
    schema: `designProjectId`, a default `reconcileRule` (`canonical-wins`), and a `components[]`
    row per component discovered (each `wip`, `lastImplementedHash: null`). Map `localPath`,
-   `storyId`, and the intended `designPath`.
+   `storyId`, and the intended `designPath`. With more than one Storybook target, also write the
+   `storybooks` map and set each component's `storybook` key; a single root target on `:6006`
+   needs neither.
 
 6. **Verify preconditions.** Walk contract §6 and confirm each is satisfied. List anything still
    missing.
