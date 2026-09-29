@@ -14,7 +14,7 @@ Change this doc first; then bring the skills into line with it.
               │  storybook-init  → Storybook + Chromatic + Storybook MCP     │
               └──────────────────────────────────────────────────────────────┘
 
-  1. SYNC UP    canonical CSS + component catalog ──/design-sync──▶ Claude Design project
+  1. SYNC UP    canonical CSS + component catalog ──/design sync──▶ Claude Design project
   2. EXPLORE    you + claude.ai/design iterate palette / component look (fast, no source churn)
   3. APPROVE    you flip a component (or the palette) to `status: approved` in the manifest
   ── IMPLEMENT (design-loop, in a Claude Code session) ───────────────────────────────
@@ -77,7 +77,7 @@ queries. None exist yet — YAGNI.)
       "name": "Button",
       "localPath": "src/components/Button/Button.tsx",
       "storyId": "components-button--default",
-      "designPath": "components/button/index.html",
+      "designPath": "components/ui/Button/Button.html",
       "status": "wip",
       "lastImplementedHash": null
     }
@@ -95,12 +95,13 @@ queries. None exist yet — YAGNI.)
 | `components[].name`                | Human name; also the label used in the Design catalog card.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `components[].localPath`           | The React source file to edit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `components[].storyId`             | Storybook story id (`<component-id>--<story>`, e.g. `ui-button--default`, never the bare component id), used by the MCP and Playwright to target the render.                                                                                                                                                                                                                                                                                                                                     |
-| `components[].designPath`          | Path of the preview card **inside the Design project** (what `DesignSync get_file` reads).                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `components[].designPath`          | Path of the preview card **inside the Design project** (what `DesignSync get_file` reads). `/design sync` writes `components/<group>/<Name>/<Name>.html`; `null` until the component has a card.                                                                                                                                                                                                                                                                                                 |
 | `components[].status`              | `wip` \| `approved`. The approval signal — see §4.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `components[].lastImplementedHash` | Hash of the Design target the last successful implementation was built from. Detects drift.                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-`design-sync` writes/updates the mapping when it pushes cards up. `design-loop` writes
-`lastImplementedHash` (and never downgrades `status`) after a successful publish.
+`/design sync` pushes the cards up but does not touch the manifest: `design-init` maps each
+`designPath` to its card afterwards. `design-loop` writes `lastImplementedHash` (and never
+downgrades `status`) after a successful publish.
 
 ### Storybook targets (`storybooks`, optional)
 
@@ -168,7 +169,7 @@ Skills always resolve a component's target through these rules — never hardcod
    files, and the Design System view labels each card by its file name. Two tools write the
    root, each for one file:
    - the card, through DesignSync (`finalize_plan` + `write_files`, directly from `design-init`,
-     not through `/design-sync`);
+     not through `/design sync`);
    - the Design Components runtime `support.js` the card needs beside it, through the Claude
      Design tool's `create_support_js`. `design-init` writes it only when `list_files` shows it
      missing.

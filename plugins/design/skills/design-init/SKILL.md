@@ -37,7 +37,7 @@ this skill produces must satisfy the preconditions in §6.
 
    Only `DesignSync create_project` makes a design-system project, and the type cannot change
    later. Never create it with the Claude Design tool's `create_project`: that makes an ordinary
-   project, which `DesignSync list_projects` and `/design-sync` do not see. If DesignSync is not
+   project, which `DesignSync list_projects` and `/design sync` do not see. If DesignSync is not
    available, stop and ask the user to enable it (`/design-login` without a claude.ai login).
 
    Record its id as `designProjectId`.
@@ -110,14 +110,37 @@ this skill produces must satisfy the preconditions in §6.
    `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
    discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
    id such as `ui-button--default` from the target's `index.json`, not the component id
-   `ui-button`: `iframe.html?id=` renders only a story). With several Storybook targets, also
-   write `storybooks` and each component's `storybook` key.
+   `ui-button`: `iframe.html?id=` renders only a story, `designPath`: its synced card, or `null`
+   until the catalog is synced, see step 8). With several Storybook targets, also write
+   `storybooks` and each component's `storybook` key.
 
-8. **Verify preconditions.** Walk contract §6 and list anything still missing.
+8. **Prepare `/design sync`.** The built-in `/design sync` skill turns a Storybook target's
+   stories into the project's component cards. Hand it what this skill already knows so it
+   skips the discovery:
+   - Create `.design-sync/config.json` if it is missing (never overwrite it) for the first
+     target, web first: `projectId` (the `designProjectId`), `shape: "storybook"`,
+     `storybookConfigDir` (`<dir>/.storybook`), `storybookStatic: ".design-sync/sb-reference"`,
+     and `buildCmd` (`cd <dir> && npx storybook build -c .storybook -o <repo>/.design-sync/sb-reference`).
+     Seed only these fields. The file belongs to `/design sync`, which fills in the rest (entry,
+     provider, title map, card overrides), and its format may change with Claude Code.
+   - Git-ignore its local artifacts: `.design-sync/sb-reference/`, `.design-sync/.cache/`,
+     `.design-sync/learnings/`, `.design-sync/node_modules`, `.design-sync/pkg/types/`,
+     `.design-sync/pkg/node_modules`. Keep `config.json`, `NOTES.md`, `conventions.md` and the
+     `pkg/` sources tracked: the next sync resumes from them.
+   - Map the cards once a target is synced (the project then has `_ds_sync.json`): its cards are
+     `components/<group>/<Name>/<Name>.html` (`DesignSync list_files`). Set each row's
+     `designPath` to its card, matching the component name (`/design sync` may rename one, e.g.
+     `Typography` → `Text`, see its `titleMap`). A component it excluded keeps
+     `designPath: null` and cannot be approved. Sync other targets later with another
+     `/design sync` run; it only adds what changed.
 
-9. **Report & next steps.** Palette file(s), what each app imports and audit summary,
-   Storybook/Chromatic/MCP status, Design project + palette card path, manifest path. Next: `/design-sync` the component catalog,
-   iterate in Claude Design (palette included), approve, then run `design-loop`.
+9. **Verify preconditions.** Walk contract §6 and list anything still missing.
+
+10. **Report & next steps.** Palette file(s), what each app imports and audit summary,
+    Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
+    many components have a card. Next: `/design sync` the first target, then re-run
+    `design-init` to map the cards (it only fills what is missing), iterate in Claude Design
+    (palette included), approve, then run `design-loop`.
 
 ## Notes
 
