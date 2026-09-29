@@ -23,7 +23,8 @@ ask Claude Design to update `inputs` (or paste the card's **Export → Inputs JS
      `https://<branch>--<appid>.chromatic.com` or `http://localhost:6006`
    - `stories`: comma-separated story ids from `design.manifest.json` (`components[].storyId`)
 3. Upload it to the bound project at `palette/index.html` (`DesignSync finalize_plan`, then
-   `write_files`) and record it in the manifest's `palette` entry (contract §2). Approving the palette card triggers `design-loop` to copy the
+   `write_files`), add `palette/support.js` beside it (Claude Design `create_support_js`; the card
+   does not render without it) and record it in the manifest's `palette` entry (contract §2). Approving the palette card triggers `design-loop` to copy the
    approved inputs back into the canonical file and re-run `palette.mjs`.
 
 ## Live theming in Storybook (web targets)

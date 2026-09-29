@@ -66,7 +66,10 @@ this skill produces must satisfy the preconditions in §6.
    [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)). Upload
    it: `DesignSync finalize_plan` (`writes: ["palette/index.html"]`, `localDir: /tmp/design-init`),
    then `DesignSync write_files` with that `planId` and
-   `{ path: "palette/index.html", localPath: "palette.html" }`.
+   `{ path: "palette/index.html", localPath: "palette.html" }`. The card only renders with the
+   Design Components runtime beside it: when `palette/support.js` is missing, write it with Claude
+   Design's `create_support_js` (`path: "palette/support.js"`, under that tool's own
+   `finalize_plan`). DesignSync cannot write it: the content is server-provided.
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
