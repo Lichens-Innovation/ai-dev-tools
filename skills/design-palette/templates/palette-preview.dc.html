@@ -1,0 +1,739 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Instrument Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+a{color:var(--link)}
+a:hover{color:var(--link-hover)}
+input,select,textarea,button{font:inherit;color:inherit}
+</style>
+</helmet>
+
+<header data-screen-label="Navbar" style="position:relative;z-index:20;height:60px;display:flex;align-items:center;gap:clamp(8px,1.6vw,20px);padding:0 20px;background:var(--primary);color:var(--text-on-primary)">
+  <div style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.01em;white-space:nowrap;flex:none">
+    <div style="width:28px;height:28px;border-radius:8px;background:var(--quinary);color:var(--text-on-quinary);display:grid;place-items:center;font-size:14px">{{ titleInitial }}</div>
+    <span>{{ title }}</span>
+  </div>
+  <nav style="display:flex;gap:4px;flex:none;white-space:nowrap">
+    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary);background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Overview</a>
+    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary)" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Projects</a>
+    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary)" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Reports</a>
+  </nav>
+  <div style="flex:1 1 0;min-width:0"></div>
+  <input size="1" placeholder="Search…" style="min-width:60px;max-width:200px;flex:1 1 200px;height:36px;padding:0 12px;border-radius:8px;border:1px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary));color:var(--text-on-primary);outline:none">
+  <button onClick="{{ toggleMode }}" style="height:36px;padding:0 12px;border-radius:8px;border:1px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:transparent;color:var(--text-on-primary);cursor:pointer;white-space:nowrap;flex:none" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">{{ modeLabel }}</button>
+  <button onClick="{{ openExport }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--secondary-strong);background:var(--secondary);color:var(--text-on-secondary);font-weight:600;cursor:pointer;white-space:nowrap;flex:none" style-hover="background:var(--secondary-hover)">Export tokens</button>
+  <div style="position:relative">
+    <button onClick="{{ toggleUserMenu }}" style="width:36px;height:36px;border-radius:50%;border:2px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:var(--quaternary);color:var(--text-on-quaternary);font-weight:600;font-size:12px;cursor:pointer" style-hover="background:var(--quaternary-strong)">JD</button>
+    <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;right:0;top:46px;z-index:40;width:220px;padding:6px;border-radius:12px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);box-shadow:0 12px 32px -8px var(--shadow)">
+        <div style="padding:8px 10px 10px;border-bottom:1px solid var(--bg-hover);margin-bottom:4px">
+          <div style="font-weight:600">Jane Doe</div>
+          <div style="font-size:12px;color:var(--text-muted)">jane@example.com</div>
+        </div>
+        <div style="padding:8px 10px;border-radius:8px;cursor:pointer" style-hover="background:var(--bg-hover)">Profile</div>
+        <div style="padding:8px 10px;border-radius:8px;cursor:pointer" style-hover="background:var(--bg-hover)">Settings</div>
+        <div style="padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--danger-text)" style-hover="background:var(--danger-bg)">Sign out</div>
+      </div>
+    </sc-if>
+  </div>
+</header>
+
+<div style="display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 60px)">
+  <aside data-screen-label="Sidebar" style="padding:20px 12px;background:var(--bg-inset);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="padding:0 10px 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Workspace</div>
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;text-align:left;cursor:pointer;background:{{ n.bg }};color:{{ n.fg }};font-weight:{{ n.weight }}" style-hover="background:var(--bg-hover)">
+          <span style="width:8px;height:8px;border-radius:2px;background:{{ n.dot }}"></span>{{ n.label }}
+        </button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:0 10px">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Theme</div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Preset
+        <select value="{{ presetKey }}" onChange="{{ onPreset }}" style="height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none">
+          <option value="project">Project inputs</option>
+          <option value="plum">Coolors · Plum (5)</option>
+          <option value="triad">Three-color (3)</option>
+          <option value="twoTone">Two-tone (2)</option>
+        </select>
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:9px;background:var(--bg-hover)">
+        <button onClick="{{ setLight }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ lightBg }};font-weight:500" style-hover="background:var(--border)">Light</button>
+        <button onClick="{{ setDark }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ darkBg }};font-weight:500" style-hover="background:var(--border)">Dark</button>
+      </div>
+      <p style="margin:0;font-size:12px;color:var(--text-muted);text-wrap:pretty">Click any base swatch to try a color for the current mode. Swatch edits are a sandbox: to keep them, copy the Inputs JSON from Export tokens into the card's inputs prop.</p>
+    </div>
+  </aside>
+
+  <main style="padding:32px clamp(16px,4vw,48px) 80px;display:flex;flex-direction:column;gap:48px;min-width:0">
+    <section id="palette" data-screen-label="Palette" style="display:flex;flex-direction:column;gap:28px;max-width:1120px">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <h1 style="margin:0;font-size:28px;letter-spacing:-0.02em">Palette</h1>
+          <p style="margin:4px 0 0;color:var(--text-muted);max-width:60ch;text-wrap:pretty">Each color has five steps ordered by contrast against the background: faint, soft, base, strong, intense. The names mean the same thing in light and dark mode.</p>
+        </div>
+        <button onClick="{{ openExport }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Export CSS</button>
+      </div>
+
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:grid;grid-template-columns:150px repeat(5,minmax(0,1fr));gap:8px;align-items:end">
+            <div>
+              <div style="font-weight:600;font-size:15px">{{ g.title }}</div>
+              <div style="font-size:12px;color:var(--text-muted)">{{ g.note }}</div>
+            </div>
+            <div style="font:500 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">faint</div>
+            <div style="font:500 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">soft</div>
+            <div style="font:500 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">base</div>
+            <div style="font:500 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">strong</div>
+            <div style="font:500 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">intense</div>
+          </div>
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:150px repeat(5,minmax(0,1fr));gap:8px;align-items:center">
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font:500 13px 'IBM Plex Mono',monospace">{{ r.label }}</span>
+                  <sc-if value="{{ r.canRemove }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ r.onRemove }}" title="Remove" style="width:18px;height:18px;padding:0;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-muted);cursor:pointer;line-height:1" style-hover="background:var(--danger-bg);color:var(--danger-text)">×</button>
+                  </sc-if>
+                  <sc-if value="{{ r.hasIssues }}" hint-placeholder-val="{{ false }}">
+                    <span style="padding:0 6px;border-radius:999px;font-size:10px;font-weight:600;white-space:nowrap;background:var(--danger-bg);color:var(--danger-text)">{{ r.issueLabel }}</span>
+                  </sc-if>
+                </div>
+                <span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--text-muted);text-transform:uppercase">{{ r.hexLabel }}</span>
+              </div>
+              <sc-for list="{{ r.swatches }}" as="s" hint-placeholder-count="5">
+                <div title="{{ s.tok }}" style="position:relative;height:48px;border-radius:8px;background:{{ s.bg }};box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--text) 10%, transparent);outline:{{ s.outline }};outline-offset:2px;opacity:{{ s.op }}">
+                  <sc-if value="{{ s.isBase }}" hint-placeholder-val="{{ false }}">
+                    <input type="color" value="{{ s.hex }}" onChange="{{ s.onChange }}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          <sc-if value="{{ g.showAdd }}" hint-placeholder-val="{{ false }}">
+            <div style="padding-left:158px">
+              <button onClick="{{ g.onAdd }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px dashed var(--border-strong);background:transparent;color:var(--text-muted);cursor:pointer" style-hover="background:var(--bg-hover);color:var(--text)">+ Add --{{ g.addName }}</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    <div style="display:flex;flex-direction:column;gap:4px;padding:16px 20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated)">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:8px">
+          <div style="flex:1;min-width:220px">
+            <div style="font-weight:600;font-size:15px">Contrast audit</div>
+            <div style="font-size:12px;color:var(--text-muted)">{{ auditSummary }}</div>
+          </div>
+          <button onClick="{{ toggleAuditAll }}" style="height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:500;cursor:pointer" style-hover="background:var(--bg-hover)">{{ auditToggleLabel }}</button>
+        </div>
+        <sc-for list="{{ auditItems }}" as="c" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:56px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--border)">
+            <div style="height:32px;border-radius:6px;display:grid;place-items:center;font-weight:700;background:{{ c.boxBg }};color:{{ c.boxFg }};border:{{ c.boxBorder }}">{{ c.sample }}</div>
+            <div style="min-width:0">
+              <div style="font:500 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">{{ c.label }}</div>
+              <div style="font-size:12px;color:var(--text-muted)">{{ c.note }}</div>
+            </div>
+            <span style="font:400 12px 'IBM Plex Mono',monospace;white-space:nowrap">{{ c.value }}</span>
+            <span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:{{ c.badgeBg }};color:{{ c.badgeFg }}">{{ c.status }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ auditEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:8px 0;border-top:1px solid var(--border);color:var(--success-text);font-size:13px">All checks pass in both modes.</div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;padding-top:8px">
+        <div>
+          <div style="font-weight:600;font-size:15px">Semantic</div>
+          <div style="font-size:12px;color:var(--text-muted)">What components use, and what each token points to in {{ modeName }} mode.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+          <sc-for list="{{ neutrals }}" as="t" hint-placeholder-count="9">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="height:40px;border-radius:8px;background:{{ t.bg }};box-shadow:inset 0 0 0 1px var(--border)"></div>
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font:500 11px 'IBM Plex Mono',monospace">--{{ t.name }}</span>
+                <span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">→ {{ t.map }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+          <sc-for list="{{ intents }}" as="it" hint-placeholder-count="6">
+            <div style="padding:10px 12px;border-radius:8px;background:{{ it.surface }};border:1px solid {{ it.border }};color:{{ it.text }}">
+              <div style="font:600 13px 'IBM Plex Mono',monospace">{{ it.label }}</div>
+              <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
+                <sc-for list="{{ it.rows }}" as="m" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:6px;font:400 11px 'IBM Plex Mono',monospace">
+                    <span style="width:12px;height:12px;flex:none;border-radius:3px;background:{{ m.bg }};box-shadow:inset 0 0 0 1px var(--border)"></span>
+                    <span>{{ m.tok }}</span>
+                    <span>→ {{ m.map }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section id="components" data-screen-label="Components" style="display:flex;flex-direction:column;gap:20px;max-width:1120px">
+      <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Components</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px">
+        <div style="padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:16px">
+          <div style="font-weight:600">Buttons</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ brandList }}" as="b" hint-placeholder-count="2">
+              <button style="height:36px;padding:0 14px;border-radius:8px;--hov:{{ b.hov }};border:1px solid {{ b.strong }};background:{{ b.bg }};color:{{ b.fg }};font-weight:600;cursor:pointer" style-hover="background:var(--hov)">{{ b.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ brandList }}" as="b" hint-placeholder-count="2">
+              <button disabled="{{ true }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-disabled);color:var(--text-disabled);font-weight:600;cursor:not-allowed">{{ b.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Solid</button>
+            <button style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--primary-border);background:var(--primary-bg);color:var(--primary-text);font-weight:600;cursor:pointer" style-hover="background:var(--primary-bg-hover)">Soft</button>
+            <button style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--primary);background:transparent;color:var(--primary-text);font-weight:600;cursor:pointer" style-hover="background:var(--primary-bg)">Outline</button>
+            <button style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--primary-text);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Ghost</button>
+            <button disabled="{{ true }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-disabled);color:var(--text-disabled);font-weight:600;cursor:not-allowed">Disabled</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ statusList }}" as="st" hint-placeholder-count="4">
+              <button style="height:36px;padding:0 14px;border-radius:8px;--hov:{{ st.hov }};border:1px solid {{ st.strong }};background:{{ st.bg }};color:{{ st.fg }};font-weight:600;cursor:pointer" style-hover="background:var(--hov)">{{ st.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:12px">
+          <div style="font-weight:600">Alerts &amp; badges</div>
+          <sc-for list="{{ statusList }}" as="st" hint-placeholder-count="4">
+            <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;background:{{ st.faint }};border:1px solid {{ st.soft }}">
+              <span style="margin-top:6px;width:8px;height:8px;border-radius:50%;flex:none;background:{{ st.bg }}"></span>
+              <div><span style="font-weight:600;color:{{ st.raised }}">{{ st.label }}.</span> {{ st.message }}</div>
+            </div>
+          </sc-for>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px">
+            <sc-for list="{{ brandList }}" as="b" hint-placeholder-count="2">
+              <span style="padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:{{ b.faint }};color:{{ b.raised }}">{{ b.label }}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:12px">
+          <div style="font-weight:600">Overlays</div>
+          <p style="margin:0;color:var(--text-muted)">Modals and popovers sit on --bg-elevated with a border.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;position:relative">
+            <button onClick="{{ openConfirm }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Open modal</button>
+            <div style="position:relative">
+              <button onClick="{{ toggleInfoPop }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Show popover</button>
+              <sc-if value="{{ infoPopOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:0;top:44px;z-index:40;width:260px;padding:14px;border-radius:12px;background:var(--bg-elevated);border:1px solid var(--border);box-shadow:0 12px 32px -8px var(--shadow);display:flex;flex-direction:column;gap:8px">
+                  <div style="font-weight:600">Share with team</div>
+                  <div style="color:var(--text-muted);font-size:13px">Everyone in the workspace will be able to view this palette.</div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px">
+                    <button onClick="{{ closeAll }}" style="height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--border);background:transparent;cursor:pointer" style-hover="background:var(--bg-hover)">Cancel</button>
+                    <button onClick="{{ closeAll }}" style="height:30px;padding:0 10px;border-radius:7px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Share</button>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+        <div style="padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:12px">
+          <div style="font-weight:600">Links</div>
+          <p style="margin:0;text-wrap:pretty">Read the <a href="#">theming guide</a> before exporting, or <a href="#">contact support</a> if a color fails contrast.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:16px">
+            <a href="#" style="font-weight:600;text-decoration:none">View all projects →</a>
+            <a href="#" style="color:var(--text-muted)" style-hover="color:var(--text)">Muted link</a>
+            <a href="#" style="color:var(--danger-text)" style-hover="color:var(--danger-strong)">Delete account</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="forms" data-screen-label="Forms and lists" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:20px;max-width:1120px">
+      <form onSubmit="{{ onSubmit }}" style="padding:24px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:16px">
+        <div>
+          <div style="font-weight:600;font-size:16px">New project</div>
+          <div style="color:var(--text-muted);font-size:13px">Form controls use the primary color for focus and selection.</div>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Project name
+          <input placeholder="e.g. Spring campaign" style="height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Description
+          <textarea rows="3" placeholder="What is this project about?" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none;resize:vertical" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)"></textarea>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Visibility
+            <select style="height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)">
+              <option>Private</option><option>Team</option><option>Public</option>
+            </select>
+          </label>
+          <div style="display:flex;flex-direction:column;gap:6px;font-weight:500;position:relative">Owner
+            <button type="button" onClick="{{ toggleOwner }}" style="height:38px;padding:0 10px;border-radius:8px;border:1px solid {{ ownerBorder }};background:var(--bg-elevated);display:flex;align-items:center;gap:8px;cursor:pointer;text-align:left" style-hover="background:var(--bg-hover)">
+              <span style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;background:{{ owner.bg }};color:{{ owner.fg }}">{{ owner.initials }}</span>
+              <span style="flex:1">{{ owner.name }}</span>
+              <span style="color:var(--text-muted);font-size:10px">▼</span>
+            </button>
+            <sc-if value="{{ ownerOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:0;right:0;top:68px;z-index:40;padding:4px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border);box-shadow:0 12px 32px -8px var(--shadow);font-weight:400">
+                <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
+                  <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;background:{{ m.rowBg }}" style-hover="background:var(--bg-hover)">
+                    <span style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;background:{{ m.bg }};color:{{ m.fg }}">{{ m.initials }}</span>
+                    <span style="flex:1">{{ m.name }}</span>
+                    <span style="color:var(--primary-text)">{{ m.check }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-weight:500">Template</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" defaultChecked="" style="accent-color:var(--primary);margin:0">Blank</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" style="accent-color:var(--primary);margin:0">Kanban</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" style="accent-color:var(--primary);margin:0">Roadmap</label>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" defaultChecked="" style="accent-color:var(--primary);width:16px;height:16px;margin:0">Notify members</label>
+          <button type="button" onClick="{{ toggleSwitch }}" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;cursor:pointer;padding:0">
+            <span style="position:relative;width:36px;height:20px;border-radius:999px;background:{{ switchBg }};transition:background .15s">
+              <span style="position:absolute;top:2px;left:{{ switchX }};width:16px;height:16px;border-radius:50%;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s"></span>
+            </span>Archive when done
+          </button>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+          <button type="button" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Cancel</button>
+          <button type="submit" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Create project</button>
+        </div>
+      </form>
+
+      <div style="border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;overflow:hidden;align-self:start">
+        <div style="display:flex;align-items:center;gap:8px;padding:16px 20px;border-bottom:1px solid var(--bg-hover)">
+          <div style="font-weight:600;font-size:16px;flex:1">Recent projects</div>
+          <span style="padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--secondary-bg);color:var(--secondary-text)">{{ projectCount }}</span>
+        </div>
+        <sc-for list="{{ projects }}" as="p" hint-placeholder-count="5">
+          <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;border-bottom:1px solid var(--bg-inset);background:{{ p.rowBg }};box-shadow:{{ p.rowEdge }}" style-hover="background:var(--bg-inset)">
+            <span style="width:36px;height:36px;border-radius:9px;display:grid;place-items:center;font-weight:700;flex:none;background:{{ p.bg }};color:{{ p.fg }}">{{ p.initial }}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600">{{ p.name }}</div>
+              <div style="font-size:12px;color:var(--text-muted)">{{ p.meta }}</div>
+            </div>
+            <span style="padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;background:{{ p.badgeBg }};color:{{ p.badgeFg }}">{{ p.statusLabel }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    <section id="stories" data-screen-label="Storybook" style="display:flex;flex-direction:column;gap:16px;max-width:1120px">
+      <div>
+        <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Your components</h2>
+        <p style="margin:4px 0 0;color:var(--text-muted);max-width:60ch;text-wrap:pretty">Live Storybook stories. Palette edits on this page are pushed into each story.</p>
+      </div>
+      <sc-if value="{{ hasStories }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px">
+          <sc-for list="{{ storyFrames }}" as="sf" hint-placeholder-count="2">
+            <div style="border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);overflow:hidden;display:flex;flex-direction:column">
+              <div style="padding:8px 12px;border-bottom:1px solid var(--border);font:500 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">{{ sf.id }}</div>
+              <iframe data-palette-story="1" src="{{ sf.src }}" title="{{ sf.id }}" onLoad="{{ onStoryLoad }}" style="width:100%;height:260px;border:0;background:var(--bg)"></iframe>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noStories }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:20px;border-radius:12px;border:1px dashed var(--border-strong);color:var(--text-muted);text-wrap:pretty">Set storybookUrl and stories in Tweaks to preview your real components here. The Storybook needs the palette bridge (design-palette/templates/storybook-theme-bridge.ts) in its preview file.</div>
+      </sc-if>
+    </section>
+  </main>
+</div>
+
+<sc-if value="{{ anyPopover }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeAll }}" style="position:fixed;inset:0;z-index:15"></div>
+</sc-if>
+
+<sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:var(--overlay)">
+    <div onClick="{{ stop }}" style="width:min(440px,100%);padding:24px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border);box-shadow:0 24px 64px -12px var(--shadow);display:flex;flex-direction:column;gap:14px">
+      <div style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--danger-bg);color:var(--danger-text);font-weight:700;font-size:18px">!</div>
+      <div>
+        <div style="font-weight:600;font-size:17px">Delete “Northwind redesign”?</div>
+        <div style="color:var(--text-muted);margin-top:4px">This removes the project and its 12 tasks. This action can’t be undone.</div>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-weight:500;font-size:13px">Type the project name to confirm
+        <input style="height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none" style-focus="border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-border)">
+      </label>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button onClick="{{ closeModal }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Cancel</button>
+        <button onClick="{{ closeModal }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--danger-strong);background:var(--danger);color:var(--text-on-danger);font-weight:600;cursor:pointer" style-hover="background:var(--danger-hover)">Delete project</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ exportOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:var(--overlay)">
+    <div onClick="{{ stop }}" style="width:min(760px,100%);max-height:88vh;padding:24px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border);box-shadow:0 24px 64px -12px var(--shadow);display:flex;flex-direction:column;gap:14px">
+      <div>
+        <div style="font-weight:600;font-size:17px">Theme tokens</div>
+        <div style="color:var(--text-muted);margin-top:2px">{{ exportHint }}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;width:360px;max-width:100%;padding:3px;border-radius:9px;background:var(--bg-hover)">
+        <button onClick="{{ setWeb }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ webTabBg }};font-weight:500" style-hover="background:var(--border)">Web</button>
+        <button onClick="{{ setMobile }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ mobileTabBg }};font-weight:500" style-hover="background:var(--border)">Mobile · Tailwind</button>
+        <button onClick="{{ setInputsTab }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ inputsTabBg }};font-weight:500" style-hover="background:var(--border)">Inputs JSON</button>
+      </div>
+      <pre style="margin:0;flex:1;min-height:0;overflow:auto;padding:16px;border-radius:10px;background:var(--bg-inset);border:1px solid var(--bg-hover);font:400 12px/1.6 'IBM Plex Mono',monospace">{{ css }}</pre>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button onClick="{{ closeModal }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Close</button>
+        <button onClick="{{ copyCss }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">{{ copyLabel }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;storybookUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;stories&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
+const BRAND = ['primary','secondary','tertiary','quaternary','quinary'];
+const FALLBACK = { tertiary:'primary', quaternary:'secondary', quinary:'primary' };
+const PRESETS = {
+  plum:    { brand:[['#401f3e','#8a5585'],['#3f2e56','#705e9b'],['#453f78','#7d76c9'],['#759aab','#8fb3c3'],['#faf2a1','#f3ea94']], font:['#1f1a24','#eee8f0'], background:['#fbfaf8','#17131a'] },
+  triad:   { brand:[['#1d3557','#486c9b'],['#d92b3c','#ef5d68'],['#a8dadc','#a8dadc']], font:['#16202b','#e8eef3'], background:['#f9fafb','#10161d'] },
+  twoTone: { brand:[['#0f5c4d','#2f9c84'],['#e8a33d','#eeb356']], font:['#17211f','#e9efec'], background:['#fafaf7','#0f1513'] }
+};
+const STATUS = { info:['#2f6fde','#5b93f0'], danger:['#d33a3a','#ef6461'], success:['#237a4b','#4cb47a'], warning:['#d99a17','#e8b53c'] };
+const STEPS = ['faint','soft','','strong','intense'];
+const rgb = h => { h = h.replace('#',''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; };
+const lum = h => { const [r,g,b] = rgb(h).map(v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*r + 0.7152*g + 0.0722*b; };
+const ratio = (a,b) => { const x = lum(a), y = lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); };
+const onColor = h => ratio(h,'#ffffff') >= ratio(h,'#14111a') ? '#ffffff' : '#14111a';
+const cap = s => s[0].toUpperCase() + s.slice(1);
+const pair = ([light, dark]) => ({ light, dark });
+const mapObj = (o, fn) => Object.fromEntries(Object.entries(o).map(([k,v]) => [k, fn(v)]));
+const fromPreset = key => { const p = PRESETS[key] || PRESETS.plum; return { brand:p.brand.map(pair), font:pair(p.font), fontInverted:pair(p.background), background:pair(p.background), border:{ light: mixHex(p.font[0],14,p.background[0]), dark: mixHex(p.font[1],14,p.background[1]) }, status:mapObj(STATUS, pair) }; };
+
+const toLin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const fromLin = v => { v = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055; return Math.round(Math.min(1, Math.max(0, v)) * 255); };
+function hexToLab(h) {
+  const [r,g,b] = rgb(h).map(toLin);
+  const l = Math.cbrt(0.4122214708*r + 0.5363325363*g + 0.0514459929*b), m = Math.cbrt(0.2119034982*r + 0.6806995451*g + 0.1073969566*b), s = Math.cbrt(0.0883024619*r + 0.2817188376*g + 0.6299787005*b);
+  return [0.2104542553*l + 0.7936177850*m - 0.0040720468*s, 1.9779984951*l - 2.4285922050*m + 0.4505937099*s, 0.0259040371*l + 0.7827717662*m - 0.8086757660*s];
+}
+function labToHex([L,a,b]) {
+  const l = (L + 0.3963377774*a + 0.2158037573*b) ** 3, m = (L - 0.1055613458*a - 0.0638541728*b) ** 3, s = (L - 0.0894841775*a - 1.2914855480*b) ** 3;
+  return '#' + [4.0767416621*l - 3.3077115913*m + 0.2309699292*s, -1.2684380046*l + 2.6097574011*m - 0.3413193965*s, -0.0041960863*l - 0.7034186147*m + 1.7076147010*s].map(fromLin).map(v => v.toString(16).padStart(2,'0')).join('');
+}
+const SCALE = ['faint','soft','strong','intense'];
+const STEPS_LM = {
+  faint:   [l => 0.97, 0.3, '0.97', 'calc(c * 0.3)'],
+  soft:    [l => 0.91, 0.55, '0.91', 'calc(c * 0.55)'],
+  strong:  [l => Math.min(0.5, l * 0.8), 1, 'min(0.5, calc(l * 0.8))', 'c'],
+  intense: [l => Math.min(0.35, l * 0.6), 0.9, 'min(0.35, calc(l * 0.6))', 'calc(c * 0.9)']
+};
+const STEPS_DM = {
+  strong:  [l => Math.max(0.75, l + (1 - l) * 0.35), 0.9, 'max(0.75, calc(l + (1 - l) * 0.35))', 'calc(c * 0.9)'],
+  intense: [l => Math.max(0.88, l + (1 - l) * 0.6), 0.6, 'max(0.88, calc(l + (1 - l) * 0.6))', 'calc(c * 0.6)']
+};
+const DM_MIX = { faint:16, soft:30 };
+const relHex = (hex, d) => { const [L,a,b] = hexToLab(hex); return labToHex([d[0](L), a * d[1], b * d[1]]); };
+const mixHex = (x, pct, y) => { const A = hexToLab(x), B = hexToLab(y), t = pct / 100; return labToHex(A.map((v,i) => v * t + B[i] * (1 - t))); };
+function srcOf(p, n) { const i = BRAND.indexOf(n); if (i < 0) return n; return p.brand[i] ? n : srcOf(p, FALLBACK[n]); }
+function baseHex(p, n, m) {
+  if (BRAND.includes(n)) return p.brand[BRAND.indexOf(srcOf(p, n))][m];
+  if (n === 'font' || n === 'background' || n === 'border') return p[n][m];
+  if (n === 'font-inverted') return p.fontInverted[m];
+  return p.status[n][m];
+}
+function scaleHex(p, n, m, st) {
+  const x = baseHex(p, n, m);
+  if (m === 'light') return relHex(x, STEPS_LM[st]);
+  return DM_MIX[st] ? mixHex(x, DM_MIX[st], p.background.dark) : relHex(x, STEPS_DM[st]);
+}
+const onRef = (p, n, m) => { const x = baseHex(p,n,m); return ratio(x, p.font[m]) >= ratio(x, p.fontInverted[m]) ? 'text' : 'text-inverted'; };
+const families = p => [...BRAND, ...Object.keys(p.status)];
+const hoverMix = (hex, st, active) => ({ sign: hexToLab(hex)[0] > 0.78 ? -1 : 1, d: active ? 0.12 : 0.07 });
+function resolver(p, m) { const T = Object.fromEntries(tokensFor(p, m)); return k => { let v = T[k], g = 0; while (v && v.startsWith('var(--color-') && g++ < 10) v = T[v.slice(12, -1)]; return v; }; }
+function runAudit(p) {
+  const out = [];
+  ['light','dark'].forEach(m => {
+    const r = resolver(p, m);
+    const ints = intentsOf(p).filter(k => !BRAND.includes(k) || p.brand[BRAND.indexOf(k)]);
+    const add = (kind, fg, bg, need, level = 'fail') => {
+      const a = r(fg), b = r(bg); if (!a || !b) return;
+      const val = kind === 'state' ? Math.abs(hexToLab(a)[0] - hexToLab(b)[0]) : ratio(a, b);
+      out.push({ m, kind, fg, bg, a, b, need, val, pass: val >= need, level });
+    };
+    ints.forEach(k => { const lx = hexToLab(r(k))[0]; if (lx > 0.9) out.push({ m, kind:'input', fg:k, bg:'bg', a:r(k), b:r('bg'), need:0.9, val:lx, pass:false, level:'warn' }); });
+    const hueOf = x => { const [, a, b2] = hexToLab(x); return { h: (Math.atan2(b2, a) * 180 / Math.PI + 360) % 360, c: Math.hypot(a, b2), l: hexToLab(x)[0] }; };
+    ints.filter(k => BRAND.includes(k)).forEach(k => Object.keys(p.status).forEach(st => {
+      const A = hueOf(r(k)), B = hueOf(r(st)); if (A.c < 0.04 || B.c < 0.04) return;
+      const dh = Math.min(Math.abs(A.h - B.h), 360 - Math.abs(A.h - B.h)), dl = Math.abs(A.l - B.l);
+      if (dh < 25 && dl < 0.2) out.push({ m, kind:'hue', fg:k, bg:st, a:r(k), b:r(st), need:25, val:dh, pass:false, level:'warn' });
+    }));
+    ints.forEach(k => { add('text', k + '-text', k + '-bg', 4.5); add('text', 'text-on-' + k, k, 4.5); add('state', k + '-hover', k, 0.04); add('state', k + '-bg-hover', k + '-bg', 0.04); add('brand', k, 'bg', 3, 'warn'); });
+    ['bg','bg-elevated','bg-inset'].forEach(bg => { add('text', 'text', bg, 4.5); add('text', 'text-muted', bg, 4.5); });
+    ['bg','bg-elevated'].forEach(bg => { add('text', 'link', bg, 4.5); add('line', 'border-input', bg, 3); add('line', 'focus-ring', bg, 3); });
+    add('state', 'bg-hover', 'bg', 0.04, 'warn'); add('state', 'bg-hover', 'bg-elevated', 0.04, 'warn');
+  });
+  return out;
+}
+const famOf = t => { if (t.startsWith('text-on-')) return t.slice(8); if (t === 'link' || t === 'focus-ring') return 'primary'; if (t === 'border-input') return 'text'; if (t.startsWith('text-inverted')) return 'text-inverted'; return t.split('-')[0]; };
+const intentsOf = families;
+
+const BASE_INPUTS = ['font', 'font-inverted', 'background', 'border'];
+function fromInputs(o) {
+  const g = n => o[n] ? { light: o[n].lm ?? o[n].dm, dark: o[n].dm ?? o[n].lm } : null;
+  const brand = []; BRAND.forEach((n, i) => { const v = g(n); if (v) brand[i] = v; });
+  const font = g('font'), background = g('background'), status = {};
+  Object.keys(o).filter(n => !BRAND.includes(n) && !BASE_INPUTS.includes(n)).forEach(n => { status[n] = g(n); });
+  return { brand: brand.filter(Boolean), font, background, status: Object.keys(status).length ? status : mapObj(STATUS, pair),
+    fontInverted: g('font-inverted') ?? { ...background },
+    border: g('border') ?? { light: mixHex(font.light, 14, background.light), dark: mixHex(font.dark, 14, background.dark) } };
+}
+function toInputs(p) {
+  const o = {};
+  [...p.brand.map((_, i) => BRAND[i]), ...BASE_INPUTS, ...Object.keys(p.status)].forEach(n => { o[n] = { lm: baseHex(p, n, 'light'), dm: baseHex(p, n, 'dark') }; });
+  return o;
+}
+const hasInputs = o => !!(o && typeof o === 'object' && o.primary && o.secondary && o.font && o.background);
+
+function buildWebCss(p, prefix) {
+  const pre = prefix ? '--' + prefix + '-' : '--';
+  const inp = (n, m) => 'var(' + pre + n + (m === 'light' ? '-lm' : '-dm') + ')';
+  const ld = (x, y) => 'light-dark(' + x + ', ' + y + ')';
+  const mx = (x, n, y) => 'color-mix(in oklab, ' + x + ' ' + n + '%, ' + y + ')';
+  const oc = (src, l, c) => 'oklch(from ' + src + ' ' + l + ' ' + c + ' h)';
+  const FL = inp('font','light'), FD = inp('font','dark'), BL = inp('background','light'), BD = inp('background','dark'), RL = inp('border','light'), RD = inp('border','dark');
+  const status = Object.keys(p.status);
+  const inputs = [...p.brand.map((_,i) => BRAND[i]), 'font', 'font-inverted', 'background', 'border', ...status];
+  const L = ['/* Generated from the Theme Palette prototype. Edit the inputs there and re-export:', '   --text-on-* is chosen at export time and will not follow manual edits. */', ':root {', '  color-scheme: light; /* set to light | dark to switch modes */', '', '  /* 1. Inputs: -lm light mode, -dm dark mode. Primary + secondary required */'];
+  inputs.forEach(n => L.push('  ' + pre + n + '-lm: ' + baseHex(p,n,'light') + ';', '  ' + pre + n + '-dm: ' + baseHex(p,n,'dark') + ';'));
+  L.push('', '  /* 2. Scales: faint > soft > base > strong > intense, ordered by contrast against the background.', '     Same names in both modes; only the values differ. Unset brand slots fall back. */');
+  families(p).forEach(n => {
+    const s = srcOf(p,n);
+    if (s !== n) { L.push('  --' + n + ': var(--' + s + ');'); SCALE.forEach(st => L.push('  --' + n + '-' + st + ': var(--' + s + '-' + st + ');')); return; }
+    L.push('  --' + n + ': ' + ld(inp(n,'light'), inp(n,'dark')) + ';');
+    SCALE.forEach(st => L.push('  --' + n + '-' + st + ': ' + ld(oc(inp(n,'light'), STEPS_LM[st][2], STEPS_LM[st][3]), DM_MIX[st] ? mx(inp(n,'dark'), DM_MIX[st], BD) : oc(inp(n,'dark'), STEPS_DM[st][2], STEPS_DM[st][3])) + ';'));
+  });
+  L.push('', '  /* Neutral scales: same names, smaller relative shifts. Subtler than brand steps:', '     --bg-intense is not as strong as --primary-intense */',
+    '  --bg: ' + ld(BL, BD) + ';',
+    '  --bg-faint: ' + ld(mx(FL,6,BL), mx(FD,11,BD)) + ';',
+    '  --bg-soft: ' + ld(mx(FL,10,BL), mx(FD,15,BD)) + ';',
+    '  --bg-strong: ' + ld(RL, RD) + '; /* border input */',
+    '  --bg-intense: ' + ld(mx(RL,80,FL), mx(RD,80,FD)) + ';',
+    '  --bg-elevated: ' + ld(mx(BL,30,'white'), mx(FD,5,BD)) + '; /* literal: lighter in both modes */',
+    '  --bg-inset: ' + ld(mx(FL,3,BL), mx(BD,80,'black')) + '; /* literal: darker in both modes */',
+    '  --text: ' + ld(FL, FD) + ';',
+    '  --text-inverted: ' + ld(inp('font-inverted','light'), inp('font-inverted','dark')) + ';',
+    '  --text-faint: ' + ld(mx(FL,45,BL), mx(FD,45,BD)) + ';',
+    '  --text-soft: ' + ld(mx(FL,68,BL), mx(FD,68,BD)) + ';',
+    '  --text-strong: ' + ld(mx(FL,85,'black'), mx(FD,85,'white')) + ';',
+    '  --text-intense: ' + ld(mx(FL,70,'black'), mx(FD,70,'white')) + ';');
+  L.push('', '  /* 3. Semantic: references only, identical in both modes */',
+    '  --bg-hover: var(--bg-faint);', '  --bg-active: var(--bg-soft);', '  --border: var(--bg-strong);', '  --border-strong: var(--bg-intense);',
+    '  --border-input: var(--text-faint); /* 3:1 against bg for form controls (WCAG 1.4.11) */',
+    '  --text-muted: var(--text-soft);', '  --text-disabled: var(--text-faint);', '  --bg-disabled: var(--bg-soft);',
+    '  --focus-ring: var(--primary-strong);', '  --link: var(--primary-text);', '  --link-hover: var(--primary-strong);');
+  intentsOf(p).forEach(n => L.push('  --' + n + '-bg: var(--' + n + '-faint);', '  --' + n + '-bg-hover: var(--' + n + '-soft);', '  --' + n + '-border: var(--' + n + '-soft);', '  --' + n + '-text: var(--' + n + '-intense);'));
+  L.push('', '  /* Text on solid fills: --text or --text-inverted, picked per mode for contrast */');
+  intentsOf(p).forEach(n => { const x = onRef(p,n,'light'), y = onRef(p,n,'dark'); L.push('  --text-on-' + n + ': ' + (x === y ? 'var(--' + x + ')' : ld('var(--' + x + ')', 'var(--' + y + ')')) + ';'); });
+  L.push('', '  /* 4. Interaction + effects: not derivable from the scales */');
+  const hov = (n, st, active) => { const e = m => { const x = hoverMix(baseHex(p,n,m), st, active); return oc(inp(srcOf(p,n), m), 'calc(l ' + (x.sign > 0 ? '+ ' : '- ') + x.d + ')', 'c'); }; return ld(e('light'), e('dark')); };
+  L.push('  /* Hover/active: fixed lightness shift (0.07 / 0.12), lighter unless the color is already light (L > 0.78) */');
+  BRAND.forEach(n => L.push('  --' + n + '-hover: ' + hov(n, false, false) + ';', '  --' + n + '-active: ' + hov(n, false, true) + ';'));
+  status.forEach(n => L.push('  --' + n + '-hover: ' + hov(n, true, false) + ';', '  --' + n + '-active: ' + hov(n, true, true) + ';'));
+  L.push('  --overlay: ' + ld(mx('black',45,'transparent'), mx('black',65,'transparent')) + ';', '  --shadow: ' + ld(mx(FL,18,'transparent'), mx('black',55,'transparent')) + ';', '}');
+  return L.join('\n');
+}
+
+function buildThumbnail(p, title) {
+  const bg = baseHex(p, 'primary', 'light'), fg = baseHex(p, onRef(p, 'primary', 'light') === 'text' ? 'font' : 'font-inverted', 'light');
+  const t = String(title || 'Palette').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const strip = Object.keys(p.status).map(k => '<div style="flex:1;background:' + baseHex(p, k, 'light') + '"></div>').join('');
+  return '<!doctype html>\n<!-- Generated by design-palette/scripts/palette.mjs from the palette inputs. Do not edit. -->\n<html><head><meta charset="utf-8"><title>' + t + '</title>' +
+    '<style>html,body{margin:0;height:100%}body{display:flex;background:' + bg + ';color:' + fg + ';font:700 clamp(32px,12vw,160px)/1 system-ui,sans-serif;letter-spacing:-0.03em}</style></head>' +
+    '<body><div style="flex:1;display:grid;place-items:center;padding:0 6vw;text-align:center">' + t + '</div><div style="width:4vw;display:flex;flex-direction:column">' + strip + '</div></body></html>\n';
+}
+
+function tokensFor(p, m) {
+  const T = [], lm = m === 'light', f = p.font[m], b = p.background[m], r = p.border[m], W = '#ffffff', K = '#000000';
+  families(p).forEach(n => { T.push([n, baseHex(p,n,m)]); SCALE.forEach(st => T.push([n + '-' + st, scaleHex(p,n,m,st)])); });
+  T.push(['bg', b], ['bg-faint', mixHex(f, lm ? 6 : 11, b)], ['bg-soft', mixHex(f, lm ? 10 : 15, b)], ['bg-strong', r], ['bg-intense', mixHex(r,80,f)],
+    ['bg-elevated', lm ? mixHex(b,30,W) : mixHex(f,5,b)], ['bg-inset', lm ? mixHex(f,3,b) : mixHex(b,80,K)],
+    ['text', f], ['text-inverted', p.fontInverted[m]], ['text-faint', mixHex(f,45,b)], ['text-soft', mixHex(f,68,b)], ['text-strong', mixHex(f,85, lm ? K : W)], ['text-intense', mixHex(f,70, lm ? K : W)]);
+  const ref = k => 'var(--color-' + k + ')';
+  T.push(['bg-hover', ref('bg-faint')], ['bg-active', ref('bg-soft')], ['border', ref('bg-strong')], ['border-strong', ref('bg-intense')], ['border-input', ref('text-faint')], ['text-muted', ref('text-soft')], ['text-disabled', ref('text-faint')], ['bg-disabled', ref('bg-soft')], ['focus-ring', ref('primary-strong')], ['link', ref('primary-text')], ['link-hover', ref('primary-strong')]);
+  intentsOf(p).forEach(n => T.push([n + '-bg', ref(n + '-faint')], [n + '-bg-hover', ref(n + '-soft')], [n + '-border', ref(n + '-soft')], [n + '-text', ref(n + '-intense')], ['text-on-' + n, ref(onRef(p,n,m))]));
+  const sh = (x, o) => { const [l,a,b2] = hexToLab(x); return labToHex([l + o.sign * o.d, a, b2]); };
+  families(p).forEach(n => { const x = baseHex(p,n,m); T.push([n + '-hover', sh(x, hoverMix(x, false, false))], [n + '-active', sh(x, hoverMix(x, false, true))]); });
+  T.push(['overlay', lm ? '#00000073' : '#000000a6'], ['shadow', lm ? f + '2e' : '#0000008c']);
+  return T;
+}
+function buildMobileCss(p) {
+  const lt = tokensFor(p,'light'), dk = tokensFor(p,'dark'), lmap = Object.fromEntries(lt);
+  const L = ['/* Generated from the Theme Palette prototype. Re-export instead of editing: --color-text-on-* is chosen at export time. */', '@import "tailwindcss";', '', '/* Light values + semantic references. Utilities: bg-primary, bg-primary-bg, text-primary-text, border-border… */', '@theme {'];
+  lt.forEach(([k,v]) => L.push('  --color-' + k + ': ' + v + ';'));
+  L.push('}', '', '/* Dark mode: only values that change. Appearance.setColorScheme(mode) drives this query */', '@media (prefers-color-scheme: dark) {', '  :root {');
+  dk.filter(([k,v]) => lmap[k] !== v).forEach(([k,v]) => L.push('    --color-' + k + ': ' + v + ';'));
+  L.push('  }', '}');
+  return L.join('\n');
+}
+
+const PROJECTS = [
+  { name:'Northwind redesign', meta:'Updated 2h ago · 12 tasks', status:'success', label:'On track' },
+  { name:'Q4 onboarding flow', meta:'Updated yesterday · 8 tasks', status:'warning', label:'At risk' },
+  { name:'Billing migration', meta:'Updated 3 days ago · 21 tasks', status:'danger', label:'Blocked' },
+  { name:'Help center refresh', meta:'Updated last week · 5 tasks', status:'info', label:'In review' },
+  { name:'Mobile nav audit', meta:'Updated last week · 3 tasks', status:'success', label:'On track' }
+];
+const MEMBERS = [['Jane Doe','JD'],['Sam Park','SP'],['Leah Ortiz','LO'],['Omar Haddad','OH']];
+const MESSAGES = { info:'A new version of the palette is available.', danger:'Two colors fail contrast on buttons.', success:'Tokens exported to your clipboard.', warning:'Quinary falls back to primary.' };
+const NEUTRAL_MAP = {
+  'bg': 'background input', 'bg-elevated': 'lighter than bg (literal)', 'bg-inset': 'darker than bg (literal)',
+  'bg-hover': '--bg-faint', 'bg-active': '--bg-soft', 'border': '--bg-strong (border input)', 'border-strong': '--bg-intense', 'border-input': '--text-faint (3:1)', 'bg-disabled': '--bg-soft',
+  'text': 'font input', 'text-inverted': 'font-inverted input', 'text-muted': '--text-soft', 'text-disabled': '--text-faint',
+  'focus-ring': '--primary-strong', 'link': '--primary-text', 'link-hover': '--primary-strong', 'overlay': 'black, per mode', 'shadow': 'per mode'
+};
+const NEUTRALS = Object.keys(NEUTRAL_MAP);
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const preset = props.preset ?? (hasInputs(props.inputs) ? 'project' : 'plum');
+    this.state = { mode: props.mode ?? 'light', preset, pal: this.palFor(preset), pop:null, modal:null, owner:0, selected:0, sw:true, nav:'palette', copied:false, tab:'web', auditAll:false };
+  }
+  palFor(key) { return key === 'project' && hasInputs(this.props.inputs) ? fromInputs(this.props.inputs) : fromPreset(key === 'project' ? 'plum' : key); }
+  componentDidMount() { this.inject(); }
+  componentDidUpdate(prev) {
+    if (prev.preset !== this.props.preset || prev.inputs !== this.props.inputs) { const preset = this.props.preset ?? (hasInputs(this.props.inputs) ? 'project' : 'plum'); this.setState({ preset, pal: this.palFor(preset) }); }
+    if (prev.mode !== this.props.mode) this.setState({ mode: this.props.mode ?? 'light' });
+    this.inject();
+  }
+  inject() {
+    let el = document.getElementById('theme-palette-tokens');
+    if (!el) { el = document.createElement('style'); el.id = 'theme-palette-tokens'; document.head.appendChild(el); }
+    const css = buildWebCss(this.state.pal, this.props.prefix ?? '');
+    if (el.textContent !== css) el.textContent = css;
+    document.documentElement.style.colorScheme = this.state.mode;
+    delete document.documentElement.dataset.theme;
+    this.pushToStories();
+  }
+  pushToStories() {
+    const msg = { type:'palette:apply', css: buildWebCss(this.state.pal, this.props.prefix ?? ''), mode: this.state.mode };
+    document.querySelectorAll('iframe[data-palette-story]').forEach(fr => { try { if (fr.contentWindow) fr.contentWindow.postMessage(msg, '*'); } catch (e) {} });
+  }
+  setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) })); }
+  row(name, entry, get, extra = {}) {
+    const m = this.state.mode, hex = entry[m];
+    const set = v => this.setPal(q => { get(q)[m] = v; return q; });
+    return { name, label: extra.label ?? '--' + name, hex, hexLabel: entry.light === entry.dark ? entry.light : entry.light + ' · ' + entry.dark, ...extra, swatches: STEPS.map(st => {
+      const tok = st ? '--' + name + '-' + st : '--' + name;
+      return { tok, bg:'var(' + tok + ')', isBase:!st, op: extra.only && st && !extra.only.includes(st) ? 0 : 1, hex, onChange: e => set(e.target.value), outline: st ? 'none' : '2px solid var(--border)' };
+    }) };
+  }
+  renderVals() {
+    const s = this.state, p = s.pal;
+    const setMode = mode => this.setState({ mode });
+    const n = p.brand.length;
+    const brandRows = p.brand.map((e,i) => this.row(BRAND[i], e, q => q.brand[i],
+      { canRemove: i === n - 1 && i >= 2, onRemove: () => this.setPal(q => (q.brand.pop(), q)) }));
+    const groups = [
+      { title:'Brand', note: n + ' of 5 · from logo', rows:brandRows, showAdd:n < 5, addName:BRAND[n] || '', onAdd:() => this.setPal(q => { const c = ['#453f78','#759aab','#faf2a1'][q.brand.length - 2] || '#888888'; q.brand.push({ light:c, dark:c }); return q; }) },
+      { title:'Base', note:'Inputs for --text, --text-inverted, --bg, --border', rows:[this.row('text', p.font, q => q.font, { label:'font → --text' }), this.row('text-inverted', p.fontInverted, q => q.fontInverted, { label:'font-inverted', only:[] }), this.row('bg', p.background, q => q.background, { label:'background → --bg' }), this.row('border', p.border, q => q.border, { label:'border → --bg-strong', only:[] })] },
+      { title:'Status', note:'Feedback states', rows:Object.keys(p.status).map(k => this.row(k, p.status[k], q => q.status[k])) }
+    ];
+    const audit = runAudit(p), bad = audit.filter(c => !c.pass), issuesBy = {};
+    bad.filter(c => c.m === s.mode).forEach(c => new Set([famOf(c.fg), famOf(c.bg)]).forEach(k => { issuesBy[k] = (issuesBy[k] || 0) + 1; }));
+    groups.forEach(g => g.rows.forEach(r => { const n = issuesBy[r.name] || 0; r.hasIssues = n > 0; r.issueLabel = n + (n > 1 ? ' issues' : ' issue'); }));
+    const cnt = (m, lv) => bad.filter(c => c.m === m && c.level === lv).length, perMode = audit.length / 2;
+    const shown = (s.auditAll ? audit : bad).slice().sort((x, y) => (x.pass - y.pass) || ((x.level === 'fail' ? 0 : 1) - (y.level === 'fail' ? 0 : 1)));
+    const auditItems = shown.map(c => { const st = c.pass ? 'Pass' : c.level === 'fail' ? 'Fail' : 'Warn', tone = c.pass ? 'success' : c.level === 'fail' ? 'danger' : 'warning';
+      return { label: c.kind === 'hue' ? '--' + c.fg + ' looks like --' + c.bg : c.kind === 'input' ? '--' + c.fg + ' is very light' : '--' + c.fg + ' on --' + c.bg, note: c.m + ' mode · ' + (c.kind === 'hue' ? 'brand may be mistaken for a status' : c.kind === 'input' ? 'tints and hover will be weak' : c.kind === 'state' ? 'visible state change' : c.kind === 'line' ? 'UI boundary' : c.kind === 'brand' ? 'fill visible on page (advisory)' : 'text'),
+        value: c.kind === 'hue' ? 'Δhue ' + c.val.toFixed(0) + '° < 25°' : c.kind === 'input' ? 'L ' + c.val.toFixed(2) + ' > 0.9' : c.kind === 'state' ? 'ΔL ' + c.val.toFixed(3) + ' / ' + c.need : c.val.toFixed(2) + ':1 / ' + c.need + ':1', status: st, badgeBg: 'var(--' + tone + '-bg)', badgeFg: 'var(--' + tone + '-text)',
+        boxBg: c.kind === 'hue' ? 'linear-gradient(90deg, ' + c.a + ' 50%, ' + c.b + ' 50%)' : c.kind === 'state' ? 'linear-gradient(90deg, ' + c.b + ' 50%, ' + c.a + ' 50%)' : c.kind === 'brand' ? c.b : c.b, boxFg: c.a, boxBorder: c.kind === 'line' ? '2px solid ' + c.a : '1px solid var(--border)',
+        sample: c.kind === 'text' ? 'Aa' : c.kind === 'brand' ? '●' : '' }; });
+    const fam = k => ({ bg:'var(--' + k + ')', fg:'var(--text-on-' + k + ')', faint:'var(--' + k + '-bg)', soft:'var(--' + k + '-border)', strong:'var(--' + k + '-strong)', raised:'var(--' + k + '-text)' });
+    const members = MEMBERS.map(([name, initials], i) => ({ name, initials, ...fam(BRAND[i % 5]),
+      rowBg: i === s.owner ? 'var(--primary-bg)' : 'transparent', check: i === s.owner ? '✓' : '',
+      onPick: () => this.setState({ owner:i, pop:null }) }));
+    const navDefs = [['palette','Palette'],['components','Components'],['forms','Forms & lists'],['stories','Your components']];
+    const sbUrl = (this.props.storybookUrl ?? '').replace(/\/$/, ''), ids = (this.props.stories ?? '').split(',').map(x => x.trim()).filter(Boolean);
+    const storyFrames = sbUrl ? ids.map(id => ({ id, src: sbUrl + '/iframe.html?id=' + encodeURIComponent(id) + '&viewMode=story' })) : [];
+    const closeAll = () => this.setState({ pop:null });
+    const css = s.tab === 'web' ? buildWebCss(p, this.props.prefix ?? '') : s.tab === 'mobile' ? buildMobileCss(p) : JSON.stringify(toInputs(p), null, 2);
+    return {
+      css, exportHint: s.tab === 'web' ? 'light-dark() tokens. Set the -lm / -dm inputs; the scale and semantic tokens follow.' : s.tab === 'mobile' ? 'Tailwind v4 theme with flat hex values, flipped by prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. design-loop reads it when the palette is approved.',
+      inputsTabBg: s.tab === 'inputs' ? 'var(--bg-elevated)' : 'transparent', setInputsTab: () => this.setState({ tab:'inputs', copied:false }),
+      webTabBg: s.tab === 'web' ? 'var(--bg-elevated)' : 'transparent', mobileTabBg: s.tab === 'mobile' ? 'var(--bg-elevated)' : 'transparent',
+      setWeb: () => this.setState({ tab:'web', copied:false }), setMobile: () => this.setState({ tab:'mobile', copied:false }),
+      modeLabel: s.mode === 'dark' ? 'Light mode' : 'Dark mode', presetKey: s.preset,
+      toggleMode: () => setMode(s.mode === 'dark' ? 'light' : 'dark'),
+      setLight: () => setMode('light'), setDark: () => setMode('dark'),
+      lightBg: s.mode === 'light' ? 'var(--bg-elevated)' : 'transparent',
+      darkBg: s.mode === 'dark' ? 'var(--bg-elevated)' : 'transparent',
+      onPreset: e => { const preset = e.target.value; this.setState({ preset, pal: this.palFor(preset) }); },
+      navItems: navDefs.map(([id,label], i) => ({ label,
+        bg: s.nav === id ? 'var(--primary-bg)' : 'transparent', fg: s.nav === id ? 'var(--primary-text)' : 'var(--text)',
+        weight: s.nav === id ? 600 : 400, dot: 'var(--' + BRAND[i] + ')',
+        onClick: () => { this.setState({ nav:id }); const el = document.getElementById(id); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 84, behavior:'smooth' }); } })),
+      storyFrames, hasStories: storyFrames.length > 0, noStories: storyFrames.length === 0, onStoryLoad: () => this.pushToStories(),
+      title: this.props.title || 'Palette', titleInitial: (this.props.title || 'Palette').trim().charAt(0).toUpperCase(),
+      groups, auditItems, auditEmpty: auditItems.length === 0,
+      auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + audit.filter(c => c.m === 'light').length + ' light / ' + audit.filter(c => c.m === 'dark').length + ' dark checks',
+      auditToggleLabel: s.auditAll ? 'Show issues only' : 'Show all checks', toggleAuditAll: () => this.setState(st => ({ auditAll: !st.auditAll })),
+      modeName: s.mode,
+      neutrals: NEUTRALS.map(t => ({ name:t, bg:'var(--' + t + ')', map: NEUTRAL_MAP[t] })),
+      intents: [...p.brand.map((_,i) => BRAND[i]), ...Object.keys(p.status)].map(k => ({ label:'--' + k, surface:'var(--' + k + '-bg)', border:'var(--' + k + '-border)', text:'var(--' + k + '-text)',
+        rows: [
+          { tok:'-bg', bg:'var(--' + k + '-bg)', map:'--' + k + '-faint' },
+          { tok:'-bg-hover', bg:'var(--' + k + '-bg-hover)', map:'--' + k + '-soft' },
+          { tok:'-border', bg:'var(--' + k + '-border)', map:'--' + k + '-soft' },
+          { tok:'-text', bg:'var(--' + k + '-text)', map:'--' + k + '-intense' },
+          { tok:'-hover', bg:'var(--' + k + '-hover)', map: (hm => 'L ' + (hm.sign > 0 ? '+' : '−') + hm.d)(hoverMix(baseHex(p, k, s.mode), false, false)) },
+          { tok:'text-on-' + k, bg:'var(--text-on-' + k + ')', map:'--' + onRef(p, k, s.mode) }
+        ] })),
+      brandList: p.brand.map((_,i) => ({ label: cap(BRAND[i]), ...fam(BRAND[i]), hov: 'var(--' + BRAND[i] + '-hover)' })),
+      statusList: Object.keys(p.status).map(k => ({ label: cap(k), message: MESSAGES[k], ...fam(k), hov: 'var(--' + k + '-hover)' })),
+      members, owner: members[s.owner], ownerOpen: s.pop === 'owner',
+      ownerBorder: s.pop === 'owner' ? 'var(--primary)' : 'var(--border-input)',
+      toggleOwner: () => this.setState(st => ({ pop: st.pop === 'owner' ? null : 'owner' })),
+      userMenuOpen: s.pop === 'user', toggleUserMenu: () => this.setState(st => ({ pop: st.pop === 'user' ? null : 'user' })),
+      infoPopOpen: s.pop === 'info', toggleInfoPop: () => this.setState(st => ({ pop: st.pop === 'info' ? null : 'info' })),
+      anyPopover: !!s.pop, closeAll,
+      switchBg: s.sw ? 'var(--primary)' : 'var(--border-strong)', switchX: s.sw ? '18px' : '2px',
+      toggleSwitch: () => this.setState(st => ({ sw: !st.sw })),
+      onSubmit: e => e.preventDefault(),
+      projectCount: PROJECTS.length,
+      projects: PROJECTS.map((pr,i) => ({ name: pr.name, meta: pr.meta, statusLabel: pr.label, initial: pr.name[0], ...fam(BRAND[i % 5]),
+        badgeBg: 'var(--' + pr.status + '-bg)', badgeFg: 'var(--' + pr.status + '-text)',
+        rowBg: i === s.selected ? 'var(--primary-bg)' : 'transparent',
+        rowEdge: i === s.selected ? 'inset 3px 0 0 var(--primary)' : 'none',
+        onClick: () => this.setState({ selected:i }) })),
+      confirmOpen: s.modal === 'confirm', exportOpen: s.modal === 'export',
+      openConfirm: () => this.setState({ modal:'confirm', pop:null }),
+      openExport: () => this.setState({ modal:'export', pop:null, copied:false }),
+      closeModal: () => this.setState({ modal:null }), stop: e => e.stopPropagation(),
+      copyLabel: s.copied ? 'Copied' : s.tab === 'inputs' ? 'Copy JSON' : 'Copy CSS',
+      copyCss: () => { navigator.clipboard?.writeText(css).then(() => this.setState({ copied:true }), () => {}); }
+    };
+  }
+}
+</script>
+</body>
+</html>

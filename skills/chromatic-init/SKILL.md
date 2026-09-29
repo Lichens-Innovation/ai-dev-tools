@@ -1,6 +1,6 @@
 ---
 name: chromatic-init
-description: "Adds Chromatic visual testing to a Storybook project: installs the chromatic package, wires the CHROMATIC_PROJECT_TOKEN, adds a publish script, runs the baseline build, and sets up CI publishing - the publish/approval gate of the design loop. Used by design-init, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow. Use when the user asks to add Chromatic, set up visual regression, or publish Storybook for review."
+description: "Adds Chromatic visual testing to a Storybook project: installs the chromatic package, wires the CHROMATIC_PROJECT_TOKEN, adds a publish script, runs the baseline build, and optionally sets up CI publishing - the publish/approval gate of the design loop. Used by design-init, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow. Use when the user asks to add Chromatic, set up visual regression, or publish Storybook for review."
 disable-model-invocation: true
 ---
 
@@ -45,8 +45,10 @@ queue independent.
    ```
 
 3. **Get + store the project token.** Prompt the user for their Chromatic project token — do
-   **not** hard-code it. Recommend the `CHROMATIC_PROJECT_TOKEN` env var (local `.env` that is
-   gitignored, and a CI secret). Never commit the token.
+   **not** hard-code it, and ask the user to put it in the gitignored `.env` themselves rather than
+   paste it into the conversation. Never commit the token. The CLI reads only
+   `CHROMATIC_PROJECT_TOKEN`, so with per-target names (`CHROMATIC_PROJECT_TOKEN_<KEY>`) add a
+   wrapper — a task-runner recipe or root script — that maps the target's variable onto it.
 
 4. **Add the publish script.** Add to the target's `package.json` so the token is read from the
    env var:
@@ -63,15 +65,22 @@ queue independent.
 
    Confirm the build succeeds and the Storybook is published; report the build URL.
 
-6. **CI integration.** Set the token as a CI secret and run `npm run chromatic` in the pipeline
-   (ensure `git` is available and history is fetched, as Chromatic needs it to associate commits
-   with PRs/MRs). With several targets, add one job per target, working in its `dir`, and limit
-   each to changes that affect it (the target and the workspace packages it consumes) when the CI
-   supports path filters. If the repo already has a CI config, add a job/step; otherwise note it
-   as a follow-up rather than inventing pipeline files.
+   Chromatic's setup page shows the same `npx chromatic --project-token=...` command; it only waits
+   for a first build, however it arrives. In a monorepo, don't run it at the repo root (there is
+   no Storybook there) — run it in the target's `dir`, or through the repo's wrapper. Prefer
+   reading the token from the env var over typing it on the command line (shell history).
+
+6. **Ask about CI publishing.** Publishing is already covered without CI: `design-loop` publishes
+   each target manually once a component converges. CI publishing adds a build — and its
+   snapshots — on every triggering push, which can exhaust a free or small Chromatic plan. Ask
+   the user whether to publish from CI, stating that trade-off.
+   - **Yes** → read [`references/ci.md`](references/ci.md) and follow it.
+   - **No** → leave the pipeline alone (building Storybook in CI without publishing is still a
+     free breakage check, but that's `storybook-init`'s concern).
 
 7. **Report.**
    - `chromatic` package + script added; where the token is read from; baseline build URL.
+   - The CI decision, and for "yes", what `references/ci.md` asks to report.
    - Record `chromaticTokenEnv` on the target in `design.manifest.json#storybooks` (not needed for
      a single target using `CHROMATIC_PROJECT_TOKEN`).
    - Confirm this satisfies the PUBLISH precondition in contract §6.
@@ -79,5 +88,7 @@ queue independent.
 ## Notes
 
 - Keep the token out of version control — env var / secret only.
+- A wrapper that reads the token from `.env` should tolerate `export `, spaces around `=`, quotes
+  and CRLF — a strict `^NAME=` match reports "not set" on a correctly filled file.
 - The first `chromatic` run has no baseline to diff against; it just establishes one. Diffs appear
   on subsequent runs — which is exactly the `design-loop` publish step.
