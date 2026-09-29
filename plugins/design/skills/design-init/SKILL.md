@@ -73,10 +73,14 @@ this skill produces must satisfy the preconditions in §6.
    Also set the `default` of its `storybookUrl` and `stories` props (see
    [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)).
    `storybookUrl` is the Chromatic branch permalink of the web target when `chromatic-init` ran
-   (`https://<branch>--<appId>.chromatic.com`, `appId` from its baseline build URL, `<branch>`
-   the default branch once it has been published, else the baseline build's branch), otherwise
-   that target's local `url` (`http://localhost:6006`). The permalink works for anyone opening
-   the card; localhost only on the machine running Storybook.
+   and the Chromatic project is public (`https://<branch>--<appId>.chromatic.com`, `appId` from
+   its baseline build URL, `<branch>` the default branch once it has been published, else the
+   baseline build's branch). To check, request `<permalink>/iframe.html` (for example
+   `curl -s -o /dev/null -w '%{http_code}' <permalink>/iframe.html`): `401` means private.
+   Otherwise, private project or no Chromatic, use that target's local `url`
+   (`http://localhost:6006`). A private permalink redirects the frame to Chromatic's login,
+   which refuses to be embedded, so the stories never load. The permalink works for anyone
+   opening the card; localhost only on the machine running Storybook.
 
    Upload the card and the thumbnail to the project root: the Pages list only shows root files,
    and the Design System view labels each card by its file name. `DesignSync finalize_plan`
