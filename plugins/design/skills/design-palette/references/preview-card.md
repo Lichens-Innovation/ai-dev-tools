@@ -37,7 +37,9 @@ import "./storybook-theme-bridge";
 ```
 
 It only injects a `<style>` element and sets `color-scheme`; it never executes received code.
-To restrict senders, set `ALLOWED_ORIGINS` in the file.
+On localhost or a development build it accepts any sender. Published builds (e.g. Chromatic) only
+accept `ALLOWED_ORIGINS`: open the card once against the published Storybook, copy the origin the
+story's console reports as ignored, and add it to the list.
 
 ## Limits
 

@@ -80,14 +80,15 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
 1. Step 1 saved the card as `/tmp/design-loop/palette.target.html`. Show what changed:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --diff-card /tmp/design-loop/palette.target.html
+   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --diff-card /tmp/design-loop/palette.target.html
    ```
 
-2. Apply the card's inputs to the canonical file and regenerate every output the project uses
-   (the output flags from `design-palette` step 5: `--web` and/or `--mobile <tw.css>`):
+2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
+   output in `palette.outputs`: `--web` when `outputs.web` is set, `--mobile <outputs.mobile>`
+   when `outputs.mobile` is set:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --from-card /tmp/design-loop/palette.target.html --web [--mobile <tw.css>]
+   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--web] [--mobile <outputs.mobile>]
    ```
 
    Only inputs change by hand; never edit generated tokens. Report the audit it prints; propose
