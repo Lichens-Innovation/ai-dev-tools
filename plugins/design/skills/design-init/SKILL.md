@@ -31,11 +31,14 @@ this skill produces must satisfy the preconditions in §6.
 
 4. **Create or bind the Claude Design project.** `DesignSync list_projects`.
    - **Default: create a new project** for this repo with `DesignSync create_project` (`name`:
-     the repo name). It is an ordinary project, which is all the loop needs.
-   - Reuse an existing project only when the user points at one; confirm it with
-     `DesignSync get_project`. Either type works: a `PROJECT_TYPE_DESIGN_SYSTEM` project also
-     shows the cards in the Design System view and can be picked as the design system of other
-     projects.
+     the repo name).
+   - Reuse an existing project only when the user points at one; confirm with
+     `DesignSync get_project` that its type is `PROJECT_TYPE_DESIGN_SYSTEM`.
+
+   Only `DesignSync create_project` makes a design-system project, and the type cannot change
+   later. Never create it with the Claude Design tool's `create_project`: that makes an ordinary
+   project, which `DesignSync list_projects` and `/design-sync` do not see. If DesignSync is not
+   available, stop and ask the user to enable it (`/design-login` without a claude.ai login).
 
    Record its id as `designProjectId`.
 
@@ -76,14 +79,12 @@ this skill produces must satisfy the preconditions in §6.
    the card; localhost only on the machine running Storybook.
 
    Upload the card and the thumbnail to the project root: the Pages list only shows root files,
-   and a design-system project's Design System view labels each card by its file name.
-   `DesignSync finalize_plan`
+   and the Design System view labels each card by its file name. `DesignSync finalize_plan`
    (`writes: ["Palette.dc.html", "thumbnail.html"]`, `deletes: []`, `localDir: /tmp/design-init`),
    then `DesignSync write_files` with that `planId` and
    `{ path: "Palette.dc.html", localPath: "palette.html" }`,
-   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. The thumbnail is the project's card
-   image; on a design-system project, Claude Design's design-system check also reports a missing
-   root `thumbnail.html`. It is generated from the inputs: never
+   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
+   reports a project without a root `thumbnail.html`. It is generated from the inputs: never
    hand-edit it, and replace one Claude Design created by itself.
 
    The card only renders with the Design Components runtime `support.js` beside it. Use the
@@ -103,7 +104,9 @@ this skill produces must satisfy the preconditions in §6.
    `outputs`: the `web`, `scheme`, `mobile` and `json` files from `design-palette` step 1,
    `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
    `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
-   discovered component (`wip`, `lastImplementedHash: null`). With several Storybook targets, also
+   discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
+   id such as `ui-button--default` from the target's `index.json`, not the component id
+   `ui-button`: `iframe.html?id=` renders only a story). With several Storybook targets, also
    write `storybooks` and each component's `storybook` key.
 
 8. **Verify preconditions.** Walk contract §6 and list anything still missing.
