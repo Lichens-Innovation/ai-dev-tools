@@ -1,0 +1,29 @@
+/* design-palette inputs (canonical). -lm light mode, -dm dark mode.
+   Edit these values, then run: node <skill>/scripts/palette.mjs <this file> --web [--mobile <tw.css>] */
+:root {
+  /* Brand: primary + secondary required, tertiary–quinary optional */
+  --primary-lm: #401f3e;
+  --primary-dm: #8a5585;
+  --secondary-lm: #3f2e56;
+  --secondary-dm: #705e9b;
+
+  /* Base: font-inverted and border are optional */
+  --font-lm: #1f1a24;
+  --font-dm: #eee8f0;
+  --font-inverted-lm: #fbfaf8;
+  --font-inverted-dm: #17131a;
+  --background-lm: #fbfaf8;
+  --background-dm: #17131a;
+  --border-lm: #dcdad9;
+  --border-dm: #37323a;
+
+  /* Status */
+  --info-lm: #2f6fde;
+  --info-dm: #5b93f0;
+  --danger-lm: #d33a3a;
+  --danger-dm: #ef6461;
+  --success-lm: #237a4b;
+  --success-dm: #4cb47a;
+  --warning-lm: #d99a17;
+  --warning-dm: #e8b53c;
+}

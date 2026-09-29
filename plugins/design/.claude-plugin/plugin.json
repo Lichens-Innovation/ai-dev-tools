@@ -1,6 +1,6 @@
 {
   "name": "design",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "Claude Design <-> Storybook/Chromatic iteration loop: sync a design-system catalog to Claude Design, iterate look-and-feel there, then implement and visually validate the result in a React or React Native codebase.",
   "author": {
     "name": "Samuel Daigle",
