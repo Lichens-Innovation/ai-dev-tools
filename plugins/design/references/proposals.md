@@ -3,13 +3,16 @@
 `/design sync` mirrors the repo's components into the Claude Design project. Those synced files
 (`components/`, `_ds_bundle.*`, `_preview/`, `styles.css`) are **read only** in Claude Design:
 it refuses to edit them, and every sync overwrites them. A component change is therefore made on
-a separate page, a **proposal**, and `design-loop` implements it in the repo.
+a separate page, a **proposal**, and `design-loop` implements it in the repo. Screens work the
+same way, from a mockup: see [`screens.md`](./screens.md).
 
-| Project files                 | Written by                 | Role                                             |
-| ----------------------------- | -------------------------- | ------------------------------------------------ |
-| `components/<group>/<Name>/…` | `/design sync`, from code  | Reference: how the component looks in code today |
-| `proposals/<name>.html`       | Claude Design              | Target: the synced component plus the change     |
-| `Palette.dc.html`             | `design-init`, then edited | Target for the palette (inputs prop)             |
+| Project files                   | Written by                  | Role                                             |
+| ------------------------------- | --------------------------- | ------------------------------------------------ |
+| `components/<group>/<Name>/…`   | `/design sync`, from code   | Reference: how the component looks in code today |
+| `proposals/<name>.html`         | Claude Design               | Target: the synced component plus the change     |
+| `screens/<name>.html`           | `design-screens`, from code | Reference: a screen rebuilt from the components  |
+| `proposals/screens/<name>.html` | Claude Design               | Target: the screen mockup plus the change        |
+| `Palette.dc.html`               | `design-init`, then edited  | Target for the palette (inputs prop)             |
 
 ## A proposal page
 
@@ -36,6 +39,11 @@ a separate page, a **proposal**, and `design-loop` implements it in the repo.
   component inside the provider's side-by-side mode (`mode="both"`) and put the change in
   page-local CSS or props, scoped to what changes. Never edit `components/`, `_ds_bundle.*` or
   `styles.css`: they are synced from the repo and overwritten on every sync.
+- **Screens** (`screens/<name>.html`) are mockups of the app's pages, rebuilt from the code:
+  don't edit them. A screen change goes in `proposals/screens/<name>.html`, a copy of the mockup
+  with the change, in the same mode. Its layout may be restructured with the semantic tokens and
+  the synced components; its data is illustrative. A change to a component itself goes in that
+  component's proposal.
 ```
 
 ## Side-by-side modes and the navbar in the design provider
@@ -55,7 +63,7 @@ const ModePanel = ({ mode, children }) => (
   </div>
 );
 
-// Only in Claude Design, and only for synced cards and proposals: local renders (/design sync
+// Only in Claude Design, and only for synced cards, proposals and screen mockups: local renders (/design sync
 // grading, design-loop screenshots), ?story= captures and the designs Claude Design builds stay as is.
 const designNavRoot = () => {
   if (!location.hostname.endsWith(".claudeusercontent.com") || new URLSearchParams(location.search).has("story"))
@@ -64,7 +72,7 @@ const designNavRoot = () => {
   if (!bundle) return null;
   const root = new URL("./", bundle.src);
   const path = decodeURIComponent(location.pathname).slice(decodeURIComponent(root.pathname).length);
-  return /^(components|proposals)\//.test(path) ? root : null;
+  return /^(components|proposals|screens)\//.test(path) ? root : null;
 };
 
 // The navbar's light/dark switch, or null when the page has no navbar.

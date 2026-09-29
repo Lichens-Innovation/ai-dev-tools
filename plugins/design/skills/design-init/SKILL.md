@@ -114,7 +114,8 @@ finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`
      unclassified tokens.
    - Git-ignore its local artifacts: `.design-sync/sb-reference/`, `.design-sync/.cache/`,
      `.design-sync/learnings/`, `.design-sync/node_modules`, `.design-sync/pkg/types/`,
-     `.design-sync/pkg/node_modules`. Keep `config.json`, `NOTES.md`, `conventions.md` and the
+     `.design-sync/pkg/node_modules`, and `.design-screens/` (the saved sign-in for screen
+     screenshots, see [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md)). Keep `config.json`, `NOTES.md`, `conventions.md` and the
      `pkg/` sources tracked: the next sync resumes from them.
    - Map the cards once a target is synced (the project then has `_ds_sync.json`): its cards are
      `components/<group>/<Name>/<Name>.html` (`DesignSync list_files`). Set each row's
@@ -124,7 +125,7 @@ finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`
      `/design sync` run; it only adds what changed.
    - Set up proposals ([`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md)), once
      the first sync has written its wrapper package: give its design provider the side-by-side
-     `mode="both"` and the shared navbar hook, add the proposal conventions to its readme header (`readmeHeader` in its
+     `mode="both"` and the shared navbar hook (on `components/`, `proposals/` and `screens/`), add the proposal conventions to its readme header (`readmeHeader` in its
      config), and ask the user to run `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
@@ -134,7 +135,8 @@ finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`
     many components have a card. Next: `/design sync` the first target, then re-run
     `design-init` to map the cards and set up proposals (it only fills what is missing). Then, in
     Claude Design, edit the palette card or ask for a component proposal
-    (`proposals/<name>.html`), approve it in the manifest, and run `design-loop`.
+    (`proposals/<name>.html`), approve it in the manifest, and run `design-loop`. To design whole
+    pages, add them with `design-screens`; keep Claude Design current with `design-refresh`.
 
 ## Notes
 

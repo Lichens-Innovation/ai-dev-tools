@@ -23,6 +23,15 @@ In Claude Design, change the palette card, or ask for a proposal of a component 
 (`proposals/<name>.html`, see [`references/proposals.md`](./references/proposals.md)). Set its
 manifest `status` to `approved`, then in Claude Code run `/design-loop`.
 
+To design a whole page, bring it in first: `/design-loop add the Home page to Claude Design` (or
+`/design-screens`). It rebuilds the page as a mockup from the synced components, checked against
+the running app, with no change to the app ([`references/screens.md`](./references/screens.md)).
+Propose changes in `proposals/screens/<name>.html` and approve them like a component.
+
+Run `/design-refresh` to bring Claude Design up to date with the code (design-loop offers it
+after implementing): it re-syncs the components only when their code changed, in a background
+subagent, and rebuilds the mockups whose screen changed.
+
 ## Skills
 
 | Skill            | Role                                                                                                                                                                                                                                                                    |
@@ -31,8 +40,10 @@ manifest `status` to `approved`, then in Claude Code run `/design-loop`.
 | `design-palette` | Creates or migrates the canonical theme palette (light/dark inputs → scales → semantic tokens), generates one theme shared by web and React Native plus Tailwind utilities, audits contrast, and provides a live palette card for Claude Design. Used by `design-init`. |
 | `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                              |
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                          |
-| `design-loop`    | The runtime skill. Reads an approved component proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic.                                                                              |
+| `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to the two skills below.          |
+| `design-screens` | Adds or refreshes app screens in Claude Design as mockups built from the synced components, checked against screenshots of the running app.                                                                                                                             |
+| `design-refresh` | Brings Claude Design up to date: re-syncs changed components through the `design-sync-runner` agent (upload in the main session), then rebuilds stale screen mockups and offers new screens.                                                                            |
 
 ## The contract
 
-All four skills agree on one shared contract — the manifest schema, the Claude Design ↔ local mapping, the approval signal, and the token-reconciliation rules. See [`references/design-contract.md`](./references/design-contract.md). Read it before changing any skill.
+All the skills agree on one shared contract — the manifest schema, the Claude Design ↔ local mapping, the approval signal, and the token-reconciliation rules. See [`references/design-contract.md`](./references/design-contract.md). Read it before changing any skill.
