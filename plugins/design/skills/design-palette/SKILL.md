@@ -1,47 +1,70 @@
 ---
 name: design-palette
-description: "Creates or normalizes a CSS theme palette file that is the canonical source of truth for a project's design tokens, preserving raw-scale vs semantic-token structure. Used by design-init, or directly when the user wants to generate/consolidate a color/token theme file or restructure existing CSS variables into a palette. Use when the user asks to create a theme palette, set up design tokens, or normalize their CSS variables."
+description: "Creates or migrates the canonical CSS theme palette: brand/base/status inputs per light and dark mode, generated faint→intense scales, a reference-only semantic layer, web (light-dark) and/or Tailwind v4 outputs, and a contrast audit. Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
 disable-model-invocation: true
 ---
 
 # Design Palette
 
-Produces the **canonical CSS theme palette** — the single source of truth for design tokens
-(contract §5). Usually invoked by `design-init`; can also be run standalone.
+Produces the **canonical theme palette**, the single source of truth for design tokens
+(contract §5). Usually invoked by `design-init`; can run standalone.
 
-## Shared contract
+Read before starting:
 
-Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md), especially
-§5 (token reconciliation and structure).
+- [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) §5
+- [`references/palette-structure.md`](references/palette-structure.md), the token model this skill produces
 
 ## Workflow
 
-1. **Find existing color/token sources.** Look for existing CSS custom properties, hard-coded
-   hex/rgb values, or a partial theme file. Ask the user to point at the intended file if
-   ambiguous — do not guess across unrelated projects.
+1. **Ask the targets.** Web, mobile, or both, and the file paths:
+   - web → the canonical `theme.css` (e.g. `src/styles/theme.css`)
+   - mobile → the Tailwind v4 CSS file (e.g. `apps/mobile/global.css`)
+   - mobile only → the Tailwind file is also the canonical file (it holds the inputs block)
 
-2. **Choose the token structure** (confirm with the user if not already established):
-   - **Raw scale** — e.g. `--blue-500`, `--gray-900`: the primitive palette.
-   - **Semantic layer** — e.g. `--color-primary`, `--color-danger`, `--color-surface`: what
-     components actually consume, referencing the raw scale.
-   Preserve any structure that already exists; never flatten semantic tokens into raw hex.
+2. **Detect existing tokens.** Look for CSS custom properties, a Tailwind theme, or hard-coded
+   colors. If any exist, follow [`references/migration.md`](references/migration.md) instead of
+   starting from the template. Never overwrite an existing palette without showing the diff.
 
-3. **Generate / normalize the palette file.** Write a single CSS file (e.g.
-   `src/styles/theme.css`) with the raw scale first, then the semantic layer referencing it
-   under `:root`. Consolidate duplicate/near-duplicate colors and report the merges.
+3. **Collect the inputs.** For each of light (`-lm`) and dark (`-dm`) mode:
+   - brand: `primary` and `secondary` required, `tertiary`–`quinary` optional. Reuse the logo
+     colors; without a logo, suggest a generator such as coolors.co.
+   - base: `font`, `background`; optional `font-inverted` (defaults to background) and `border`
+     (defaults to a 14% font-into-background mix).
+   - status: `info`, `danger`, `success`, `warning` (defaults in the template).
 
-4. **Rewire references (optional, on request).** Where components hard-code colors, offer to
-   replace them with the matching semantic token. Do not do this silently.
+4. **Write the inputs** into the canonical file using
+   [`templates/theme.inputs.css`](templates/theme.inputs.css). Inputs are the only hand-edited
+   values.
 
-5. **Report.**
-   - Palette file path; raw vs. semantic token counts; any colors merged or flagged as
-     near-duplicates.
-   - Remind the user this file is canonical: Claude Design and Chromatic are downstream of it,
-     and `design-loop` reconciles changes back into it.
+5. **Generate.** Run [`scripts/palette.mjs`](scripts/palette.mjs) (Node 20+, no dependencies):
 
-## Notes
+   ```bash
+   node ${CLAUDE_SKILL_DIR}/scripts/palette.mjs <theme.css> --web                      # web
+   node ${CLAUDE_SKILL_DIR}/scripts/palette.mjs <theme.css> --web --mobile <tw.css>    # both
+   node ${CLAUDE_SKILL_DIR}/scripts/palette.mjs <tw.css> --mobile <tw.css>             # mobile only
+   ```
 
-- This file feeds the Claude Design palette card via `/design-sync`, but it stays canonical —
-  Design-side edits are reconciled back here, never the reverse.
-- Keep it framework-agnostic CSS custom properties unless the project already uses a specific
-  token system (Tailwind theme, CSS-in-JS tokens) — then match it.
+   Card sync: `--to-card <card>` writes the inputs into the palette card, `--from-card <card>`
+   takes them from it, `--diff-card <card>` only prints the differences.
+
+   The script reads every `--name-lm` / `--name-dm` input, regenerates the rest of the file(s),
+   and prints the contrast audit. Re-run it after any input change.
+
+6. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input
+   change that fixes it (usually nudging that color's lightness) and ask before applying.
+   `WARN` lines are advisory; explain them in one line each.
+
+7. **Palette card.** When run by `design-init`, stop here: it seeds the Claude Design card and
+   reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md). For
+   web Storybooks, install the live-theme bridge so palette edits show up in real stories.
+
+8. **Report.** Canonical file path, generated file(s), input count, audit summary, and the
+   reminder that the inputs block is canonical: Claude Design and Chromatic are downstream, and
+   `design-loop` reconciles changes back into the inputs.
+
+## Rules
+
+- Components consume **semantic tokens only** (`--bg`, `--border`, `--text-muted`,
+  `--primary-bg`, `--text-on-primary`…). Raw scale steps are for rare one-offs.
+- Never hand-edit generated tokens; change an input and re-run.
+- Keep the structure: inputs → scales → semantic. Never flatten semantic tokens into hex.
