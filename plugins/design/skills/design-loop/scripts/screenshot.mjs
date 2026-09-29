@@ -11,10 +11,22 @@
  *   node screenshot.mjs <url-or-html-file> <out.png> [--selector "#storybook-root"]
  *
  * Requires Playwright (installed by storybook-init):  npm i -D playwright && npx playwright install chromium
+ * Run it from the Storybook target's dir: Playwright resolves from the working directory.
  */
-import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+
+// Resolve Playwright from the project (the working directory), not from this plugin folder:
+// run the script from a directory whose node_modules has it, e.g. the Storybook target's dir.
+let chromium;
+try {
+  ({ chromium } = createRequire(join(process.cwd(), 'noop.js'))('playwright'));
+} catch {
+  console.error(`Playwright not found from ${process.cwd()}. Run from the Storybook target's dir, or install it there.`);
+  process.exit(1);
+}
 
 const args = process.argv.slice(2);
 const source = args[0];

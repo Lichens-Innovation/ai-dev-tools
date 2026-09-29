@@ -165,7 +165,7 @@ surrounding code style, naming, and idioms.
 1. Screenshot the **design target**:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs /tmp/design-loop/project/<proposalPath> /tmp/design-loop/<name>.target.png
+   cd <dir> && node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs /tmp/design-loop/project/<proposalPath> /tmp/design-loop/<name>.target.png
    ```
 
 2. Find the changed stories: the target's Storybook MCP `stories-changed` → the `storyId`s
@@ -176,7 +176,7 @@ surrounding code style, naming, and idioms.
 3. Screenshot each changed story from the target's running Storybook:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs \
+   cd <dir> && node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs \
      "<url>/iframe.html?id=<storyId>&viewMode=story" \
      /tmp/design-loop/<name>.story.png
    ```
@@ -237,4 +237,5 @@ next change. Never delete or edit it from here.
 - This skill **implements**; it does not decide look-and-feel. That happens in Claude Design.
 - Keep temp artifacts under `/tmp/design-loop/`; they're throwaway between runs.
 - `screenshot.mjs` renders both a live Storybook URL and a local target `.html` the same way, so
-  the two screenshots are comparable.
+  the two screenshots are comparable. Run it from the target's `dir`: it loads Playwright from the
+  working directory.
