@@ -63,10 +63,16 @@ this skill produces must satisfy the preconditions in §6.
    ```
 
    Also set the `default` of its `storybookUrl` and `stories` props (see
-   [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)). Upload
-   it to the project root (the Design System view and Pages list only pick up root files):
-   `DesignSync finalize_plan` (`writes: ["Palette.dc.html"]`, `deletes: []`,
-   `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId` and
+   [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)).
+   `storybookUrl` is the Chromatic branch permalink of the web target when `chromatic-init` ran
+   (`https://<branch>--<appId>.chromatic.com`, `appId` from its baseline build URL, `<branch>`
+   the default branch once it has been published, else the baseline build's branch), otherwise
+   that target's local `url` (`http://localhost:6006`). The permalink works for anyone opening
+   the card; localhost only on the machine running Storybook.
+
+   Upload the card to the project root: the Pages list only shows root files, and the Design
+   System view labels each card by its file name. `DesignSync finalize_plan`
+   (`writes: ["Palette.dc.html"]`, `deletes: []`, `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId` and
    `{ path: "Palette.dc.html", localPath: "palette.html" }`.
 
    The card only renders with the Design Components runtime `support.js` beside it. Use the

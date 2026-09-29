@@ -157,8 +157,9 @@ Skills always resolve a component's target through these rules — never hardcod
 4. **"Where does the palette live?"** → both places, kept equal: the canonical inputs file
    (`palette.localPath`) and the palette card's `inputs` prop (`palette.designPath`).
    `design-init` seeds the card from the repo; an approved card flows back through `design-loop`.
-   The card lives at the project root as `Palette.dc.html`: the Design System view and Pages
-   list ignore files in folders. Two tools write the root, each for one file:
+   The card lives at the project root as `Palette.dc.html`: the Pages list only shows root
+   files, and the Design System view labels each card by its file name. Two tools write the
+   root, each for one file:
    - the card, through DesignSync (`finalize_plan` + `write_files`, directly from `design-init`,
      not through `/design-sync`);
    - the Design Components runtime `support.js` the card needs beside it, through the Claude

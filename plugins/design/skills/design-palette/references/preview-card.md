@@ -19,11 +19,12 @@ ask Claude Design to update `inputs` (or paste the card's **Export → Inputs JS
 1. Write the inputs: `node palette.mjs <canonical> --to-card <card>`.
 2. Set the `default` of the other props (the HTML-escaped `data-props` JSON on its
    `<script data-dc-script>` tag):
-   - `storybookUrl`: a Storybook reachable from the browser, e.g. the Chromatic permalink
-     `https://<branch>--<appid>.chromatic.com` or `http://localhost:6006`
+   - `storybookUrl`: the Chromatic branch permalink `https://<branch>--<appId>.chromatic.com`
+     when the target publishes to Chromatic, otherwise `http://localhost:6006`
    - `stories`: comma-separated story ids from `design.manifest.json` (`components[].storyId`)
 3. Upload it to the bound project's root as `Palette.dc.html` (`DesignSync finalize_plan`, then
-   `write_files`). Files in folders do not appear in the Design System view or the Pages list.
+   `write_files`). The Pages list only shows root files, and the Design System view labels each
+   card by its file name.
 4. If the root has no `support.js` (`DesignSync list_files`), write it with the Claude Design
    tool's `create_support_js`. The card does not render without it; never overwrite an
    existing one.
@@ -65,4 +66,10 @@ republish.
   `@storybook/react-native-web-vite` (web build) work like web targets.
 - Browsers may block embedding `http://localhost` from an https page (private network access).
   Prefer the Chromatic permalink for shared cards.
+- The permalink shows the last published build, not unpublished story edits. On a private
+  Chromatic project, viewers may need a Chromatic login, which browsers can block inside an
+  embedded frame; check once that stories load in the card.
+- Deleting or moving a card file can leave a stale "file not found" entry in the Design System
+  view (Claude Design keeps it in its generated `_ds_manifest.json`). Upload the card at its
+  final path the first time.
 - Stories must use the semantic tokens for edits to show; hard-coded colors will not change.
