@@ -513,52 +513,34 @@ function toInputs(p) {
 }
 const hasInputs = o => !!(o && typeof o === 'object' && o.primary && o.secondary && o.font && o.background);
 
+// [token, light, dark]: each side is a hex literal, an input (var(--X-lm)) or a token reference (var(--Y)).
+function webTokens(p, pre) {
+  const dk = Object.fromEntries(tokensFor(p, 'dark')), inp = (n, m) => 'var(' + pre + n + (m === 'light' ? '-lm' : '-dm') + ')';
+  const input = { bg:'background', 'bg-strong':'border', text:'font', 'text-inverted':'font-inverted' }, alias = {};
+  families(p).forEach(n => { const s = srcOf(p, n); if (s === n) { input[n] = n; return; } ['', ...SCALE.map(st => '-' + st), '-hover', '-active'].forEach(x => { alias[n + x] = 'var(--' + s + x + ')'; }); });
+  const ref = v => v.startsWith('var(--color-') ? 'var(--' + v.slice(12) : v;
+  return tokensFor(p, 'light').map(([k, v]) => alias[k] ? [k, alias[k], alias[k]] : input[k] ? [k, inp(input[k], 'light'), inp(input[k], 'dark')] : [k, ref(v), ref(dk[k])]);
+}
+const modeRef = (k, v, m) => v[0] === '#' ? 'var(--' + k + '-' + m + ')' : v;
 function buildWebCss(p, prefix) {
-  const pre = prefix ? '--' + prefix + '-' : '--';
-  const inp = (n, m) => 'var(' + pre + n + (m === 'light' ? '-lm' : '-dm') + ')';
-  const ld = (x, y) => 'light-dark(' + x + ', ' + y + ')';
-  const mx = (x, n, y) => 'color-mix(in oklab, ' + x + ' ' + n + '%, ' + y + ')';
-  const oc = (src, l, c) => 'oklch(from ' + src + ' ' + l + ' ' + c + ' h)';
-  const FL = inp('font','light'), FD = inp('font','dark'), BL = inp('background','light'), BD = inp('background','dark'), RL = inp('border','light'), RD = inp('border','dark');
-  const status = Object.keys(p.status);
-  const inputs = [...p.brand.map((_,i) => BRAND[i]), 'font', 'font-inverted', 'background', 'border', ...status];
-  const L = ['/* Generated from the Theme Palette prototype. Edit the inputs there and re-export:', '   --text-on-* is chosen at export time and will not follow manual edits. */', ':root {', '  color-scheme: light; /* set to light | dark to switch modes */', '', '  /* 1. Inputs: -lm light mode, -dm dark mode. Primary + secondary required */'];
+  const pre = prefix ? '--' + prefix + '-' : '--', T = webTokens(p, pre);
+  const inputs = [...p.brand.map((_,i) => BRAND[i]), 'font', 'font-inverted', 'background', 'border', ...Object.keys(p.status)];
+  const L = ['/* Generated from the Theme Palette card. Edit the inputs there and re-export.', '   Plain values and var() only, so web and React Native (NativeWind) can share this file. */', ':root {', '  /* 1. Inputs: -lm light mode, -dm dark mode. Primary + secondary required */'];
   inputs.forEach(n => L.push('  ' + pre + n + '-lm: ' + baseHex(p,n,'light') + ';', '  ' + pre + n + '-dm: ' + baseHex(p,n,'dark') + ';'));
-  L.push('', '  /* 2. Scales: faint > soft > base > strong > intense, ordered by contrast against the background.', '     Same names in both modes; only the values differ. Unset brand slots fall back. */');
-  families(p).forEach(n => {
-    const s = srcOf(p,n);
-    if (s !== n) { L.push('  --' + n + ': var(--' + s + ');'); SCALE.forEach(st => L.push('  --' + n + '-' + st + ': var(--' + s + '-' + st + ');')); return; }
-    L.push('  --' + n + ': ' + ld(inp(n,'light'), inp(n,'dark')) + ';');
-    SCALE.forEach(st => L.push('  --' + n + '-' + st + ': ' + ld(oc(inp(n,'light'), STEPS_LM[st][2], STEPS_LM[st][3]), DM_MIX[st] ? mx(inp(n,'dark'), DM_MIX[st], BD) : oc(inp(n,'dark'), STEPS_DM[st][2], STEPS_DM[st][3])) + ';'));
-  });
-  L.push('', '  /* Neutral scales: same names, smaller relative shifts. Subtler than brand steps:', '     --bg-intense is not as strong as --primary-intense */',
-    '  --bg: ' + ld(BL, BD) + ';',
-    '  --bg-faint: ' + ld(mx(FL,6,BL), mx(FD,11,BD)) + ';',
-    '  --bg-soft: ' + ld(mx(FL,10,BL), mx(FD,15,BD)) + ';',
-    '  --bg-strong: ' + ld(RL, RD) + '; /* border input */',
-    '  --bg-intense: ' + ld(mx(RL,80,FL), mx(RD,80,FD)) + ';',
-    '  --bg-elevated: ' + ld(mx(BL,30,'white'), mx(FD,5,BD)) + '; /* literal: lighter in both modes */',
-    '  --bg-inset: ' + ld(mx(FL,3,BL), mx(BD,80,'black')) + '; /* literal: darker in both modes */',
-    '  --text: ' + ld(FL, FD) + ';',
-    '  --text-inverted: ' + ld(inp('font-inverted','light'), inp('font-inverted','dark')) + ';',
-    '  --text-faint: ' + ld(mx(FL,45,BL), mx(FD,45,BD)) + ';',
-    '  --text-soft: ' + ld(mx(FL,68,BL), mx(FD,68,BD)) + ';',
-    '  --text-strong: ' + ld(mx(FL,85,'black'), mx(FD,85,'white')) + ';',
-    '  --text-intense: ' + ld(mx(FL,70,'black'), mx(FD,70,'white')) + ';');
-  L.push('', '  /* 3. Semantic: references only, identical in both modes */',
-    '  --bg-hover: var(--bg-faint);', '  --bg-active: var(--bg-soft);', '  --border: var(--bg-strong);', '  --border-strong: var(--bg-intense);',
-    '  --border-input: var(--text-faint); /* 3:1 against bg for form controls (WCAG 1.4.11) */',
-    '  --text-muted: var(--text-soft);', '  --text-disabled: var(--text-faint);', '  --bg-disabled: var(--bg-soft);',
-    '  --focus-ring: var(--primary-strong);', '  --link: var(--primary-text);', '  --link-hover: var(--primary-strong);');
-  intentsOf(p).forEach(n => L.push('  --' + n + '-bg: var(--' + n + '-faint);', '  --' + n + '-bg-hover: var(--' + n + '-soft);', '  --' + n + '-border: var(--' + n + '-soft);', '  --' + n + '-text: var(--' + n + '-intense);'));
-  L.push('', '  /* Text on solid fills: --text or --text-inverted, picked per mode for contrast */');
-  intentsOf(p).forEach(n => { const x = onRef(p,n,'light'), y = onRef(p,n,'dark'); L.push('  --text-on-' + n + ': ' + (x === y ? 'var(--' + x + ')' : ld('var(--' + x + ')', 'var(--' + y + ')')) + ';'); });
-  L.push('', '  /* 4. Interaction + effects: not derivable from the scales */');
-  const hov = (n, st, active) => { const e = m => { const x = hoverMix(baseHex(p,n,m), st, active); return oc(inp(srcOf(p,n), m), 'calc(l ' + (x.sign > 0 ? '+ ' : '- ') + x.d + ')', 'c'); }; return ld(e('light'), e('dark')); };
-  L.push('  /* Hover/active: fixed lightness shift (0.07 / 0.12), lighter unless the color is already light (L > 0.78) */');
-  BRAND.forEach(n => L.push('  --' + n + '-hover: ' + hov(n, false, false) + ';', '  --' + n + '-active: ' + hov(n, false, true) + ';'));
-  status.forEach(n => L.push('  --' + n + '-hover: ' + hov(n, true, false) + ';', '  --' + n + '-active: ' + hov(n, true, true) + ';'));
-  L.push('  --overlay: ' + ld(mx('black',45,'transparent'), mx('black',65,'transparent')) + ';', '  --shadow: ' + ld(mx(FL,18,'transparent'), mx('black',55,'transparent')) + ';', '}');
+  L.push('', '  /* 2. Generated values per mode: faint > soft > base > strong > intense scales, neutrals, hover, effects */');
+  T.forEach(([k,a,b]) => { if (a === b) return; if (a[0] === '#') L.push('  --' + k + '-light: ' + a + ';'); if (b[0] === '#') L.push('  --' + k + '-dark: ' + b + ';'); });
+  L.push('', '  /* 3. Tokens: what components use. Light values here; the dark block below re-points the ones that change.', '     Semantic tokens only reference other tokens, so they follow the mode. */');
+  T.forEach(([k,a,b]) => L.push('  --' + k + ': ' + (a === b ? a : modeRef(k, a, 'light')) + ';'));
+  L.push('}', '', '/* Dark mode: prefers-color-scheme (Appearance.setColorScheme on React Native). To force a mode in a browser,', '   import the scheme file (palette.mjs --scheme) after this one and set color-scheme on <html>. */', '@media (prefers-color-scheme: dark) {', '  :root {');
+  T.forEach(([k,a,b]) => { if (a !== b) L.push('    --' + k + ': ' + modeRef(k, b, 'dark') + ';'); });
+  L.push('  }', '}');
+  return L.join('\n');
+}
+function buildSchemeCss(p, prefix) {
+  const T = webTokens(p, prefix ? '--' + prefix + '-' : '--');
+  const L = ['/* Generated with the design palette. Browser only: never import it on React Native, where react-native-css', '   turns light-dark() into arrays. Import it after the theme; color-scheme on <html> then picks the mode. */', ':root {', '  color-scheme: light dark;'];
+  T.forEach(([k,a,b]) => { if (a !== b) L.push('  --' + k + ': light-dark(' + modeRef(k, a, 'light') + ', ' + modeRef(k, b, 'dark') + ');'); });
+  L.push('}');
   return L.join('\n');
 }
 
@@ -586,12 +568,9 @@ function tokensFor(p, m) {
   return T;
 }
 function buildMobileCss(p) {
-  const lt = tokensFor(p,'light'), dk = tokensFor(p,'dark'), lmap = Object.fromEntries(lt);
-  const L = ['/* Generated from the Theme Palette prototype. Re-export instead of editing: --color-text-on-* is chosen at export time. */', '@import "tailwindcss";', '', '/* Light values + semantic references. Utilities: bg-primary, bg-primary-bg, text-primary-text, border-border… */', '@theme {'];
-  lt.forEach(([k,v]) => L.push('  --color-' + k + ': ' + v + ';'));
-  L.push('}', '', '/* Dark mode: only values that change. Appearance.setColorScheme(mode) drives this query */', '@media (prefers-color-scheme: dark) {', '  :root {');
-  dk.filter(([k,v]) => lmap[k] !== v).forEach(([k,v]) => L.push('    --color-' + k + ': ' + v + ';'));
-  L.push('  }', '}');
+  const L = ['/* Generated from the Theme Palette card: the theme plus Tailwind v4 utilities for its tokens. Re-export instead of editing. */', '@import "tailwindcss";', '', buildWebCss(p, ''), '', '/* Utilities: bg-primary, bg-primary-bg, text-primary-text, border-border… inline keeps them following the mode */', '@theme inline {'];
+  tokensFor(p, 'light').forEach(([k]) => L.push('  --color-' + k + ': var(--' + k + ');'));
+  L.push('}');
   return L.join('\n');
 }
 
@@ -628,14 +607,15 @@ class Component extends DCLogic {
   inject() {
     let el = document.getElementById('theme-palette-tokens');
     if (!el) { el = document.createElement('style'); el.id = 'theme-palette-tokens'; document.head.appendChild(el); }
-    const css = buildWebCss(this.state.pal, this.props.prefix ?? '');
+    const css = this.webCss();
     if (el.textContent !== css) el.textContent = css;
     document.documentElement.style.colorScheme = this.state.mode;
     delete document.documentElement.dataset.theme;
     this.pushToStories();
   }
+  webCss() { return buildWebCss(this.state.pal, this.props.prefix ?? '') + '\n\n' + buildSchemeCss(this.state.pal, this.props.prefix ?? ''); }
   pushToStories() {
-    const msg = { type:'palette:apply', css: buildWebCss(this.state.pal, this.props.prefix ?? ''), mode: this.state.mode };
+    const msg = { type:'palette:apply', css: this.webCss(), mode: this.state.mode };
     document.querySelectorAll('iframe[data-palette-story]').forEach(fr => { try { if (fr.contentWindow) fr.contentWindow.postMessage(msg, '*'); } catch (e) {} });
   }
   setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) })); }
@@ -676,9 +656,9 @@ class Component extends DCLogic {
     const sbUrl = (this.props.storybookUrl ?? '').replace(/\/$/, ''), ids = (this.props.stories ?? '').split(',').map(x => x.trim()).filter(Boolean);
     const storyFrames = sbUrl ? ids.map(id => ({ id, src: sbUrl + '/iframe.html?id=' + encodeURIComponent(id) + '&viewMode=story' })) : [];
     const closeAll = () => this.setState({ pop:null });
-    const css = s.tab === 'web' ? buildWebCss(p, this.props.prefix ?? '') : s.tab === 'mobile' ? buildMobileCss(p) : JSON.stringify(toInputs(p), null, 2);
+    const css = s.tab === 'web' ? this.webCss() : s.tab === 'mobile' ? buildMobileCss(p) : JSON.stringify(toInputs(p), null, 2);
     return {
-      css, exportHint: s.tab === 'web' ? 'light-dark() tokens. Set the -lm / -dm inputs; the scale and semantic tokens follow.' : s.tab === 'mobile' ? 'Tailwind v4 theme with flat hex values, flipped by prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. design-loop reads it when the palette is approved.',
+      css, exportHint: s.tab === 'web' ? 'The theme (plain values, flipped by prefers-color-scheme) plus the browser scheme block, so color-scheme on <html> can force a mode.' : s.tab === 'mobile' ? 'The theme plus Tailwind v4 utilities, for a mobile-only project. React Native follows prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. design-loop reads it when the palette is approved.',
       inputsTabBg: s.tab === 'inputs' ? 'var(--bg-elevated)' : 'transparent', setInputsTab: () => this.setState({ tab:'inputs', copied:false }),
       webTabBg: s.tab === 'web' ? 'var(--bg-elevated)' : 'transparent', mobileTabBg: s.tab === 'mobile' ? 'var(--bg-elevated)' : 'transparent',
       setWeb: () => this.setState({ tab:'web', copied:false }), setMobile: () => this.setState({ tab:'mobile', copied:false }),

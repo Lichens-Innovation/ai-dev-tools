@@ -23,13 +23,13 @@ In Claude Code, run `/design-loop`.
 
 ## Skills
 
-| Skill            | Role                                                                                                                                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `design-init`    | One-time setup orchestrator for an existing React or React Native project. Runs the setup sub-skills below and verifies the result.                                                                                               |
-| `design-palette` | Creates or migrates the canonical theme palette (light/dark inputs → scales → semantic tokens), generates web and/or Tailwind output, audits contrast, and provides a live palette card for Claude Design. Used by `design-init`. |
-| `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                        |
-| `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                    |
-| `design-loop`    | The runtime skill. Reads the approved target from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic.                                                                         |
+| Skill            | Role                                                                                                                                                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `design-init`    | One-time setup orchestrator for an existing React or React Native project. Runs the setup sub-skills below and verifies the result.                                                                                                                                     |
+| `design-palette` | Creates or migrates the canonical theme palette (light/dark inputs → scales → semantic tokens), generates one theme shared by web and React Native plus Tailwind utilities, audits contrast, and provides a live palette card for Claude Design. Used by `design-init`. |
+| `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                              |
+| `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                          |
+| `design-loop`    | The runtime skill. Reads the approved target from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic.                                                                                                               |
 
 ## The contract
 

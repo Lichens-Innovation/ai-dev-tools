@@ -16,8 +16,63 @@ Three layers. Components only touch layer 3.
 | Base   | `font`, `background`, `font-inverted`, `border`                        | `font-inverted` defaults to background; `border` to 14% font into background     |
 | Status | `info`, `danger`, `success`, `warning`                                 | Any extra non-brand, non-base input is treated as a status color                 |
 
-Every input has `-lm` (light mode) and `-dm` (dark mode). Mode is switched by `color-scheme`
-on `:root` (web, via `light-dark()`) or `prefers-color-scheme` (Tailwind / React Native).
+Every input has `-lm` (light mode) and `-dm` (dark mode).
+
+## Generated files
+
+`palette.mjs` computes every token as a hex per mode, the same values the audit checks, and writes:
+
+| File     | Holds                                                                                                                                          | Used by                 |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| theme    | Inputs, generated `--X-light` / `--X-dark` values, the tokens (light), and a `prefers-color-scheme: dark` block re-pointing them. `var()` only | web and React Native    |
+| scheme   | `color-scheme: light dark` and `--X: light-dark(<light>, <dark>)` for every token that changes, so `color-scheme` on `<html>` forces a mode    | browsers only           |
+| Tailwind | `@import "tailwindcss"` and `@theme inline { --color-X: var(--X) }`                                                                            | Tailwind and NativeWind |
+| JSON     | `{ "X": { "light": "#…", "dark": "#…" } }`, references resolved                                                                                | code without CSS vars   |
+
+```css
+:root {
+  --primary-lm: #401f3e; /* input */
+  --primary-dm: #8a5585;
+  --primary-faint-light: #fef0fc; /* generated */
+  --primary-faint-dark: #271d29;
+  --primary: var(--primary-lm); /* token */
+  --primary-faint: var(--primary-faint-light);
+  --primary-bg: var(--primary-faint); /* semantic: same in both modes */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: var(--primary-dm);
+    --primary-faint: var(--primary-faint-dark);
+  }
+}
+```
+
+Only the inputs are hand-edited; the rest is regenerated on every run.
+
+### Shared theme package (web and mobile in one repo)
+
+```
+packages/theme/
+├── package.json           exports public names: "./theme.css": "./src/generated/theme.css", …
+└── src/
+    ├── theme.inputs.css   the inputs (canonical, manifest palette.localPath)
+    ├── tailwind-tokens.css project aliases, hand-written: --color-surface: var(--bg)
+    ├── palette.ts         typed reader of generated/palette.json, only if JS needs hex values
+    └── generated/         never edited: theme.css, scheme.css, tailwind.css, palette.json
+```
+
+- Apps import the package's export names, never a `generated/` path, so the layout can change
+  without touching them.
+- Add `generated/` to the formatter's and linter's ignore files: a reformatted output turns every
+  regenerate into a diff.
+- Read `palette.json` through one small typed module; do not generate a second copy of the
+  values in TS.
+
+| Consumer                  | Imports, in order                                                         |
+| ------------------------- | ------------------------------------------------------------------------- |
+| Web app, web Storybook    | `tailwind.css`, `theme.css`, `scheme.css`, project aliases                |
+| React Native (NativeWind) | `tailwind.css`, `theme.css`, NativeWind theme, project aliases; no scheme |
+| React Native Storybook    | the app's global CSS, then `scheme.css` (it renders in a browser)         |
 
 ## 2. Scales
 
@@ -76,5 +131,9 @@ Neutral scales use the same names with smaller shifts (`--bg-intense` is not as 
 
 - Dark faint/soft are mixes: relative color syntax cannot read the background's lightness.
 - `--text-on-*` is decided at generation time; re-run after changing inputs.
-- Tailwind hex values are computed to match the browser; very saturated colors may differ by a shade.
-- Web output needs `light-dark()` and relative color syntax (browsers from ~2024).
+- The scheme file needs `light-dark()` (browsers from 2024). The theme itself has no such requirement.
+- Changing an input in devtools does not update the scales: re-run the script (the palette card
+  recomputes live).
+- On React Native, a Tailwind alias through another `--color-*` (`--color-surface: var(--color-bg)`)
+  freezes to the light value (react-native-css 3.0.7 inlines once-declared variables in stylesheet
+  order). Alias onto the theme token instead: `--color-surface: var(--bg)`.
