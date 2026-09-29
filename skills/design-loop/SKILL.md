@@ -84,12 +84,13 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
    ```
 
 2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
-   output in `palette.outputs`: `--web` when `outputs.web` is set, `--mobile <outputs.mobile>`
-   when `outputs.mobile` is set. The same run regenerates the project thumbnail (its title comes
-   from the card):
+   output in `palette.outputs`: `--theme <outputs.web>` (or `--web` when `outputs.web` equals
+   `localPath`), then `--scheme <outputs.scheme>`, `--mobile <outputs.mobile>` and
+   `--json <outputs.json>` for each one set. The inputs file receives the card's inputs. The same
+   run regenerates the project thumbnail (its title comes from the card):
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--web] [--mobile <outputs.mobile>] \
+   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile>] [--json <outputs.json>] \
      --thumbnail /tmp/design-loop/thumbnail.html
    ```
 

@@ -1,5 +1,6 @@
 /* design-palette inputs (canonical). -lm light mode, -dm dark mode.
-   Edit these values, then run: node <skill>/scripts/palette.mjs <this file> --web [--mobile <tw.css>] */
+   Edit these values, then run: node <skill>/scripts/palette.mjs <this file> --theme generated/theme.css
+   [--scheme generated/scheme.css] [--mobile generated/tailwind.css] [--json generated/palette.json] */
 :root {
   /* Brand: primary + secondary required, tertiary–quinary optional */
   --primary-lm: #401f3e;

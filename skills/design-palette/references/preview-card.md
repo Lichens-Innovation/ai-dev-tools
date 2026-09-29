@@ -2,7 +2,7 @@
 
 [`templates/palette-preview.dc.html`](../templates/palette-preview.dc.html) is a Claude Design
 card: the palette grid (editable per mode), contrast audit, semantic mapping, a demo page of
-common components, a web/Tailwind export, and a **Your components** section that embeds real
+common components, a theme/Tailwind export, and a **Your components** section that embeds real
 Storybook stories and themes them live.
 
 ## Where the colors live
@@ -45,7 +45,9 @@ to the target's `.storybook/` folder and import it from `preview.ts` so stories 
 import "./storybook-theme-bridge";
 ```
 
-It only injects a `<style>` element and sets `color-scheme`; it never executes received code.
+The CSS is the theme plus its scheme block, so `mode` applies through `color-scheme`. Stories
+that use the Tailwind utilities follow too: `@theme inline` points them at the theme tokens. It
+only injects a `<style>` element and sets `color-scheme`; it never executes received code.
 On localhost or a development build it accepts any sender. Published builds (e.g. Chromatic) only
 accept `ALLOWED_ORIGINS`, which `design-init` sets to the bound project's origin:
 
