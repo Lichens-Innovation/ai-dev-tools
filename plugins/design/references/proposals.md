@@ -21,7 +21,8 @@ a separate page, a **proposal**, and `design-loop` implements it in the repo.
   as the change (one variant, one state). Say what changed in the page `<title>` or a short note.
 - Shows both modes: the project's design provider in its side-by-side mode (see below), or two
   panels that each set `data-theme` and `color-scheme` themselves. A page that sets neither
-  follows the viewer's OS mode, so a "light" panel can silently render dark tokens.
+  follows the viewer's OS mode, so a "light" panel can silently render dark tokens. In Claude
+  Design, the shared navbar's light/dark switch then shows one panel at a time.
 
 ## Conventions for Claude Design (design-sync readme header)
 
@@ -37,10 +38,13 @@ a separate page, a **proposal**, and `design-loop` implements it in the repo.
   `styles.css`: they are synced from the repo and overwritten on every sync.
 ```
 
-## Side-by-side modes in the design provider
+## Side-by-side modes and the navbar in the design provider
 
 The provider in `/design sync`'s wrapper package (its `provider` config) can render the content
-in a light and a dark panel. A mode scoped to a container works with the palette's scheme file:
+in a light and a dark panel. It is also the one hook that runs in every synced card and proposal:
+`/design sync` has no option to add markup to its cards, so the provider loads the project's
+shared navbar (`design-nav.js`, uploaded by `design-init` next to the palette card) and follows
+its light/dark switch. A mode scoped to a container works with the palette's scheme file:
 `light-dark()` follows the nearest `color-scheme`, and a Tailwind `dark:` variant written as
 `&:where([data-theme="dark"], [data-theme="dark"] *)` matches any dark ancestor.
 
@@ -51,24 +55,61 @@ const ModePanel = ({ mode, children }) => (
   </div>
 );
 
+// Only in Claude Design, and only for synced cards and proposals: local renders (/design sync
+// grading, design-loop screenshots), ?story= captures and the designs Claude Design builds stay as is.
+const designNavRoot = () => {
+  if (!location.hostname.endsWith(".claudeusercontent.com") || new URLSearchParams(location.search).has("story"))
+    return null;
+  const bundle = document.querySelector('script[src*="_ds_bundle.js"]');
+  if (!bundle) return null;
+  const root = new URL("./", bundle.src);
+  const path = decodeURIComponent(location.pathname).slice(decodeURIComponent(root.pathname).length);
+  return /^(components|proposals)\//.test(path) ? root : null;
+};
+
+// The navbar's light/dark switch, or null when the page has no navbar.
+const useDesignNavMode = () => {
+  const [mode, setMode] = useState(() => window.designNav?.mode ?? null);
+  useEffect(() => {
+    const root = designNavRoot();
+    if (!root) return;
+    const onMode = (e) => setMode(e.detail.mode);
+    window.addEventListener("design-nav:mode", onMode);
+    if (window.designNav) setMode(window.designNav.mode);
+    else if (!document.querySelector("script[data-design-nav]")) {
+      const script = document.createElement("script");
+      script.src = new URL("design-nav.js", root).href;
+      script.dataset.designNav = "";
+      document.head.append(script);
+    }
+    return () => window.removeEventListener("design-nav:mode", onMode);
+  }, []);
+  return mode;
+};
+
 // light / dark: set the mode on <html>, as the synced cards and Storybook do.
 // both: keep the page light and render the children in a light and a dark panel.
-export const DesignProvider = ({ mode = "light", children }) => (
-  <ColorScheme mode={mode === "both" ? "light" : mode}>
-    {mode === "both" ? (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-        <ModePanel mode="light">{children}</ModePanel>
-        <ModePanel mode="dark">{children}</ModePanel>
-      </div>
-    ) : (
-      children
-    )}
-  </ColorScheme>
-);
+// With the navbar, its switch picks the mode and "both" shows only that panel.
+export const DesignProvider = ({ mode = "light", children }) => {
+  const navMode = useDesignNavMode();
+  return (
+    <ColorScheme mode={navMode ?? (mode === "both" ? "light" : mode)}>
+      {mode === "both" && !navMode ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+          <ModePanel mode="light">{children}</ModePanel>
+          <ModePanel mode="dark">{children}</ModePanel>
+        </div>
+      ) : (
+        children
+      )}
+    </ColorScheme>
+  );
+};
 ```
 
 Keep `light` (the default) rendering exactly like Storybook: `/design sync` grades each synced
-card against its story, and two panels would not match. Overlays portal to `<body>`, outside the
+card against its story, and two panels or a navbar would not match. Grading renders run
+locally, so the hostname check keeps the navbar out of them. Overlays portal to `<body>`, outside the
 panels, so they follow the page mode.
 
 ## Rendering a proposal locally

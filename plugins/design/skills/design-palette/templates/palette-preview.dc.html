@@ -5,6 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<script src="./design-nav.js"></script>
 </head>
 <body>
 <x-dc>
@@ -21,70 +22,14 @@ input,select,textarea,button{font:inherit;color:inherit}
 </style>
 </helmet>
 
-<header data-screen-label="Navbar" style="position:relative;z-index:20;height:60px;display:flex;align-items:center;gap:clamp(8px,1.6vw,20px);padding:0 20px;background:var(--primary);color:var(--text-on-primary)">
-  <div style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.01em;white-space:nowrap;flex:none">
-    <div style="width:28px;height:28px;border-radius:8px;background:var(--quinary);color:var(--text-on-quinary);display:grid;place-items:center;font-size:14px">{{ titleInitial }}</div>
-    <span>{{ title }}</span>
-  </div>
-  <nav style="display:flex;gap:4px;flex:none;white-space:nowrap">
-    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary);background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Overview</a>
-    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary)" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Projects</a>
-    <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary)" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Reports</a>
-  </nav>
-  <div style="flex:1 1 0;min-width:0"></div>
-  <input size="1" placeholder="Search…" style="min-width:60px;max-width:200px;flex:1 1 200px;height:36px;padding:0 12px;border-radius:8px;border:1px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary));color:var(--text-on-primary);outline:none">
-  <button onClick="{{ toggleMode }}" style="height:36px;padding:0 12px;border-radius:8px;border:1px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:transparent;color:var(--text-on-primary);cursor:pointer;white-space:nowrap;flex:none" style-hover="background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">{{ modeLabel }}</button>
-  <button onClick="{{ openExport }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--secondary-strong);background:var(--secondary);color:var(--text-on-secondary);font-weight:600;cursor:pointer;white-space:nowrap;flex:none" style-hover="background:var(--secondary-hover)">Export tokens</button>
-  <div style="position:relative">
-    <button onClick="{{ toggleUserMenu }}" style="width:36px;height:36px;border-radius:50%;border:2px solid color-mix(in oklab, var(--text-on-primary) 30%, var(--primary));background:var(--quaternary);color:var(--text-on-quaternary);font-weight:600;font-size:12px;cursor:pointer" style-hover="background:var(--quaternary-strong)">JD</button>
-    <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;right:0;top:46px;z-index:40;width:220px;padding:6px;border-radius:12px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);box-shadow:0 12px 32px -8px var(--shadow)">
-        <div style="padding:8px 10px 10px;border-bottom:1px solid var(--bg-hover);margin-bottom:4px">
-          <div style="font-weight:600">Jane Doe</div>
-          <div style="font-size:12px;color:var(--text-muted)">jane@example.com</div>
-        </div>
-        <div style="padding:8px 10px;border-radius:8px;cursor:pointer" style-hover="background:var(--bg-hover)">Profile</div>
-        <div style="padding:8px 10px;border-radius:8px;cursor:pointer" style-hover="background:var(--bg-hover)">Settings</div>
-        <div style="padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--danger-text)" style-hover="background:var(--danger-bg)">Sign out</div>
-      </div>
-    </sc-if>
-  </div>
-</header>
-
-<div style="display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 60px)">
-  <aside data-screen-label="Sidebar" style="padding:20px 12px;background:var(--bg-inset);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:24px">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <div style="padding:0 10px 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Workspace</div>
-      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">
-        <button onClick="{{ n.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;text-align:left;cursor:pointer;background:{{ n.bg }};color:{{ n.fg }};font-weight:{{ n.weight }}" style-hover="background:var(--bg-hover)">
-          <span style="width:8px;height:8px;border-radius:2px;background:{{ n.dot }}"></span>{{ n.label }}
-        </button>
-      </sc-for>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;padding:0 10px">
-      <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Theme</div>
-      <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Preset
-        <select value="{{ presetKey }}" onChange="{{ onPreset }}" style="height:36px;padding:0 10px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none">
-          <option value="project">Project inputs</option>
-          <option value="plum">Coolors · Plum (5)</option>
-          <option value="triad">Three-color (3)</option>
-          <option value="twoTone">Two-tone (2)</option>
-        </select>
-      </label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:9px;background:var(--bg-hover)">
-        <button onClick="{{ setLight }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ lightBg }};font-weight:500" style-hover="background:var(--border)">Light</button>
-        <button onClick="{{ setDark }}" style="height:30px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:{{ darkBg }};font-weight:500" style-hover="background:var(--border)">Dark</button>
-      </div>
-      <p style="margin:0;font-size:12px;color:var(--text-muted);text-wrap:pretty">Click any base swatch to try a color for the current mode. Swatch edits are a sandbox: to keep them, copy the Inputs JSON from Export tokens into the card's inputs prop.</p>
-    </div>
-  </aside>
-
-  <main style="padding:32px clamp(16px,4vw,48px) 80px;display:flex;flex-direction:column;gap:48px;min-width:0">
-    <section id="palette" data-screen-label="Palette" style="display:flex;flex-direction:column;gap:28px;max-width:1120px">
+<main style="width:100%;max-width:1216px;margin:0 auto;padding:32px clamp(16px,4vw,48px) 80px;display:flex;flex-direction:column;gap:48px;min-width:0">
+    <section id="palette" data-screen-label="Palette" data-nav-section="Palette" style="display:flex;flex-direction:column;gap:28px;max-width:1120px">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div>
+          <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">{{ title }}</div>
           <h1 style="margin:0;font-size:28px;letter-spacing:-0.02em">Palette</h1>
           <p style="margin:4px 0 0;color:var(--text-muted);max-width:60ch;text-wrap:pretty">Each color has five steps ordered by contrast against the background: faint, soft, base, strong, intense. The names mean the same thing in light and dark mode.</p>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);max-width:60ch;text-wrap:pretty">Click any base swatch to try a color for the current mode. Edits are shared with the Palette footer on every card of the project; to keep them, use its Copy request and paste it in Claude Design's chat.</p>
         </div>
         <button onClick="{{ openExport }}" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Export CSS</button>
       </div>
@@ -191,7 +136,7 @@ input,select,textarea,button{font:inherit;color:inherit}
       </div>
     </section>
 
-    <section id="components" data-screen-label="Components" style="display:flex;flex-direction:column;gap:20px;max-width:1120px">
+    <section id="components" data-screen-label="Components" data-nav-section="Components" style="display:flex;flex-direction:column;gap:20px;max-width:1120px">
       <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Components</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px">
         <div style="padding:20px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:16px">
@@ -266,104 +211,7 @@ input,select,textarea,button{font:inherit;color:inherit}
         </div>
       </div>
     </section>
-
-    <section id="forms" data-screen-label="Forms and lists" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:20px;max-width:1120px">
-      <form onSubmit="{{ onSubmit }}" style="padding:24px;border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;gap:16px">
-        <div>
-          <div style="font-weight:600;font-size:16px">New project</div>
-          <div style="color:var(--text-muted);font-size:13px">Form controls use the primary color for focus and selection.</div>
-        </div>
-        <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Project name
-          <input placeholder="e.g. Spring campaign" style="height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)">
-        </label>
-        <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Description
-          <textarea rows="3" placeholder="What is this project about?" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none;resize:vertical" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)"></textarea>
-        </label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <label style="display:flex;flex-direction:column;gap:6px;font-weight:500">Visibility
-            <select style="height:38px;padding:0 10px;border-radius:8px;border:1px solid var(--border-input);background:var(--bg-elevated);outline:none" style-focus="border-color:var(--primary);box-shadow:0 0 0 3px var(--focus-ring)">
-              <option>Private</option><option>Team</option><option>Public</option>
-            </select>
-          </label>
-          <div style="display:flex;flex-direction:column;gap:6px;font-weight:500;position:relative">Owner
-            <button type="button" onClick="{{ toggleOwner }}" style="height:38px;padding:0 10px;border-radius:8px;border:1px solid {{ ownerBorder }};background:var(--bg-elevated);display:flex;align-items:center;gap:8px;cursor:pointer;text-align:left" style-hover="background:var(--bg-hover)">
-              <span style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;background:{{ owner.bg }};color:{{ owner.fg }}">{{ owner.initials }}</span>
-              <span style="flex:1">{{ owner.name }}</span>
-              <span style="color:var(--text-muted);font-size:10px">▼</span>
-            </button>
-            <sc-if value="{{ ownerOpen }}" hint-placeholder-val="{{ false }}">
-              <div style="position:absolute;left:0;right:0;top:68px;z-index:40;padding:4px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border);box-shadow:0 12px 32px -8px var(--shadow);font-weight:400">
-                <sc-for list="{{ members }}" as="m" hint-placeholder-count="4">
-                  <div onClick="{{ m.onPick }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:7px;cursor:pointer;background:{{ m.rowBg }}" style-hover="background:var(--bg-hover)">
-                    <span style="width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;background:{{ m.bg }};color:{{ m.fg }}">{{ m.initials }}</span>
-                    <span style="flex:1">{{ m.name }}</span>
-                    <span style="color:var(--primary-text)">{{ m.check }}</span>
-                  </div>
-                </sc-for>
-              </div>
-            </sc-if>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="font-weight:500">Template</div>
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" defaultChecked="" style="accent-color:var(--primary);margin:0">Blank</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" style="accent-color:var(--primary);margin:0">Kanban</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="tpl" style="accent-color:var(--primary);margin:0">Roadmap</label>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" defaultChecked="" style="accent-color:var(--primary);width:16px;height:16px;margin:0">Notify members</label>
-          <button type="button" onClick="{{ toggleSwitch }}" style="display:flex;align-items:center;gap:8px;border:0;background:transparent;cursor:pointer;padding:0">
-            <span style="position:relative;width:36px;height:20px;border-radius:999px;background:{{ switchBg }};transition:background .15s">
-              <span style="position:absolute;top:2px;left:{{ switchX }};width:16px;height:16px;border-radius:50%;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s"></span>
-            </span>Archive when done
-          </button>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
-          <button type="button" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);font-weight:600;cursor:pointer" style-hover="background:var(--bg-hover)">Cancel</button>
-          <button type="submit" style="height:38px;padding:0 16px;border-radius:8px;border:1px solid var(--primary-strong);background:var(--primary);color:var(--text-on-primary);font-weight:600;cursor:pointer" style-hover="background:var(--primary-hover)">Create project</button>
-        </div>
-      </form>
-
-      <div style="border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);display:flex;flex-direction:column;overflow:hidden;align-self:start">
-        <div style="display:flex;align-items:center;gap:8px;padding:16px 20px;border-bottom:1px solid var(--bg-hover)">
-          <div style="font-weight:600;font-size:16px;flex:1">Recent projects</div>
-          <span style="padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--secondary-bg);color:var(--secondary-text)">{{ projectCount }}</span>
-        </div>
-        <sc-for list="{{ projects }}" as="p" hint-placeholder-count="5">
-          <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;border-bottom:1px solid var(--bg-inset);background:{{ p.rowBg }};box-shadow:{{ p.rowEdge }}" style-hover="background:var(--bg-inset)">
-            <span style="width:36px;height:36px;border-radius:9px;display:grid;place-items:center;font-weight:700;flex:none;background:{{ p.bg }};color:{{ p.fg }}">{{ p.initial }}</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-weight:600">{{ p.name }}</div>
-              <div style="font-size:12px;color:var(--text-muted)">{{ p.meta }}</div>
-            </div>
-            <span style="padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;background:{{ p.badgeBg }};color:{{ p.badgeFg }}">{{ p.statusLabel }}</span>
-          </div>
-        </sc-for>
-      </div>
-    </section>
-    <section id="stories" data-screen-label="Storybook" style="display:flex;flex-direction:column;gap:16px;max-width:1120px">
-      <div>
-        <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Your components</h2>
-        <p style="margin:4px 0 0;color:var(--text-muted);max-width:60ch;text-wrap:pretty">Live Storybook stories. Palette edits on this page are pushed into each story.</p>
-      </div>
-      <sc-if value="{{ hasStories }}" hint-placeholder-val="{{ false }}">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px">
-          <sc-for list="{{ storyFrames }}" as="sf" hint-placeholder-count="2">
-            <div style="border-radius:12px;border:1px solid var(--border);background:var(--bg-elevated);overflow:hidden;display:flex;flex-direction:column">
-              <div style="padding:8px 12px;border-bottom:1px solid var(--border);font:500 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">{{ sf.id }}</div>
-              <iframe data-palette-story="1" src="{{ sf.src }}" title="{{ sf.id }}" onLoad="{{ onStoryLoad }}" style="width:100%;height:260px;border:0;background:var(--bg)"></iframe>
-            </div>
-          </sc-for>
-        </div>
-      </sc-if>
-      <sc-if value="{{ noStories }}" hint-placeholder-val="{{ true }}">
-        <div style="padding:20px;border-radius:12px;border:1px dashed var(--border-strong);color:var(--text-muted);text-wrap:pretty">Set storybookUrl and stories in Tweaks to preview your real components here. The Storybook needs the palette bridge (design-palette/templates/storybook-theme-bridge.ts) in its preview file.</div>
-      </sc-if>
-    </section>
-  </main>
-</div>
+</main>
 
 <sc-if value="{{ anyPopover }}" hint-placeholder-val="{{ false }}">
   <div onClick="{{ closeAll }}" style="position:fixed;inset:0;z-index:15"></div>
@@ -409,7 +257,7 @@ input,select,textarea,button{font:inherit;color:inherit}
   </div>
 </sc-if>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;storybookUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;stories&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
 const BRAND = ['primary','secondary','tertiary','quaternary','quinary'];
 const FALLBACK = { tertiary:'primary', quaternary:'secondary', quinary:'primary' };
 const PRESETS = {
@@ -574,14 +422,6 @@ function buildMobileCss(p) {
   return L.join('\n');
 }
 
-const PROJECTS = [
-  { name:'Northwind redesign', meta:'Updated 2h ago · 12 tasks', status:'success', label:'On track' },
-  { name:'Q4 onboarding flow', meta:'Updated yesterday · 8 tasks', status:'warning', label:'At risk' },
-  { name:'Billing migration', meta:'Updated 3 days ago · 21 tasks', status:'danger', label:'Blocked' },
-  { name:'Help center refresh', meta:'Updated last week · 5 tasks', status:'info', label:'In review' },
-  { name:'Mobile nav audit', meta:'Updated last week · 3 tasks', status:'success', label:'On track' }
-];
-const MEMBERS = [['Jane Doe','JD'],['Sam Park','SP'],['Leah Ortiz','LO'],['Omar Haddad','OH']];
 const MESSAGES = { info:'A new version of the palette is available.', danger:'Two colors fail contrast on buttons.', success:'Tokens exported to your clipboard.', warning:'Quinary falls back to primary.' };
 const NEUTRAL_MAP = {
   'bg': 'background input', 'bg-elevated': 'lighter than bg (literal)', 'bg-inset': 'darker than bg (literal)',
@@ -595,13 +435,23 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     const preset = props.preset ?? (hasInputs(props.inputs) ? 'project' : 'plum');
-    this.state = { mode: props.mode ?? 'light', preset, pal: this.palFor(preset), pop:null, modal:null, owner:0, selected:0, sw:true, nav:'palette', copied:false, tab:'web', auditAll:false };
+    const shared = preset === 'project' && window.designNav?.palette;
+    this.state = { mode: window.designNav?.mode ?? props.mode ?? 'light', preset, pal: shared ? fromInputs(shared) : this.palFor(preset), pop:null, modal:null, copied:false, tab:'web', auditAll:false };
+    // The shared navbar (design-nav.js) owns the light/dark switch and the palette draft its footer edits; follow both.
+    this.onNavMode = e => this.setState({ mode: e.detail.mode });
+    this.onNavPalette = e => { const o = e.detail.inputs; if (this.state.preset === 'project' && o && JSON.stringify(o) !== JSON.stringify(toInputs(this.state.pal))) this.setState({ pal: fromInputs(o) }); };
   }
   palFor(key) { return key === 'project' && hasInputs(this.props.inputs) ? fromInputs(this.props.inputs) : fromPreset(key === 'project' ? 'plum' : key); }
-  componentDidMount() { this.inject(); }
+  componentDidMount() {
+    this.inject();
+    window.addEventListener('design-nav:mode', this.onNavMode);
+    window.addEventListener('design-nav:palette', this.onNavPalette);
+    if (window.designNav && window.designNav.mode !== this.state.mode) this.setState({ mode: window.designNav.mode });
+  }
+  componentWillUnmount() { window.removeEventListener('design-nav:mode', this.onNavMode); window.removeEventListener('design-nav:palette', this.onNavPalette); }
   componentDidUpdate(prev) {
     if (prev.preset !== this.props.preset || prev.inputs !== this.props.inputs) { const preset = this.props.preset ?? (hasInputs(this.props.inputs) ? 'project' : 'plum'); this.setState({ preset, pal: this.palFor(preset) }); }
-    if (prev.mode !== this.props.mode) this.setState({ mode: this.props.mode ?? 'light' });
+    if (prev.mode !== this.props.mode) { const mode = this.props.mode ?? 'light'; if (window.designNav) window.designNav.setMode(mode); else this.setState({ mode }); }
     this.inject();
   }
   inject() {
@@ -610,15 +460,10 @@ class Component extends DCLogic {
     const css = this.webCss();
     if (el.textContent !== css) el.textContent = css;
     document.documentElement.style.colorScheme = this.state.mode;
-    delete document.documentElement.dataset.theme;
-    this.pushToStories();
+    document.documentElement.dataset.theme = this.state.mode;
   }
   webCss() { return buildWebCss(this.state.pal, this.props.prefix ?? '') + '\n\n' + buildSchemeCss(this.state.pal, this.props.prefix ?? ''); }
-  pushToStories() {
-    const msg = { type:'palette:apply', css: this.webCss(), mode: this.state.mode };
-    document.querySelectorAll('iframe[data-palette-story]').forEach(fr => { try { if (fr.contentWindow) fr.contentWindow.postMessage(msg, '*'); } catch (e) {} });
-  }
-  setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) })); }
+  setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) }), () => { if (this.state.preset === 'project') window.designNav?.setPalette?.(toInputs(this.state.pal)); }); }
   row(name, entry, get, extra = {}) {
     const m = this.state.mode, hex = entry[m];
     const set = v => this.setPal(q => { get(q)[m] = v; return q; });
@@ -629,7 +474,6 @@ class Component extends DCLogic {
   }
   renderVals() {
     const s = this.state, p = s.pal;
-    const setMode = mode => this.setState({ mode });
     const n = p.brand.length;
     const brandRows = p.brand.map((e,i) => this.row(BRAND[i], e, q => q.brand[i],
       { canRemove: i === n - 1 && i >= 2, onRemove: () => this.setPal(q => (q.brand.pop(), q)) }));
@@ -641,7 +485,7 @@ class Component extends DCLogic {
     const audit = runAudit(p), bad = audit.filter(c => !c.pass), issuesBy = {};
     bad.filter(c => c.m === s.mode).forEach(c => new Set([famOf(c.fg), famOf(c.bg)]).forEach(k => { issuesBy[k] = (issuesBy[k] || 0) + 1; }));
     groups.forEach(g => g.rows.forEach(r => { const n = issuesBy[r.name] || 0; r.hasIssues = n > 0; r.issueLabel = n + (n > 1 ? ' issues' : ' issue'); }));
-    const cnt = (m, lv) => bad.filter(c => c.m === m && c.level === lv).length, perMode = audit.length / 2;
+    const cnt = (m, lv) => bad.filter(c => c.m === m && c.level === lv).length;
     const shown = (s.auditAll ? audit : bad).slice().sort((x, y) => (x.pass - y.pass) || ((x.level === 'fail' ? 0 : 1) - (y.level === 'fail' ? 0 : 1)));
     const auditItems = shown.map(c => { const st = c.pass ? 'Pass' : c.level === 'fail' ? 'Fail' : 'Warn', tone = c.pass ? 'success' : c.level === 'fail' ? 'danger' : 'warning';
       return { label: c.kind === 'hue' ? '--' + c.fg + ' looks like --' + c.bg : c.kind === 'input' ? '--' + c.fg + ' is very light' : '--' + c.fg + ' on --' + c.bg, note: c.m + ' mode · ' + (c.kind === 'hue' ? 'brand may be mistaken for a status' : c.kind === 'input' ? 'tints and hover will be weak' : c.kind === 'state' ? 'visible state change' : c.kind === 'line' ? 'UI boundary' : c.kind === 'brand' ? 'fill visible on page (advisory)' : 'text'),
@@ -649,12 +493,6 @@ class Component extends DCLogic {
         boxBg: c.kind === 'hue' ? 'linear-gradient(90deg, ' + c.a + ' 50%, ' + c.b + ' 50%)' : c.kind === 'state' ? 'linear-gradient(90deg, ' + c.b + ' 50%, ' + c.a + ' 50%)' : c.kind === 'brand' ? c.b : c.b, boxFg: c.a, boxBorder: c.kind === 'line' ? '2px solid ' + c.a : '1px solid var(--border)',
         sample: c.kind === 'text' ? 'Aa' : c.kind === 'brand' ? '●' : '' }; });
     const fam = k => ({ bg:'var(--' + k + ')', fg:'var(--text-on-' + k + ')', faint:'var(--' + k + '-bg)', soft:'var(--' + k + '-border)', strong:'var(--' + k + '-strong)', raised:'var(--' + k + '-text)' });
-    const members = MEMBERS.map(([name, initials], i) => ({ name, initials, ...fam(BRAND[i % 5]),
-      rowBg: i === s.owner ? 'var(--primary-bg)' : 'transparent', check: i === s.owner ? '✓' : '',
-      onPick: () => this.setState({ owner:i, pop:null }) }));
-    const navDefs = [['palette','Palette'],['components','Components'],['forms','Forms & lists'],['stories','Your components']];
-    const sbUrl = (this.props.storybookUrl ?? '').replace(/\/$/, ''), ids = (this.props.stories ?? '').split(',').map(x => x.trim()).filter(Boolean);
-    const storyFrames = sbUrl ? ids.map(id => ({ id, src: sbUrl + '/iframe.html?id=' + encodeURIComponent(id) + '&viewMode=story' })) : [];
     const closeAll = () => this.setState({ pop:null });
     const css = s.tab === 'web' ? this.webCss() : s.tab === 'mobile' ? buildMobileCss(p) : JSON.stringify(toInputs(p), null, 2);
     return {
@@ -662,18 +500,7 @@ class Component extends DCLogic {
       inputsTabBg: s.tab === 'inputs' ? 'var(--bg-elevated)' : 'transparent', setInputsTab: () => this.setState({ tab:'inputs', copied:false }),
       webTabBg: s.tab === 'web' ? 'var(--bg-elevated)' : 'transparent', mobileTabBg: s.tab === 'mobile' ? 'var(--bg-elevated)' : 'transparent',
       setWeb: () => this.setState({ tab:'web', copied:false }), setMobile: () => this.setState({ tab:'mobile', copied:false }),
-      modeLabel: s.mode === 'dark' ? 'Light mode' : 'Dark mode', presetKey: s.preset,
-      toggleMode: () => setMode(s.mode === 'dark' ? 'light' : 'dark'),
-      setLight: () => setMode('light'), setDark: () => setMode('dark'),
-      lightBg: s.mode === 'light' ? 'var(--bg-elevated)' : 'transparent',
-      darkBg: s.mode === 'dark' ? 'var(--bg-elevated)' : 'transparent',
-      onPreset: e => { const preset = e.target.value; this.setState({ preset, pal: this.palFor(preset) }); },
-      navItems: navDefs.map(([id,label], i) => ({ label,
-        bg: s.nav === id ? 'var(--primary-bg)' : 'transparent', fg: s.nav === id ? 'var(--primary-text)' : 'var(--text)',
-        weight: s.nav === id ? 600 : 400, dot: 'var(--' + BRAND[i] + ')',
-        onClick: () => { this.setState({ nav:id }); const el = document.getElementById(id); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 84, behavior:'smooth' }); } })),
-      storyFrames, hasStories: storyFrames.length > 0, noStories: storyFrames.length === 0, onStoryLoad: () => this.pushToStories(),
-      title: this.props.title || 'Palette', titleInitial: (this.props.title || 'Palette').trim().charAt(0).toUpperCase(),
+      title: this.props.title || 'Palette',
       groups, auditItems, auditEmpty: auditItems.length === 0,
       auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + audit.filter(c => c.m === 'light').length + ' light / ' + audit.filter(c => c.m === 'dark').length + ' dark checks',
       auditToggleLabel: s.auditAll ? 'Show issues only' : 'Show all checks', toggleAuditAll: () => this.setState(st => ({ auditAll: !st.auditAll })),
@@ -690,21 +517,8 @@ class Component extends DCLogic {
         ] })),
       brandList: p.brand.map((_,i) => ({ label: cap(BRAND[i]), ...fam(BRAND[i]), hov: 'var(--' + BRAND[i] + '-hover)' })),
       statusList: Object.keys(p.status).map(k => ({ label: cap(k), message: MESSAGES[k], ...fam(k), hov: 'var(--' + k + '-hover)' })),
-      members, owner: members[s.owner], ownerOpen: s.pop === 'owner',
-      ownerBorder: s.pop === 'owner' ? 'var(--primary)' : 'var(--border-input)',
-      toggleOwner: () => this.setState(st => ({ pop: st.pop === 'owner' ? null : 'owner' })),
-      userMenuOpen: s.pop === 'user', toggleUserMenu: () => this.setState(st => ({ pop: st.pop === 'user' ? null : 'user' })),
       infoPopOpen: s.pop === 'info', toggleInfoPop: () => this.setState(st => ({ pop: st.pop === 'info' ? null : 'info' })),
       anyPopover: !!s.pop, closeAll,
-      switchBg: s.sw ? 'var(--primary)' : 'var(--border-strong)', switchX: s.sw ? '18px' : '2px',
-      toggleSwitch: () => this.setState(st => ({ sw: !st.sw })),
-      onSubmit: e => e.preventDefault(),
-      projectCount: PROJECTS.length,
-      projects: PROJECTS.map((pr,i) => ({ name: pr.name, meta: pr.meta, statusLabel: pr.label, initial: pr.name[0], ...fam(BRAND[i % 5]),
-        badgeBg: 'var(--' + pr.status + '-bg)', badgeFg: 'var(--' + pr.status + '-text)',
-        rowBg: i === s.selected ? 'var(--primary-bg)' : 'transparent',
-        rowEdge: i === s.selected ? 'inset 3px 0 0 var(--primary)' : 'none',
-        onClick: () => this.setState({ selected:i }) })),
       confirmOpen: s.modal === 'confirm', exportOpen: s.modal === 'export',
       openConfirm: () => this.setState({ modal:'confirm', pop:null }),
       openExport: () => this.setState({ modal:'export', pop:null, copied:false }),

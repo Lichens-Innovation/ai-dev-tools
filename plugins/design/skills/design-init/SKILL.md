@@ -62,31 +62,22 @@ this skill produces must satisfy the preconditions in §6.
 
 6. **Seed the palette card.** Copy
    [`palette-preview.dc.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/palette-preview.dc.html)
-   to `/tmp/design-init/palette.html`, then write the repo's inputs and name into it and generate
-   the project thumbnail:
+   to `/tmp/design-init/palette.html` and
+   [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js) (the navbar
+   and card sidebar the project's cards share) to `/tmp/design-init/design-nav.js`, then write
+   the repo's inputs and name into the card and generate the project thumbnail:
 
    ```bash
    node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --to-card /tmp/design-init/palette.html \
      --title "<repo name>" --thumbnail /tmp/design-init/thumbnail.html
    ```
 
-   Also set the `default` of its `storybookUrl` and `stories` props (see
-   [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)).
-   `storybookUrl` is the Chromatic branch permalink of the web target when `chromatic-init` ran
-   and the Chromatic project is public (`https://<branch>--<appId>.chromatic.com`, `appId` from
-   its baseline build URL, `<branch>` the default branch once it has been published, else the
-   baseline build's branch). To check, request `<permalink>/iframe.html` (for example
-   `curl -s -o /dev/null -w '%{http_code}' <permalink>/iframe.html`): `401` means private.
-   Otherwise, private project or no Chromatic, use that target's local `url`
-   (`http://localhost:6006`). A private permalink redirects the frame to Chromatic's login,
-   which refuses to be embedded, so the stories never load. The permalink works for anyone
-   opening the card; localhost only on the machine running Storybook.
-
-   Upload the card and the thumbnail to the project root: the Pages list only shows root files,
-   and the Design System view labels each card by its file name. `DesignSync finalize_plan`
-   (`writes: ["Palette.dc.html", "thumbnail.html"]`, `deletes: []`, `localDir: /tmp/design-init`),
-   then `DesignSync write_files` with that `planId` and
-   `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   Upload the card, the navbar and the thumbnail to the project root: the Pages list only shows
+   root files, and the Design System view labels each card by its file name. `DesignSync
+finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`,
+   `deletes: []`, `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId`
+   and `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   `{ path: "design-nav.js", localPath: "design-nav.js" }`,
    `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
    reports a project without a root `thumbnail.html`. It is generated from the inputs: never
    hand-edit it, and replace one Claude Design created by itself.
@@ -96,12 +87,6 @@ this skill produces must satisfy the preconditions in §6.
    Design tool's `create_support_js` (`path: "support.js"`, under that tool's own
    `finalize_plan`). DesignSync cannot write it, because its content is server-provided. Never
    overwrite an existing `support.js`.
-
-   For web Storybooks, copy
-   [`storybook-theme-bridge.ts`](${CLAUDE_SKILL_DIR}/../design-palette/templates/storybook-theme-bridge.ts)
-   into each target's `.storybook/`, import it from `preview.ts`, and set
-   `ALLOWED_ORIGINS = ["https://<designProjectId>.claudeusercontent.com"]` with the id from
-   step 4. List that exact origin; never a wildcard for all of `claudeusercontent.com`.
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
@@ -139,7 +124,7 @@ this skill produces must satisfy the preconditions in §6.
      `/design sync` run; it only adds what changed.
    - Set up proposals ([`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md)), once
      the first sync has written its wrapper package: give its design provider the side-by-side
-     `mode="both"`, add the proposal conventions to its readme header (`readmeHeader` in its
+     `mode="both"` and the shared navbar hook, add the proposal conventions to its readme header (`readmeHeader` in its
      config), and ask the user to run `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
