@@ -20,7 +20,8 @@ ask Claude Design to update `inputs` (or paste the card's **Export → Inputs JS
 2. Set the `default` of the other props (the HTML-escaped `data-props` JSON on its
    `<script data-dc-script>` tag):
    - `storybookUrl`: the Chromatic branch permalink `https://<branch>--<appId>.chromatic.com`
-     when the target publishes to Chromatic, otherwise `http://localhost:6006`
+     when the target publishes to a public Chromatic project, otherwise `http://localhost:6006`
+     (a private permalink answers `401` and cannot be embedded)
    - `stories`: comma-separated story ids from `design.manifest.json` (`components[].storyId`)
 3. Upload it to the bound project's root as `Palette.dc.html` (`DesignSync finalize_plan`, then
    `write_files`). The Pages list only shows root files, and the Design System view labels each
@@ -66,11 +67,13 @@ republish.
 
 - React Native on-device Storybook cannot be embedded. Mobile targets built with
   `@storybook/react-native-web-vite` (web build) work like web targets.
-- Browsers may block embedding `http://localhost` from an https page (private network access).
-  Prefer the Chromatic permalink for shared cards.
-- The permalink shows the last published build, not unpublished story edits. On a private
-  Chromatic project, viewers may need a Chromatic login, which browsers can block inside an
-  embedded frame; check once that stories load in the card.
+- `http://localhost` only works on the machine running Storybook, and Chrome may ask for
+  local network access before loading it. Use a public Chromatic permalink for shared cards.
+- The permalink shows the last published build, not unpublished story edits.
+- A private Chromatic project cannot be embedded: the permalink redirects to Chromatic's login
+  page, which sends `X-Frame-Options: SAMEORIGIN` (Firefox: "will not allow Firefox to display
+  the page"). Logging in elsewhere does not help, since the frame's cookies are third-party. Use
+  localhost, make the project public, or host the Storybook publicly.
 - Deleting or moving a card file can leave a stale "file not found" entry in the Design System
   view (Claude Design keeps it in its generated `_ds_manifest.json`). Upload the card at its
   final path the first time.
