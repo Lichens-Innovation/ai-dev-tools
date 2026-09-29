@@ -1,6 +1,6 @@
 ---
 name: design-loop
-description: "Runs the Claude Design -> React implementation loop: reads an approved design target from a Claude Design project, implements it in the mapped component using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component (or the palette) is ready to implement, asks to sync approved Claude Design changes into code, or wants to run the design loop."
+description: "Runs the Claude Design -> React implementation loop: reads an approved component proposal (or the palette card) from a Claude Design project, implements it in the mapped component using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component (or the palette) is ready to implement, asks to sync approved Claude Design changes into code, or wants to run the design loop."
 disable-model-invocation: true
 ---
 
@@ -13,14 +13,15 @@ code. Assumes the project was already set up with `design-init`.
 
 Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) first — it
 defines the manifest, the mapping, the approval signal, and the reconciliation rules this skill
-depends on. Do not re-derive them here.
+depends on. Do not re-derive them here. Components change through proposals:
+[`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md).
 
 ## Tools this skill drives
 
 | Purpose                              | Mechanism                                            |
 | ------------------------------------ | ---------------------------------------------------- |
 | Read approved set + write back state | Read/Write on `design.manifest.json`                 |
-| Read design target                   | `DesignSync get_file` (projectId + `designPath`)     |
+| Read design target                   | `DesignSync get_file` (`proposalPath`, palette card) |
 | Read component API                   | Storybook MCP `docs-show`                            |
 | Which stories changed                | Storybook MCP `stories-changed`                      |
 | Render for comparison                | `scripts/screenshot.mjs` (Playwright)                |
@@ -57,8 +58,9 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 1. `Read` `design.manifest.json`. Note `designProjectId` and `reconcileRule`.
 2. Filter to components with `status == "approved"`. Treat the manifest's `palette` entry
    (contract §2) as one more item with the same fields.
-3. For each approved component, determine **drift**: `DesignSync get_file` on its `designPath`,
-   write the exact returned bytes to a temp file, and hash them:
+3. For each approved component, determine **drift**: `DesignSync get_file` on its
+   `proposalPath` (for the palette: its `designPath`, the card), write the exact returned bytes
+   to a temp file, and hash them:
 
    ```bash
    shasum -a 256 /tmp/design-loop/<name>.target.html | cut -d' ' -f1
@@ -66,7 +68,9 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 
    A component is **stale** (needs work) when this hash differs from `lastImplementedHash`
    (including when `lastImplementedHash` is `null`). Skip components whose hash matches — they're
-   already implemented from the current target.
+   already implemented from the current target. An approved component whose proposal does not
+   exist (or has no `proposalPath`) has nothing to implement: report it and skip it. Never read
+   its synced card (`designPath`) as a target; it only mirrors the code.
 
 4. If nothing is stale, tell the user everything approved is up to date and stop.
 
@@ -116,8 +120,21 @@ task = component, no per-substep subtasks). Then process each task: set it `in_p
 
 ### 3. Read the target
 
-You already fetched it in step 1 (`/tmp/design-loop/<name>.target.html`). This standalone preview
-card holds the exact HTML/CSS — colors, spacing, radii, type — the design converged on.
+You already fetched it in step 1 (`/tmp/design-loop/<name>.target.html`). A proposal renders the
+**synced** component (the current code) and applies the change on top, as page-local CSS
+overrides and/or props. The change is exactly those overrides and props:
+
+- List each override: its selector, what it matches in the synced component (the compiled
+  classes come from `localPath`, e.g. `bg-button-surface` → the primary variant) and its values.
+- Check the scope against what the proposal says it changes (title, notes). When a selector
+  matches more than that (other variants, states, sizes), ask which one is meant.
+- Look at both modes: proposals show a light and a dark panel. A change that only looks right in
+  one mode is a finding to raise, not to guess.
+
+Stage the render for step 7: copy the local `/design sync` output folder (`ds-bundle/`) to
+`/tmp/design-loop/project/`, check its `_ds_sync.json` `bundleSha12` against the project's
+(`DesignSync get_file _ds_sync.json`; a mismatch means run `/design sync` first), and write the
+target to `/tmp/design-loop/project/<proposalPath>` so its relative links resolve.
 
 ### 4. Read the system
 
@@ -126,7 +143,7 @@ token usage. Implement **within** this API; do not invent props or restructure t
 
 ### 5. Reconcile tokens (into canonical CSS)
 
-Extract the concrete values from the target and map them onto the **canonical CSS palette** per
+Take the values from the proposal's overrides and map them onto the **canonical CSS palette** per
 `reconcileRule` (contract §5):
 
 - `canonical-wins` (default): snap each value to the nearest existing **semantic** token. If a
@@ -139,14 +156,16 @@ changes.
 
 ### 6. Edit the component
 
-Update `localPath` to consume the tokens. Match the surrounding code style, naming, and idioms.
+Update `localPath` to consume the tokens. Express each override in the component's own terms (the
+variant map, a prop, a token), scoped like the proposal, not as a copied selector. Match the
+surrounding code style, naming, and idioms.
 
 ### 7. See & converge (the visual loop)
 
 1. Screenshot the **design target**:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs /tmp/design-loop/<name>.target.html /tmp/design-loop/<name>.target.png
+   node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs /tmp/design-loop/project/<proposalPath> /tmp/design-loop/<name>.target.png
    ```
 
 2. Find the changed stories: the target's Storybook MCP `stories-changed` → the `storyId`s
@@ -163,7 +182,8 @@ Update `localPath` to consume the tokens. Match the surrounding code style, nami
    ```
 
 4. `Read` both PNGs and compare them visually — colors, spacing, radii, type scale, states.
-   Judge convergence against the target. (Optionally add an objective delta with a pixel-diff
+   Judge convergence against the target, in each mode the proposal shows (screenshot the story
+   in dark too when the Storybook has a theme toolbar or a dark story). (Optionally add an objective delta with a pixel-diff
    tool, but the primary judge is your visual read of both images.)
 
 5. If they don't match, go back to **step 6**, adjust, and re-screenshot. Loop 6→7 until the
@@ -195,7 +215,10 @@ component untouched. Mark the task `completed`.
 ### 11. Report
 
 Per component: what changed, tokens added or snapped, test result, Chromatic build URL. Summarize
-which approved components were implemented and which were already up to date.
+which approved components were implemented, which were already up to date, and which had no
+proposal. Then tell the user to run `/design sync`: the synced catalog still shows the old code
+until then. Keep the proposal; its hash is now `lastImplementedHash`, so a later edit to it is the
+next change. Never delete or edit it from here.
 
 ---
 
@@ -205,6 +228,9 @@ which approved components were implemented and which were already up to date.
 - A target value has no close token under `canonical-wins` → stop, ask before adding a token.
 - The render won't converge because the target uses something outside the token system → stop and
   raise it (contract §5) instead of hard-coding a one-off value.
+- A proposal override matches more than the change it describes → stop and ask which part is meant.
+- The local `ds-bundle/` does not match the project's bundle → stop and ask the user to run
+  `/design sync`.
 
 ## Notes
 

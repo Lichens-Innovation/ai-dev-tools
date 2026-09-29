@@ -15,10 +15,11 @@ Change this doc first; then bring the skills into line with it.
               └──────────────────────────────────────────────────────────────┘
 
   1. SYNC UP    canonical CSS + component catalog ──/design sync──▶ Claude Design project
-  2. EXPLORE    you + claude.ai/design iterate palette / component look (fast, no source churn)
+  2. EXPLORE    you + claude.ai/design iterate the palette card and component proposals
+                (proposals/<name>.html: the synced component + the change; fast, no source churn)
   3. APPROVE    you flip a component (or the palette) to `status: approved` in the manifest
   ── IMPLEMENT (design-loop, in a Claude Code session) ───────────────────────────────
-     a. READ TARGET   DesignSync get_file → exact HTML/CSS values from the Design project
+     a. READ TARGET   DesignSync get_file → the proposal (or palette card) from the Design project
      b. READ SYSTEM   Storybook MCP docs-show → real props / stories / token usage
      c. RECONCILE     apply new values to the CANONICAL CSS (tokens = source of truth)
      d. EDIT          update component code to consume the tokens
@@ -27,7 +28,8 @@ Change this doc first; then bring the skills into line with it.
      g. CONVERGE      loop d→f until pixels match
      h. VALIDATE      Storybook MCP test-run → a11y + interaction pass
   4. PUBLISH   push to Chromatic → team visual diff / approval
-  5. RESTART   back to step 2 for the next change
+  5. RESYNC    /design sync again, so the synced catalog shows the new code
+  6. RESTART   back to step 2 for the next change
 ```
 
 ### Role split (who owns what)
@@ -35,7 +37,7 @@ Change this doc first; then bring the skills into line with it.
 | Role                                   | Responsibility                                                                                        |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | **Claude Design** (`claude.ai/design`) | Fast, low-stakes exploration of look-and-feel (steps 2–3).                                            |
-| **DesignSync tool**                    | Transport both ways: push catalog up (1), read approved target back (3a).                             |
+| **DesignSync tool**                    | Transport both ways: push catalog up (1, 5), read the approved proposal back (3a).                    |
 | **Storybook MCP**                      | Knowledge + validation: props, stories, changed-set, a11y/interaction tests. Does **not** screenshot. |
 | **Playwright**                         | The eyes — the actual pixels the loop converges against (3f–g).                                       |
 | **Canonical CSS**                      | Single source of truth for token **values and structure**.                                            |
@@ -78,6 +80,7 @@ queries. None exist yet — YAGNI.)
       "localPath": "src/components/Button/Button.tsx",
       "storyId": "components-button--default",
       "designPath": "components/ui/Button/Button.html",
+      "proposalPath": "proposals/button.html",
       "status": "wip",
       "lastImplementedHash": null
     }
@@ -95,9 +98,10 @@ queries. None exist yet — YAGNI.)
 | `components[].name`                | Human name; also the label used in the Design catalog card.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `components[].localPath`           | The React source file to edit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `components[].storyId`             | Storybook story id (`<component-id>--<story>`, e.g. `ui-button--default`, never the bare component id), used by the MCP and Playwright to target the render.                                                                                                                                                                                                                                                                                                                                     |
-| `components[].designPath`          | Path of the preview card **inside the Design project** (what `DesignSync get_file` reads). `/design sync` writes `components/<group>/<Name>/<Name>.html`; `null` until the component has a card.                                                                                                                                                                                                                                                                                                 |
+| `components[].designPath`          | The component's **synced** card in the Design project, `components/<group>/<Name>/<Name>.html` from `/design sync`: the reference (how the code looks today). Read only: Claude Design never edits it and every sync overwrites it. `null` until the component has a card.                                                                                                                                                                                                                       |
+| `components[].proposalPath`        | The **proposal** page, `proposals/<kebab-name>.html`: the synced component plus the change, written in Claude Design (see [`proposals.md`](./proposals.md)). The design target `design-loop` implements. `null` until the component has a card; the file may not exist yet.                                                                                                                                                                                                                      |
 | `components[].status`              | `wip` \| `approved`. The approval signal — see §4.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `components[].lastImplementedHash` | Hash of the Design target the last successful implementation was built from. Detects drift.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `components[].lastImplementedHash` | Hash of the proposal (for the palette: the card) the last successful implementation was built from. Detects drift.                                                                                                                                                                                                                                                                                                                                                                               |
 
 `/design sync` pushes the cards up but does not touch the manifest: `design-init` maps each
 `designPath` to its card afterwards. `design-loop` writes `lastImplementedHash` (and never
@@ -159,8 +163,9 @@ Skills always resolve a component's target through these rules — never hardcod
 
 1. **"Which files are approved?"** → the manifest `status` field. Not chat, not a running
    service — the versioned file.
-2. **"Which local component does Design card X correspond to?"** → the `designPath` ↔
-   `localPath`/`storyId` row in the manifest.
+2. **"Which local component does Design card X correspond to?"** → the `designPath` /
+   `proposalPath` ↔ `localPath`/`storyId` row in the manifest. The synced card (`designPath`)
+   mirrors the code; a change is made on the proposal (`proposalPath`), never on the card.
 3. **"What happens when Design invents a value?"** → the reconciliation rule (§5).
 4. **"Where does the palette live?"** → both places, kept equal: the canonical inputs file
    (`palette.localPath`) and the palette card's `inputs` prop (`palette.designPath`).
@@ -250,6 +255,8 @@ changed (approved palette card), copy the new **inputs** into the canonical file
 - Playwright is installed and can screenshot a running Storybook.
 - Chromatic is wired for publish, one project per target.
 - `design.manifest.json` exists and its `designProjectId` resolves via `DesignSync`.
+- The local `/design sync` output (`ds-bundle/`) matches the project: same `bundleSha12` in its
+  `_ds_sync.json` and in the project's. `design-loop` renders proposals against it.
 
 If a precondition is missing, `design-loop` stops and points the user at `design-init` rather
 than guessing.

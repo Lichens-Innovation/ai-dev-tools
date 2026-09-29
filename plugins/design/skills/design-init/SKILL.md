@@ -111,8 +111,9 @@ this skill produces must satisfy the preconditions in §6.
    discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
    id such as `ui-button--default` from the target's `index.json`, not the component id
    `ui-button`: `iframe.html?id=` renders only a story, `designPath`: its synced card, or `null`
-   until the catalog is synced, see step 8). With several Storybook targets, also write
-   `storybooks` and each component's `storybook` key.
+   until the catalog is synced, see step 8, and `proposalPath`: `proposals/<kebab-name>.html`
+   once it has a card, else `null`). With several Storybook targets, also write `storybooks`
+   and each component's `storybook` key.
 
 8. **Prepare `/design sync`.** The built-in `/design sync` skill turns a Storybook target's
    stories into the project's component cards. Hand it what this skill already knows so it
@@ -123,6 +124,9 @@ this skill produces must satisfy the preconditions in §6.
      and `buildCmd` (`cd <dir> && npx storybook build -c .storybook -o <repo>/.design-sync/sb-reference`).
      Seed only these fields. The file belongs to `/design sync`, which fills in the rest (entry,
      provider, title map, card overrides), and its format may change with Claude Code.
+   - Tell `/design sync` to leave out Tailwind's `--tw-*` custom properties when it extracts
+     tokens; otherwise Claude Design's design-system check reports them as unregistered and
+     unclassified tokens.
    - Git-ignore its local artifacts: `.design-sync/sb-reference/`, `.design-sync/.cache/`,
      `.design-sync/learnings/`, `.design-sync/node_modules`, `.design-sync/pkg/types/`,
      `.design-sync/pkg/node_modules`. Keep `config.json`, `NOTES.md`, `conventions.md` and the
@@ -133,14 +137,19 @@ this skill produces must satisfy the preconditions in §6.
      `Typography` → `Text`, see its `titleMap`). A component it excluded keeps
      `designPath: null` and cannot be approved. Sync other targets later with another
      `/design sync` run; it only adds what changed.
+   - Set up proposals ([`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md)), once
+     the first sync has written its wrapper package: give its design provider the side-by-side
+     `mode="both"`, add the proposal conventions to its readme header (`readmeHeader` in its
+     config), and ask the user to run `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
 
 10. **Report & next steps.** Palette file(s), what each app imports and audit summary,
     Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
     many components have a card. Next: `/design sync` the first target, then re-run
-    `design-init` to map the cards (it only fills what is missing), iterate in Claude Design
-    (palette included), approve, then run `design-loop`.
+    `design-init` to map the cards and set up proposals (it only fills what is missing). Then, in
+    Claude Design, edit the palette card or ask for a component proposal
+    (`proposals/<name>.html`), approve it in the manifest, and run `design-loop`.
 
 ## Notes
 

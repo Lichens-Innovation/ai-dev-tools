@@ -19,7 +19,9 @@ those directly only to (re)configure one piece.
 
 ## Usage
 
-In Claude Code, run `/design-loop`.
+In Claude Design, change the palette card, or ask for a proposal of a component change
+(`proposals/<name>.html`, see [`references/proposals.md`](./references/proposals.md)). Set its
+manifest `status` to `approved`, then in Claude Code run `/design-loop`.
 
 ## Skills
 
@@ -29,7 +31,7 @@ In Claude Code, run `/design-loop`.
 | `design-palette` | Creates or migrates the canonical theme palette (light/dark inputs → scales → semantic tokens), generates one theme shared by web and React Native plus Tailwind utilities, audits contrast, and provides a live palette card for Claude Design. Used by `design-init`. |
 | `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                              |
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                          |
-| `design-loop`    | The runtime skill. Reads the approved target from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic.                                                                                                               |
+| `design-loop`    | The runtime skill. Reads an approved component proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic.                                                                              |
 
 ## The contract
 
