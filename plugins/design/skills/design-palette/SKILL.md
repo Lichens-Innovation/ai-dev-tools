@@ -45,14 +45,16 @@ Read before starting:
    ```
 
    Card sync: `--to-card <card>` writes the inputs into the palette card, `--from-card <card>`
-   takes them from it, `--diff-card <card>` only prints the differences.
+   takes them from it, `--diff-card <card>` only prints the differences. `--title <name>` sets the
+   card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
 
    The script reads every `--name-lm` / `--name-dm` input, regenerates the rest of the file(s),
    and prints the contrast audit. Re-run it after any input change.
 
 6. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input
    change that fixes it (usually nudging that color's lightness) and ask before applying.
-   `WARN` lines are advisory; explain them in one line each.
+   `WARN` lines are advisory; explain them in one line each. Also say which brand slots fall back
+   (e.g. "tertiary and quinary use primary").
 
 7. **Palette card.** When run by `design-init`, stop here: it seeds the Claude Design card and
    reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md). For

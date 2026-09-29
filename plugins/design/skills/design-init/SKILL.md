@@ -56,10 +56,12 @@ this skill produces must satisfy the preconditions in §6.
 
 6. **Seed the palette card.** Copy
    [`palette-preview.dc.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/palette-preview.dc.html)
-   to `/tmp/design-init/palette.html`, then write the repo's inputs into it:
+   to `/tmp/design-init/palette.html`, then write the repo's inputs and name into it and generate
+   the project thumbnail:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --to-card /tmp/design-init/palette.html
+   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --to-card /tmp/design-init/palette.html \
+     --title "<repo name>" --thumbnail /tmp/design-init/thumbnail.html
    ```
 
    Also set the `default` of its `storybookUrl` and `stories` props (see
@@ -70,10 +72,14 @@ this skill produces must satisfy the preconditions in §6.
    that target's local `url` (`http://localhost:6006`). The permalink works for anyone opening
    the card; localhost only on the machine running Storybook.
 
-   Upload the card to the project root: the Pages list only shows root files, and the Design
-   System view labels each card by its file name. `DesignSync finalize_plan`
-   (`writes: ["Palette.dc.html"]`, `deletes: []`, `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId` and
-   `{ path: "Palette.dc.html", localPath: "palette.html" }`.
+   Upload the card and the thumbnail to the project root: the Pages list only shows root files,
+   and the Design System view labels each card by its file name. `DesignSync finalize_plan`
+   (`writes: ["Palette.dc.html", "thumbnail.html"]`, `deletes: []`, `localDir: /tmp/design-init`),
+   then `DesignSync write_files` with that `planId` and
+   `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
+   reports a project without a root `thumbnail.html`. It is generated from the inputs: never
+   hand-edit it, and replace one Claude Design created by itself.
 
    The card only renders with the Design Components runtime `support.js` beside it. Use the
    `list_files` result from step 5: when the root has no `support.js`, write it with the Claude
@@ -89,10 +95,11 @@ this skill produces must satisfy the preconditions in §6.
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
-   `outputs`: the web and/or mobile files from `design-palette` step 1, `designPath: "Palette.dc.html"`, `status: "wip"`, `lastImplementedHash`: `shasum -a 256` of
-   the uploaded card), and a `components[]` row per discovered component (`wip`,
-   `lastImplementedHash: null`). With several Storybook targets, also write `storybooks` and each
-   component's `storybook` key.
+   `outputs`: the web and/or mobile files from `design-palette` step 1,
+   `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
+   `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
+   discovered component (`wip`, `lastImplementedHash: null`). With several Storybook targets, also
+   write `storybooks` and each component's `storybook` key.
 
 8. **Verify preconditions.** Walk contract §6 and list anything still missing.
 

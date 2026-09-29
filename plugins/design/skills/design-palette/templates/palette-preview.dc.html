@@ -23,8 +23,8 @@ input,select,textarea,button{font:inherit;color:inherit}
 
 <header data-screen-label="Navbar" style="position:relative;z-index:20;height:60px;display:flex;align-items:center;gap:clamp(8px,1.6vw,20px);padding:0 20px;background:var(--primary);color:var(--text-on-primary)">
   <div style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.01em;white-space:nowrap;flex:none">
-    <div style="width:28px;height:28px;border-radius:8px;background:var(--quinary);color:var(--text-on-quinary);display:grid;place-items:center;font-size:14px">P</div>
-    <span>Palette Lab</span>
+    <div style="width:28px;height:28px;border-radius:8px;background:var(--quinary);color:var(--text-on-quinary);display:grid;place-items:center;font-size:14px">{{ titleInitial }}</div>
+    <span>{{ title }}</span>
   </div>
   <nav style="display:flex;gap:4px;flex:none;white-space:nowrap">
     <a href="#" style="padding:6px 12px;border-radius:8px;text-decoration:none;color:var(--text-on-primary);background:color-mix(in oklab, var(--text-on-primary) 14%, var(--primary))">Overview</a>
@@ -409,7 +409,7 @@ input,select,textarea,button{font:inherit;color:inherit}
   </div>
 </sc-if>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;storybookUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;stories&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;storybookUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;stories&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Storybook&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
 const BRAND = ['primary','secondary','tertiary','quaternary','quinary'];
 const FALLBACK = { tertiary:'primary', quaternary:'secondary', quinary:'primary' };
 const PRESETS = {
@@ -480,6 +480,12 @@ function runAudit(p) {
       out.push({ m, kind, fg, bg, a, b, need, val, pass: val >= need, level });
     };
     ints.forEach(k => { const lx = hexToLab(r(k))[0]; if (lx > 0.9) out.push({ m, kind:'input', fg:k, bg:'bg', a:r(k), b:r('bg'), need:0.9, val:lx, pass:false, level:'warn' }); });
+    const hueOf = x => { const [, a, b2] = hexToLab(x); return { h: (Math.atan2(b2, a) * 180 / Math.PI + 360) % 360, c: Math.hypot(a, b2), l: hexToLab(x)[0] }; };
+    ints.filter(k => BRAND.includes(k)).forEach(k => Object.keys(p.status).forEach(st => {
+      const A = hueOf(r(k)), B = hueOf(r(st)); if (A.c < 0.04 || B.c < 0.04) return;
+      const dh = Math.min(Math.abs(A.h - B.h), 360 - Math.abs(A.h - B.h)), dl = Math.abs(A.l - B.l);
+      if (dh < 25 && dl < 0.2) out.push({ m, kind:'hue', fg:k, bg:st, a:r(k), b:r(st), need:25, val:dh, pass:false, level:'warn' });
+    }));
     ints.forEach(k => { add('text', k + '-text', k + '-bg', 4.5); add('text', 'text-on-' + k, k, 4.5); add('state', k + '-hover', k, 0.04); add('state', k + '-bg-hover', k + '-bg', 0.04); add('brand', k, 'bg', 3, 'warn'); });
     ['bg','bg-elevated','bg-inset'].forEach(bg => { add('text', 'text', bg, 4.5); add('text', 'text-muted', bg, 4.5); });
     ['bg','bg-elevated'].forEach(bg => { add('text', 'link', bg, 4.5); add('line', 'border-input', bg, 3); add('line', 'focus-ring', bg, 3); });
@@ -554,6 +560,15 @@ function buildWebCss(p, prefix) {
   status.forEach(n => L.push('  --' + n + '-hover: ' + hov(n, true, false) + ';', '  --' + n + '-active: ' + hov(n, true, true) + ';'));
   L.push('  --overlay: ' + ld(mx('black',45,'transparent'), mx('black',65,'transparent')) + ';', '  --shadow: ' + ld(mx(FL,18,'transparent'), mx('black',55,'transparent')) + ';', '}');
   return L.join('\n');
+}
+
+function buildThumbnail(p, title) {
+  const bg = baseHex(p, 'primary', 'light'), fg = baseHex(p, onRef(p, 'primary', 'light') === 'text' ? 'font' : 'font-inverted', 'light');
+  const t = String(title || 'Palette').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const strip = Object.keys(p.status).map(k => '<div style="flex:1;background:' + baseHex(p, k, 'light') + '"></div>').join('');
+  return '<!doctype html>\n<!-- Generated by design-palette/scripts/palette.mjs from the palette inputs. Do not edit. -->\n<html><head><meta charset="utf-8"><title>' + t + '</title>' +
+    '<style>html,body{margin:0;height:100%}body{display:flex;background:' + bg + ';color:' + fg + ';font:700 clamp(32px,12vw,160px)/1 system-ui,sans-serif;letter-spacing:-0.03em}</style></head>' +
+    '<body><div style="flex:1;display:grid;place-items:center;padding:0 6vw;text-align:center">' + t + '</div><div style="width:4vw;display:flex;flex-direction:column">' + strip + '</div></body></html>\n';
 }
 
 function tokensFor(p, m) {
@@ -649,9 +664,9 @@ class Component extends DCLogic {
     const cnt = (m, lv) => bad.filter(c => c.m === m && c.level === lv).length, perMode = audit.length / 2;
     const shown = (s.auditAll ? audit : bad).slice().sort((x, y) => (x.pass - y.pass) || ((x.level === 'fail' ? 0 : 1) - (y.level === 'fail' ? 0 : 1)));
     const auditItems = shown.map(c => { const st = c.pass ? 'Pass' : c.level === 'fail' ? 'Fail' : 'Warn', tone = c.pass ? 'success' : c.level === 'fail' ? 'danger' : 'warning';
-      return { label: c.kind === 'input' ? '--' + c.fg + ' is very light' : '--' + c.fg + ' on --' + c.bg, note: c.m + ' mode · ' + (c.kind === 'input' ? 'tints and hover will be weak' : c.kind === 'state' ? 'visible state change' : c.kind === 'line' ? 'UI boundary' : c.kind === 'brand' ? 'fill visible on page (advisory)' : 'text'),
-        value: c.kind === 'input' ? 'L ' + c.val.toFixed(2) + ' > 0.9' : c.kind === 'state' ? 'ΔL ' + c.val.toFixed(3) + ' / ' + c.need : c.val.toFixed(2) + ':1 / ' + c.need + ':1', status: st, badgeBg: 'var(--' + tone + '-bg)', badgeFg: 'var(--' + tone + '-text)',
-        boxBg: c.kind === 'state' ? 'linear-gradient(90deg, ' + c.b + ' 50%, ' + c.a + ' 50%)' : c.kind === 'brand' ? c.b : c.b, boxFg: c.a, boxBorder: c.kind === 'line' ? '2px solid ' + c.a : '1px solid var(--border)',
+      return { label: c.kind === 'hue' ? '--' + c.fg + ' looks like --' + c.bg : c.kind === 'input' ? '--' + c.fg + ' is very light' : '--' + c.fg + ' on --' + c.bg, note: c.m + ' mode · ' + (c.kind === 'hue' ? 'brand may be mistaken for a status' : c.kind === 'input' ? 'tints and hover will be weak' : c.kind === 'state' ? 'visible state change' : c.kind === 'line' ? 'UI boundary' : c.kind === 'brand' ? 'fill visible on page (advisory)' : 'text'),
+        value: c.kind === 'hue' ? 'Δhue ' + c.val.toFixed(0) + '° < 25°' : c.kind === 'input' ? 'L ' + c.val.toFixed(2) + ' > 0.9' : c.kind === 'state' ? 'ΔL ' + c.val.toFixed(3) + ' / ' + c.need : c.val.toFixed(2) + ':1 / ' + c.need + ':1', status: st, badgeBg: 'var(--' + tone + '-bg)', badgeFg: 'var(--' + tone + '-text)',
+        boxBg: c.kind === 'hue' ? 'linear-gradient(90deg, ' + c.a + ' 50%, ' + c.b + ' 50%)' : c.kind === 'state' ? 'linear-gradient(90deg, ' + c.b + ' 50%, ' + c.a + ' 50%)' : c.kind === 'brand' ? c.b : c.b, boxFg: c.a, boxBorder: c.kind === 'line' ? '2px solid ' + c.a : '1px solid var(--border)',
         sample: c.kind === 'text' ? 'Aa' : c.kind === 'brand' ? '●' : '' }; });
     const fam = k => ({ bg:'var(--' + k + ')', fg:'var(--text-on-' + k + ')', faint:'var(--' + k + '-bg)', soft:'var(--' + k + '-border)', strong:'var(--' + k + '-strong)', raised:'var(--' + k + '-text)' });
     const members = MEMBERS.map(([name, initials], i) => ({ name, initials, ...fam(BRAND[i % 5]),
@@ -678,8 +693,9 @@ class Component extends DCLogic {
         weight: s.nav === id ? 600 : 400, dot: 'var(--' + BRAND[i] + ')',
         onClick: () => { this.setState({ nav:id }); const el = document.getElementById(id); if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 84, behavior:'smooth' }); } })),
       storyFrames, hasStories: storyFrames.length > 0, noStories: storyFrames.length === 0, onStoryLoad: () => this.pushToStories(),
+      title: this.props.title || 'Palette', titleInitial: (this.props.title || 'Palette').trim().charAt(0).toUpperCase(),
       groups, auditItems, auditEmpty: auditItems.length === 0,
-      auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + perMode + ' checks per mode',
+      auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + audit.filter(c => c.m === 'light').length + ' light / ' + audit.filter(c => c.m === 'dark').length + ' dark checks',
       auditToggleLabel: s.auditAll ? 'Show issues only' : 'Show all checks', toggleAuditAll: () => this.setState(st => ({ auditAll: !st.auditAll })),
       modeName: s.mode,
       neutrals: NEUTRALS.map(t => ({ name:t, bg:'var(--' + t + ')', map: NEUTRAL_MAP[t] })),

@@ -85,10 +85,12 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
 
 2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
    output in `palette.outputs`: `--web` when `outputs.web` is set, `--mobile <outputs.mobile>`
-   when `outputs.mobile` is set:
+   when `outputs.mobile` is set. The same run regenerates the project thumbnail (its title comes
+   from the card):
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--web] [--mobile <outputs.mobile>]
+   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--web] [--mobile <outputs.mobile>] \
+     --thumbnail /tmp/design-loop/thumbnail.html
    ```
 
    Only inputs change by hand; never edit generated tokens. Report the audit it prints; propose
@@ -96,10 +98,15 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
 
 3. Converge and validate across **all** targets: `stories-changed` on each target, screenshot a
    representative set of stories, `test-run`, then publish each target (steps 7–9).
-4. Record `palette.lastImplementedHash` (step 10).
+4. Upload `/tmp/design-loop/thumbnail.html` to `palette.thumbnailPath` (`DesignSync finalize_plan`
+   with `writes: [<thumbnailPath>]`, `deletes: []`, `localDir: /tmp/design-loop`, then
+   `write_files`). It is generated: never hand-edit it.
+
+5. Record `palette.lastImplementedHash` (step 10).
 
 The card (`palette.designPath`, `Palette.dc.html` at the project root) is read only: never
-upload it back, and never write or rewrite the project's `support.js`.
+upload it back, and never write or rewrite the project's `support.js`. The thumbnail is the only
+palette file `design-loop` uploads.
 
 ### 2. Open the execution ledger
 

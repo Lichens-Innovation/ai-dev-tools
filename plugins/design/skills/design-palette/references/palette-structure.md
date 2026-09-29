@@ -69,7 +69,8 @@ Neutral scales use the same names with smaller shifts (`--bg-intense` is not as 
 - 4.5:1 text: `-text` on `-bg`, `--text-on-X` on `X`, `--text`/`--text-muted` on `--bg`/`--bg-elevated`/`--bg-inset`, `--link`
 - 3:1 UI: `--border-input`, `--focus-ring`
 - visible states (ΔL ≥ 0.04): `-hover` vs base, `-bg-hover` vs `-bg`, `--bg-hover` (advisory)
-- advisory: brand fill visible on page (3:1), very light inputs (L > 0.9)
+- advisory: brand fill visible on page (3:1), very light inputs (L > 0.9), brand vs status
+  look-alikes (hue < 25° apart and lightness within 0.2)
 
 ## Known limits
 
