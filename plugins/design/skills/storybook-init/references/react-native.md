@@ -91,7 +91,8 @@ follow the OS setting.
 The fix is to make the web palette respond to an explicit scheme instead of the media query:
 - Override the flipping tokens with `light-dark()`:
   `:root { --primary: light-dark(var(--primary-light), var(--primary-dark)); }`.
-  Load this in the Storybook preview only, not in the native CSS entry.
+  With a `design-palette` theme this is the generated scheme file (`palette.mjs --scheme`).
+  Load it in the Storybook preview only, not in the native CSS entry.
 - In the theme decorator, set `document.documentElement.style.colorScheme = mode` (plus
   `data-theme` if other CSS keys off it). Keep passing `mode` to the native provider as well.
 - If a web app in the same repo already has this override, move it into the shared theme package

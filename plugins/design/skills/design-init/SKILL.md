@@ -49,8 +49,9 @@ this skill produces must satisfy the preconditions in §6.
    - Differences → show them and ask which side wins, per input or globally:
      - **repo wins** (default, `canonical-wins`): step 6 overwrites the card.
      - **Design wins**: `palette.mjs <canonical> --from-card /tmp/design-init/remote-palette.html`
-       with the output flags for the targets chosen in `design-palette` step 1 (`--web` and/or
-       `--mobile <tw.css>`), report the audit, then run step 6 so both sides match.
+       with the output flags for the targets chosen in `design-palette` step 1 (`--theme <file>`
+       or `--web`, `--scheme <file>`, `--mobile <file>`, `--json <file>`), report the audit, then run
+       step 6 so both sides match.
 
    Never merge silently.
 
@@ -95,7 +96,7 @@ this skill produces must satisfy the preconditions in §6.
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
-   `outputs`: the web and/or mobile files from `design-palette` step 1,
+   `outputs`: the `web`, `scheme`, `mobile` and `json` files from `design-palette` step 1,
    `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
    `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
    discovered component (`wip`, `lastImplementedHash: null`). With several Storybook targets, also
@@ -103,8 +104,8 @@ this skill produces must satisfy the preconditions in §6.
 
 8. **Verify preconditions.** Walk contract §6 and list anything still missing.
 
-9. **Report & next steps.** Palette file(s) and audit summary, Storybook/Chromatic/MCP status,
-   Design project + palette card path, manifest path. Next: `/design-sync` the component catalog,
+9. **Report & next steps.** Palette file(s), what each app imports and audit summary,
+   Storybook/Chromatic/MCP status, Design project + palette card path, manifest path. Next: `/design-sync` the component catalog,
    iterate in Claude Design (palette included), approve, then run `design-loop`.
 
 ## Notes
