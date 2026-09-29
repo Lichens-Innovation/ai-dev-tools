@@ -31,9 +31,11 @@ this skill produces must satisfy the preconditions in §6.
 
 4. **Create or bind the Claude Design project.** `DesignSync list_projects`.
    - **Default: create a new project** for this repo with `DesignSync create_project` (`name`:
-     the repo name).
-   - Reuse an existing project only when the user points at one; confirm with
-     `DesignSync get_project` that its type is `PROJECT_TYPE_DESIGN_SYSTEM`.
+     the repo name). It is an ordinary project, which is all the loop needs.
+   - Reuse an existing project only when the user points at one; confirm it with
+     `DesignSync get_project`. Either type works: a `PROJECT_TYPE_DESIGN_SYSTEM` project also
+     shows the cards in the Design System view and can be picked as the design system of other
+     projects.
 
    Record its id as `designProjectId`.
 
@@ -74,12 +76,14 @@ this skill produces must satisfy the preconditions in §6.
    the card; localhost only on the machine running Storybook.
 
    Upload the card and the thumbnail to the project root: the Pages list only shows root files,
-   and the Design System view labels each card by its file name. `DesignSync finalize_plan`
+   and a design-system project's Design System view labels each card by its file name.
+   `DesignSync finalize_plan`
    (`writes: ["Palette.dc.html", "thumbnail.html"]`, `deletes: []`, `localDir: /tmp/design-init`),
    then `DesignSync write_files` with that `planId` and
    `{ path: "Palette.dc.html", localPath: "palette.html" }`,
-   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
-   reports a project without a root `thumbnail.html`. It is generated from the inputs: never
+   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. The thumbnail is the project's card
+   image; on a design-system project, Claude Design's design-system check also reports a missing
+   root `thumbnail.html`. It is generated from the inputs: never
    hand-edit it, and replace one Claude Design created by itself.
 
    The card only renders with the Design Components runtime `support.js` beside it. Use the

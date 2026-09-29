@@ -23,8 +23,8 @@ ask Claude Design to update `inputs` (or paste the card's **Export → Inputs JS
      when the target publishes to Chromatic, otherwise `http://localhost:6006`
    - `stories`: comma-separated story ids from `design.manifest.json` (`components[].storyId`)
 3. Upload it to the bound project's root as `Palette.dc.html` (`DesignSync finalize_plan`, then
-   `write_files`). The Pages list only shows root files, and the Design System view labels each
-   card by its file name.
+   `write_files`). The Pages list only shows root files, and a design-system project's Design
+   System view labels each card by its file name.
 4. If the root has no `support.js` (`DesignSync list_files`), write it with the Claude Design
    tool's `create_support_js`. The card does not render without it; never overwrite an
    existing one.
