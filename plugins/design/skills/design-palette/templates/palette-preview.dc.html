@@ -21,7 +21,7 @@ input,select,textarea,button{font:inherit;color:inherit}
 </style>
 </helmet>
 
-<header data-screen-label="Navbar" style="position:sticky;top:0;z-index:20;height:60px;display:flex;align-items:center;gap:clamp(8px,1.6vw,20px);padding:0 20px;background:var(--primary);color:var(--text-on-primary)">
+<header data-screen-label="Navbar" style="position:relative;z-index:20;height:60px;display:flex;align-items:center;gap:clamp(8px,1.6vw,20px);padding:0 20px;background:var(--primary);color:var(--text-on-primary)">
   <div style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-0.01em;white-space:nowrap;flex:none">
     <div style="width:28px;height:28px;border-radius:8px;background:var(--quinary);color:var(--text-on-quinary);display:grid;place-items:center;font-size:14px">P</div>
     <span>Palette Lab</span>
@@ -52,7 +52,7 @@ input,select,textarea,button{font:inherit;color:inherit}
 </header>
 
 <div style="display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 60px)">
-  <aside data-screen-label="Sidebar" style="position:sticky;top:60px;height:calc(100vh - 60px);overflow:auto;padding:20px 12px;background:var(--bg-inset);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:24px">
+  <aside data-screen-label="Sidebar" style="padding:20px 12px;background:var(--bg-inset);border-right:1px solid var(--border);display:flex;flex-direction:column;gap:24px">
     <div style="display:flex;flex-direction:column;gap:2px">
       <div style="padding:0 10px 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Workspace</div>
       <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">

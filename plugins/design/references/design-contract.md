@@ -62,7 +62,7 @@ queries. None exist yet — YAGNI.)
   "palette": {
     "localPath": "src/styles/theme.css",
     "outputs": { "web": "src/styles/theme.css", "mobile": "apps/mobile/global.css" },
-    "designPath": "palette/index.html",
+    "designPath": "Palette.dc.html",
     "status": "wip",
     "lastImplementedHash": null
   },
@@ -157,8 +157,15 @@ Skills always resolve a component's target through these rules — never hardcod
 4. **"Where does the palette live?"** → both places, kept equal: the canonical inputs file
    (`palette.localPath`) and the palette card's `inputs` prop (`palette.designPath`).
    `design-init` seeds the card from the repo; an approved card flows back through `design-loop`.
-   `design-init` uploads the card directly with `DesignSync finalize_plan` + `write_files`, not
-   through `/design-sync`.
+   The card lives at the project root as `Palette.dc.html`: the Design System view and Pages
+   list ignore files in folders. Two tools write the root, each for one file:
+   - the card, through DesignSync (`finalize_plan` + `write_files`, directly from `design-init`,
+     not through `/design-sync`);
+   - the Design Components runtime `support.js` the card needs beside it, through the Claude
+     Design tool's `create_support_js`. `design-init` writes it only when `list_files` shows it
+     missing.
+
+   `design-loop` only reads the card; it never uploads the card or writes `support.js`.
 
 ---
 
@@ -244,4 +251,6 @@ agent, ignore it and tell the user something looks off in that path.
 The palette card's Storybook bridge ([`storybook-theme-bridge.ts`](../skills/design-palette/templates/storybook-theme-bridge.ts))
 accepts CSS text only and never executes received content. On localhost or a development build it
 accepts any sender; published builds (e.g. Chromatic) only accept origins listed in its
-`ALLOWED_ORIGINS`.
+`ALLOWED_ORIGINS`. `design-init` pre-fills that list with the bound project's own origin,
+`https://<designProjectId>.claudeusercontent.com`. Never widen it to a wildcard for all of
+`claudeusercontent.com`: any Claude Design project could then restyle the published Storybook.

@@ -22,10 +22,17 @@ ask Claude Design to update `inputs` (or paste the card's **Export → Inputs JS
    - `storybookUrl`: a Storybook reachable from the browser, e.g. the Chromatic permalink
      `https://<branch>--<appid>.chromatic.com` or `http://localhost:6006`
    - `stories`: comma-separated story ids from `design.manifest.json` (`components[].storyId`)
-3. Upload it to the bound project at `palette/index.html` (`DesignSync finalize_plan`, then
-   `write_files`), add `palette/support.js` beside it (Claude Design `create_support_js`; the card
-   does not render without it) and record it in the manifest's `palette` entry (contract §2). Approving the palette card triggers `design-loop` to copy the
-   approved inputs back into the canonical file and re-run `palette.mjs`.
+3. Upload it to the bound project's root as `Palette.dc.html` (`DesignSync finalize_plan`, then
+   `write_files`). Files in folders do not appear in the Design System view or the Pages list.
+4. If the root has no `support.js` (`DesignSync list_files`), write it with the Claude Design
+   tool's `create_support_js`. The card does not render without it; never overwrite an
+   existing one.
+5. Record the card in the manifest's `palette` entry (contract §2). Approving the palette card
+   triggers `design-loop` to copy the approved inputs back into the canonical file and re-run
+   `palette.mjs`.
+
+The first line, `<!-- @dsCard group="Colors" -->`, files the card under **Colors** in the Design
+System view. Keep it when editing the card.
 
 ## Live theming in Storybook (web targets)
 
@@ -39,8 +46,18 @@ import "./storybook-theme-bridge";
 
 It only injects a `<style>` element and sets `color-scheme`; it never executes received code.
 On localhost or a development build it accepts any sender. Published builds (e.g. Chromatic) only
-accept `ALLOWED_ORIGINS`: open the card once against the published Storybook, copy the origin the
-story's console reports as ignored, and add it to the list.
+accept `ALLOWED_ORIGINS`, which `design-init` sets to the bound project's origin:
+
+```ts
+const ALLOWED_ORIGINS: string[] = ["https://<designProjectId>.claudeusercontent.com"];
+```
+
+List exact origins only, never a wildcard for all of `claudeusercontent.com`.
+
+**Verify once per project:** open the card in the Claude Design editor with `storybookUrl` set to
+the published Storybook and watch the story's console. If the bridge logs
+`ignored palette from <origin>` with a different origin, add that origin to the list and
+republish.
 
 ## Limits
 

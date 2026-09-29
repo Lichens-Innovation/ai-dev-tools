@@ -4,7 +4,8 @@
 // Only a <style> element and color-scheme are touched; nothing received is executed.
 
 // Senders accepted by published builds (e.g. Chromatic). Local development accepts any sender.
-// Fill in from the origin the console reports the first time a card's message is ignored.
+// design-init sets this to ["https://<designProjectId>.claudeusercontent.com"]. Exact origins only,
+// never a wildcard; add any other origin the console reports as ignored.
 const ALLOWED_ORIGINS: string[] = [];
 
 type PaletteMessage = { type: "palette:apply"; css: string; mode?: "light" | "dark" };

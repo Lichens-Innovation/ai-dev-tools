@@ -98,6 +98,9 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
    representative set of stories, `test-run`, then publish each target (steps 7–9).
 4. Record `palette.lastImplementedHash` (step 10).
 
+The card (`palette.designPath`, `Palette.dc.html` at the project root) is read only: never
+upload it back, and never write or rewrite the project's `support.js`.
+
 ### 2. Open the execution ledger
 
 `TaskCreate` **one task per stale component**, plus one for the palette when stale (contract §4 —
