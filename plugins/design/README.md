@@ -6,11 +6,16 @@ You explore look-and-feel fast and cheaply inside a [Claude Design](https://clau
 
 ## Prerequisites
 
-Make sure that you have the Claude Design MCP installed:
+Make sure that you have the Claude Design MCP installed and Claude Code's DesignSync enabled:
 
-1. Install the design-sync MCP: `claude mcp add --scope user --transport http claude-design https://api.anthropic.com/v1/design/mcp`
+1. Install the Claude Design MCP: `claude mcp add --scope user --transport http claude-design https://api.anthropic.com/v1/design/mcp`
 2. In Claude Code, run `/design-login`
 3. Check in `/plugins` that the MCP connection is successful; if not, select the MCP and reconnect.
+4. Check that `/design sync` is listed. The plugin uses the built-in DesignSync tool to create the design-system project and to upload the palette card. If only `/design consent` and `/design revoke` show up, look in the project's `.claude/settings*.json` for:
+   - `"DesignSync"` in `permissions.deny`: remove it.
+   - `"disableBundledSkills": true`: set it to `false`, and turn off the bundled skills you do not want with `skillOverrides` (`"<skill>": "off"`).
+
+   Then start a new session.
 
 ## Installation
 
