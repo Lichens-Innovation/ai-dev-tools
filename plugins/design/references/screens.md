@@ -5,10 +5,11 @@ synced components, with sample data, that looks like the running screen. Nothing
 changes for it: no stories, no mocks, no view split. The components are the real ones; the page
 layout is a hand-made copy, close but not exact.
 
-| Project files                   | Written by       | Role                                             |
-| ------------------------------- | ---------------- | ------------------------------------------------ |
-| `screens/<name>.html`           | `design-screens` | Reference: the screen as the code renders it now |
-| `proposals/screens/<name>.html` | Claude Design    | Target: the mockup plus the change               |
+| Project files                   | Written by       | Role                                                            |
+| ------------------------------- | ---------------- | --------------------------------------------------------------- |
+| `screens/<name>.html`           | `design-screens` | Reference: the screen as the code renders it now                |
+| `screens/index.json`            | `design-screens` | The navbar's Pages list (`{ "screens": [{ "name", "path" }] }`) |
+| `proposals/screens/<name>.html` | Claude Design    | Target: the mockup plus the change                              |
 
 `design-screens` writes the mockup and `design-refresh` rebuilds it when the screen's code
 changes. `design-loop` implements an approved screen proposal in the screen's code.
@@ -82,7 +83,7 @@ component proposal.
   cd <dir> && node <screenshot.mjs> --save-auth "<url>" <screensAuth>
   ```
 
-  Sign in in the window that opens, then close it. The file holds session tokens: git-ignore it,
+  Sign in in the window that opens, then click its "Save login" button. The file holds session tokens: git-ignore it,
   never upload or print it. Record it again when a screenshot shows the sign-in page.
 
 ## In the manifest
@@ -102,4 +103,6 @@ the mockup renders the synced components, so a sync updates them.
 The design provider loads the shared navbar only on `components/` and `proposals/` pages
 ([`proposals.md`](./proposals.md#side-by-side-modes-and-the-navbar-in-the-design-provider)). For
 screens, add `screens` to its path check (`/^(components|proposals|screens)\//`), so the palette
-footer can re-theme a screen live. Screens are pages, not cards: the sidebar doesn't list them.
+footer can re-theme a screen live. The sidebar lists the screens under **Pages**, from
+`screens/index.json` (Claude Design's card list doesn't include them): every upload of
+`design-screens` rewrites it from the manifest's `screens[]`.

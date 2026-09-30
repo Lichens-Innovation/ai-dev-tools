@@ -60,12 +60,13 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 - **Add or refresh a page (screen) in Claude Design** ("add the Home page", "mock the settings
   screen") → this is not implementation: follow
   [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md) in add mode (refresh mode
-  for a screen that already has a row), then stop.
+  for a screen that already has a row; fix mode when the user says its mockup doesn't match the
+  real page), then stop.
 - **Bring Claude Design up to date** ("refresh Claude Design", "sync the design project") →
   follow [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md), then stop.
 - **Otherwise**, implement (steps 1–11). First a quick staleness check, as `design-refresh`
-  step 1 does for components (`lastSync`): if the code changed since the last sync, say so and
-  offer `design-refresh` now. It is not required to implement already-approved proposals, but
+  step 1 does for components: if the code changed since the last sync, say so and suggest
+  `/design-sync` (only the user can start it). It is not required to implement already-approved proposals, but
   the user should refresh before designing the next change.
 
 ### 1. Select the work (read manifest + drift check)

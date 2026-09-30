@@ -16,8 +16,8 @@
  * --viewport sets the page size (default 1280x720): screens render at their manifest viewport.
  * --color-scheme emulates the OS mode, for apps that follow prefers-color-scheme.
  * --storage-state loads a saved login (cookies + localStorage), for apps behind a sign-in.
- * --save-auth opens a visible browser on <url>: sign in, then close the window. The login is saved to
- *   <auth.json> every second until then. The file holds session tokens: keep it git-ignored, never upload it.
+ * --save-auth opens a visible browser on <url>: sign in, then click the "Save login" button it adds
+ *   (bottom right). The login is saved to <auth.json> then, once; nothing touches the page before. The file holds session tokens: keep it git-ignored, never upload it.
  *
  * Requires Playwright (installed by storybook-init):  npm i -D playwright && npx playwright install chromium
  * Run it from the Storybook target's dir: Playwright resolves from the working directory.
@@ -51,17 +51,43 @@ if (args[0] === '--save-auth') {
   }
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: null });
+  // Nothing touches the page while the user signs in: the login is saved once, when they click
+  // the "Save login" button added to every page of the window.
+  let done;
+  const saved = new Promise(resolve => (done = resolve));
+  await context.exposeBinding('__designScreensSaveAuth', async () => {
+    await context.storageState({ path: statePath });
+    done(true);
+  });
+  await context.addInitScript(() => {
+    const add = () => {
+      if (!document.body || document.getElementById('__design-screens-save')) return;
+      const button = document.createElement('button');
+      button.id = '__design-screens-save';
+      button.textContent = 'Save login';
+      button.title = 'Click once you are signed in and see the app';
+      button.style.cssText =
+        'position:fixed;right:16px;bottom:16px;z-index:2147483647;padding:10px 16px;border:0;border-radius:8px;' +
+        'background:#2563eb;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer';
+      button.onclick = () => {
+        button.textContent = 'Saving…';
+        window.__designScreensSaveAuth();
+      };
+      document.body.append(button);
+    };
+    document.addEventListener('DOMContentLoaded', add);
+    new MutationObserver(add).observe(document, { childList: true, subtree: true });
+  });
+  browser.on('disconnected', () => done(false));
   const page = await context.newPage();
-  let closed = false;
-  page.on('close', () => (closed = true));
-  browser.on('disconnected', () => (closed = true));
   await page.goto(url);
-  console.log(`Sign in in the browser window, then close it. Saving the login to ${statePath}…`);
-  while (!closed) {
-    await context.storageState({ path: statePath }).catch(() => {});
-    await new Promise(r => setTimeout(r, 1000));
-  }
+  console.log('Sign in in the browser window. Once you see the app, click "Save login" (bottom right).');
+  const ok = await saved;
   await browser.close().catch(() => {});
+  if (!ok) {
+    console.error('The window was closed before "Save login": nothing saved.');
+    process.exit(1);
+  }
   console.log(statePath);
   process.exit(0);
 }

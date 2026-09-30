@@ -29,8 +29,8 @@ the running app, with no change to the app ([`references/screens.md`](./referenc
 Propose changes in `proposals/screens/<name>.html` and approve them like a component.
 
 Run `/design-refresh` to bring Claude Design up to date with the code (design-loop offers it
-after implementing): it re-syncs the components only when their code changed, in a background
-subagent, and rebuilds the mockups whose screen changed.
+after implementing): it tells you when the components are behind their code (then run
+`/design-sync`, which only you can start), and rebuilds the mockups whose screen changed.
 
 ## Skills
 
@@ -41,8 +41,8 @@ subagent, and rebuilds the mockups whose screen changed.
 | `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                              |
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                          |
 | `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to the two skills below.          |
-| `design-screens` | Adds or refreshes app screens in Claude Design as mockups built from the synced components, checked against screenshots of the running app.                                                                                                                             |
-| `design-refresh` | Brings Claude Design up to date: re-syncs changed components through the `design-sync-runner` agent (upload in the main session), then rebuilds stale screen mockups and offers new screens.                                                                            |
+| `design-screens` | Adds, refreshes or fixes app screens in Claude Design as mockups built from the synced components, checked against screenshots of the running app, then asks until the mockup is faithful enough.                                                                       |
+| `design-refresh` | Brings Claude Design up to date: says when the components need a `/design-sync`, then rebuilds stale screen mockups and offers new screens.                                                                                                                             |
 
 ## The contract
 

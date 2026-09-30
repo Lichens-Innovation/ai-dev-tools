@@ -88,7 +88,6 @@ queries. None exist yet — YAGNI.)
       "lastImplementedHash": null
     }
   ],
-  "lastSync": { "commit": "<git sha>", "bundleSha12": "<from _ds_sync.json>" },
   "screensAuth": ".design-screens/auth.json",
   "screens": [
     {
@@ -105,8 +104,7 @@ queries. None exist yet — YAGNI.)
       "status": "wip",
       "lastImplementedHash": null
     }
-  ],
-  "screensIgnored": ["/settings"]
+  ]
 }
 ```
 
@@ -124,11 +122,8 @@ queries. None exist yet — YAGNI.)
 | `components[].proposalPath`        | The **proposal** page, `proposals/<kebab-name>.html`: the synced component plus the change, written in Claude Design (see [`proposals.md`](./proposals.md)). The design target `design-loop` implements. `null` until the component has a card; the file may not exist yet.                                                                                                                                                                                                                      |
 | `components[].status`              | `wip` \| `approved`. The approval signal — see §4.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `components[].lastImplementedHash` | Hash of the proposal (for the palette: the card) the last successful implementation was built from. Detects drift.                                                                                                                                                                                                                                                                                                                                                                               |
-
-| `lastSync` | Optional. The commit (and bundle) the project last matched after a sync, written by `design-refresh`. Lets it skip the sync when no file the sync reads changed since. |
-| `screensAuth` | Optional. A saved sign-in (Playwright storage state) for screenshotting an app behind a login. Holds session tokens: git-ignored, never uploaded or printed. See [`screens.md`](./screens.md). |
-| `screens[]` | Optional. One row per app screen brought into Claude Design as a mockup ([`screens.md`](./screens.md)). `storybook`: the target whose `dir` runs Playwright. `route` / `url`: where the dev server shows it. `sources`: the files that shape its layout; `sourceHash` detects a stale mockup. `mockupPath`: the mockup (read only in Claude Design, like a synced card); `mockupHash`: the uploaded bytes, to catch edits. `proposalPath`, `status`, `lastImplementedHash`: as for a component. |
-| `screensIgnored` | Optional. Routes the user declined to mock; `design-refresh` doesn't offer them again. |
+| `screensAuth`                      | Optional. A saved sign-in (Playwright storage state) for screenshotting an app behind a login. Holds session tokens: git-ignored, never uploaded or printed. See [`screens.md`](./screens.md).                                                                                                                                                                                                                                                                                                   |
+| `screens[]`                        | Optional. One row per app screen brought into Claude Design as a mockup ([`screens.md`](./screens.md)). `storybook`: the target whose `dir` runs Playwright. `route` / `url`: where the dev server shows it. `sources`: the files that shape its layout; `sourceHash` detects a stale mockup. `mockupPath`: the mockup (read only in Claude Design, like a synced card); `mockupHash`: the uploaded bytes, to catch edits. `proposalPath`, `status`, `lastImplementedHash`: as for a component.  |
 
 `/design sync` pushes the cards up but does not touch the manifest: `design-init` maps each
 `designPath` to its card afterwards. `design-loop` writes `lastImplementedHash` (and never

@@ -1,82 +1,84 @@
 ---
 name: design-refresh
-description: "Brings the Claude Design project up to date with the code: re-syncs the components when their code changed (the long local part runs in the design-sync-runner subagent, the upload in this session), rebuilds the screen mockups whose code changed, and offers screens that have no mockup yet. Use when the user wants Claude Design refreshed or up to date before designing, or after design-loop applied changes."
+description: "Brings the Claude Design project up to date with the code: checks whether the synced components are behind their code (and asks the user to run /design-sync when they are), rebuilds the screen mockups whose code changed, and offers screens that have no mockup yet. Use when the user wants Claude Design refreshed or up to date before designing, or after design-loop applied changes."
 disable-model-invocation: true
 ---
 
 # Design Refresh
 
 One entry point to make Claude Design match the repo: the synced components (through
-`/design sync`) and the screen mockups (through `design-screens`). Cheap when nothing changed.
+`/design-sync`, run by the user) and the screen mockups (through `design-screens`). Cheap when
+nothing changed.
 
 ## Shared contract
 
-Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) (`lastSync`,
-`screens[]`, §2) and [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md).
+Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) (`screens[]`,
+§2) and [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md).
+
+`/design-sync` is built into Claude Code and only the user can start it (typing `/design-sync`):
+neither this skill nor a subagent can invoke it. This skill decides whether a sync is needed,
+hands it to the user, and does the rest.
 
 ## Preconditions
 
 `design.manifest.json` exists and `.design-sync/config.json` has `projectId` and `pkg`. Without
-them the project has never been synced: point at `design-init`, then a first `/design sync` in
-this session (it asks questions a subagent can't).
+them the project has never been synced: point at `design-init`, then a first `/design-sync`.
 
 ## Workflow
 
 1. **What is stale.**
-   - **Components.** With `lastSync.commit` in the manifest, list the files the sync reads that
-     changed since, committed or not:
+   - **Components.** They are current when all of these hold:
+     - the local `ds-bundle/_ds_sync.json` exists and its `bundleSha12` equals the project's
+       (`DesignSync get_file _ds_sync.json`): the last build is the one uploaded;
+     - no file the sync reads changed after that build:
 
-     ```bash
-     git diff --name-only <lastSync.commit> -- <paths>; git status --porcelain -- <paths>
-     ```
+       ```bash
+       find <paths> -type f -newer ds-bundle/_ds_sync.json -not -path '*/node_modules/*' | head
+       ```
 
-     `<paths>`: `.design-sync/` (minus its ignored folders), each Storybook target's config dir,
-     the palette's `outputs`, and the folder of every component row's `localPath` (their stories
-     live there). Any output, or no `lastSync`, means stale. When unsure, treat it as stale: the
-     sync's own diff decides what really changed.
+       `<paths>`: `.design-sync/` minus its git-ignored folders (`sb-reference/`, `.cache/`,
+       `learnings/`, `pkg/types/`), each Storybook target's config dir, the palette's `outputs`,
+       and the folder of every component row's `localPath` (their stories live there).
+
+     Anything else means stale. A false alarm only costs a `/design-sync` that finds nothing to
+     upload.
 
    - **Screens.** For each `screens[]` row, recompute `sourceHash` (screens.md): a different
      value means its mockup is stale.
-   - **New screens.** List the app's routes (its router) that have no row and are not in
-     `screensIgnored`.
+   - **Shared navbar.** `DesignSync get_file design-nav.js` and compare it with the plugin's
+     [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js): different
+     bytes mean the project runs an older navbar.
 
-   Tell the user what you found in one short list. Nothing stale and no new screens: say
-   Claude Design is up to date and stop.
+   Tell the user what you found in one short list. Nothing stale: say Claude Design is up to
+   date and go to step 5.
 
-2. **Re-sync the components** (when stale). Start the `design-sync-runner` agent in the
-   background (Agent tool, `run_in_background: true`) with the repo root and the manifest's
-   `designProjectId`. Tell the user it is running and that a sync can take a while; answer
-   questions meanwhile, but don't write screen mockups until it finishes (it rebuilds
-   `ds-bundle/`). Then act on its report:
-   - `nothing-to-upload` → go to step 4.
-   - `ready-to-upload` → step 3.
-   - `blocked` or `first sync needed` → relay what the user must do, and stop the component part.
-     Screens whose only change is their own code can still refresh if the local `ds-bundle/`
-     matches the project.
+2. **Components stale → hand the sync to the user.** Ask them to type `/design-sync` (it
+   re-syncs only what changed; they approve its upload) and to run `/design-refresh` again when
+   it finishes. Tell them the sync must keep the project's own files: `screens/`, `proposals/`,
+   `Palette.dc.html`, `design-nav.js`, `thumbnail.html` and `support.js` are not from the sync
+   and must not be in its deletes. Then stop: the mockups render the synced bundle, so they wait
+   for the new one. Only when no stale screen needs the new bundle (they use only components that
+   didn't change) may you go on to steps 3–4 first; say so.
 
-3. **Upload** in this session, so the user is here for the approval. Invoke the built-in
-   `design-sync` skill and tell it: verification is done by `design-sync-runner`, the verdict
-   is `ds-bundle/.resync-verdict.json`; run only its upload step (atomic path), which re-fetches
-   the anchor first and re-runs the driver if it moved. The deletes come from the verdict's
-   `upload.deletePaths`, verbatim; never delete `screens/`, `proposals/`, `Palette.dc.html`,
-   `design-nav.js`, `thumbnail.html` or `support.js`. If the approval is denied, stop and ask.
+3. **Navbar** (when older). Show the user it changed and ask before replacing it: someone may
+   have edited it in Claude Design. On yes, copy the template to `/tmp/design-refresh/` and upload
+   it to `design-nav.js` (`DesignSync finalize_plan` with `writes: ["design-nav.js"]`,
+   `deletes: []`, `localDir: /tmp/design-refresh`, then `write_files`). It doesn't need a sync.
 
-4. **Record the sync.** Once the project matches (uploaded, or nothing to upload), set
-   `lastSync` in the manifest: `{ "commit": "<git rev-parse HEAD>", "bundleSha12": "<from
-ds-bundle/_ds_sync.json>" }`. A dirty tree is fine: the next check still sees those files
-   through `git status`.
+4. **Screens.** Follow [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md):
+   refresh mode for the stale rows, one run for all of them.
 
-5. **Screens.** Follow [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md):
-   refresh mode for the stale rows, one run for all of them. For new screens, ask once with
-   `AskUserQuestion` (multi-select; the four most used first, the rest named in the question)
-   which to add; build those in add mode, and add the ones the user declines to `screensIgnored`
-   so they aren't offered again.
+5. **Offer new screens, last.** List the app's routes (its router) that have no `screens[]` row.
+   If there are any, ask whether to add some now (`AskUserQuestion`, multi-select, with a "Not
+   now" option; name the rest in the question when there are more than fit). Build the chosen
+   ones with `design-screens` in add mode. Record nothing for the others: they are offered again
+   next time, so the user adds screens as they start working on them.
 
-6. **Report**: components re-synced (or already up to date), screens rebuilt or added, anything
-   blocked, the durable `.design-sync/` files the runner changed (offer to commit them; don't
-   commit unasked), and the project link (`https://claude.ai/design/p/<designProjectId>`).
+6. **Report**: whether the components are current (or waiting on `/design-sync`), the navbar,
+   the screens rebuilt or added, anything blocked, and the project link
+   (`https://claude.ai/design/p/<designProjectId>`).
 
 ## Notes
 
-- Order matters: mockups render the synced bundle, so the component upload comes first.
-- This skill never edits app code.
+- Order matters: mockups render the synced bundle, so the component sync comes first.
+- This skill never edits app code and never writes the synced files.

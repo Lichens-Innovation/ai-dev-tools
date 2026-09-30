@@ -1,6 +1,7 @@
-// Shared navigation for the cards of a Claude Design project: a fixed navbar (sidebar toggle, page title, section
-// shortcuts, light/dark switch) and a sidebar listing every card from the _ds_manifest.json Claude Design compiles at
-// the project root. Upload it to the project root as design-nav.js. The palette card loads it directly; synced cards
+// Shared navigation for the cards of a Claude Design project: a fixed navbar (sidebar toggle, palette link, page title,
+// section shortcuts, light/dark switch) and a sidebar: the palette link (Palette.dc.html), the Pages
+// (the screen mockups listed in screens/index.json, written by design-screens), then every other card from the
+// _ds_manifest.json Claude Design compiles at the project root. Upload it to the project root as design-nav.js. The palette card loads it directly; synced cards
 // and proposals load it through the design provider. Framework free, styled with the palette's semantic tokens.
 //
 // Mode: sets data-theme and color-scheme on <html>, remembers the choice for the project, exposes
@@ -15,7 +16,7 @@
   if (window.designNav) return;
   const script = document.currentScript;
   const root = new URL('./', script ? script.src : location.href);
-  const KEY = 'design-nav', DRAFT = 'design-nav:palette', PALETTE = 'Palette.dc.html', BAR = 56, SIDE = 280, WIDE = 900;
+  const KEY = 'design-nav', DRAFT = 'design-nav:palette', PALETTE = 'Palette.dc.html', SCREENS = 'screens/index.json', BAR = 56, SIDE = 280, WIDE = 900;
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
   const save = o => { try { localStorage.setItem(KEY, JSON.stringify({ ...load(), ...o })); } catch {} };
   const saved = load();
@@ -54,6 +55,11 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 .dn-open .dn-burger span:nth-child(1){transform:translateY(6px) rotate(45deg)}
 .dn-open .dn-burger span:nth-child(2){opacity:0}
 .dn-open .dn-burger span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.dn-palette{flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;color:inherit}
+.dn-palette:hover{background:var(--bg-hover,#f3f4f6)}
+.dn-palette[aria-current]{color:var(--link,#4f46e5)}
+.dn-palette svg,.dn-side a svg{flex:none;width:20px;height:20px}
+.dn-side a.dn-side-palette{gap:10px;margin-bottom:4px;font-weight:600}
 .dn-title{flex:none;max-width:30vw;font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dn-sections{flex:1 1 0;min-width:0;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .dn-sections::-webkit-scrollbar{display:none}
@@ -112,9 +118,15 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 .dn-req{display:block;width:100%;margin-top:6px;padding:8px;border:1px solid var(--border,#e5e7eb);border-radius:8px;background:var(--bg-inset,#f9fafb);color:inherit;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
 @media (max-width:640px){.dn-foot-status{display:none}.dn-foot-head{justify-content:flex-end}.dn-foot-toggle{margin-right:auto}}`;
 
-  let bar, side, foot = null, pad = null, cards = null;
+  let bar, side, foot = null, pad = null, cards = null, screens = null;
   const wide = () => innerWidth >= WIDE;
   const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
+  const paletteIcon = () => { const s = el('span'); s.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4.5 4H16a2 2 0 0 0-1.4 3.4A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="10.5" cy="6.5" r="1" fill="currentColor"/><circle cx="15.5" cy="7.5" r="1" fill="currentColor"/></svg>'; return s.firstChild; };
+  const pageTitle = () => {
+    if (here === PALETTE) return ''; // the palette icon beside it names the page
+    const screen = (screens || []).find(s => s.path === here);
+    return screen ? screen.name : labelOf(here) || document.title;
+  };
 
   function layout() {
     const b = document.body; if (!b) return;
@@ -296,26 +308,35 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     const sw = bar.querySelector('.dn-switch');
     sw.setAttribute('aria-checked', String(state.mode === 'dark'));
     sw.querySelector('small').textContent = state.mode === 'dark' ? 'Dark' : 'Light';
+    bar.querySelector('.dn-title').textContent = pageTitle();
     const nav = side.querySelector('nav');
-    if (cards === null) { nav.replaceChildren(el('div', { className: 'dn-note', textContent: 'Loading cards…' })); return; }
-    if (!cards.length) { nav.replaceChildren(el('div', { className: 'dn-note', textContent: 'No card list: open this page inside its Claude Design project.' })); return; }
-    const groups = new Map();
-    cards.forEach(c => { if (!groups.has(c.group)) groups.set(c.group, []); groups.get(c.group).push(c); });
-    nav.replaceChildren(...[...groups].flatMap(([group, list]) => [el('div', { className: 'dn-group', textContent: group }), ...list.map(c => {
-      const a = el('a', { href: hrefOf(c.path), textContent: labelOf(c.path), title: c.path });
-      if (c.path === here) a.setAttribute('aria-current', 'page');
+    const link = (path, label, kids = []) => {
+      const a = el('a', { href: hrefOf(path), title: path }, [...kids, label]);
+      if (path === here) a.setAttribute('aria-current', 'page');
       a.addEventListener('click', () => { if (!wide()) { state.open = false; render(); } });
       return a;
-    })]));
+    };
+    const paletteLink = link(PALETTE, '', [paletteIcon()]);
+    paletteLink.className = 'dn-side-palette';
+    paletteLink.title = 'Palette';
+    paletteLink.ariaLabel = 'Palette';
+    if (cards === null || screens === null) { nav.replaceChildren(paletteLink, el('div', { className: 'dn-note', textContent: 'Loading cards…' })); return; }
+    const others = cards.filter(c => c.path !== PALETTE);
+    if (!others.length && !screens.length) { nav.replaceChildren(paletteLink, el('div', { className: 'dn-note', textContent: 'No card list: open this page inside its Claude Design project.' })); return; }
+    const groups = new Map(screens.length ? [['Pages', screens.map(s => ({ path: s.path, label: s.name }))]] : []);
+    others.forEach(c => { if (!groups.has(c.group)) groups.set(c.group, []); groups.get(c.group).push({ path: c.path, label: labelOf(c.path) }); });
+    nav.replaceChildren(paletteLink, ...[...groups].flatMap(([group, list]) => [el('div', { className: 'dn-group', textContent: group }), ...list.map(c => link(c.path, c.label))]));
   }
 
   function mount() {
     html.setAttribute('data-design-nav', '');
     document.head.append(el('style', { textContent: css }));
-    const title = (cards || []).find(c => c.path === here);
+    const paletteLink = el('a', { className: 'dn-palette', href: hrefOf(PALETTE), title: 'Palette', ariaLabel: 'Palette' }, [paletteIcon()]);
+    if (here === PALETTE) paletteLink.setAttribute('aria-current', 'page');
     bar = el('header', { className: 'dn-bar' }, [
       el('button', { className: 'dn-burger', type: 'button', title: 'Cards', ariaLabel: 'Toggle the card list', onclick: toggleSide }, [el('span'), el('span'), el('span')]),
-      el('div', { className: 'dn-title', textContent: labelOf(title ? title.path : here) || document.title }),
+      paletteLink,
+      el('div', { className: 'dn-title', textContent: pageTitle() }),
       el('div', { className: 'dn-sections' }),
       el('button', { className: 'dn-switch', type: 'button', role: 'switch', ariaLabel: 'Dark mode', onclick: () => window.designNav.setMode(state.mode === 'dark' ? 'light' : 'dark') }, [el('small'), el('span', { className: 'dn-track' }, [el('i')])])
     ]);
@@ -334,6 +355,12 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     cards = (Array.isArray(j && j.cards) ? j.cards : []).filter(c => c && typeof c.path === 'string').map(c => ({ path: c.path, group: c.group || 'Other' }));
     render();
   }, () => { cards = []; render(); });
+  fetch(new URL(SCREENS, root)).then(r => r.ok ? r.json() : null).then(j => {
+    screens = (Array.isArray(j && j.screens) ? j.screens : [])
+      .filter(s => s && typeof s.path === 'string' && /^screens\//.test(s.path))
+      .map(s => ({ path: s.path, name: typeof s.name === 'string' && s.name ? s.name : labelOf(s.path) }));
+    render();
+  }, () => { screens = []; render(); });
   loadPalette();
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();

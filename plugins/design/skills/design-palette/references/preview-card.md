@@ -11,10 +11,13 @@ uploaded to the project root as `design-nav.js`. Synced cards and proposals load
 through the design provider ([proposals](../../../references/proposals.md#side-by-side-modes-and-the-navbar-in-the-design-provider)),
 so every card in the project shares:
 
-- **Hamburger button and sidebar**: every card, grouped as in the Design System view, from the
-  `_ds_manifest.json` Claude Design compiles at the project root. A click opens that card in
-  place. The sidebar starts open on wide screens and remembers its state; on narrow screens it
-  covers the page and closes after a pick. Proposals are pages, not cards, so they are not listed.
+- **Palette link**: a palette icon in the navbar and at the top of the sidebar opens the palette
+  card, the project's start page.
+- **Hamburger button and sidebar**: the palette link, then **Pages** (the screen mockups, from
+  `screens/index.json`, written by `design-screens`), then every other card grouped as in the
+  Design System view, from the `_ds_manifest.json` Claude Design compiles at the project root.
+  A click opens that page in place. The sidebar starts open on wide screens and remembers its
+  state; on narrow screens it covers the page and closes after a pick. Proposals are not listed.
 - **Section shortcuts**: the elements marked `data-nav-section="<label>"` (Palette and Components
   here), or a synced card's stories.
 - **Light / dark switch**: sets `data-theme` and `color-scheme` on `<html>` and is remembered for
