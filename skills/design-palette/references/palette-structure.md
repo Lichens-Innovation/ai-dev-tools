@@ -91,6 +91,7 @@ Neutral scales use the same names with smaller shifts (`--bg-intense` is not as 
 `--primary-intense`):
 
 - `--bg-faint`, `--bg-soft` (font into background), `--bg-strong` (= border input), `--bg-intense`
+  (border input with 20% font, so it follows the border input too)
 - `--text-faint`, `--text-soft` (font into background), `--text-strong`, `--text-intense`
 - `--bg-elevated`, `--bg-inset`: literal lightness (lighter / darker in both modes), outside the scale
 
@@ -111,6 +112,11 @@ Neutral scales use the same names with smaller shifts (`--bg-intense` is not as 
 | `--text-on-X`                      | `--text` or `--text-inverted`, picked per mode for contrast |
 
 `X` = every brand and status color.
+
+`--text-faint` (and so `--text-disabled` and `--border-input`) is about 3:1 against the
+background: enough for disabled text, placeholders and input borders, not for text people need to
+read. Use `--text-muted` (4.5:1, checked by the audit) for help text, labels and other secondary
+text.
 
 ## 4. Interaction and effects (not derivable from scales)
 
