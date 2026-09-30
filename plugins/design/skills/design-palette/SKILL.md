@@ -88,8 +88,7 @@ Read before starting:
    (e.g. "tertiary and quinary use primary").
 
 7. **Palette card.** When run by `design-init`, stop here: it seeds the Claude Design card and
-   reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md). For
-   web Storybooks, install the live-theme bridge so palette edits show up in real stories.
+   reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md).
 
 8. **Report.** Canonical file path, generated file(s), what each app imports, input count, audit
    summary, and the reminder that the inputs block is canonical: Claude Design and Chromatic are

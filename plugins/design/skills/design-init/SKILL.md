@@ -37,7 +37,7 @@ this skill produces must satisfy the preconditions in §6.
 
    Only `DesignSync create_project` makes a design-system project, and the type cannot change
    later. Never create it with the Claude Design tool's `create_project`: that makes an ordinary
-   project, which `DesignSync list_projects` and `/design-sync` do not see. If DesignSync is not
+   project, which `DesignSync list_projects` and `/design sync` do not see. If DesignSync is not
    available, stop and ask the user to enable it (`/design-login` without a claude.ai login).
 
    Record its id as `designProjectId`.
@@ -62,31 +62,22 @@ this skill produces must satisfy the preconditions in §6.
 
 6. **Seed the palette card.** Copy
    [`palette-preview.dc.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/palette-preview.dc.html)
-   to `/tmp/design-init/palette.html`, then write the repo's inputs and name into it and generate
-   the project thumbnail:
+   to `/tmp/design-init/palette.html` and
+   [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js) (the navbar
+   and card sidebar the project's cards share) to `/tmp/design-init/design-nav.js`, then write
+   the repo's inputs and name into the card and generate the project thumbnail:
 
    ```bash
    node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <canonical> --to-card /tmp/design-init/palette.html \
      --title "<repo name>" --thumbnail /tmp/design-init/thumbnail.html
    ```
 
-   Also set the `default` of its `storybookUrl` and `stories` props (see
-   [`preview-card.md`](${CLAUDE_SKILL_DIR}/../design-palette/references/preview-card.md)).
-   `storybookUrl` is the Chromatic branch permalink of the web target when `chromatic-init` ran
-   and the Chromatic project is public (`https://<branch>--<appId>.chromatic.com`, `appId` from
-   its baseline build URL, `<branch>` the default branch once it has been published, else the
-   baseline build's branch). To check, request `<permalink>/iframe.html` (for example
-   `curl -s -o /dev/null -w '%{http_code}' <permalink>/iframe.html`): `401` means private.
-   Otherwise, private project or no Chromatic, use that target's local `url`
-   (`http://localhost:6006`). A private permalink redirects the frame to Chromatic's login,
-   which refuses to be embedded, so the stories never load. The permalink works for anyone
-   opening the card; localhost only on the machine running Storybook.
-
-   Upload the card and the thumbnail to the project root: the Pages list only shows root files,
-   and the Design System view labels each card by its file name. `DesignSync finalize_plan`
-   (`writes: ["Palette.dc.html", "thumbnail.html"]`, `deletes: []`, `localDir: /tmp/design-init`),
-   then `DesignSync write_files` with that `planId` and
-   `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   Upload the card, the navbar and the thumbnail to the project root: the Pages list only shows
+   root files, and the Design System view labels each card by its file name. `DesignSync
+finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`,
+   `deletes: []`, `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId`
+   and `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   `{ path: "design-nav.js", localPath: "design-nav.js" }`,
    `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
    reports a project without a root `thumbnail.html`. It is generated from the inputs: never
    hand-edit it, and replace one Claude Design created by itself.
@@ -97,12 +88,6 @@ this skill produces must satisfy the preconditions in §6.
    `finalize_plan`). DesignSync cannot write it, because its content is server-provided. Never
    overwrite an existing `support.js`.
 
-   For web Storybooks, copy
-   [`storybook-theme-bridge.ts`](${CLAUDE_SKILL_DIR}/../design-palette/templates/storybook-theme-bridge.ts)
-   into each target's `.storybook/`, import it from `preview.ts`, and set
-   `ALLOWED_ORIGINS = ["https://<designProjectId>.claudeusercontent.com"]` with the id from
-   step 4. List that exact origin; never a wildcard for all of `claudeusercontent.com`.
-
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
    `outputs`: the `web`, `scheme`, `mobile` and `json` files from `design-palette` step 1,
@@ -110,14 +95,48 @@ this skill produces must satisfy the preconditions in §6.
    `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
    discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
    id such as `ui-button--default` from the target's `index.json`, not the component id
-   `ui-button`: `iframe.html?id=` renders only a story). With several Storybook targets, also
-   write `storybooks` and each component's `storybook` key.
+   `ui-button`: `iframe.html?id=` renders only a story, `designPath`: its synced card, or `null`
+   until the catalog is synced, see step 8, and `proposalPath`: `proposals/<kebab-name>.html`
+   once it has a card, else `null`). With several Storybook targets, also write `storybooks`
+   and each component's `storybook` key.
 
-8. **Verify preconditions.** Walk contract §6 and list anything still missing.
+8. **Prepare `/design sync`.** The built-in `/design sync` skill turns a Storybook target's
+   stories into the project's component cards. Hand it what this skill already knows so it
+   skips the discovery:
+   - Create `.design-sync/config.json` if it is missing (never overwrite it) for the first
+     target, web first: `projectId` (the `designProjectId`), `shape: "storybook"`,
+     `storybookConfigDir` (`<dir>/.storybook`), `storybookStatic: ".design-sync/sb-reference"`,
+     and `buildCmd` (`cd <dir> && npx storybook build -c .storybook -o <repo>/.design-sync/sb-reference`).
+     Seed only these fields. The file belongs to `/design sync`, which fills in the rest (entry,
+     provider, title map, card overrides), and its format may change with Claude Code.
+   - Tell `/design sync` to leave out Tailwind's `--tw-*` custom properties when it extracts
+     tokens; otherwise Claude Design's design-system check reports them as unregistered and
+     unclassified tokens.
+   - Git-ignore its local artifacts: `.design-sync/sb-reference/`, `.design-sync/.cache/`,
+     `.design-sync/learnings/`, `.design-sync/node_modules`, `.design-sync/pkg/types/`,
+     `.design-sync/pkg/node_modules`, and `.design-screens/` (the saved sign-in for screen
+     screenshots, see [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md)). Keep `config.json`, `NOTES.md`, `conventions.md` and the
+     `pkg/` sources tracked: the next sync resumes from them.
+   - Map the cards once a target is synced (the project then has `_ds_sync.json`): its cards are
+     `components/<group>/<Name>/<Name>.html` (`DesignSync list_files`). Set each row's
+     `designPath` to its card, matching the component name (`/design sync` may rename one, e.g.
+     `Typography` → `Text`, see its `titleMap`). A component it excluded keeps
+     `designPath: null` and cannot be approved. Sync other targets later with another
+     `/design sync` run; it only adds what changed.
+   - Set up proposals ([`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md)), once
+     the first sync has written its wrapper package: give its design provider the side-by-side
+     `mode="both"` and the shared navbar hook (on `components/`, `proposals/` and `screens/`), add the proposal conventions to its readme header (`readmeHeader` in its
+     config), and ask the user to run `/design sync` again so both reach the project.
 
-9. **Report & next steps.** Palette file(s), what each app imports and audit summary,
-   Storybook/Chromatic/MCP status, Design project + palette card path, manifest path. Next: `/design-sync` the component catalog,
-   iterate in Claude Design (palette included), approve, then run `design-loop`.
+9. **Verify preconditions.** Walk contract §6 and list anything still missing.
+
+10. **Report & next steps.** Palette file(s), what each app imports and audit summary,
+    Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
+    many components have a card. Next: `/design sync` the first target, then re-run
+    `design-init` to map the cards and set up proposals (it only fills what is missing). Then, in
+    Claude Design, edit the palette card or ask for a component proposal
+    (`proposals/<name>.html`), approve it in the manifest, and run `design-loop`. To design whole
+    pages, add them with `design-screens`; keep Claude Design current with `design-refresh`.
 
 ## Notes
 
