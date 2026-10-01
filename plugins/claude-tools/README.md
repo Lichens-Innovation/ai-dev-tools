@@ -9,7 +9,7 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   (`.claude/settings.local.json`) that shrinks the auto-compact window and disables
   connectors, workflows, bundled skills, artifacts, and a set of noisy/expensive tools.
 - **setup-claude-guardrails** — installs native permission rules, an optional Bash sandbox, and a
-  `PreToolUse` hook in the project's `.claude/` (personal, untracked by git) that keep Claude
+  `PreToolUse` hook in the project's `.claude/` and its git worktrees (personal, untracked by git) that keep Claude
   inside a scoped directory (the project, or a parent like `~/Documents/gits`) and block access
   to `.env` files (except `.env*.example`).
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
