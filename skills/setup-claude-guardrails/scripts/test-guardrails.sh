@@ -50,6 +50,10 @@ ln -s .env "$PROJECT/notes.txt"
 export CLAUDE_PROJECT_DIR="$PROJECT"
 failures=0
 
+# Enough ../ to climb from the project to /. A fixed ../.. depends on where TMPDIR sits: under
+# /private/tmp/claude-501 (the Claude Code sandbox) it lands in /private/tmp, an allowed temp root.
+UP="$(printf '%s' "$PROJECT" | tr -cd '/' | sed 's|/|../|g')"
+
 # check <expected: deny|ask|allow> <tool> <tool_input JSON> [cwd]
 check() {
   local expected="$1" tool="$2" tool_input="$3" cwd="${4:-$PROJECT}" out rc actual
@@ -73,16 +77,18 @@ check deny  Read  '{"file_path":"'"$HOME"'/.ssh/id_rsa"}'
 check allow Read  '{"file_path":"'"$PROJECT"'/src/index.ts"}'
 check allow Read  '{"file_path":"'"$OTHER"'/README.md"}'
 check allow Read  '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
-check deny  Write '{"file_path":"'"$HOME"'/.claude/settings.json"}'
+# Readable but not writable. Not ~/.claude/settings.json: the sandbox denies reading it, so the
+# hook can't resolve it and fails closed (exit 2) instead of denying.
+check deny  Write '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
 check allow Write '{"file_path":"'"$PROJECT"'/src/new/file.ts"}'
 check deny  Glob  '{"pattern":"/etc/**"}'
-check deny  Glob  '{"pattern":"../../**/*"}'
+check deny  Glob  '{"pattern":"'"$UP"'**/*"}'
 check allow Glob  '{"pattern":"src/**/*.ts"}'
 check deny  Grep  '{"pattern":"x","path":"/etc"}'
 check deny  Bash  '{"command":"cat /etc/passwd"}'
 check deny  Bash  '{"command":"cat ~/.ssh/id_rsa"}'
 check deny  Bash  '{"command":"ls $HOME"}'
-check deny  Bash  '{"command":"cd ../.. && ls"}'
+check deny  Bash  '{"command":"cd '"$UP"' && ls"}'
 check deny  Bash  '{"command":"cd && cat .ssh/id_rsa"}'
 check deny  Bash  '{"command":"git status; cd; ls"}'
 check deny  Bash  '{"command":"ls"}' "/etc"
