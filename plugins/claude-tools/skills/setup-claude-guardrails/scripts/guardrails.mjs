@@ -5,10 +5,12 @@
 //   node "$CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.mjs"
 //
 // Runs three checks on every matched tool call:
-//   scope — deny paths outside the project + permissions.additionalDirectories (+ temp dirs, and
-//           read-only access to Claude Code's own ~/.claude files)
-//   env   — deny .env files, except .env*.example / .sample / .template / .dist
-//   self  — ask before anything writes this hook or the project's .claude/settings*.json
+//   scope — deny paths outside the project + permissions.additionalDirectories (+ temp dirs and
+//           Claude Code's own ~/.claude)
+//   env   — deny .env files, except .env*.example / .sample / .template / .dist, and Claude Code's
+//           ~/.claude/.credentials.json and ~/.claude.json
+//   self  — ask before anything writes this hook, a checkout's .claude/settings*.json (project or
+//           worktree) or the user's ~/.claude/settings.json
 //
 // This is a heuristic layer on top of the native controls the skill also installs
 // (permissions.deny, blockReadsOutsideWorkingDirectories, sandbox). It is not a sandbox.
@@ -68,6 +70,18 @@ const bashTokens = (command) =>
     })
     .filter(Boolean);
 
+// Programs run by absolute path from a system bin dir (`/usr/bin/python3 x.py`, `| /usr/bin/grep`).
+// Only the word in command position is exempt from the scope check; its arguments are still checked.
+const SYSTEM_BIN = /^\/(?:usr\/(?:local\/)?(?:s?bin|libexec)|s?bin|opt\/homebrew\/s?bin)\/[^/]+$/;
+const WRAPPERS = new Set(["env", "exec", "command", "time", "nohup", "xargs"]);
+const systemPrograms = (command) =>
+  new Set(
+    command.split(/[;&|\n(`]+/).flatMap((segment) => {
+      const program = segment.trim().split(/\s+/).map(unquote).find((w) => !/^\w+=/.test(w) && !WRAPPERS.has(w));
+      return program && SYSTEM_BIN.test(path.posix.normalize(program)) ? [program] : [];
+    })
+  );
+
 // --- Glob helpers ------------------------------------------------------------------------------
 
 const GLOB_CHARS = /[*?[{]/;
@@ -118,19 +132,24 @@ const main = () => {
 
   // --- scope -----------------------------------------------------------------------------------
 
-  const settings = [".claude/settings.json", ".claude/settings.local.json"].map((f) => readJson(path.join(projectDir, f)));
-  const extraRoots = settings.flatMap((s) => s.permissions?.additionalDirectories ?? []).filter((r) => typeof r === "string");
   const claudeDir = realish(path.resolve(expandHome(process.env.CLAUDE_CONFIG_DIR || "~/.claude")));
+  const settingsFiles = [
+    path.join(projectDir, ".claude/settings.json"),
+    path.join(projectDir, ".claude/settings.local.json"),
+    path.join(claudeDir, "settings.json"),
+  ];
+  const extraRoots = settingsFiles
+    .flatMap((f) => readJson(f).permissions?.additionalDirectories ?? [])
+    .filter((r) => typeof r === "string");
 
-  const READ_TOOLS = new Set(["Read", "Glob", "Grep", "LSP"]);
   const roots = [
     projectDir,
     ...extraRoots.map((r) => resolvePath(r, projectDir)),
     realish(os.tmpdir()),
     realish("/tmp"),
-    // Claude Code's own skills, plugins, plans and saved tool output live here.
-    ...(READ_TOOLS.has(tool) ? [claudeDir] : []),
-    ...(command !== null ? [path.join(claudeDir, "plugins"), path.join(claudeDir, "skills")] : []),
+    // Claude Code's own config: settings, skills, plugins, plans, memory, saved tool output.
+    // Its settings.json and .credentials.json are guarded by the self and env checks below.
+    claudeDir,
   ];
 
   const inScope = (p) => roots.some((root) => p === root || p.startsWith(root + path.sep));
@@ -140,8 +159,9 @@ const main = () => {
     respond(
       "deny",
       "scope",
-      `${what} is outside the allowed scope (${roots.join(", ")}). Stay inside the project, ` +
-        `or ask the user to add the directory to permissions.additionalDirectories in .claude/settings.local.json.`
+      `${what} is outside the allowed scope (${roots.join(", ")}). Stay inside the project, or ask the user ` +
+        `to add the directory to permissions.additionalDirectories in ${settingsFiles[1]} (this project) or ` +
+        `${settingsFiles[2]} (all projects). Directories added with /add-dir for this session only are not visible to this hook.`
     );
 
   let offender;
@@ -154,8 +174,11 @@ const main = () => {
     // A bare `cd` (or `pushd`) goes to $HOME.
     if (/(?:^|[;&|(\n])\s*(?:cd|pushd)\s*(?=$|[;&|)\n])/.test(command)) denyScope(`\`cd\` with no argument (${os.homedir()})`);
 
+    const programs = systemPrograms(command);
     const pathLike = tokens.filter(
-      (t) => /^(\/|~|\$\{?HOME\}?)/.test(t) || t === ".." || t.startsWith("../") || t.includes("/../") || t.endsWith("/..")
+      (t) =>
+        !programs.has(t) &&
+        (/^(\/|~|\$\{?HOME\}?)/.test(t) || t === ".." || t.startsWith("../") || t.includes("/../") || t.endsWith("/.."))
     );
     offender = outside(pathLike.map((t) => t.replace(/^\$\{?HOME\}?/, "~")));
   } else {
@@ -209,21 +232,35 @@ const main = () => {
     );
   }
 
+  // Claude Code's OAuth tokens (.credentials.json on Linux/Windows; macOS keeps them in the
+  // Keychain) and ~/.claude.json, which holds MCP server configs that can carry API keys.
+  const CLAUDE_SECRETS = new Set([".credentials.json", ".claude.json"]);
+  const touchesClaudeSecret = (p) => CLAUDE_SECRETS.has(path.basename(p).toLowerCase()) || CLAUDE_SECRETS.has(realName(p));
+  const secretOffender = envCandidates.filter((v) => typeof v === "string" && v).find(touchesClaudeSecret);
+  if (secretOffender) {
+    respond("deny", "env", `Access to Claude Code's credentials / account file "${secretOffender}" is blocked.`);
+  }
+
   // --- self ------------------------------------------------------------------------------------
 
-  const PROTECTED = ["settings.json", "settings.local.json", "hooks/guardrails.mjs"].map((f) => path.join(projectDir, ".claude", f));
+  // Any checkout's .claude/settings*.json and hook (the project and its worktrees), plus the
+  // user's settings.json, which can turn hooks off (disableAllHooks) or register new ones.
+  const isProtected = (p) =>
+    p === path.join(claudeDir, "settings.json") ||
+    /[\\/]\.claude[\\/](?:settings(?:\.local)?\.json|hooks[\\/]guardrails\.mjs)$/.test(p);
   const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
   const protectedHit =
     command !== null
-      ? tokens.filter((t) => /settings|guardrails/.test(t)).map((t) => resolvePath(t)).find((p) => PROTECTED.includes(p))
+      ? tokens.filter((t) => /settings|guardrails/.test(t)).map((t) => resolvePath(t)).find(isProtected)
       : WRITE_TOOLS.has(tool)
-        ? filePaths.map((p) => resolvePath(p)).find((p) => PROTECTED.includes(p))
+        ? filePaths.map((p) => resolvePath(p)).find(isProtected)
         : undefined;
   if (protectedHit) {
     respond(
       "ask",
       "self",
-      `${path.relative(projectDir, protectedHit)} configures the guardrails. Confirm this change is intended.`
+      `${protectedHit.startsWith(projectDir + path.sep) ? path.relative(projectDir, protectedHit) : protectedHit} ` +
+        `configures the guardrails. Confirm this change is intended.`
     );
   }
 };
