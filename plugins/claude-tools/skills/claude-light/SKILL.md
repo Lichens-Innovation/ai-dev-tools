@@ -14,7 +14,7 @@ This is the full config this skill applies:
 
 ```json
 {
-  "autoCompactWindow": 150000,
+  "autoCompactWindow": 200000,
   "permissions": {
     "deny": [
       "NotebookEdit",
@@ -61,4 +61,20 @@ Write to `.claude/settings.local.json` in the current project's working director
    - For `permissions`, merge at the `permissions` object level — keep any existing `allow`/`ask` arrays untouched, and set `deny` to the union (deduped) of the existing `deny` array and the target list, unless the user chose otherwise.
    - Write the result back with the Write tool (or Edit tool if the file already exists), pretty-printed with 2-space indentation, preserving unrelated existing keys.
 
-5. **Report.** Tell the user the path written (`.claude/settings.local.json`) and a short summary of what changed (new keys added, values overridden, values kept as-is per their choice). Mention that some settings (like `permissions.deny` additions) take effect on the next Claude Code session/restart in this project.
+5. **Offer to disable more global resources.** After the light config is written, ask whether the user also wants to disable some of their globally available plugins, skills, or agents for this project. This is optional — if they decline, skip to step 6.
+
+   **Discover what's available** by reading the same host files the help-server (`apps/help-server`, via `@repo/claude-fs`) reads. Read them directly rather than depending on the help-server being up (it runs in Docker):
+   - **Plugins** — `~/.claude/plugins/installed_plugins.json` (keys are `<plugin>@<marketplace>`), cross-referenced with `enabledPlugins` in `~/.claude/settings.json` and the project's `.claude/settings.json` / `.claude/settings.local.json`. List only plugins that are currently enabled; skip any already `false`.
+   - **Skills** — user skills in `~/.claude/skills/<name>/SKILL.md`, plus the `skills/<name>/SKILL.md` of each enabled plugin under its `installPath`. Read the `name` and `description` frontmatter.
+   - **Agents** — `~/.claude/agents/` and each enabled plugin's `agents/` (flat `<name>.md` or `<name>/AGENTS.md`).
+
+   **Ask** with `AskUserQuestion` (`multiSelect: true`), one question per category (plugins, skills, agents), with at most 4 options each. If a category has more than 4 candidates, group them (e.g. by plugin) or show the heaviest/most likely ones first and let "Other" cover the rest. Show a short description on each option. Skip categories that have nothing to disable.
+
+   **Apply** the selections to `.claude/settings.local.json`, merging as in step 4:
+   - Plugin → `"enabledPlugins": { "<plugin>@<marketplace>": false }` (disabling a plugin covers all its skills and agents, so drop any skill/agent choices that belong to a plugin the user just disabled).
+   - Skill → add `"Skill(<name>)"` to `permissions.deny` (use the `<plugin>:<name>` form for plugin skills).
+   - Agent → add `"Agent(<name>)"` to `permissions.deny` (use the `<plugin>:<name>` form for plugin agents).
+
+   Never touch `~/.claude/settings.json` — these overrides are project-local only.
+
+6. **Report.** Tell the user the path written (`.claude/settings.local.json`) and a short summary of what changed (new keys added, values overridden, values kept as-is per their choice, plus any plugins/skills/agents disabled in step 5). Mention that some settings (like `permissions.deny` and `enabledPlugins` changes) take effect on the next Claude Code session/restart in this project.
