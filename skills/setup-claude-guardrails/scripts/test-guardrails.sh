@@ -5,12 +5,41 @@
 # Exits non-zero if any case gets the wrong decision.
 
 set -u
-SCRIPT="$(cd "$(dirname "${1:-$(dirname "$0")/guardrails.mjs}")" && pwd)/$(basename "${1:-guardrails.mjs}")"
-PROJECT="$(mktemp -d)"
-OTHER="$(mktemp -d)"
-trap 'rm -rf "$PROJECT" "$OTHER"' EXIT
-PROJECT="$(cd "$PROJECT" && pwd -P)"
-OTHER="$(cd "$OTHER" && pwd -P)"
+
+die() { echo "test-guardrails: $*" >&2; exit 2; }
+
+HOOK="${1:-$(dirname "$0")/guardrails.mjs}"
+[ -f "$HOOK" ] || die "hook not found: $HOOK"
+SCRIPT="$(cd "$(dirname "$HOOK")" && pwd -P)/$(basename "$HOOK")"
+
+# The scratch dirs get populated with fake secrets and then rm -rf'd, so they must be fresh
+# mktemp dirs under the temp root. An unchecked empty mktemp result once made `cd "" && pwd`
+# resolve to the caller's cwd, and the cleanup trap deleted the real project.
+TMP_ROOT="$(cd "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P)"
+[ -n "$TMP_ROOT" ] && [ "$TMP_ROOT" != "/" ] || die "temp dir ${TMPDIR:-/tmp} is not usable"
+MARKER=".guardrails-test-scratch"
+
+make_scratch() {
+  local dir
+  dir="$(mktemp -d "$TMP_ROOT/guardrails-test.XXXXXX")" || return 1
+  case "$dir" in "$TMP_ROOT"/guardrails-test.?*) ;; *) return 1 ;; esac
+  [ -d "$dir" ] || return 1
+  touch "$dir/$MARKER" || return 1
+  printf '%s\n' "$dir"
+}
+
+# Only removes dirs that match the scratch pattern and carry the marker this script wrote.
+cleanup() {
+  local dir
+  for dir in "$@"; do
+    case "$dir" in "$TMP_ROOT"/guardrails-test.?*) ;; *) continue ;; esac
+    [ -f "$dir/$MARKER" ] && rm -rf -- "$dir"
+  done
+}
+
+PROJECT="$(make_scratch)" || die "could not create a scratch project under $TMP_ROOT"
+OTHER="$(make_scratch)" || { cleanup "$PROJECT"; die "could not create a scratch dir under $TMP_ROOT"; }
+trap 'cleanup "$PROJECT" "$OTHER"' EXIT
 
 mkdir -p "$PROJECT/.claude/hooks" "$PROJECT/src"
 printf '{ "permissions": { "additionalDirectories": ["%s"] } }\n' "$OTHER" > "$PROJECT/.claude/settings.json"

@@ -25,20 +25,27 @@ The native layers are the real enforcement; the hook is a heuristic that catches
 
 ## Workflow
 
-1. **Ask the two questions** in one `AskUserQuestion` call:
-   - "Which directories may Claude access?" — project directory only (recommended), or project + other directories (e.g. `~/Documents/gits`, collected via "Other").
+1. **Check for an existing install** before asking anything. Read-only — inspect:
+   - `.claude/hooks/guardrails.mjs` exists and is identical to this skill's `scripts/guardrails.mjs`
+   - `.claude/settings.local.json` (or `settings.json`) has the hook entry with the same `command`, all 14 env `deny` entries, and `blockReadsOutsideWorkingDirectories`
+   - `git check-ignore -q` succeeds for `.claude/hooks/guardrails.mjs` and `.claude/settings.local.json`
+
+   If **everything is in place**, report the current setup (allowed roots from `additionalDirectories`, sandbox on/off, hook up to date) and ask one question: keep it as is (recommended — stop here, don't run the tests), or reconfigure (continue to step 2 with the current values as defaults). If it's **partially installed** (e.g. the hook is outdated, or a deny entry is missing), list what's missing, then continue but only fill the gaps, using the current values as defaults. If nothing is installed, continue.
+
+2. **Ask the two questions** in one `AskUserQuestion` call:
+   - "Which directories may Claude access?" — project directory only (recommended), or project + other directories (e.g. `~/Documents/gits`). If the user picks the second without naming any, ask for the paths before writing settings.
    - "Enable the Bash sandbox?" — Yes, strict (recommended: OS-enforced, closes the Bash gaps; network access then needs per-domain approval and commands can't fall back to unsandboxed), or No (hook heuristics only for Bash).
 
-2. **Check prerequisites.**
+3. **Check prerequisites.**
    - `node --version` must be >= 18. If not, stop: the hook would fail closed on every tool call.
    - `claude --version` must be >= 2.1.257 for `blockReadsOutsideWorkingDirectories`. If older, skip that key and tell the user to upgrade.
    - On Linux/WSL2 with the sandbox chosen, tell the user to run `/sandbox` afterwards to check bubblewrap is installed. Native Windows can't use the sandbox — skip it there.
 
-3. **Copy the hook.** Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
+4. **Copy the hook.** Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
 
    Keep it out of git: if the project is a git repo, append `.claude/hooks/guardrails.mjs` to `$(git rev-parse --git-common-dir)/info/exclude` unless already listed. Then run `git check-ignore -q .claude/hooks/guardrails.mjs` and `git check-ignore -q .claude/settings.local.json`. If either is not ignored, add that path to the exclude file too. If either path is already tracked (`git ls-files --error-unmatch <path>` succeeds), ignoring it has no effect: tell the user and ask whether to `git rm --cached` it.
 
-4. **Merge `.claude/settings.local.json`.** Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
+5. **Merge `.claude/settings.local.json`.** Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
 
    ```json
    {
@@ -69,9 +76,11 @@ The native layers are the real enforcement; the hook is a heuristic that catches
    - Skip the hook entry if one with the same `command` already exists.
    - Once the hook is installed it asks before any edit to `.claude/settings*.json` or the hook itself — on a re-run, expect those prompts.
 
-5. **Verify.** Run this skill's `scripts/test-guardrails.sh <project>/.claude/hooks/guardrails.mjs`. It builds a throwaway project and checks ~50 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
+6. **Verify.** Run this skill's `scripts/test-guardrails.sh <project>/.claude/hooks/guardrails.mjs`. It builds a throwaway project under `$TMPDIR` and checks ~50 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
+   - If it exits 2 with `could not create a scratch ...` or `temp dir ... is not usable`, stop and report it. Never work around it by pointing `TMPDIR` at the project or any other real directory: the script writes fake secrets into the scratch dir and deletes it afterwards.
+   - If a run prints `rm:` errors on paths outside `$TMPDIR`, stop right away and tell the user. Don't run anything else in the project.
 
-6. **Report.** List the files changed (and that none of them are tracked by git), the allowed roots, whether the sandbox is on, and the limitations below. Note that a fresh clone or a new git worktree won't have the guardrails; re-run the skill there. Tell the user hooks and the sandbox load at session start, so they must restart Claude Code; if the sandbox is on, suggest `/sandbox` → Config to review the effective read/write lists.
+7. **Report.** List the files changed (and that none of them are tracked by git), the allowed roots, whether the sandbox is on, and the limitations below. Note that a fresh clone or a new git worktree won't have the guardrails; re-run the skill there. Tell the user hooks and the sandbox load at session start, so they must restart Claude Code; if the sandbox is on, suggest `/sandbox` → Config to review the effective read/write lists.
 
 ## Hook behavior
 
