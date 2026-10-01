@@ -6,8 +6,10 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
 ## What's inside
 
 - **claude-light** — applies a lightweight local Claude Code configuration
-  (`.claude/settings.local.json`) that shrinks the auto-compact window and disables
-  connectors, workflows, bundled skills, artifacts, and a set of noisy/expensive tools.
+  (`.claude/settings.local.json`) that disables connectors, workflows, bundled skills,
+  artifacts, and a set of noisy/expensive tools, and optionally enables auto-compact at a
+  chosen level (default 200k). Re-runnable: it lists every global plugin, skill, agent, MCP
+  server and marketplace and offers to disable more of them for the project.
 - **setup-claude-guardrails** — installs native permission rules, an optional Bash sandbox, and a
   `PreToolUse` hook in the project's `.claude/` and its git worktrees (personal, untracked by git) that keep Claude
   inside a scoped directory (the project, or a parent like `~/Documents/gits`) and block access
