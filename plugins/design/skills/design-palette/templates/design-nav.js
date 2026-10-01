@@ -1,4 +1,4 @@
-// Shared navigation for the cards of a Claude Design project: a fixed navbar (sidebar toggle, palette link, page title,
+// Shared navigation for the cards of a Claude Design project: a fixed navbar (sidebar toggle, palette and Tailwind links, page title,
 // section shortcuts, light/dark switch) and a sidebar: the palette and Tailwind icon links (Palette.dc.html,
 // Tailwind.html), the Pages
 // (the screen mockups listed in screens/index.json, written by design-screens), then every other card from the
@@ -63,6 +63,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 .dn-palette{flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;color:inherit}
 .dn-palette:hover{background:var(--bg-hover,#f3f4f6)}
 .dn-palette[aria-current]{color:var(--link,#4f46e5)}
+.dn-palette[hidden]{display:none}
 .dn-palette svg,.dn-side a svg{flex:none;width:20px;height:20px}
 .dn-side-top{display:flex;gap:4px;margin:0 12px 4px}
 .dn-side .dn-side-top a{width:40px;padding:0;justify-content:center;border-radius:8px}
@@ -133,7 +134,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
   // The Tailwind CSS mark (simple-icons).
   const tailwindIcon = () => { const s = el('span'); s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4.8c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.91.23 1.57.89 2.29 1.62C13.67 10.62 15.03 12 18 12c3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.91-.23-1.57-.89-2.29-1.62C16.34 6.18 14.98 4.8 12 4.8zM6 12c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.91.23 1.57.89 2.29 1.62 1.18 1.2 2.54 2.58 5.51 2.58 3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.91-.23-1.57-.89-2.29-1.62C10.34 13.38 8.98 12 6 12z"/></svg>'; return s.firstChild; };
   const pageTitle = () => {
-    if (here === PALETTE) return ''; // the palette icon beside it names the page
+    if (here === PALETTE || here === TAILWIND) return ''; // the current icon link names the page
     const screen = (screens || []).find(s => s.path === here);
     return screen ? screen.name : labelOf(here) || document.title;
   };
@@ -329,6 +330,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     // Icon links to the palette card and, once the project has it, the Tailwind card.
     const iconLink = (path, label, icon) => { const a = link(path, '', [icon]); a.title = label; a.ariaLabel = label; return a; };
     const hasTailwind = (cards || []).some(c => c.path === TAILWIND);
+    bar.querySelector('.dn-tailwind').hidden = !hasTailwind;
     const top = el('div', { className: 'dn-side-top' }, [iconLink(PALETTE, 'Palette', paletteIcon()), ...(hasTailwind ? [iconLink(TAILWIND, 'Tailwind classes', tailwindIcon())] : [])]);
     if (cards === null || screens === null) { nav.replaceChildren(top, el('div', { className: 'dn-note', textContent: 'Loading cards…' })); return; }
     const others = cards.filter(c => c.path !== PALETTE && c.path !== TAILWIND);
@@ -343,9 +345,13 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     document.head.append(el('style', { textContent: css }));
     const paletteLink = el('a', { className: 'dn-palette', href: hrefOf(PALETTE), title: 'Palette', ariaLabel: 'Palette' }, [paletteIcon()]);
     if (here === PALETTE) paletteLink.setAttribute('aria-current', 'page');
+    // Shown by render() once the card list has Tailwind.html.
+    const tailwindLink = el('a', { className: 'dn-palette dn-tailwind', href: hrefOf(TAILWIND), title: 'Tailwind classes', ariaLabel: 'Tailwind classes', hidden: true }, [tailwindIcon()]);
+    if (here === TAILWIND) tailwindLink.setAttribute('aria-current', 'page');
     bar = el('header', { className: 'dn-bar' }, [
       el('button', { className: 'dn-burger', type: 'button', title: 'Cards', ariaLabel: 'Toggle the card list', onclick: toggleSide }, [el('span'), el('span'), el('span')]),
       paletteLink,
+      tailwindLink,
       el('div', { className: 'dn-title', textContent: pageTitle() }),
       el('div', { className: 'dn-sections' }),
       el('button', { className: 'dn-switch', type: 'button', role: 'switch', ariaLabel: 'Dark mode', onclick: () => window.designNav.setMode(state.mode === 'dark' ? 'light' : 'dark') }, [el('small'), el('span', { className: 'dn-track' }, [el('i')])])
