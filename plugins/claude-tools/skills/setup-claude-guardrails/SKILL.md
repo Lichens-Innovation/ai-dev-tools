@@ -92,7 +92,7 @@ Everything below is installed per **checkout** — the main checkout and each li
    - Once the hook is installed it asks before any edit to a checkout's `.claude/settings*.json`, the hook itself, or `~/.claude/settings.json` — on a re-run, expect those prompts.
 
 6. **Update `.worktreeinclude`** in the main checkout's root (gitignore syntax; Claude Code copies files that match it *and* are gitignored into each worktree it creates). Append `.claude/settings.local.json` and `.claude/hooks/guardrails.mjs` unless already listed.
-   - If the file doesn't exist, create it and add `/.worktreeinclude` to the shared `info/exclude`, so it stays personal.
+   - If the file doesn't exist, create it and add `.worktreeinclude` to the shared `info/exclude` (unanchored: the hook reads a leading `/` as an absolute path), so it stays personal.
    - If it is tracked (`git ls-files --error-unmatch .worktreeinclude`), it is shared with the team: show the two lines and ask before editing it. If the user declines, skip this step and say new Claude Code worktrees won't get a copy.
 
 7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` (the copies in the worktrees are identical). It builds a throwaway project under `$TMPDIR` and checks ~80 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
