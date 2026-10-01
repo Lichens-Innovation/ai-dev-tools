@@ -154,7 +154,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 
   // Palette footer. P.base: the inputs saved in Palette.dc.html ({ name: { lm, dm } }); P.draft: the changes to them
   // ({ name: { lm?, dm? } }, null for a removed input), kept per project in localStorage.
-  const P = { eng: null, base: null, prefix: '', draft: {}, open: saved.palette === true, rows: new Map(), queued: false };
+  const P = { eng: null, base: null, draft: {}, open: saved.palette === true, rows: new Map(), queued: false };
   const norm = h => { h = String(h || '').trim().toLowerCase(); if (/^#[0-9a-f]{3}$/.test(h)) h = '#' + [...h.slice(1)].map(c => c + c).join(''); return h; };
   const isHex = h => /^#[0-9a-f]{6}$/.test(norm(h));
   const mk = () => state.mode === 'dark' ? 'dm' : 'lm';
@@ -198,7 +198,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     if (!own) { if (st) st.textContent = ''; return; }
     if (!st) st = el('style', { id: 'design-nav-palette' });
     const p = P.eng.fromInputs(merged());
-    st.textContent = P.eng.buildWebCss(p, P.prefix) + '\n' + P.eng.buildSchemeCss(p, P.prefix);
+    st.textContent = P.eng.buildWebCss(p) + '\n' + P.eng.buildSchemeCss(p);
     document.head.append(st);
   }
   function changes() {
@@ -223,7 +223,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
   function togglePalette() { P.open = !P.open; save({ palette: P.open }); html.classList.toggle('dn-foot-open', P.open); layout(); }
   function buildRows() {
     const o = merged(), names = Object.keys(o), base = ['font', 'font-inverted', 'background', 'border'];
-    const label = { font: 'font (--text)', 'font-inverted': 'font-inverted', background: 'background (--bg)', border: 'border (--bg-strong)' };
+    const label = { font: 'font (--text)', 'font-inverted': 'font-inverted', background: 'background (--bg)', border: 'border (--border)' };
     const groups = [['Brand', names.filter(n => !base.includes(n) && P.eng.BRAND.includes(n))], ['Base', names.filter(n => base.includes(n))], ['Status', names.filter(n => !base.includes(n) && !P.eng.BRAND.includes(n))]];
     P.rows = new Map();
     const body = foot.querySelector('.dn-foot-rows');
@@ -278,7 +278,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     new ResizeObserver(layout).observe(foot);
   }
   // Palette.dc.html holds the saved inputs (data-props) and the engine that turns them into tokens (its script, up to
-  // the component class), the same one palette.mjs mirrors.
+  // the component class), the same one palette.ts mirrors.
   function loadPalette() {
     fetch(new URL(PALETTE, root)).then(r => r.ok ? r.text() : Promise.reject(new Error(r.status))).then(src => {
       const tag = new DOMParser().parseFromString(src, 'text/html').querySelector('script[data-dc-script]');
@@ -287,7 +287,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       if (end < 0) return;
       const eng = new Function(code.slice(0, end) + '\nreturn { BRAND, fromInputs, buildWebCss, buildSchemeCss, runAudit, hasInputs };')();
       if (!eng.hasInputs(inputs)) return;
-      P.eng = eng; P.base = inputs; P.prefix = (props.prefix && props.prefix.default) || '';
+      P.eng = eng; P.base = inputs;
       try { const d = JSON.parse(localStorage.getItem(DRAFT)); if (d && typeof d === 'object' && !Array.isArray(d)) P.draft = d; } catch {}
       P.draft = diff(merged()); // drops the changes Palette.dc.html already has
       mountFoot(); paletteChanged();
