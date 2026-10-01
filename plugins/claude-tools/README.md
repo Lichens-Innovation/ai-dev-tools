@@ -8,6 +8,10 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
 - **claude-light** — applies a lightweight local Claude Code configuration
   (`.claude/settings.local.json`) that shrinks the auto-compact window and disables
   connectors, workflows, bundled skills, artifacts, and a set of noisy/expensive tools.
+- **setup-claude-guardrails** — installs native permission rules, an optional Bash sandbox, and a
+  `PreToolUse` hook in the project's `.claude/` that keep Claude inside a scoped directory (the
+  project, or a parent like `~/Documents/gits`) and block access to `.env` files (except
+  `.env*.example`).
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
@@ -27,6 +31,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 ## Use it
 
 - `/claude-light` — apply the light-mode local settings to the current project.
+- `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
 - `/help-server` — start the help server and open its dashboard in the browser.
 - `/manage-marketplace` — ask about plugin/marketplace install, update, or removal commands.
