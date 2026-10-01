@@ -39,10 +39,22 @@ cleanup() {
 
 PROJECT="$(make_scratch)" || die "could not create a scratch project under $TMP_ROOT"
 OTHER="$(make_scratch)" || { cleanup "$PROJECT"; die "could not create a scratch dir under $TMP_ROOT"; }
-trap 'cleanup "$PROJECT" "$OTHER"' EXIT
+# Stand-in for ~/.claude: the sandbox denies reading the real settings.json, so the hook can't
+# resolve it and fails closed (exit 2) instead of deciding.
+CONFIG="$(make_scratch)" || { cleanup "$PROJECT" "$OTHER"; die "could not create a scratch dir under $TMP_ROOT"; }
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG"' EXIT
 
-mkdir -p "$PROJECT/.claude/hooks" "$PROJECT/src"
-printf '{ "permissions": { "additionalDirectories": ["%s"] } }\n' "$OTHER" > "$PROJECT/.claude/settings.json"
+# Every scratch dir sits in the temp root, which is always allowed, so allow-checks on them can't
+# fail. Extra roots under $HOME make those checks real; they're never created (the hook resolves
+# paths that don't exist yet), so nothing is written outside the temp root.
+EXTRA="$HOME/.guardrails-test-extra"
+USER_EXTRA="$HOME/.guardrails-test-user"
+WORKTREE="$PROJECT/.claude/worktrees/feat"
+
+mkdir -p "$PROJECT/.claude/hooks" "$PROJECT/src" "$WORKTREE/.claude"
+printf '{ "permissions": { "additionalDirectories": ["%s", "%s", "~/.guardrails-test-tilde"] } }\n' "$OTHER" "$EXTRA" \
+  > "$PROJECT/.claude/settings.json"
+printf '{ "permissions": { "additionalDirectories": ["%s"] } }\n' "$USER_EXTRA" > "$CONFIG/settings.json"
 echo "SECRET=1" > "$PROJECT/.env"
 echo "SECRET=" > "$PROJECT/.env.example"
 ln -s .env "$PROJECT/notes.txt"
@@ -76,11 +88,8 @@ check deny  Read  '{"file_path":"/etc/hosts"}'
 check deny  Read  '{"file_path":"'"$HOME"'/.ssh/id_rsa"}'
 check allow Read  '{"file_path":"'"$PROJECT"'/src/index.ts"}'
 check allow Read  '{"file_path":"'"$OTHER"'/README.md"}'
-check allow Read  '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
-# Readable but not writable. Not ~/.claude/settings.json: the sandbox denies reading it, so the
-# hook can't resolve it and fails closed (exit 2) instead of denying.
-check deny  Write '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
 check allow Write '{"file_path":"'"$PROJECT"'/src/new/file.ts"}'
+check allow Write '{"file_path":"/tmp/guardrails-note.txt"}'
 check deny  Glob  '{"pattern":"/etc/**"}'
 check deny  Glob  '{"pattern":"'"$UP"'**/*"}'
 check allow Glob  '{"pattern":"src/**/*.ts"}'
@@ -95,6 +104,46 @@ check deny  Bash  '{"command":"ls"}' "/etc"
 check allow Bash  '{"command":"cd '"$PROJECT"' && ls"}' "/etc"
 check allow Bash  '{"command":"ls /tmp > /dev/null"}'
 check allow Bash  '{"command":"npm test -- --watch=false"}'
+
+echo "additional directories"
+check allow Read  '{"file_path":"'"$EXTRA"'/README.md"}'
+check allow Write '{"file_path":"'"$EXTRA"'/src/new.ts"}'
+check deny  Read  '{"file_path":"'"$EXTRA"'-sibling/README.md"}'
+check allow Bash  '{"command":"cat ~/.guardrails-test-tilde/notes.md"}'
+check allow Bash  '{"command":"ls"}' "$EXTRA"
+check deny  Read  '{"file_path":"'"$USER_EXTRA"'/README.md"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check allow Read '{"file_path":"'"$USER_EXTRA"'/README.md"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check allow Bash '{"command":"ls '"$USER_EXTRA"'"}'
+
+echo "system programs"
+check allow Bash  '{"command":"/usr/bin/python3 -c \"print(1)\""}'
+check allow Bash  '{"command":"git log | /usr/bin/grep fix"}'
+check allow Bash  '{"command":"FOO=1 /usr/bin/env node -v && /opt/homebrew/bin/jq . package.json"}'
+check deny  Bash  '{"command":"/usr/bin/cat /etc/passwd"}'
+check deny  Bash  '{"command":"/usr/bin/../../etc/evil.sh"}'
+check deny  Bash  '{"command":"/etc/evil.sh"}'
+check deny  Bash  '{"command":"cat /usr/bin/python3"}'
+
+echo "worktrees"
+check allow Bash  '{"command":"ls"}' "$WORKTREE"
+check allow Edit  '{"file_path":"'"$WORKTREE"'/src/index.ts"}' "$WORKTREE"
+check deny  Read  '{"file_path":"'"$WORKTREE"'/.env"}' "$WORKTREE"
+check ask   Edit  '{"file_path":"'"$WORKTREE"'/.claude/settings.local.json"}' "$WORKTREE"
+check ask   Bash  '{"command":"rm .claude/hooks/guardrails.mjs"}' "$WORKTREE"
+
+echo "claude config"
+check allow Read  '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
+check allow Write '{"file_path":"'"$HOME"'/.claude/plugins/x/SKILL.md"}'
+check allow Bash  '{"command":"ls ~/.claude/rules"}'
+check allow Bash  '{"command":"ls"}' "$HOME/.claude/plugins"
+check deny  Bash  '{"command":"cat ~/.claude-backup/settings.json"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check ask  Edit '{"file_path":"'"$CONFIG"'/settings.json"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check ask  Bash '{"command":"rm '"$CONFIG"'/settings.json"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check deny Read '{"file_path":"'"$CONFIG"'/.credentials.json"}'
+CLAUDE_CONFIG_DIR="$CONFIG" check deny Bash '{"command":"cd '"$CONFIG"' && cat .credentials.json"}'
+# Not the real ~/.claude.json: like settings.json, the sandbox can't resolve it (exit 2).
+check deny  Read  '{"file_path":"'"$PROJECT"'/backup/.claude.json"}'
+check deny  Bash  '{"command":"cat backup/.claude.json"}'
 
 echo "env"
 check deny  Read  '{"file_path":"'"$PROJECT"'/.env"}'
