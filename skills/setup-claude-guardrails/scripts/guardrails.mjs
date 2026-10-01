@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Claude Code PreToolUse guardrails. Zero dependencies (Node >= 18).
 //
-// Registered once in .claude/settings.json:
+// Registered once in .claude/settings.local.json (personal, untracked):
 //   node "$CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.mjs"
 //
 // Runs three checks on every matched tool call:
@@ -141,7 +141,7 @@ const main = () => {
       "deny",
       "scope",
       `${what} is outside the allowed scope (${roots.join(", ")}). Stay inside the project, ` +
-        `or ask the user to add the directory to permissions.additionalDirectories in .claude/settings.json.`
+        `or ask the user to add the directory to permissions.additionalDirectories in .claude/settings.local.json.`
     );
 
   let offender;
