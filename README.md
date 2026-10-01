@@ -30,7 +30,7 @@ To use agents, skills, hooks and MCP with Claude Code, install the desired [plug
 
 1. Clone the repository `git clone https://github.com/Lichens-Innovation/ai-dev-tools.git`
 2. Register to the marketplace `claude plugin marketplace add ./ai-dev-tools`
-3. Install the desired plugin with `claude plugin install my-plugin@lichens-ai-dev-tools`, e.g. `claude plugin install ai-tools-manager@lichens-ai-dev-tools`
+3. Install the desired plugin with `claude plugin install my-plugin@lichens-ai-dev-tools`, e.g. `claude plugin install claude-tools@lichens-ai-dev-tools`
 
 ### Rule
 

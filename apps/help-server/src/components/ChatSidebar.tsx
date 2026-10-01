@@ -124,7 +124,7 @@ export default function ChatSidebar() {
   }, [])
 
   const installCommand =
-    'claude plugin install ai-tools-manager@lichens-ai-dev-tools'
+    'claude plugin install claude-tools@lichens-ai-dev-tools'
 
   return (
     <SlidePanel

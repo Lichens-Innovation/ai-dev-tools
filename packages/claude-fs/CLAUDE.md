@@ -1,6 +1,6 @@
 # claude-fs
 
-A shared utility package for reading Claude Code's `~/.claude/` filesystem. Used by server functions in `apps/ai-tools-manager` to populate form dropdowns with live data from the host.
+A shared utility package for reading Claude Code's `~/.claude/` filesystem. Used by server functions in `apps/help-server` to read installed plugins and cached marketplace data from the host.
 
 ## Purpose
 

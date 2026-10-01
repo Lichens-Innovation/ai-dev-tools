@@ -15,9 +15,6 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
 - **manage-marketplace** — reference for installing, updating, and removing Claude Code
   plugins and marketplaces.
 
-More skills and agents get added over time using `create-skill` and `create-subagent`
-from the `ai-tools-manager` plugin.
-
 ## Install
 
 From this marketplace:

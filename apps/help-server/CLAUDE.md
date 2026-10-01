@@ -1,6 +1,6 @@
 # help-server
 
-A dashboard app that surfaces Claude Code tooling — installed plugins, project marketplace, curated plugins, rules, CLI commands, usage stats, and documentation — in a single browser UI. Launched via the `/help-server` command (`plugins/ai-tools-manager/commands/help-server.md`), which brings the container up with Docker Compose and opens the dashboard.
+A dashboard app that surfaces Claude Code tooling — installed plugins, project marketplace, curated plugins, rules, CLI commands, usage stats, and documentation — in a single browser UI. Launched via the `/help-server` command (`plugins/claude-tools/commands/help-server.md`), which brings the container up with Docker Compose and opens the dashboard.
 
 ## Stack
 
