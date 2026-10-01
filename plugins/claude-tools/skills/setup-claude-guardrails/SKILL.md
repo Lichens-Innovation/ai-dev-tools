@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Setup Claude Guardrails
 
-Install layered guardrails into the current project's `.claude/settings.json` (committed, so the whole team gets them; use `settings.local.json` only if the user asks for personal-only):
+Install layered guardrails into the current project's `.claude/settings.local.json`. They are personal preferences, so nothing is committed: Claude Code keeps `settings.local.json` out of git, and the hook script is excluded via `.git/info/exclude`. Use the committed `.claude/settings.json` only if the user explicitly asks to share the guardrails with the team.
 
 | Layer | Enforced by | Covers |
 | ----- | ----------- | ------ |
@@ -20,7 +20,8 @@ The native layers are the real enforcement; the hook is a heuristic that catches
 ## Target files (in the current project's root)
 
 - `.claude/hooks/guardrails.mjs` — copied from this skill's `scripts/guardrails.mjs`
-- `.claude/settings.json` — permissions, optional sandbox, hook registration
+- `.claude/settings.local.json` — permissions, optional sandbox, hook registration
+- `.git/info/exclude` — gets a `.claude/hooks/guardrails.mjs` line, so the script stays untracked without touching the shared `.gitignore`
 
 ## Workflow
 
@@ -35,7 +36,9 @@ The native layers are the real enforcement; the hook is a heuristic that catches
 
 3. **Copy the hook.** Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
 
-4. **Merge `.claude/settings.json`.** Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
+   Keep it out of git: if the project is a git repo, append `.claude/hooks/guardrails.mjs` to `$(git rev-parse --git-common-dir)/info/exclude` unless already listed. Then run `git check-ignore -q .claude/hooks/guardrails.mjs` and `git check-ignore -q .claude/settings.local.json`. If either is not ignored, add that path to the exclude file too. If either path is already tracked (`git ls-files --error-unmatch <path>` succeeds), ignoring it has no effect: tell the user and ask whether to `git rm --cached` it.
+
+4. **Merge `.claude/settings.local.json`.** Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
 
    ```json
    {
@@ -68,11 +71,11 @@ The native layers are the real enforcement; the hook is a heuristic that catches
 
 5. **Verify.** Run this skill's `scripts/test-guardrails.sh <project>/.claude/hooks/guardrails.mjs`. It builds a throwaway project and checks ~50 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
 
-6. **Report.** List the files changed, the allowed roots, whether the sandbox is on, and the limitations below. Tell the user hooks and the sandbox load at session start, so they must restart Claude Code; if the sandbox is on, suggest `/sandbox` → Config to review the effective read/write lists.
+6. **Report.** List the files changed (and that none of them are tracked by git), the allowed roots, whether the sandbox is on, and the limitations below. Note that a fresh clone or a new git worktree won't have the guardrails; re-run the skill there. Tell the user hooks and the sandbox load at session start, so they must restart Claude Code; if the sandbox is on, suggest `/sandbox` → Config to review the effective read/write lists.
 
 ## Hook behavior
 
-- **scope** — allowed: the project, `permissions.additionalDirectories` from the project's `settings.json` / `settings.local.json` (relative entries resolve against the project), the temp dirs, `/dev/null`-style devices. Read tools may also read `~/.claude` (skills, plugins, plans, saved tool output); Bash may use `~/.claude/plugins` and `~/.claude/skills` (skill scripts). Symlinks are followed. Glob patterns with absolute or `..` prefixes are checked. In Bash: absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and any command run from an out-of-scope working directory unless it starts with `cd <in-scope dir>`.
+- **scope** — allowed: the project, `permissions.additionalDirectories` from the project's `settings.local.json` / `settings.json` (relative entries resolve against the project), the temp dirs, `/dev/null`-style devices. Read tools may also read `~/.claude` (skills, plugins, plans, saved tool output); Bash may use `~/.claude/plugins` and `~/.claude/skills` (skill scripts). Symlinks are followed. Glob patterns with absolute or `..` prefixes are checked. In Bash: absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and any command run from an out-of-scope working directory unless it starts with `cd <in-scope dir>`.
 - **env** — blocks names matching `.env`, `.env.*`, `*.env` (case-insensitive) except `.env*.example|.sample|.template|.dist`; Bash wildcards that could expand to one (`.env*`, `.e?v`, `.e[n]v`); quote-split names (`.e''nv`); symlinks pointing at one; Grep `glob` filters. Glob patterns are not checked (they only list names).
 - **self** — `ask` (not deny) on writes to `.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/guardrails.mjs`, including Bash commands naming them, so the user can still approve legitimate changes.
 - Malformed input or any internal error exits 2, which blocks the call (fail closed).
