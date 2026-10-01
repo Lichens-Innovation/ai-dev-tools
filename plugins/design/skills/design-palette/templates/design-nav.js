@@ -1,5 +1,6 @@
 // Shared navigation for the cards of a Claude Design project: a fixed navbar (sidebar toggle, palette link, page title,
-// section shortcuts, light/dark switch) and a sidebar: the palette link (Palette.dc.html), the Pages
+// section shortcuts, light/dark switch) and a sidebar: the palette and Tailwind icon links (Palette.dc.html,
+// Tailwind.html), the Pages
 // (the screen mockups listed in screens/index.json, written by design-screens), then every other card from the
 // _ds_manifest.json Claude Design compiles at the project root. Upload it to the project root as design-nav.js. The palette card loads it directly; synced cards
 // and proposals load it through the design provider. Framework free, styled with the palette's semantic tokens.
@@ -12,11 +13,13 @@
 // project's Palette.dc.html, keeps the changes as a per-project draft and turns them into a request to paste in
 // Claude Design's chat. window.designNav.palette is the drafted inputs; setPalette(inputs) replaces them and a
 // 'design-nav:palette' event ({ detail: { inputs } }) follows each change. The palette card shares the draft.
+// window.designNav.engine is that palette engine (null until Palette.dc.html is read) and .namespace the card's Tailwind
+// namespace: the Tailwind card (Tailwind.html) lists its classes from them.
 (() => {
   if (window.designNav) return;
   const script = document.currentScript;
   const root = new URL('./', script ? script.src : location.href);
-  const KEY = 'design-nav', DRAFT = 'design-nav:palette', PALETTE = 'Palette.dc.html', SCREENS = 'screens/index.json', BAR = 56, SIDE = 280, WIDE = 900;
+  const KEY = 'design-nav', DRAFT = 'design-nav:palette', PALETTE = 'Palette.dc.html', TAILWIND = 'Tailwind.html', SCREENS = 'screens/index.json', BAR = 56, SIDE = 280, WIDE = 900;
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
   const save = o => { try { localStorage.setItem(KEY, JSON.stringify({ ...load(), ...o })); } catch {} };
   const saved = load();
@@ -38,6 +41,8 @@
       updateFoot();
     },
     get palette() { return P.base ? merged() : null; },
+    get engine() { return P.base ? P.eng : null; },
+    get namespace() { return P.ns; },
     setPalette(inputs) { if (P.base && inputs) setDraft(diff(inputs)); }
   };
   window.dispatchEvent(new CustomEvent('design-nav:mode', { detail: { mode: state.mode } }));
@@ -59,7 +64,10 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 .dn-palette:hover{background:var(--bg-hover,#f3f4f6)}
 .dn-palette[aria-current]{color:var(--link,#4f46e5)}
 .dn-palette svg,.dn-side a svg{flex:none;width:20px;height:20px}
-.dn-side a.dn-side-palette{gap:10px;margin-bottom:4px;font-weight:600}
+.dn-side-top{display:flex;gap:4px;margin:0 12px 4px}
+.dn-side .dn-side-top a{width:40px;padding:0;justify-content:center;border-radius:8px}
+.dn-side .dn-side-top a::before{display:none}
+.dn-side .dn-side-top a[aria-current]{color:var(--link,#4f46e5);background:var(--bg-hover,#f3f4f6)}
 .dn-title{flex:none;max-width:30vw;font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dn-sections{flex:1 1 0;min-width:0;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .dn-sections::-webkit-scrollbar{display:none}
@@ -122,6 +130,8 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
   const wide = () => innerWidth >= WIDE;
   const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
   const paletteIcon = () => { const s = el('span'); s.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4.5 4H16a2 2 0 0 0-1.4 3.4A1.6 1.6 0 0 1 12 22z"/><circle cx="7.5" cy="10.5" r="1" fill="currentColor"/><circle cx="10.5" cy="6.5" r="1" fill="currentColor"/><circle cx="15.5" cy="7.5" r="1" fill="currentColor"/></svg>'; return s.firstChild; };
+  // The Tailwind CSS mark (simple-icons).
+  const tailwindIcon = () => { const s = el('span'); s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4.8c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.91.23 1.57.89 2.29 1.62C13.67 10.62 15.03 12 18 12c3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.91-.23-1.57-.89-2.29-1.62C16.34 6.18 14.98 4.8 12 4.8zM6 12c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.91.23 1.57.89 2.29 1.62 1.18 1.2 2.54 2.58 5.51 2.58 3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.91-.23-1.57-.89-2.29-1.62C10.34 13.38 8.98 12 6 12z"/></svg>'; return s.firstChild; };
   const pageTitle = () => {
     if (here === PALETTE) return ''; // the palette icon beside it names the page
     const screen = (screens || []).find(s => s.path === here);
@@ -154,7 +164,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 
   // Palette footer. P.base: the inputs saved in Palette.dc.html ({ name: { lm, dm } }); P.draft: the changes to them
   // ({ name: { lm?, dm? } }, null for a removed input), kept per project in localStorage.
-  const P = { eng: null, base: null, draft: {}, open: saved.palette === true, rows: new Map(), queued: false };
+  const P = { eng: null, base: null, ns: '', draft: {}, open: saved.palette === true, rows: new Map(), queued: false };
   const norm = h => { h = String(h || '').trim().toLowerCase(); if (/^#[0-9a-f]{3}$/.test(h)) h = '#' + [...h.slice(1)].map(c => c + c).join(''); return h; };
   const isHex = h => /^#[0-9a-f]{6}$/.test(norm(h));
   const mk = () => state.mode === 'dark' ? 'dm' : 'lm';
@@ -285,9 +295,9 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       const code = tag.textContent, end = code.indexOf('\nclass Component');
       const props = JSON.parse(tag.dataset.props || '{}'), inputs = props.inputs && props.inputs.default;
       if (end < 0) return;
-      const eng = new Function(code.slice(0, end) + '\nreturn { BRAND, fromInputs, buildWebCss, buildSchemeCss, runAudit, hasInputs };')();
+      const eng = new Function(code.slice(0, end) + '\nreturn { BRAND, fromInputs, buildWebCss, buildSchemeCss, runAudit, hasInputs, families, tokensFor, resolver, namespacedNames };')();
       if (!eng.hasInputs(inputs)) return;
-      P.eng = eng; P.base = inputs;
+      P.eng = eng; P.base = inputs; P.ns = (props.namespace && props.namespace.default) || '';
       try { const d = JSON.parse(localStorage.getItem(DRAFT)); if (d && typeof d === 'object' && !Array.isArray(d)) P.draft = d; } catch {}
       P.draft = diff(merged()); // drops the changes Palette.dc.html already has
       mountFoot(); paletteChanged();
@@ -316,16 +326,16 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       a.addEventListener('click', () => { if (!wide()) { state.open = false; render(); } });
       return a;
     };
-    const paletteLink = link(PALETTE, '', [paletteIcon()]);
-    paletteLink.className = 'dn-side-palette';
-    paletteLink.title = 'Palette';
-    paletteLink.ariaLabel = 'Palette';
-    if (cards === null || screens === null) { nav.replaceChildren(paletteLink, el('div', { className: 'dn-note', textContent: 'Loading cards…' })); return; }
-    const others = cards.filter(c => c.path !== PALETTE);
-    if (!others.length && !screens.length) { nav.replaceChildren(paletteLink, el('div', { className: 'dn-note', textContent: 'No card list: open this page inside its Claude Design project.' })); return; }
+    // Icon links to the palette card and, once the project has it, the Tailwind card.
+    const iconLink = (path, label, icon) => { const a = link(path, '', [icon]); a.title = label; a.ariaLabel = label; return a; };
+    const hasTailwind = (cards || []).some(c => c.path === TAILWIND);
+    const top = el('div', { className: 'dn-side-top' }, [iconLink(PALETTE, 'Palette', paletteIcon()), ...(hasTailwind ? [iconLink(TAILWIND, 'Tailwind classes', tailwindIcon())] : [])]);
+    if (cards === null || screens === null) { nav.replaceChildren(top, el('div', { className: 'dn-note', textContent: 'Loading cards…' })); return; }
+    const others = cards.filter(c => c.path !== PALETTE && c.path !== TAILWIND);
+    if (!others.length && !screens.length) { nav.replaceChildren(top, el('div', { className: 'dn-note', textContent: 'No card list: open this page inside its Claude Design project.' })); return; }
     const groups = new Map(screens.length ? [['Pages', screens.map(s => ({ path: s.path, label: s.name }))]] : []);
     others.forEach(c => { if (!groups.has(c.group)) groups.set(c.group, []); groups.get(c.group).push({ path: c.path, label: labelOf(c.path) }); });
-    nav.replaceChildren(paletteLink, ...[...groups].flatMap(([group, list]) => [el('div', { className: 'dn-group', textContent: group }), ...list.map(c => link(c.path, c.label))]));
+    nav.replaceChildren(top, ...[...groups].flatMap(([group, list]) => [el('div', { className: 'dn-group', textContent: group }), ...list.map(c => link(c.path, c.label))]));
   }
 
   function mount() {

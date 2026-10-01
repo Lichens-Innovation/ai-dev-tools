@@ -13,6 +13,7 @@ same way, from a mockup: see [`screens.md`](./screens.md).
 | `screens/<name>.html`           | `design-screens`, from code | Reference: a screen rebuilt from the components  |
 | `proposals/screens/<name>.html` | Claude Design               | Target: the screen mockup plus the change        |
 | `Palette.dc.html`               | `design-init`, then edited  | Target for the palette (inputs prop)             |
+| `Tailwind.html`                 | `design-init`, read only    | Reference: every palette Tailwind class          |
 
 ## A proposal page
 

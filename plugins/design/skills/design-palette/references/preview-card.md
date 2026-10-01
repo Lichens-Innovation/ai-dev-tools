@@ -12,7 +12,8 @@ through the design provider ([proposals](../../../references/proposals.md#side-b
 so every card in the project shares:
 
 - **Palette link**: a palette icon in the navbar and at the top of the sidebar opens the palette
-  card, the project's start page.
+  card, the project's start page. Next to it in the sidebar, a Tailwind icon opens the
+  [Tailwind classes card](#tailwind-classes-card) when the project has one.
 - **Hamburger button and sidebar**: the palette link, then **Pages** (the screen mockups, from
   `screens/index.json`, written by `design-screens`), then every other card grouped as in the
   Design System view, from the `_ds_manifest.json` Claude Design compiles at the project root.
@@ -31,6 +32,20 @@ so every card in the project shares:
   The footer reads the saved inputs and the palette engine from `Palette.dc.html` itself (its
   `data-props` and its script up to the component class), so it only appears when that card is
   at the project root, and changes the card already has drop out of the draft.
+
+## Tailwind classes card
+
+[`templates/tailwind-classes.html`](../templates/tailwind-classes.html), uploaded to the project
+root as `Tailwind.html` by `design-init` when the palette has a Tailwind namespace, lists every
+class the palette generates: the text, background and border names (`text-noa-muted`,
+`bg-noa-primary-subtle`, `border-noa-danger-strong`, …) grouped by color, then every token by its
+full name on a chosen utility (`ring-noa-focus-ring`). Each class shows its swatch, the token it
+points to and its value in the current mode; a click copies it, and a filter narrows the list.
+
+It has no palette code or inputs of its own: it takes the engine, the inputs and the namespace
+from `design-nav.js` (`window.designNav.engine`, `.palette`, `.namespace`), which reads them from
+`Palette.dc.html`. So it follows the light/dark switch and the palette footer's draft, and needs
+both files beside it. It is plain HTML, without `support.js`.
 
 ## Where the colors live
 

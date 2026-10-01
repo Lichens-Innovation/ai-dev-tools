@@ -47,7 +47,10 @@ them the project has never been synced: point at `design-init`, then a first `/d
      value means its mockup is stale.
    - **Shared navbar.** `DesignSync get_file design-nav.js` and compare it with the plugin's
      [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js): different
-     bytes mean the project runs an older navbar.
+     bytes mean the project runs an older navbar. When the manifest has a `palette.namespace`, do
+     the same for `Tailwind.html` against
+     [`tailwind-classes.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/tailwind-classes.html):
+     different bytes mean an older Tailwind card, no file means the project has none yet.
 
    Tell the user what you found in one short list. Nothing stale: say Claude Design is up to
    date and go to step 5.
@@ -55,15 +58,17 @@ them the project has never been synced: point at `design-init`, then a first `/d
 2. **Components stale → hand the sync to the user.** Ask them to type `/design-sync` (it
    re-syncs only what changed; they approve its upload) and to run `/design-refresh` again when
    it finishes. Tell them the sync must keep the project's own files: `screens/`, `proposals/`,
-   `Palette.dc.html`, `design-nav.js`, `thumbnail.html` and `support.js` are not from the sync
+   `Palette.dc.html`, `Tailwind.html`, `design-nav.js`, `thumbnail.html` and `support.js` are not from the sync
    and must not be in its deletes. Then stop: the mockups render the synced bundle, so they wait
    for the new one. Only when no stale screen needs the new bundle (they use only components that
    didn't change) may you go on to steps 3–4 first; say so.
 
-3. **Navbar** (when older). Show the user it changed and ask before replacing it: someone may
-   have edited it in Claude Design. On yes, copy the template to `/tmp/design-refresh/` and upload
-   it to `design-nav.js` (`DesignSync finalize_plan` with `writes: ["design-nav.js"]`,
-   `deletes: []`, `localDir: /tmp/design-refresh`, then `write_files`). It doesn't need a sync.
+3. **Navbar and Tailwind card** (when older or missing). Show the user what changed and ask
+   before replacing a file: someone may have edited it in Claude Design. On yes, copy the
+   templates to `/tmp/design-refresh/` and upload them to `design-nav.js` and `Tailwind.html`
+   (`DesignSync finalize_plan` with `writes` naming those files, `deletes: []`,
+   `localDir: /tmp/design-refresh`, then `write_files`). Upload the navbar with the Tailwind card:
+   the card needs the navbar's palette engine and adds itself to its sidebar. Neither needs a sync.
 
 4. **Screens.** Follow [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md):
    refresh mode for the stale rows, one run for all of them.
