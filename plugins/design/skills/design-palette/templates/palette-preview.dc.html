@@ -106,32 +106,58 @@ input,select,textarea,button{font:inherit;color:inherit}
           <div style="font-weight:600;font-size:15px">Semantic</div>
           <div style="font-size:12px;color:var(--text-muted)">What components use, and what each token points to in {{ modeName }} mode.</div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
-          <sc-for list="{{ neutrals }}" as="t" hint-placeholder-count="9">
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="height:40px;border-radius:8px;background:{{ t.bg }};box-shadow:inset 0 0 0 1px var(--border)"></div>
-              <div style="display:flex;flex-direction:column;gap:1px">
-                <span style="font:500 11px 'IBM Plex Mono',monospace">--{{ t.name }}</span>
-                <span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--text-muted)">→ {{ t.map }}</span>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ semRows }}" as="g" hint-placeholder-count="6">
+            <div style="display:flex;gap:12px 16px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--border)">
+              <div style="flex:0 0 120px;display:flex;flex-direction:column;gap:2px">
+                <span style="font-weight:600;font-size:13px">{{ g.title }}</span>
+                <span style="font-size:11px;color:var(--text-muted)">{{ g.note }}</span>
               </div>
-            </div>
-          </sc-for>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
-          <sc-for list="{{ intents }}" as="it" hint-placeholder-count="6">
-            <div style="padding:10px 12px;border-radius:8px;background:{{ it.surface }};border:1px solid {{ it.border }};color:{{ it.text }}">
-              <div style="font:600 13px 'IBM Plex Mono',monospace">{{ it.label }}</div>
-              <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
-                <sc-for list="{{ it.rows }}" as="m" hint-placeholder-count="4">
-                  <div style="display:flex;align-items:center;gap:6px;font:400 11px 'IBM Plex Mono',monospace">
-                    <span style="width:12px;height:12px;flex:none;border-radius:3px;background:{{ m.bg }};box-shadow:inset 0 0 0 1px var(--border)"></span>
-                    <span>{{ m.tok }}</span>
-                    <span>→ {{ m.map }}</span>
+              <div style="flex:1 1 320px;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+                <sc-for list="{{ g.tokens }}" as="t" hint-placeholder-count="4">
+                  <div title="--{{ t.name }}" style="display:flex;flex-direction:column;gap:6px;opacity:{{ t.op }}">
+                    <div style="height:40px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:15px;{{ t.style }}">{{ t.sample }}</div>
+                    <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+                      <span style="font:500 11px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">--{{ t.name }}</span>
+                      <span style="font:400 11px 'IBM Plex Mono',monospace;color:var(--text-muted);overflow-wrap:anywhere">{{ t.map }}</span>
+                    </div>
                   </div>
                 </sc-for>
               </div>
             </div>
           </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:8px">
+          <div style="font-weight:600;font-size:13px">Intents</div>
+          <div style="font-size:12px;color:var(--text-muted)">One column per brand and status color. An unset brand slot has no tokens.</div>
+        </div>
+        <div style="overflow-x:auto;min-width:0;padding-bottom:4px">
+          <div style="display:flex;flex-direction:column;min-width:{{ intentMinWidth }}">
+            <div style="display:grid;grid-template-columns:{{ intentCols }};gap:8px;padding:0 0 8px">
+              <span></span>
+              <sc-for list="{{ intentHeads }}" as="h" hint-placeholder-count="6">
+                <div style="display:flex;flex-direction:column;min-width:0">
+                  <span style="font:600 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">--{{ h.name }}</span>
+                  <span style="font-size:11px;color:var(--text-muted)">{{ h.note }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ intentRows }}" as="r" hint-placeholder-count="10">
+              <div style="display:grid;grid-template-columns:{{ intentCols }};gap:8px;align-items:start;padding:8px 0;border-top:{{ r.rule }}">
+                <div style="display:flex;flex-direction:column;min-width:0">
+                  <span style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">{{ r.group }}</span>
+                  <span style="font:500 11px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">{{ r.tok }}</span>
+                  <span style="font-size:11px;color:var(--text-muted)">{{ r.note }}</span>
+                </div>
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6">
+                  <div title="{{ c.name }}" style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                    <div style="height:28px;border-radius:6px;display:grid;place-items:center;font-weight:700;font-size:13px;{{ c.style }}">{{ c.sample }}</div>
+                    <span style="font:400 10px 'IBM Plex Mono',monospace;color:var(--text-muted);overflow-wrap:anywhere">{{ c.map }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
         </div>
       </div>
     </section>
@@ -257,9 +283,8 @@ input,select,textarea,button{font:inherit;color:inherit}
   </div>
 </sc-if>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;prefix&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;namespace&quot;:{&quot;editor&quot;:null,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
 const BRAND = ['primary','secondary','tertiary','quaternary','quinary'];
-const FALLBACK = { tertiary:'primary', quaternary:'secondary', quinary:'primary' };
 const PRESETS = {
   plum:    { brand:[['#401f3e','#8a5585'],['#3f2e56','#705e9b'],['#453f78','#7d76c9'],['#759aab','#8fb3c3'],['#faf2a1','#f3ea94']], font:['#1f1a24','#eee8f0'], background:['#fbfaf8','#17131a'] },
   triad:   { brand:[['#1d3557','#486c9b'],['#d92b3c','#ef5d68'],['#a8dadc','#a8dadc']], font:['#16202b','#e8eef3'], background:['#f9fafb','#10161d'] },
@@ -301,9 +326,8 @@ const STEPS_DM = {
 const DM_MIX = { faint:16, soft:30 };
 const relHex = (hex, d) => { const [L,a,b] = hexToLab(hex); return labToHex([d[0](L), a * d[1], b * d[1]]); };
 const mixHex = (x, pct, y) => { const A = hexToLab(x), B = hexToLab(y), t = pct / 100; return labToHex(A.map((v,i) => v * t + B[i] * (1 - t))); };
-function srcOf(p, n) { const i = BRAND.indexOf(n); if (i < 0) return n; return p.brand[i] ? n : srcOf(p, FALLBACK[n]); }
 function baseHex(p, n, m) {
-  if (BRAND.includes(n)) return p.brand[BRAND.indexOf(srcOf(p, n))][m];
+  if (BRAND.includes(n)) return p.brand[BRAND.indexOf(n)][m];
   if (n === 'font' || n === 'background' || n === 'border') return p[n][m];
   if (n === 'font-inverted') return p.fontInverted[m];
   return p.status[n][m];
@@ -313,15 +337,25 @@ function scaleHex(p, n, m, st) {
   if (m === 'light') return relHex(x, STEPS_LM[st]);
   return DM_MIX[st] ? mixHex(x, DM_MIX[st], p.background.dark) : relHex(x, STEPS_DM[st]);
 }
+// An intent's text and strong border: its fill when readable, else the first darker (lighter, in dark mode) step that is.
+const elevatedHex = (p, m) => m === 'light' ? mixHex(p.background[m], 30, '#ffffff') : mixHex(p.font[m], 5, p.background[m]);
+function readableRef(p, n, m, need, steps, on) {
+  const hex = st => st ? scaleHex(p, n, m, st) : baseHex(p, n, m);
+  const st = steps.find(x => on.every(b => ratio(hex(x), b) >= need)) ?? steps[steps.length - 1];
+  return st ? n + '-' + st : n;
+}
+const textRef = (p, n, m) => readableRef(p, n, m, 4.5, ['', 'strong', 'intense'], [p.background[m], elevatedHex(p, m), scaleHex(p, n, m, 'faint')]);
+const borderRef = (p, n, m) => readableRef(p, n, m, 3, ['', 'strong'], [p.background[m], elevatedHex(p, m)]);
 const onRef = (p, n, m) => { const x = baseHex(p,n,m); return ratio(x, p.font[m]) >= ratio(x, p.fontInverted[m]) ? 'text' : 'text-inverted'; };
-const families = p => [...BRAND, ...Object.keys(p.status)];
+// Unset brand slots have no tokens: only the set ones and the status colors are intents.
+const families = p => [...p.brand.map((_, i) => BRAND[i]), ...Object.keys(p.status)];
 const hoverMix = (hex, st, active) => ({ sign: hexToLab(hex)[0] > 0.78 ? -1 : 1, d: active ? 0.12 : 0.07 });
 function resolver(p, m) { const T = Object.fromEntries(tokensFor(p, m)); return k => { let v = T[k], g = 0; while (v && v.startsWith('var(--color-') && g++ < 10) v = T[v.slice(12, -1)]; return v; }; }
 function runAudit(p) {
   const out = [];
   ['light','dark'].forEach(m => {
     const r = resolver(p, m);
-    const ints = intentsOf(p).filter(k => !BRAND.includes(k) || p.brand[BRAND.indexOf(k)]);
+    const ints = intentsOf(p);
     const add = (kind, fg, bg, need, level = 'fail') => {
       const a = r(fg), b = r(bg); if (!a || !b) return;
       const val = kind === 'state' ? Math.abs(hexToLab(a)[0] - hexToLab(b)[0]) : ratio(a, b);
@@ -334,14 +368,14 @@ function runAudit(p) {
       const dh = Math.min(Math.abs(A.h - B.h), 360 - Math.abs(A.h - B.h)), dl = Math.abs(A.l - B.l);
       if (dh < 25 && dl < 0.2) out.push({ m, kind:'hue', fg:k, bg:st, a:r(k), b:r(st), need:25, val:dh, pass:false, level:'warn' });
     }));
-    ints.forEach(k => { add('text', k + '-text', k + '-bg', 4.5); add('text', 'text-on-' + k, k, 4.5); add('state', k + '-hover', k, 0.04); add('state', k + '-bg-hover', k + '-bg', 0.04); add('brand', k, 'bg', 3, 'warn'); });
+    ints.forEach(k => { add('text', k + '-text', k + '-bg', 4.5); add('text', k + '-text', 'bg', 4.5); add('line', k + '-border-strong', 'bg', 3); add('text', 'text-on-' + k, k, 4.5); add('state', k + '-hover', k, 0.04); add('state', k + '-bg-hover', k + '-bg', 0.04); add('state', k + '-bg-active', k + '-bg-hover', 0.04); add('brand', k, 'bg', 3, 'warn'); });
     ['bg','bg-elevated','bg-inset'].forEach(bg => { add('text', 'text', bg, 4.5); add('text', 'text-muted', bg, 4.5); });
-    ['bg','bg-elevated'].forEach(bg => { add('text', 'link', bg, 4.5); add('line', 'border-input', bg, 3); add('line', 'focus-ring', bg, 3); });
+    ['bg','bg-elevated'].forEach(bg => { add('text', 'link', bg, 4.5); add('line', 'border-input', bg, 3); add('line', 'focus-ring', bg, 3); add('line', 'focus-ring-danger', bg, 3); });
     add('state', 'bg-hover', 'bg', 0.04, 'warn'); add('state', 'bg-hover', 'bg-elevated', 0.04, 'warn');
   });
   return out;
 }
-const famOf = t => { if (t.startsWith('text-on-')) return t.slice(8); if (t === 'link' || t === 'focus-ring') return 'primary'; if (t === 'border-input') return 'text'; if (t.startsWith('text-inverted')) return 'text-inverted'; return t.split('-')[0]; };
+const famOf = t => { if (t.startsWith('text-on-')) return t.slice(8); if (t === 'link' || t === 'focus-ring') return 'primary'; if (t === 'focus-ring-danger') return 'danger'; if (t === 'border-input') return 'text'; if (t.startsWith('text-inverted')) return 'text-inverted'; return t.split('-')[0]; };
 const intentsOf = families;
 
 const BASE_INPUTS = ['font', 'font-inverted', 'background', 'border'];
@@ -362,30 +396,30 @@ function toInputs(p) {
 const hasInputs = o => !!(o && typeof o === 'object' && o.primary && o.secondary && o.font && o.background);
 
 // [token, light, dark]: each side is a hex literal, an input (var(--X-lm)) or a token reference (var(--Y)).
-function webTokens(p, pre) {
-  const dk = Object.fromEntries(tokensFor(p, 'dark')), inp = (n, m) => 'var(' + pre + n + (m === 'light' ? '-lm' : '-dm') + ')';
-  const input = { bg:'background', 'bg-strong':'border', text:'font', 'text-inverted':'font-inverted' }, alias = {};
-  families(p).forEach(n => { const s = srcOf(p, n); if (s === n) { input[n] = n; return; } ['', ...SCALE.map(st => '-' + st), '-hover', '-active'].forEach(x => { alias[n + x] = 'var(--' + s + x + ')'; }); });
+function webTokens(p) {
+  const dk = Object.fromEntries(tokensFor(p, 'dark')), inp = (n, m) => 'var(--' + n + (m === 'light' ? '-lm' : '-dm') + ')';
+  const input = { bg:'background', border:'border', text:'font', 'text-inverted':'font-inverted' };
+  families(p).forEach(n => { input[n] = n; });
   const ref = v => v.startsWith('var(--color-') ? 'var(--' + v.slice(12) : v;
-  return tokensFor(p, 'light').map(([k, v]) => alias[k] ? [k, alias[k], alias[k]] : input[k] ? [k, inp(input[k], 'light'), inp(input[k], 'dark')] : [k, ref(v), ref(dk[k])]);
+  return tokensFor(p, 'light').map(([k, v]) => input[k] ? [k, inp(input[k], 'light'), inp(input[k], 'dark')] : [k, ref(v), ref(dk[k])]);
 }
 const modeRef = (k, v, m) => v[0] === '#' ? 'var(--' + k + '-' + m + ')' : v;
-function buildWebCss(p, prefix) {
-  const pre = prefix ? '--' + prefix + '-' : '--', T = webTokens(p, pre);
+function buildWebCss(p) {
+  const T = webTokens(p);
   const inputs = [...p.brand.map((_,i) => BRAND[i]), 'font', 'font-inverted', 'background', 'border', ...Object.keys(p.status)];
   const L = ['/* Generated from the Theme Palette card. Edit the inputs there and re-export.', '   Plain values and var() only, so web and React Native (NativeWind) can share this file. */', ':root {', '  /* 1. Inputs: -lm light mode, -dm dark mode. Primary + secondary required */'];
-  inputs.forEach(n => L.push('  ' + pre + n + '-lm: ' + baseHex(p,n,'light') + ';', '  ' + pre + n + '-dm: ' + baseHex(p,n,'dark') + ';'));
+  inputs.forEach(n => L.push('  --' + n + '-lm: ' + baseHex(p,n,'light') + ';', '  --' + n + '-dm: ' + baseHex(p,n,'dark') + ';'));
   L.push('', '  /* 2. Generated values per mode: faint > soft > base > strong > intense scales, neutrals, hover, effects */');
   T.forEach(([k,a,b]) => { if (a === b) return; if (a[0] === '#') L.push('  --' + k + '-light: ' + a + ';'); if (b[0] === '#') L.push('  --' + k + '-dark: ' + b + ';'); });
   L.push('', '  /* 3. Tokens: what components use. Light values here; the dark block below re-points the ones that change.', '     Semantic tokens only reference other tokens, so they follow the mode. */');
   T.forEach(([k,a,b]) => L.push('  --' + k + ': ' + (a === b ? a : modeRef(k, a, 'light')) + ';'));
-  L.push('}', '', '/* Dark mode: prefers-color-scheme (Appearance.setColorScheme on React Native). To force a mode in a browser,', '   import the scheme file (palette.mjs --scheme) after this one and set color-scheme on <html>. */', '@media (prefers-color-scheme: dark) {', '  :root {');
+  L.push('}', '', '/* Dark mode: prefers-color-scheme (Appearance.setColorScheme on React Native). To force a mode in a browser,', '   import the scheme file (palette.ts --scheme) after this one and set color-scheme on <html>. */', '@media (prefers-color-scheme: dark) {', '  :root {');
   T.forEach(([k,a,b]) => { if (a !== b) L.push('    --' + k + ': ' + modeRef(k, b, 'dark') + ';'); });
   L.push('  }', '}');
   return L.join('\n');
 }
-function buildSchemeCss(p, prefix) {
-  const T = webTokens(p, prefix ? '--' + prefix + '-' : '--');
+function buildSchemeCss(p) {
+  const T = webTokens(p);
   const L = ['/* Generated with the design palette. Browser only: never import it on React Native, where react-native-css', '   turns light-dark() into arrays. Import it after the theme; color-scheme on <html> then picks the mode. */', ':root {', '  color-scheme: light dark;'];
   T.forEach(([k,a,b]) => { if (a !== b) L.push('  --' + k + ': light-dark(' + modeRef(k, a, 'light') + ', ' + modeRef(k, b, 'dark') + ');'); });
   L.push('}');
@@ -396,7 +430,7 @@ function buildThumbnail(p, title) {
   const bg = baseHex(p, 'primary', 'light'), fg = baseHex(p, onRef(p, 'primary', 'light') === 'text' ? 'font' : 'font-inverted', 'light');
   const t = String(title || 'Palette').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const strip = Object.keys(p.status).map(k => '<div style="flex:1;background:' + baseHex(p, k, 'light') + '"></div>').join('');
-  return '<!doctype html>\n<!-- Generated by design-palette/scripts/palette.mjs from the palette inputs. Do not edit. -->\n<html><head><meta charset="utf-8"><title>' + t + '</title>' +
+  return '<!doctype html>\n<!-- Generated by design-palette/scripts/palette.ts from the palette inputs. Do not edit. -->\n<html><head><meta charset="utf-8"><title>' + t + '</title>' +
     '<style>html,body{margin:0;height:100%}body{display:flex;background:' + bg + ';color:' + fg + ';font:700 clamp(32px,12vw,160px)/1 system-ui,sans-serif;letter-spacing:-0.03em}</style></head>' +
     '<body><div style="flex:1;display:grid;place-items:center;padding:0 6vw;text-align:center">' + t + '</div><div style="width:4vw;display:flex;flex-direction:column">' + strip + '</div></body></html>\n';
 }
@@ -404,32 +438,78 @@ function buildThumbnail(p, title) {
 function tokensFor(p, m) {
   const T = [], lm = m === 'light', f = p.font[m], b = p.background[m], r = p.border[m], W = '#ffffff', K = '#000000';
   families(p).forEach(n => { T.push([n, baseHex(p,n,m)]); SCALE.forEach(st => T.push([n + '-' + st, scaleHex(p,n,m,st)])); });
-  T.push(['bg', b], ['bg-faint', mixHex(f, lm ? 6 : 11, b)], ['bg-soft', mixHex(f, lm ? 10 : 15, b)], ['bg-strong', r], ['bg-intense', mixHex(r,80,f)],
+  T.push(['bg', b], ['bg-faint', mixHex(f, lm ? 6 : 11, b)], ['bg-soft', mixHex(f, lm ? 10 : 15, b)], ['bg-strong', mixHex(f, lm ? 14 : 20, b)], ['bg-intense', mixHex(f, lm ? 31 : 36, b)],
+    ['border', r], ['border-strong', mixHex(r,80,f)],
     ['bg-elevated', lm ? mixHex(b,30,W) : mixHex(f,5,b)], ['bg-inset', lm ? mixHex(f,3,b) : mixHex(b,80,K)],
     ['text', f], ['text-inverted', p.fontInverted[m]], ['text-faint', mixHex(f,45,b)], ['text-soft', mixHex(f,68,b)], ['text-strong', mixHex(f,85, lm ? K : W)], ['text-intense', mixHex(f,70, lm ? K : W)]);
   const ref = k => 'var(--color-' + k + ')';
-  T.push(['bg-hover', ref('bg-faint')], ['bg-active', ref('bg-soft')], ['border', ref('bg-strong')], ['border-strong', ref('bg-intense')], ['border-input', ref('text-faint')], ['text-muted', ref('text-soft')], ['text-disabled', ref('text-faint')], ['bg-disabled', ref('bg-soft')], ['focus-ring', ref('primary-strong')], ['link', ref('primary-text')], ['link-hover', ref('primary-strong')]);
-  intentsOf(p).forEach(n => T.push([n + '-bg', ref(n + '-faint')], [n + '-bg-hover', ref(n + '-soft')], [n + '-border', ref(n + '-soft')], [n + '-text', ref(n + '-intense')], ['text-on-' + n, ref(onRef(p,n,m))]));
+  T.push(['bg-hover', ref('bg-faint')], ['bg-active', ref('bg-soft')], ['border-input', ref('text-faint')], ['text-muted', ref('text-soft')], ['text-disabled', ref('text-faint')], ['bg-disabled', ref('bg-soft')], ['focus-ring', ref('primary-strong')], ['link', ref('primary-text')], ['link-hover', ref('primary-strong')]);
+  intentsOf(p).forEach(n => T.push([n + '-bg', ref(n + '-faint')], [n + '-bg-hover', ref(n + '-soft')], [n + '-border', ref(n + '-soft')], [n + '-border-strong', ref(borderRef(p, n, m))], [n + '-text', ref(textRef(p, n, m))], ['text-on-' + n, ref(onRef(p,n,m))]));
+  if (intentsOf(p).includes('danger')) T.push(['focus-ring-danger', ref('danger-border-strong')]);
   const sh = (x, o) => { const [l,a,b2] = hexToLab(x); return labToHex([l + o.sign * o.d, a, b2]); };
-  families(p).forEach(n => { const x = baseHex(p,n,m); T.push([n + '-hover', sh(x, hoverMix(x, false, false))], [n + '-active', sh(x, hoverMix(x, false, true))]); });
+  families(p).forEach(n => { const x = baseHex(p,n,m), s = scaleHex(p,n,m,'soft'); T.push([n + '-hover', sh(x, hoverMix(x, false, false))], [n + '-active', sh(x, hoverMix(x, false, true))], [n + '-bg-active', sh(s, hoverMix(s, false, false))]); });
   T.push(['overlay', lm ? '#00000073' : '#000000a6'], ['shadow', lm ? f + '2e' : '#0000008c']);
   return T;
 }
-function buildMobileCss(p) {
-  const L = ['/* Generated from the Theme Palette card: the theme plus Tailwind v4 utilities for its tokens. Re-export instead of editing. */', '@import "tailwindcss";', '', buildWebCss(p, ''), '', '/* Utilities: bg-primary, bg-primary-bg, text-primary-text, border-border… inline keeps them following the mode */', '@theme inline {'];
-  tokensFor(p, 'light').forEach(([k]) => L.push('  --color-' + k + ': var(--' + k + ');'));
+// Same names as palette.ts: text-<ns>-muted, bg-<ns>-elevated, bg-<ns>-primary-subtle… (see its comment).
+const ROLE_NS = { text:'--text-color-', bg:'--background-color-', border:'--border-color-' };
+function namespacedNames(p, ns) {
+  const intents = intentsOf(p), out = { text:[], bg:[], border:[] };
+  const add = (role, name, k) => { if (!out[role].some(([n]) => n === name)) out[role].push([name, k]); };
+  tokensFor(p, 'light').forEach(([k]) => {
+    const role = Object.keys(ROLE_NS).find(r => k === r || k.startsWith(r + '-'));
+    if (role) return add(role, ns + k.slice(role.length), k);
+    const i = intents.find(n => k === n || k.startsWith(n + '-'));
+    if (!i) return;
+    const rest = k.slice(i.length);
+    if (rest === '' || rest === '-hover' || rest === '-active') add('bg', ns + '-' + k, k);
+    else if (rest === '-bg' || rest === '-bg-hover' || rest === '-bg-active') add('bg', ns + '-' + i + '-subtle' + rest.slice(3), k);
+    else if (rest === '-text') add('text', ns + '-' + i, k);
+    else if (rest === '-border') add('border', ns + '-' + i, k);
+    else if (rest === '-border-strong') add('border', ns + '-' + i + '-strong', k);
+  });
+  return out;
+}
+function buildTailwindCss(p, ns) {
+  if (!ns) return '/* No Tailwind namespace yet: set palette.namespace in design.manifest.json, then re-seed the card (palette.ts --to-card --namespace <name>). */';
+  const L = ['/* Generated from the Theme Palette card: the theme plus Tailwind v4 utilities for its tokens. Re-export instead of editing. */', '@import "tailwindcss";', '', buildWebCss(p), '',
+    '/* text-' + ns + ', text-' + ns + '-muted, bg-' + ns + '-elevated, border-' + ns + '-strong, bg-' + ns + '-primary (solid), bg-' + ns + '-primary-subtle (tint), text-' + ns + '-primary… */', '@theme inline {'];
+  tokensFor(p, 'light').forEach(([k]) => L.push('  --color-' + ns + '-' + k + ': var(--' + k + ');'));
+  Object.entries(namespacedNames(p, ns)).forEach(([role, names]) => names.forEach(([n, k]) => L.push('  ' + ROLE_NS[role] + n + ': var(--' + k + ');')));
   L.push('}');
   return L.join('\n');
 }
 
-const MESSAGES = { info:'A new version of the palette is available.', danger:'Two colors fail contrast on buttons.', success:'Tokens exported to your clipboard.', warning:'Quinary falls back to primary.' };
-const NEUTRAL_MAP = {
-  'bg': 'background input', 'bg-elevated': 'lighter than bg (literal)', 'bg-inset': 'darker than bg (literal)',
-  'bg-hover': '--bg-faint', 'bg-active': '--bg-soft', 'border': '--bg-strong (border input)', 'border-strong': '--bg-intense', 'border-input': '--text-faint (3:1)', 'bg-disabled': '--bg-soft',
-  'text': 'font input', 'text-inverted': 'font-inverted input', 'text-muted': '--text-soft', 'text-disabled': '--text-faint',
-  'focus-ring': '--primary-strong', 'link': '--primary-text', 'link-hover': '--primary-strong', 'overlay': 'black, per mode', 'shadow': 'per mode'
-};
-const NEUTRALS = Object.keys(NEUTRAL_MAP);
+const MESSAGES = { info:'A new version of the palette is available.', danger:'Two colors fail contrast on buttons.', success:'Tokens exported to your clipboard.', warning:'One border is below 3:1 on the page.' };
+// Semantic rows, one per role. `needs` names the status color a token exists for; without it the slot shows as missing.
+const SEM_ROWS = [
+  { title:'Background', note:'bg-noa-*', kind:'bg', tokens:[['bg', 'background input'], ['bg-elevated', 'lighter than bg (literal)'], ['bg-inset', 'darker than bg (literal)'], ['bg-hover', '--bg-faint'], ['bg-active', '--bg-soft'], ['bg-disabled', '--bg-soft']] },
+  { title:'Border', note:'border-noa-*', kind:'line', tokens:[['border', 'border input'], ['border-strong', 'border + 20% font'], ['border-input', '--text-faint (3:1)']] },
+  { title:'Text', note:'text-noa-*', kind:'text', tokens:[['text', 'font input'], ['text-muted', '--text-soft (4.5:1)'], ['text-disabled', '--text-faint'], ['text-inverted', 'font-inverted input']] },
+  { title:'Link', note:'text-noa-link…', kind:'text', tokens:[['link', '--primary-text'], ['link-hover', '--primary-strong']] },
+  { title:'Focus', note:'ring-noa-focus-ring…', kind:'ring', tokens:[['focus-ring', '--primary-strong'], ['focus-ring-danger', '--danger-border-strong', 'danger']] },
+  { title:'Effects', note:'own alpha', kind:'fx', tokens:[['overlay', 'black, per mode'], ['shadow', 'per mode']] }
+];
+const MISSING = 'background:transparent;border:1px dashed var(--border-strong)';
+const semStyle = (kind, t) => kind === 'bg' ? 'background:var(--' + t + ');box-shadow:inset 0 0 0 1px var(--border)'
+  : kind === 'line' ? 'background:var(--bg);border:2px solid var(--' + t + ')'
+  : kind === 'text' ? 'color:var(--' + t + ');background:' + (t === 'text-inverted' ? 'var(--text)' : 'var(--bg)') + ';box-shadow:inset 0 0 0 1px var(--border)'
+  : kind === 'ring' ? 'background:var(--bg-elevated);box-shadow:inset 0 0 0 1px var(--border);outline:2px solid var(--' + t + ');outline-offset:2px'
+  : t === 'overlay' ? 'background:linear-gradient(var(--overlay), var(--overlay)), repeating-linear-gradient(45deg, var(--text) 0 6px, var(--bg) 6px 12px)'
+  : 'background:var(--bg-elevated);box-shadow:0 6px 16px var(--shadow), inset 0 0 0 1px var(--border)';
+// Intent matrix: one row per token, one column per brand and status color. `kind` picks how the cell shows it (fill, edge, text).
+const INTENT_ROWS = [
+  { group:'Fill', tok:'X', kind:'bg', note:'bg-noa-X' },
+  { tok:'-hover', kind:'bg', map:'hover' },
+  { tok:'-active', kind:'bg', map:'active' },
+  { tok:'text-on-X', kind:'on', note:'on the fill, 4.5:1' },
+  { group:'Subtle', tok:'-bg', kind:'bg', map:'faint', note:'bg-noa-X-subtle' },
+  { tok:'-bg-hover', kind:'bg', map:'soft' },
+  { tok:'-bg-active', kind:'bg', map:'soft-active' },
+  { group:'Border', tok:'-border', kind:'line', map:'soft', note:'border-noa-X' },
+  { tok:'-border-strong', kind:'line', map:'border', note:'3:1' },
+  { group:'Text', tok:'-text', kind:'text', map:'text', note:'text-noa-X, 4.5:1' }
+];
 
 class Component extends DCLogic {
   constructor(props) {
@@ -462,7 +542,7 @@ class Component extends DCLogic {
     document.documentElement.style.colorScheme = this.state.mode;
     document.documentElement.dataset.theme = this.state.mode;
   }
-  webCss() { return buildWebCss(this.state.pal, this.props.prefix ?? '') + '\n\n' + buildSchemeCss(this.state.pal, this.props.prefix ?? ''); }
+  webCss() { return buildWebCss(this.state.pal) + '\n\n' + buildSchemeCss(this.state.pal); }
   setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) }), () => { if (this.state.preset === 'project') window.designNav?.setPalette?.(toInputs(this.state.pal)); }); }
   row(name, entry, get, extra = {}) {
     const m = this.state.mode, hex = entry[m];
@@ -479,7 +559,7 @@ class Component extends DCLogic {
       { canRemove: i === n - 1 && i >= 2, onRemove: () => this.setPal(q => (q.brand.pop(), q)) }));
     const groups = [
       { title:'Brand', note: n + ' of 5 · from logo', rows:brandRows, showAdd:n < 5, addName:BRAND[n] || '', onAdd:() => this.setPal(q => { const c = ['#453f78','#759aab','#faf2a1'][q.brand.length - 2] || '#888888'; q.brand.push({ light:c, dark:c }); return q; }) },
-      { title:'Base', note:'Inputs for --text, --text-inverted, --bg, --border', rows:[this.row('text', p.font, q => q.font, { label:'font → --text' }), this.row('text-inverted', p.fontInverted, q => q.fontInverted, { label:'font-inverted', only:[] }), this.row('bg', p.background, q => q.background, { label:'background → --bg' }), this.row('border', p.border, q => q.border, { label:'border → --bg-strong', only:[] })] },
+      { title:'Base', note:'Inputs for --text, --text-inverted, --bg, --border', rows:[this.row('text', p.font, q => q.font, { label:'font → --text' }), this.row('text-inverted', p.fontInverted, q => q.fontInverted, { label:'font-inverted', only:[] }), this.row('bg', p.background, q => q.background, { label:'background → --bg' }), this.row('border', p.border, q => q.border, { label:'border → --border', only:[] })] },
       { title:'Status', note:'Feedback states', rows:Object.keys(p.status).map(k => this.row(k, p.status[k], q => q.status[k])) }
     ];
     const audit = runAudit(p), bad = audit.filter(c => !c.pass), issuesBy = {};
@@ -494,7 +574,7 @@ class Component extends DCLogic {
         sample: c.kind === 'text' ? 'Aa' : c.kind === 'brand' ? '●' : '' }; });
     const fam = k => ({ bg:'var(--' + k + ')', fg:'var(--text-on-' + k + ')', faint:'var(--' + k + '-bg)', soft:'var(--' + k + '-border)', strong:'var(--' + k + '-strong)', raised:'var(--' + k + '-text)' });
     const closeAll = () => this.setState({ pop:null });
-    const css = s.tab === 'web' ? this.webCss() : s.tab === 'mobile' ? buildMobileCss(p) : JSON.stringify(toInputs(p), null, 2);
+    const css = s.tab === 'web' ? this.webCss() : s.tab === 'mobile' ? buildTailwindCss(p, this.props.namespace) : JSON.stringify(toInputs(p), null, 2);
     return {
       css, exportHint: s.tab === 'web' ? 'The theme (plain values, flipped by prefers-color-scheme) plus the browser scheme block, so color-scheme on <html> can force a mode.' : s.tab === 'mobile' ? 'The theme plus Tailwind v4 utilities, for a mobile-only project. React Native follows prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. design-loop reads it when the palette is approved.',
       inputsTabBg: s.tab === 'inputs' ? 'var(--bg-elevated)' : 'transparent', setInputsTab: () => this.setState({ tab:'inputs', copied:false }),
@@ -505,16 +585,35 @@ class Component extends DCLogic {
       auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + audit.filter(c => c.m === 'light').length + ' light / ' + audit.filter(c => c.m === 'dark').length + ' dark checks',
       auditToggleLabel: s.auditAll ? 'Show issues only' : 'Show all checks', toggleAuditAll: () => this.setState(st => ({ auditAll: !st.auditAll })),
       modeName: s.mode,
-      neutrals: NEUTRALS.map(t => ({ name:t, bg:'var(--' + t + ')', map: NEUTRAL_MAP[t] })),
-      intents: [...p.brand.map((_,i) => BRAND[i]), ...Object.keys(p.status)].map(k => ({ label:'--' + k, surface:'var(--' + k + '-bg)', border:'var(--' + k + '-border)', text:'var(--' + k + '-text)',
-        rows: [
-          { tok:'-bg', bg:'var(--' + k + '-bg)', map:'--' + k + '-faint' },
-          { tok:'-bg-hover', bg:'var(--' + k + '-bg-hover)', map:'--' + k + '-soft' },
-          { tok:'-border', bg:'var(--' + k + '-border)', map:'--' + k + '-soft' },
-          { tok:'-text', bg:'var(--' + k + '-text)', map:'--' + k + '-intense' },
-          { tok:'-hover', bg:'var(--' + k + '-hover)', map: (hm => 'L ' + (hm.sign > 0 ? '+' : '−') + hm.d)(hoverMix(baseHex(p, k, s.mode), false, false)) },
-          { tok:'text-on-' + k, bg:'var(--text-on-' + k + ')', map:'--' + onRef(p, k, s.mode) }
-        ] })),
+      semRows: SEM_ROWS.map(g => ({ title:g.title, note:g.note, tokens: g.tokens.map(([t, map, needs]) => { const miss = needs && !p.status[needs];
+        return { name:t, map: miss ? 'needs a ' + needs + ' status color' : '→ ' + map, style: miss ? MISSING : semStyle(g.kind, t), sample: !miss && g.kind === 'text' ? 'Aa' : '', op: miss ? 0.6 : 1 }; }) })),
+      ...(() => {
+        const ks = families(p), m = s.mode, sign = hm => 'L ' + (hm.sign > 0 ? '+' : '−') + hm.d;
+        const mapOf = (k, r) => {
+          switch (r.map) {
+            case 'hover': return sign(hoverMix(baseHex(p, k, m), false, false));
+            case 'active': return sign(hoverMix(baseHex(p, k, m), false, true));
+            case 'faint': return '→ --' + k + '-faint';
+            case 'soft': return '→ --' + k + '-soft';
+            case 'soft-active': return '--' + k + '-soft, ' + sign(hoverMix(scaleHex(p, k, m, 'soft'), false, false));
+            case 'border': return '→ --' + borderRef(p, k, m);
+            case 'text': return '→ --' + textRef(p, k, m);
+            default: return r.tok === 'text-on-X' ? '→ --' + onRef(p, k, m) : 'input';
+          } };
+        const cell = (k, r) => { const v = 'var(--' + (r.tok === 'X' ? k : r.tok === 'text-on-X' ? 'text-on-' + k : k + r.tok) + ')';
+          return { name: r.tok === 'X' ? '--' + k : r.tok === 'text-on-X' ? '--text-on-' + k : '--' + k + r.tok, map: mapOf(k, r),
+            sample: r.kind === 'on' || r.kind === 'text' ? 'Aa' : '',
+            style: r.kind === 'bg' ? 'background:' + v + ';box-shadow:inset 0 0 0 1px var(--border)'
+              : r.kind === 'line' ? 'background:var(--bg);border:2px solid ' + v
+              : r.kind === 'on' ? 'background:var(--' + k + ');color:' + v
+              : 'background:var(--' + k + '-bg);color:' + v }; };
+        return {
+          intentCols: '120px repeat(' + ks.length + ', minmax(92px, 1fr))', intentMinWidth: (120 + ks.length * 100) + 'px',
+          intentHeads: ks.map(k => ({ name:k, note: BRAND.includes(k) ? 'brand' : 'status' })),
+          intentRows: INTENT_ROWS.map(r => ({ group: r.group || '', tok: r.tok === 'X' ? '--X' : r.tok === 'text-on-X' ? '--text-on-X' : r.tok, note: r.note || '',
+            rule: r.group ? '1px solid var(--border)' : 'none', cells: ks.map(k => cell(k, r)) }))
+        };
+      })(),
       brandList: p.brand.map((_,i) => ({ label: cap(BRAND[i]), ...fam(BRAND[i]), hov: 'var(--' + BRAND[i] + '-hover)' })),
       statusList: Object.keys(p.status).map(k => ({ label: cap(k), message: MESSAGES[k], ...fam(k), hov: 'var(--' + k + '-hover)' })),
       infoPopOpen: s.pop === 'info', toggleInfoPop: () => this.setState(st => ({ pop: st.pop === 'info' ? null : 'info' })),

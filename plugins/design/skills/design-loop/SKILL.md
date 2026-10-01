@@ -97,10 +97,14 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 
 Every component consumes its tokens, so its task (step 2) runs **before** the components.
 
+`<palette.ts>` is the repo's copy (`palette.script`) when set, checked against the plugin's
+[`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts) first, else the
+plugin's (contract §5).
+
 1. Step 1 saved the card as `/tmp/design-loop/palette.target.html`. Show what changed:
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --diff-card /tmp/design-loop/palette.target.html
+   node <palette.ts> <localPath> --diff-card /tmp/design-loop/palette.target.html
    ```
 
 2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
@@ -110,7 +114,7 @@ Every component consumes its tokens, so its task (step 2) runs **before** the co
    run regenerates the project thumbnail (its title comes from the card):
 
    ```bash
-   node ${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.mjs <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile>] [--json <outputs.json>] \
+   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] \
      --thumbnail /tmp/design-loop/thumbnail.html
    ```
 

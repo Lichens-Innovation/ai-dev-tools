@@ -35,7 +35,7 @@ so every card in the project shares:
 ## Where the colors live
 
 The card reads the project palette from its `inputs` prop (`{ "primary": { "lm": "#…", "dm": "#…" }, … }`),
-written by `palette.mjs --to-card`. Swatch and footer edits are a draft; to keep them, paste the
+written by `palette.ts --to-card`. Swatch and footer edits are a draft; to keep them, paste the
 footer's **Copy request** in Claude Design's chat (or paste the card's **Export → Inputs JSON**
 into `inputs`). The card's `inputs` are what `design-loop` applies when the palette is approved.
 A component may not use the input its name suggests (a "primary" button can be filled with
@@ -45,7 +45,8 @@ A component may not use the input its name suggests (a "primary" button can be f
 
 `design-init` does this automatically (seed + reconcile). Manually:
 
-1. Write the inputs and title: `node palette.mjs <canonical> --to-card <card> --title "<name>"`.
+1. Write the inputs and title: `node palette.ts <canonical> --to-card <card> --title "<name>" --namespace <palette.namespace>`
+   (the card's Tailwind export uses it).
 2. Upload it to the bound project's root as `Palette.dc.html`, with `design-nav.js` beside it
    (`DesignSync finalize_plan`, then `write_files`). The Pages list only shows root files, and
    the Design System view labels each card by its file name.
@@ -54,7 +55,7 @@ A component may not use the input its name suggests (a "primary" button can be f
    existing one.
 4. Record the card in the manifest's `palette` entry (contract §2). Approving the palette card
    triggers `design-loop` to copy the approved inputs back into the canonical file and re-run
-   `palette.mjs`.
+   `palette.ts`.
 
 The first line, `<!-- @dsCard group="Colors" -->`, files the card under **Colors** in the Design
 System view. Keep it when editing the card.
