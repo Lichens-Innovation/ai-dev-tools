@@ -67,21 +67,27 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
    [`palette-preview.dc.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/palette-preview.dc.html)
    to `/tmp/design-init/palette.html` and
    [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js) (the navbar
-   and card sidebar the project's cards share) to `/tmp/design-init/design-nav.js`, then write
-   the repo's inputs and name into the card and generate the project thumbnail:
+   and card sidebar the project's cards share) to `/tmp/design-init/design-nav.js`. When a
+   Tailwind namespace was chosen, also copy
+   [`tailwind-classes.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/tailwind-classes.html)
+   (every palette class, with its swatch) to `/tmp/design-init/tailwind.html`. Then write the
+   repo's inputs and name into the card and generate the project thumbnail:
 
    ```bash
    node <palette.ts> <canonical> --to-card /tmp/design-init/palette.html \
      --title "<repo name>" --namespace <name> --thumbnail /tmp/design-init/thumbnail.html
    ```
 
-   Upload the card, the navbar and the thumbnail to the project root: the Pages list only shows
-   root files, and the Design System view labels each card by its file name. `DesignSync
-finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js", "thumbnail.html"]`,
-   `deletes: []`, `localDir: /tmp/design-init`), then `DesignSync write_files` with that `planId`
-   and `{ path: "Palette.dc.html", localPath: "palette.html" }`,
+   Upload the card, the navbar, the thumbnail and the Tailwind card (when copied) to the project
+   root: the Pages list only shows root files, and the Design System view labels each card by its
+   file name. `DesignSync finalize_plan` (`writes: ["Palette.dc.html", "design-nav.js",
+   "thumbnail.html", "Tailwind.html"]`, `deletes: []`, `localDir: /tmp/design-init`), then
+   `DesignSync write_files` with that `planId` and `{ path: "Palette.dc.html", localPath: "palette.html" }`,
    `{ path: "design-nav.js", localPath: "design-nav.js" }`,
-   `{ path: "thumbnail.html", localPath: "thumbnail.html" }`. Claude Design's design-system check
+   `{ path: "thumbnail.html", localPath: "thumbnail.html" }` and
+   `{ path: "Tailwind.html", localPath: "tailwind.html" }`. The Tailwind card has no palette code
+   or inputs of its own (it reads them from `Palette.dc.html` through the navbar), so it is
+   uploaded as is. Claude Design's design-system check
    reports a project without a root `thumbnail.html`. It is generated from the inputs: never
    hand-edit it, and replace one Claude Design created by itself.
 
