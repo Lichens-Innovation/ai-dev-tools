@@ -1,0 +1,154 @@
+<!-- @dsCard group="Colors" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailwind classes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="./design-nav.js"></script>
+<!--
+  Tailwind classes card: every utility the palette generates under the project's Tailwind namespace, with a live swatch,
+  the token it points to and its value in the current mode. A click copies the class. Upload it to the project root as
+  Tailwind.html, beside Palette.dc.html and design-nav.js: it has no palette code of its own, it uses the engine and the
+  namespace design-nav.js reads from Palette.dc.html, so it follows the palette footer's draft and the light/dark switch.
+-->
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Instrument Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;background:var(--bg,#fff);color:var(--text,#111);-webkit-font-smoothing:antialiased}
+main{width:100%;max-width:1216px;margin:0 auto;padding:32px clamp(16px,4vw,48px) 80px;display:flex;flex-direction:column;gap:32px;min-width:0}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#6b7280)}
+h1{margin:0;font-size:28px;letter-spacing:-0.02em}
+h2{margin:0;font-size:20px;letter-spacing:-0.01em}
+.lead{margin:4px 0 0;color:var(--text-muted,#6b7280);max-width:70ch;text-wrap:pretty}
+code{font:500 12px 'IBM Plex Mono',monospace}
+.search{width:min(360px,100%);height:38px;padding:0 12px;border-radius:8px;border:1px solid var(--border-input,#9ca3af);background:var(--bg-elevated,#fff);color:inherit;font:inherit;outline:none}
+.search:focus{border-color:var(--focus-ring,#4f46e5);box-shadow:0 0 0 3px var(--primary-bg,#eef2ff)}
+.note{padding:16px 20px;border-radius:12px;border:1px solid var(--border,#e5e7eb);background:var(--bg-elevated,#fff);color:var(--text-muted,#6b7280)}
+#tw-body{display:flex;flex-direction:column;gap:48px}
+section{display:flex;flex-direction:column;gap:12px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.count{font-size:12px;color:var(--text-muted,#6b7280)}
+.utils{display:flex;flex-wrap:wrap;gap:4px}
+.utils button{height:30px;padding:0 10px;border:1px solid var(--border,#e5e7eb);border-radius:7px;background:transparent;color:inherit;font:500 12px 'IBM Plex Mono',monospace;cursor:pointer}
+.utils button:hover{background:var(--bg-hover,#f3f4f6)}
+.utils button[aria-pressed=true]{border-color:transparent;background:var(--primary,#4f46e5);color:var(--text-on-primary,#fff)}
+.group{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--border,#e5e7eb)}
+.group-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted,#6b7280)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+.tile{display:flex;align-items:center;gap:10px;min-width:0;padding:8px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:var(--bg-elevated,#fff);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.tile:hover{background:var(--bg-hover,#f3f4f6)}
+.tile:focus-visible{outline:2px solid var(--focus-ring,#4f46e5);outline-offset:2px}
+.swatch{flex:none;width:40px;height:40px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:15px}
+.label{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cls{font:500 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere}
+.meta{font:400 11px 'IBM Plex Mono',monospace;color:var(--text-muted,#6b7280);overflow-wrap:anywhere}
+.copied .meta{color:var(--success-text,#166534)}
+.empty{color:var(--text-muted,#6b7280)}
+</style>
+</head>
+<body>
+<main>
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <div>
+      <div class="eyebrow" id="tw-ns"></div>
+      <h1>Tailwind classes</h1>
+      <p class="lead">Every palette utility for the project, with what it points to in the current mode. Click a class to copy it. Never add an opacity modifier (<code>/50</code>): use the state's own class.</p>
+    </div>
+    <input class="search" id="tw-search" type="search" placeholder="Filter: muted, danger, hover…" aria-label="Filter the classes" spellcheck="false">
+  </header>
+  <div id="tw-body"><div class="note">Reading the palette from Palette.dc.html…</div></div>
+</main>
+<script>
+(() => {
+  // Role sections: the names namespacedNames gives each role; the last section is any token on any color utility.
+  const ROLES = [['text', 'Text', 'text-'], ['bg', 'Background', 'bg-'], ['border', 'Border', 'border-']];
+  const UTILS = ['bg', 'text', 'border', 'ring', 'outline', 'divide', 'fill', 'stroke', 'shadow', 'accent', 'caret', 'decoration', 'placeholder'];
+  const TEXTISH = ['text', 'caret', 'decoration', 'placeholder'], LINEISH = ['border', 'ring', 'outline', 'divide', 'stroke'];
+  const S = { q: '', util: 'bg', copied: null };
+  const body = document.getElementById('tw-body'), search = document.getElementById('tw-search');
+  const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
+
+  function copy(text) {
+    const done = () => { S.copied = text; render(); setTimeout(() => { if (S.copied === text) { S.copied = null; render(); } }, 1200); };
+    const fallback = () => { const t = el('textarea', { value: text }); t.style.cssText = 'position:fixed;top:0;opacity:0'; document.body.append(t); t.select(); try { document.execCommand('copy'); } catch {} t.remove(); done(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+  // How a swatch shows a token: as text on its background, as a 2px edge, or as a fill.
+  function swatch(kind, k) {
+    const s = el('div', { className: 'swatch' });
+    if (kind === 'text') {
+      const on = k.startsWith('text-on-') ? 'var(--' + k.slice(8) + ')' : k === 'text-inverted' ? 'var(--text)' : 'var(--bg)';
+      s.style.cssText = 'background:' + on + ';color:var(--' + k + ');box-shadow:inset 0 0 0 1px var(--border)';
+      s.textContent = 'Aa';
+    } else if (kind === 'line') s.style.cssText = 'background:var(--bg);box-shadow:inset 0 0 0 2px var(--' + k + ')';
+    else s.style.cssText = 'background:var(--' + k + ');box-shadow:inset 0 0 0 1px var(--border)';
+    return s;
+  }
+  function tile(cls, k, kind, hex) {
+    const copied = S.copied === cls;
+    const b = el('button', { type: 'button', className: 'tile' + (copied ? ' copied' : ''), ariaLabel: 'Copy ' + cls, onclick: () => copy(cls) }, [
+      swatch(kind, k),
+      el('span', { className: 'label' }, [el('span', { className: 'cls', textContent: cls }), el('span', { className: 'meta', textContent: copied ? 'Copied' : '--' + k + (hex ? ' · ' + hex : '') })])
+    ]);
+    return b;
+  }
+  // Groups a role's entries by family: the neutrals first, then each brand and status color, its tokens in this order.
+  const SUFFIXES = ['', '-hover', '-active', '-faint', '-soft', '-strong', '-intense', '-bg', '-bg-hover', '-bg-active', '-border', '-border-strong', '-text'];
+  function grouped(entries, families) {
+    const fam = k => k.startsWith('text-on-') ? k.slice(8) : families.find(n => k === n || k.startsWith(n + '-')) || 'neutral';
+    const rank = (k, n) => n === 'neutral' ? 0 : k.startsWith('text-on-') ? SUFFIXES.length : SUFFIXES.indexOf(k.slice(n.length));
+    const order = ['neutral', ...families], by = new Map(order.map(n => [n, []]));
+    entries.forEach(e => by.get(fam(e.k)).push(e));
+    return order.filter(n => by.get(n).length).map(n => [n, by.get(n).slice().sort((a, b) => rank(a.k, n) - rank(b.k, n))]);
+  }
+  function section(label, note, entries, families, extra) {
+    const groups = grouped(entries, families);
+    return el('section', {}, [
+      el('div', { className: 'head' }, [el('div', {}, [el('h2', { textContent: label }), el('div', { className: 'count', textContent: note })]), ...(extra ? [extra] : [])]),
+      ...(groups.length ? groups.map(([n, list]) => el('div', { className: 'group' }, [el('div', { className: 'group-title', textContent: n }), el('div', { className: 'tiles' }, list.map(e => tile(e.cls, e.k, e.kind, e.hex)))]))
+        : [el('div', { className: 'empty', textContent: 'No class matches the filter.' })])
+    ]);
+  }
+  function render() {
+    const nav = window.designNav, eng = nav && nav.engine, inputs = nav && nav.palette;
+    if (!eng || !inputs) return;
+    const ns = nav.namespace;
+    document.getElementById('tw-ns').textContent = ns ? 'Namespace: ' + ns : '';
+    if (!ns) { body.replaceChildren(el('div', { className: 'note', textContent: 'No Tailwind namespace yet: set palette.namespace in design.manifest.json, then re-seed the palette card (palette.ts --to-card --namespace <name>).' })); return; }
+    const p = eng.fromInputs(inputs), hex = eng.resolver(p, nav.mode), families = eng.families(p), names = eng.namespacedNames(p, ns);
+    let st = document.getElementById('tw-tokens');
+    if (!st) { st = el('style', { id: 'tw-tokens' }); document.head.append(st); }
+    const css = eng.buildWebCss(p) + '\n' + eng.buildSchemeCss(p);
+    if (st.textContent !== css) st.textContent = css;
+    const q = S.q.trim().toLowerCase(), hit = e => !q || e.cls.includes(q) || ('--' + e.k).includes(q);
+    const sections = ROLES.map(([role, label, prefix]) => {
+      const all = names[role].map(([n, k]) => ({ cls: prefix + n, k, kind: role === 'text' ? 'text' : role === 'border' ? 'line' : 'fill', hex: hex(k) }));
+      const shown = all.filter(hit);
+      const s = section(label, shown.length + ' of ' + all.length + ' classes', shown, families);
+      s.dataset.navSection = label;
+      return s;
+    });
+    const kind = TEXTISH.includes(S.util) ? 'text' : LINEISH.includes(S.util) ? 'line' : 'fill';
+    const any = eng.tokensFor(p, 'light').map(([k]) => ({ cls: S.util + '-' + ns + '-' + k, k, kind, hex: hex(k) }));
+    const utils = el('div', { className: 'utils', role: 'group', ariaLabel: 'Utility' }, UTILS.map(u => {
+      const b = el('button', { type: 'button', textContent: u, onclick: () => { S.util = u; render(); } });
+      b.setAttribute('aria-pressed', String(u === S.util));
+      return b;
+    }));
+    const shownAny = any.filter(hit);
+    const full = section('Any utility', 'Every token by its full name, on any color utility: ' + shownAny.length + ' of ' + any.length + ' tokens', shownAny, families, utils);
+    full.dataset.navSection = 'Any utility';
+    body.replaceChildren(...sections, full);
+  }
+
+  search.addEventListener('input', () => { S.q = search.value; render(); });
+  addEventListener('design-nav:palette', render);
+  addEventListener('design-nav:mode', render);
+  render();
+})();
+</script>
+</body>
+</html>
