@@ -106,7 +106,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - If it doesn't exist, create it and add `.worktreeinclude` (unanchored: the hook reads a leading `/` as absolute) to the shared exclude.
    - If it is tracked, it is shared: show the lines and ask first. If declined, skip and say new worktrees won't get a copy.
 
-7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs`. It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
+7. **Verify.** Run `bash scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` from this skill's directory (always `bash`, never `sh`: on macOS `sh` is bash in POSIX mode and the `claude config` checks fail). It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
    - Exit 2 with `could not create a scratch ...` or `temp dir ... is not usable`: stop and report. Never point `TMPDIR` at a real directory: the script writes fake secrets there and deletes it.
    - `rm:` errors on paths outside `$TMPDIR`: stop immediately, tell the user, run nothing else.
 

@@ -5,6 +5,8 @@
 # Exits non-zero if any case gets the wrong decision.
 
 set -u
+# Under `sh` on macOS (bash in POSIX mode), `VAR=x check ...` would leak VAR into later checks.
+set +o posix
 
 die() { echo "test-guardrails: $*" >&2; exit 2; }
 
