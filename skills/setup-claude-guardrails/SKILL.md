@@ -30,17 +30,19 @@ Everything below is installed per **checkout** — the main checkout and each li
 ## Target files (per checkout)
 
 - `.claude/hooks/guardrails.mjs` — copied from this skill's `scripts/guardrails.mjs`
+- `.claude/rules/guardrails.md` — copied from this skill's `assets/guardrails.md`: tells Claude which tools to avoid and how to phrase commands so the hook doesn't reject them (loads every session, no `paths:` filter)
 - `.claude/settings.local.json` — permissions, optional sandbox, hook registration
-- `.git/info/exclude` (shared) — gets a `.claude/hooks/guardrails.mjs` line, so the script stays untracked without touching the shared `.gitignore`
-- `<main>/.worktreeinclude` — lists both files so Claude Code copies them into new worktrees
+- `.git/info/exclude` (shared) — gets `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` lines, so both stay untracked without touching the shared `.gitignore`
+- `<main>/.worktreeinclude` — lists the hook, the rule and `settings.local.json` so Claude Code copies them into new worktrees
 
 ## Workflow
 
 1. **Find the checkouts and check for an existing install** before asking anything. Read-only. If the project is a git repo, resolve the main checkout and list the linked worktrees (see above); say which checkout the session is in. In each checkout, inspect:
    - `.claude/hooks/guardrails.mjs` exists and is identical to this skill's `scripts/guardrails.mjs`
+   - `.claude/rules/guardrails.md` exists and is identical to this skill's `assets/guardrails.md`
    - `.claude/settings.local.json` (or `settings.json`) has the hook entry with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`
-   - `git check-ignore -q` succeeds for `.claude/hooks/guardrails.mjs` and `.claude/settings.local.json`
-   - and once, in the main checkout: `.worktreeinclude` lists both files
+   - `git check-ignore -q` succeeds for `.claude/hooks/guardrails.mjs`, `.claude/rules/guardrails.md` and `.claude/settings.local.json`
+   - and once, in the main checkout: `.worktreeinclude` lists all three files
 
    If **everything is in place**, report the current setup (allowed roots from `additionalDirectories`, sandbox on/off, whether git hosting commands and `open` are excluded from it, hook up to date, which checkouts have it) and ask one question: keep it as is (recommended — stop here, don't run the tests), or reconfigure (continue to step 2 with the current values as defaults). If it's **partially installed** (e.g. the hook is outdated, a deny entry is missing, a worktree lacks it), list what's missing, then continue but only fill the gaps, using the current values as defaults. If nothing is installed, continue.
 
@@ -58,7 +60,9 @@ Everything below is installed per **checkout** — the main checkout and each li
 
 4. **Copy the hook** into each chosen checkout. Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
 
-   Keep it out of git: if the project is a git repo, append `.claude/hooks/guardrails.mjs` to `$(git rev-parse --git-common-dir)/info/exclude` unless already listed (once — the file is shared). Then, in each checkout, run `git check-ignore -q .claude/hooks/guardrails.mjs` and `git check-ignore -q .claude/settings.local.json`. If either is not ignored, add that path to the exclude file too. If either path is already tracked (`git ls-files --error-unmatch <path>` succeeds), ignoring it has no effect: tell the user and ask whether to `git rm --cached` it.
+   Also copy `assets/guardrails.md` to `.claude/rules/guardrails.md` in each chosen checkout (create `.claude/rules/`; if one exists and differs, show the diff and ask before overwriting).
+
+   Keep both out of git: if the project is a git repo, append `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` to `$(git rev-parse --git-common-dir)/info/exclude` unless already listed (once — the file is shared). Then, in each checkout, run `git check-ignore -q` on those two paths and on `.claude/settings.local.json`. If either is not ignored, add that path to the exclude file too. If either path is already tracked (`git ls-files --error-unmatch <path>` succeeds), ignoring it has no effect: tell the user and ask whether to `git rm --cached` it.
 
 5. **Merge `.claude/settings.local.json`** in each chosen checkout. Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
 
@@ -138,9 +142,9 @@ Everything below is installed per **checkout** — the main checkout and each li
    - Skip the hook entry if one with the same `command` already exists.
    - Once the hook is installed it asks before any edit to a checkout's `.claude/settings*.json`, the hook itself, or `~/.claude/settings.json` — on a re-run, expect those prompts.
 
-6. **Update `.worktreeinclude`** in the main checkout's root (gitignore syntax; Claude Code copies files that match it *and* are gitignored into each worktree it creates). Append `.claude/settings.local.json` and `.claude/hooks/guardrails.mjs` unless already listed.
+6. **Update `.worktreeinclude`** in the main checkout's root (gitignore syntax; Claude Code copies files that match it *and* are gitignored into each worktree it creates). Append `.claude/settings.local.json`, `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` unless already listed.
    - If the file doesn't exist, create it and add `.worktreeinclude` to the shared `info/exclude` (unanchored: the hook reads a leading `/` as an absolute path), so it stays personal.
-   - If it is tracked (`git ls-files --error-unmatch .worktreeinclude`), it is shared with the team: show the two lines and ask before editing it. If the user declines, skip this step and say new Claude Code worktrees won't get a copy.
+   - If it is tracked (`git ls-files --error-unmatch .worktreeinclude`), it is shared with the team: show the three lines and ask before editing it. If the user declines, skip this step and say new Claude Code worktrees won't get a copy.
 
 7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` (the copies in the worktrees are identical). It builds a throwaway project under `$TMPDIR` and checks ~80 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
    - If it exits 2 with `could not create a scratch ...` or `temp dir ... is not usable`, stop and report it. Never work around it by pointing `TMPDIR` at the project or any other real directory: the script writes fake secrets into the scratch dir and deletes it afterwards.
