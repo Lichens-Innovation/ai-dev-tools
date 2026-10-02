@@ -95,7 +95,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    | Sandbox on (always, read-only: the sandbox blocks the `claude` binary, breaking step 3) | | `claude --version`, `claude -v` (exact forms only, so no unsandboxed agent session) |
    | `open` outside the sandbox | `Bash(open -a *)`, `Bash(open -b *)`, `Bash(open *://*)` | `open`, `open *`, `xdg-open`, `xdg-open *` |
 
-   Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches, never with `cd`, `$(...)`, redirections, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
+   Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
    - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
    - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
@@ -106,7 +106,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - If it doesn't exist, create it and add `.worktreeinclude` (unanchored: the hook reads a leading `/` as absolute) to the shared exclude.
    - If it is tracked, it is shared: show the lines and ask first. If declined, skip and say new worktrees won't get a copy.
 
-7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs`. It checks ~80 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
+7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs`. It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
    - Exit 2 with `could not create a scratch ...` or `temp dir ... is not usable`: stop and report. Never point `TMPDIR` at a real directory: the script writes fake secrets there and deletes it.
    - `rm:` errors on paths outside `$TMPDIR`: stop immediately, tell the user, run nothing else.
 
@@ -114,8 +114,9 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 ## Hook behavior
 
-- **scope:** allows the project (with `.claude/worktrees/`), `additionalDirectories` from project and user settings, temp dirs, devices, and `~/.claude` (or `$CLAUDE_CONFIG_DIR`). Follows symlinks and checks absolute or `..` Glob patterns. In Bash it checks absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and commands run from an out-of-scope directory unless they start with `cd <in-scope dir>`. Programs from the system bin dirs and `/opt/homebrew/bin` are allowed in command position; their arguments are still checked.
-- **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). Also blocks `.credentials.json` and `.claude.json` anywhere.
+- **scope:** allows the project (with `.claude/worktrees/`), `additionalDirectories` from project and user settings, temp dirs, devices, and `~/.claude` (or `$CLAUDE_CONFIG_DIR`). Follows symlinks and checks absolute or `..` Glob patterns. In Bash it checks absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and commands run from an out-of-scope directory unless they start with `cd <in-scope dir>`. Programs from the system bin dirs and `/opt/homebrew/bin` are allowed in command position; their arguments are still checked. Absolute paths whose top-level directory doesn't exist (`/api/users`) are skipped unless `/` is writable.
+- **messages:** text a command only stores is skipped when it has no `$` or backticks: `git commit|tag|merge|stash|notes -m`, a heredoc read by them (quoted delimiter, or no expansion in it, and not piped), and `gh`/`glab` `--title`, `--body`, `--notes`, `--description`. Commands with `$(...)`, backticks or unbalanced quotes are scanned whole. File flags (`-F`, `--body-file`, `git commit -t`) are always checked.
+- **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). `process.env` and `import.meta.env` count only if such a file exists. Also blocks `.credentials.json` and `.claude.json` anywhere.
 - **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
 - Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
@@ -123,7 +124,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 - Without the sandbox, Bash checks are a heuristic on command text: runtime paths (`$(...)`, variables, `eval`, scripts) and recursive reads (`grep -r KEY .`) get past them. With it, the OS enforces the deny rules and read block on every command.
 - Directories added with `/add-dir` for the session only are invisible to the hook until they're in a settings file's `additionalDirectories`.
-- Absolute paths in quoted strings (`grep "/api/users"`) and programs outside the system bin dirs (`~/.local/bin/...`) are denied. Use the program name from `PATH`, rephrase, or run it yourself.
+- Outside message text, a quoted string naming a real path outside scope (`grep "/etc/hosts" README.md`) and programs outside the system bin dirs (`~/.local/bin/...`) are denied. Use the program name from `PATH`, rephrase, or run it yourself.
 - Env vars already in the shell are visible to `env`; the guardrails protect files. The sandbox's `credentials.envVars` can scrub them.
 - Hooks don't apply to MCP tools.
 - With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode.
