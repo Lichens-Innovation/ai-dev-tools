@@ -13,7 +13,8 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
 - **setup-claude-guardrails** — installs native permission rules, an optional Bash sandbox, and a
   `PreToolUse` hook in the project's `.claude/` and its git worktrees (personal, untracked by git) that keep Claude
   inside a scoped directory (the project, or a parent like `~/Documents/gits`) and block access
-  to `.env` files (except `.env*.example`).
+  to `.env` files (except `.env*.example`). It also installs `.claude/rules/guardrails.md`, a rule
+  telling Claude which tools to avoid and how to phrase commands so the hook doesn't reject them.
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
