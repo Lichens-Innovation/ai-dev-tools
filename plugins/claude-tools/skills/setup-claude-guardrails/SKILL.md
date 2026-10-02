@@ -53,7 +53,7 @@ Everything below is installed per **checkout** — the main checkout and each li
 
 3. **Check prerequisites.**
    - `node --version` must be >= 18. If not, stop: the hook would fail closed on every tool call.
-   - `claude --version` must be >= 2.1.257 for `blockReadsOutsideWorkingDirectories`. If older, skip that key and tell the user to upgrade.
+   - `claude --version` must be >= 2.1.257 for `blockReadsOutsideWorkingDirectories`. If older, skip that key and tell the user to upgrade. If the command fails with `operation not permitted`, the current session's sandbox blocks it (the exclusion in step 5 only applies after a restart): ask the user to run `! claude --version` and read the result from them.
    - On Linux/WSL2 with the sandbox chosen, tell the user to run `/sandbox` afterwards to check bubblewrap is installed. Native Windows can't use the sandbox — skip it there.
 
 4. **Copy the hook** into each chosen checkout. Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
@@ -108,6 +108,17 @@ Everything below is installed per **checkout** — the main checkout and each li
      ```
 
      Excluded commands still go through permission rules and the PreToolUse hook, and `allowUnsandboxedCommands: false` doesn't stop them (it only stops the model asking to skip the sandbox). A call leaves the sandbox only when every command in it matches, and never when it uses `cd`, `$(...)`, redirections, `xargs` or `eval`.
+   - When the sandbox is chosen, always also merge the version check (no question: it is read-only). The sandbox blocks running the `claude` binary (`operation not permitted`), which breaks the prerequisite check in step 3:
+
+     ```json
+     {
+       "sandbox": {
+         "excludedCommands": ["claude --version", "claude -v"]
+       }
+     }
+     ```
+
+     Only these exact forms are excluded. `claude` with any other argument (`claude -p ...`, `claude mcp ...`) stays sandboxed, so it can't start an unsandboxed agent session.
    - If the user chose to run `open` outside the sandbox, also merge (appending to any existing `ask` / `excludedCommands` arrays, without duplicates):
 
      ```json
