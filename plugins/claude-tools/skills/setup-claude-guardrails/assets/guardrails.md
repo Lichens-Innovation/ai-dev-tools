@@ -1,29 +1,11 @@
 # Guardrails
 
-A `PreToolUse` hook (`.claude/hooks/guardrails.mjs`), permission rules and usually an OS sandbox are active in this project. Work with them instead of retrying against them.
+A PreToolUse hook, deny rules and usually a sandbox are active. Adapt to them; don't retry a denied call.
 
-## Tools
-
-- Some tools may be unavailable in a session (for example `Glob`: `No such tool available`). Don't retry them: list files with `find` or `ls` through Bash, and search content with `Grep`.
-- Use `Read` for file contents. Use `Write` / `Edit` for creating and changing files.
-- `Write` refuses to overwrite a file you haven't read in this session (`File has not been read yet`). For scratch files in `$TMPDIR`, delete a leftover with `rm -f` first, or pick a new name.
-
-## Bash
-
-- The hook scans the whole command text, heredoc bodies and quoted strings included. A path-like string (`grep "/api/users"`, a JSON description mentioning `~/.claude/...`) is treated as a path and denied as out of scope.
-  - Write multi-line or path-heavy content with the `Write` tool, never a heredoc or `echo`.
-  - Rephrase the command so no absolute path appears in an argument that isn't a real path.
-- Run programs by name from `PATH` (`node`, `python3`), not by a path under `~/.local/bin` or `/Applications`. Only the system bin dirs (`/usr/bin`, `/usr/local/bin`, `/bin`, `/sbin`, `/usr/libexec`, `/opt/homebrew/bin`) are accepted.
-- Don't `cd` out of the project. Use paths relative to it, or `cd <in-scope dir> && ...`.
-- Temp files go in `$TMPDIR` (run `echo $TMPDIR` to get the path), never a bare `/tmp`.
-- With the sandbox on, `open` and `osascript` can fail. Say so and give the user the command to run with `!`.
-
-## Scope and secrets
-
-- Stay inside the project and its `additionalDirectories`. If you need something else, ask the user instead of working around it.
-- Never read or edit `.env`, `.env.*` or `*.env` (`.env*.example`, `.sample`, `.template` and `.dist` are fine), `~/.claude.json` or `.credentials.json`. Don't build names to dodge the check (wildcards, quote-splitting, symlinks).
-
-## Prompts and denials
-
-- An `ask` on `.claude/settings*.json`, the guardrails hook or `~/.claude/settings.json` is intentional. Explain the change and wait for the user's answer.
-- A `deny` is final for that approach. Read the message (it starts with `[guardrails:...]`), change the approach, and don't retry the same command. If the task can't be done within the limits, tell the user what is missing.
+- Tools: if one is missing (e.g. `Glob`), use `find`/`ls` via Bash or `Grep`. `Write` fails on an existing file you haven't read: `rm -f` it first.
+- The hook scans the full command text, heredocs and prose included; a `/` or `~/` in a string counts as a path and is denied. Put multi-line or path-heavy text (scripts, JSON, PR/issue bodies, commit messages) in a file made with `Write`, then use `--body-file` / `-F`.
+- Run programs by name from `PATH`, not from `~/.local/bin` or `/Applications`. No `cd` outside the project. Temp files go in `$TMPDIR`.
+- `gh`, `glab`, `git push|pull|fetch` and `open` run outside the sandbox only when the call holds nothing else: no `cd`, `&&`, `;`, pipes, `$(...)`, redirections. Outside it, `$TMPDIR` differs: pass the real `/tmp/claude-<uid>/...` path.
+- `open`/`osascript` may fail in the sandbox: tell the user to run it with `!`.
+- Stay in the project and its `additionalDirectories`; ask the user for anything else. Never read or edit `.env*` (except `.example|.sample|.template|.dist`), `~/.claude.json` or `.credentials.json`, and don't dodge the check.
+- An `ask` on settings or hook files is intentional: explain and wait. After a `[guardrails:...]` deny, change approach; if impossible, tell the user what is missing.
