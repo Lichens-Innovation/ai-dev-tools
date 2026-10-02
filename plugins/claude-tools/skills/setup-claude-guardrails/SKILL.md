@@ -1,70 +1,65 @@
 ---
 name: setup-claude-guardrails
-description: "Installs guardrails in the current project's .claude/ (and its git worktrees) that (1) keep Claude Code from reading, writing, or running commands on paths outside a scoped directory (the project, or a chosen parent like ~/Documents/gits) and (2) block access to environment files (.env, .env.local, ...) except .env*.example. Combines native settings (permission deny rules, blockReadsOutsideWorkingDirectories, optional Bash sandbox) with a PreToolUse hook. Use when the user wants to sandbox Claude to the repo, protect secrets from Claude, add safety hooks, or invokes /setup-claude-guardrails."
+description: "Installs guardrails in this project's .claude/ (and its git worktrees) that keep Claude Code from reading, writing or running commands on paths outside a scoped directory (the project, or a chosen parent like ~/Documents/gits), and block env files (.env, .env.local, ...) except .env*.example. Combines permission deny rules, blockReadsOutsideWorkingDirectories, an optional Bash sandbox and a PreToolUse hook. Use when the user wants to sandbox Claude to the repo, protect secrets from Claude, add safety hooks, or invokes /setup-claude-guardrails."
 disable-model-invocation: true
 ---
 
 # Setup Claude Guardrails
 
-Install layered guardrails into the current project's `.claude/settings.local.json`. They are personal preferences, so nothing is committed: Claude Code keeps `settings.local.json` out of git, and the hook script is excluded via `.git/info/exclude`. Use the committed `.claude/settings.json` only if the user explicitly asks to share the guardrails with the team.
+Install layered guardrails into `.claude/settings.local.json`. They are personal: nothing is committed (`settings.local.json` is ignored by Claude Code, the hook and rule via `.git/info/exclude`). Use `.claude/settings.json` only if the user asks to share them with the team.
 
 | Layer | Enforced by | Covers |
 | ----- | ----------- | ------ |
-| `permissions.blockReadsOutsideWorkingDirectories` | Claude Code | `Read`, `Grep`, `Glob`, `LSP` outside the project + `additionalDirectories` |
-| `permissions.deny` `Read(...)` / `Edit(...)` rules | Claude Code | env files and Claude Code's credentials, for every file tool (and fed into the sandbox) |
-| `sandbox` (optional) | the OS (Seatbelt / bubblewrap) | what Bash commands and their child processes can actually read and write |
-| `PreToolUse` hook `scripts/guardrails.mjs` | heuristic on tool input | denies out-of-scope writes and Bash paths, env files incl. wildcards / case / symlinks, and asks before anything edits the guardrails |
+| `blockReadsOutsideWorkingDirectories` | Claude Code | `Read`, `Grep`, `Glob`, `LSP` outside the project + `additionalDirectories` |
+| `deny` `Read(...)` / `Edit(...)` rules | Claude Code | env files and Claude Code's credentials, for every file tool (also fed into the sandbox) |
+| `sandbox` (optional) | the OS (Seatbelt / bubblewrap) | what Bash commands and their children can read and write |
+| `PreToolUse` hook `scripts/guardrails.mjs` | heuristic on tool input | out-of-scope writes and Bash paths, env files (wildcards, case, symlinks), and asks before edits to the guardrails |
 
-The native layers are the real enforcement; the hook is a heuristic that catches mistakes in modes where nothing else would (e.g. `bypassPermissions`, out-of-scope writes).
+The native layers are the real enforcement; the hook catches mistakes where nothing else would (e.g. `bypassPermissions`).
 
 ## Checkouts and worktrees
 
-Everything below is installed per **checkout** — the main checkout and each linked git worktree has its own untracked `.claude/`.
+Everything is installed per checkout; each has its own untracked `.claude/`. `.git/info/exclude` is in the git common dir, shared by all.
 
-- **Main checkout**: the parent of `git rev-parse --path-format=absolute --git-common-dir`. Install here first.
-- **Claude Code worktrees** (`claude --worktree`, subagent `isolation: worktree`, desktop parallel sessions) live in `<main>/.claude/worktrees/<name>`. A session that *creates* one keeps `CLAUDE_PROJECT_DIR` and the settings of the main checkout, so the main install covers it. For a session later opened directly inside one, `.worktreeinclude` (step 6) copies the guardrail files into every new one.
-- **Other linked worktrees** (`git worktree add`, listed by `git worktree list --porcelain`) get no copy: install into each one, and re-run the skill after adding a new one.
+- **Main checkout:** the parent of `git rev-parse --path-format=absolute --git-common-dir`. Install here first.
+- **Claude Code worktrees** (`<main>/.claude/worktrees/<name>`, from `claude --worktree`, subagent `isolation: worktree`, desktop parallel sessions): a session that creates one keeps the main checkout's settings. For sessions opened inside one later, `.worktreeinclude` (step 6) copies the guardrail files into each new one.
+- **Other linked worktrees** (`git worktree list --porcelain`): install into each; re-run after adding one.
 
-`.git/info/exclude` lives in the git common dir, so it is shared by every checkout.
+## Files per checkout
 
-## Target files (per checkout)
-
-- `.claude/hooks/guardrails.mjs` — copied from this skill's `scripts/guardrails.mjs`
-- `.claude/rules/guardrails.md` — copied from this skill's `assets/guardrails.md`: tells Claude which tools to avoid and how to phrase commands so the hook doesn't reject them (loads every session, no `paths:` filter)
-- `.claude/settings.local.json` — permissions, optional sandbox, hook registration
-- `.git/info/exclude` (shared) — gets `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` lines, so both stay untracked without touching the shared `.gitignore`
-- `<main>/.worktreeinclude` — lists the hook, the rule and `settings.local.json` so Claude Code copies them into new worktrees
+- `.claude/hooks/guardrails.mjs`, from this skill's `scripts/guardrails.mjs`
+- `.claude/rules/guardrails.md`, from `assets/guardrails.md`: tells Claude how to work with the hook (loads every session)
+- `.claude/settings.local.json`: permissions, optional sandbox, hook registration
+- shared `.git/info/exclude`: the hook and rule paths
+- `<main>/.worktreeinclude`: the hook, the rule and `settings.local.json`
 
 ## Workflow
 
-1. **Find the checkouts and check for an existing install** before asking anything. Read-only. If the project is a git repo, resolve the main checkout and list the linked worktrees (see above); say which checkout the session is in. In each checkout, inspect:
-   - `.claude/hooks/guardrails.mjs` exists and is identical to this skill's `scripts/guardrails.mjs`
-   - `.claude/rules/guardrails.md` exists and is identical to this skill's `assets/guardrails.md`
-   - `.claude/settings.local.json` (or `settings.json`) has the hook entry with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`
-   - `git check-ignore -q` succeeds for `.claude/hooks/guardrails.mjs`, `.claude/rules/guardrails.md` and `.claude/settings.local.json`
-   - and once, in the main checkout: `.worktreeinclude` lists all three files
+1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
+   - the hook and rule exist and are identical to this skill's copies;
+   - settings have the hook entry with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
+   - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
+   - once, in the main checkout: `.worktreeinclude` lists all three.
 
-   If **everything is in place**, report the current setup (allowed roots from `additionalDirectories`, sandbox on/off, whether git hosting commands and `open` are excluded from it, hook up to date, which checkouts have it) and ask one question: keep it as is (recommended — stop here, don't run the tests), or reconfigure (continue to step 2 with the current values as defaults). If it's **partially installed** (e.g. the hook is outdated, a deny entry is missing, a worktree lacks it), list what's missing, then continue but only fill the gaps, using the current values as defaults. If nothing is installed, continue.
+   **All in place:** report the setup (roots from `additionalDirectories`, sandbox on/off, git hosting and `open` exclusions, hook up to date, which checkouts). Ask one question: keep it as is (recommended; stop, no tests) or reconfigure (step 2, current values as defaults). **Partial:** list the gaps and fill only those, current values as defaults. **None:** continue.
 
-2. **Ask the questions** in one `AskUserQuestion` call:
-   - "Which directories may Claude access?" — project directory only (recommended), or project + other directories (e.g. `~/Documents/gits`). If the user picks the second without naming any, ask for the paths before writing settings.
-   - "Enable the Bash sandbox?" — Yes, strict (recommended: OS-enforced, closes the Bash gaps; network access then needs per-domain approval and commands can't fall back to unsandboxed), or No (hook heuristics only for Bash).
-   - Only when the sandbox is chosen: "Run git hosting commands outside the sandbox?" — Yes (`gh`, `glab`, `git push` / `pull` / `fetch` run unsandboxed with your Keychain, SSH agent and network, while risky subcommands still prompt), or No (they fail in the sandbox: it blocks `~/.config/gh`, the Keychain, and SSH through its proxy; you run them yourself with `!`). Give no recommendation: it trades isolation for convenience.
-   - Only when the sandbox is chosen: "Run `open` outside the sandbox?" — Yes (recommended on macOS: `open` is blocked inside the sandbox, which stops skills such as `/claude-light` from opening an HTML page in the browser; the excluded command still prompts for apps and URLs), or No (you run `! open <path>` yourself).
-   - Only when linked worktrees exist: "Install in which checkouts?" — the main checkout and every worktree (recommended), or only the current checkout.
+2. **Ask** in one `AskUserQuestion` call:
+   - "Which directories may Claude access?": project only (recommended), or project + others (e.g. `~/Documents/gits`). If none are named, ask for the paths before writing.
+   - "Enable the Bash sandbox?": Yes, strict (recommended: OS-enforced; network needs per-domain approval, no unsandboxed fallback), or No (hook heuristics only).
+   - Sandbox only: "Run git hosting commands outside the sandbox?": Yes (`gh`, `glab`, `git push`/`pull`/`fetch` use your Keychain, SSH agent and network; risky subcommands prompt), or No (they fail in the sandbox; run them with `!`). No recommendation: it trades isolation for convenience.
+   - Sandbox only: "Run `open` outside the sandbox?": Yes (recommended on macOS: the sandbox blocks `open`, so skills like `/claude-light` can't open a page; apps and URLs still prompt), or No (run `! open <path>` yourself).
+   - Linked worktrees only: "Install in which checkouts?": all (recommended), or the current one.
 
-3. **Check prerequisites.**
-   - `node --version` must be >= 18. If not, stop: the hook would fail closed on every tool call.
-   - `claude --version` must be >= 2.1.257 for `blockReadsOutsideWorkingDirectories`. If older, skip that key and tell the user to upgrade. If the command fails with `operation not permitted`, the current session's sandbox blocks it (the exclusion in step 5 only applies after a restart): ask the user to run `! claude --version` and read the result from them.
-   - On Linux/WSL2 with the sandbox chosen, tell the user to run `/sandbox` afterwards to check bubblewrap is installed. Native Windows can't use the sandbox — skip it there.
+3. **Prerequisites.**
+   - `node --version` >= 18, else stop: the hook would fail closed on every call.
+   - `claude --version` >= 2.1.257 for `blockReadsOutsideWorkingDirectories`; if older, skip that key and say to upgrade. If it fails with `operation not permitted` (the session's sandbox, before step 5's exclusion applies), ask the user to run `! claude --version`.
+   - Linux/WSL2 with the sandbox: tell the user to run `/sandbox` afterwards to check bubblewrap. Native Windows: no sandbox.
 
-4. **Copy the hook** into each chosen checkout. Create `.claude/hooks/` and copy `scripts/guardrails.mjs` from this skill's directory to `.claude/hooks/guardrails.mjs`. If one exists and differs, show the diff and ask before overwriting.
+4. **Copy** the hook to `.claude/hooks/guardrails.mjs` and the rule to `.claude/rules/guardrails.md` in each chosen checkout. If a copy exists and differs, show the diff and ask first.
 
-   Also copy `assets/guardrails.md` to `.claude/rules/guardrails.md` in each chosen checkout (create `.claude/rules/`; if one exists and differs, show the diff and ask before overwriting).
+   In a git repo, append both paths to `$(git rev-parse --git-common-dir)/info/exclude` unless listed. Then in each checkout run `git check-ignore -q` on them and on `.claude/settings.local.json`, and add any that isn't ignored. If a path is tracked (`git ls-files --error-unmatch`), ignoring it does nothing: ask whether to `git rm --cached` it.
 
-   Keep both out of git: if the project is a git repo, append `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` to `$(git rev-parse --git-common-dir)/info/exclude` unless already listed (once — the file is shared). Then, in each checkout, run `git check-ignore -q` on those two paths and on `.claude/settings.local.json`. If either is not ignored, add that path to the exclude file too. If either path is already tracked (`git ls-files --error-unmatch <path>` succeeds), ignoring it has no effect: tell the user and ask whether to `git rm --cached` it.
-
-5. **Merge `.claude/settings.local.json`** in each chosen checkout. Read it (treat as `{}` if absent) and merge — never replace. Preserve all other keys, append to arrays without duplicating entries, write with 2-space indentation:
+5. **Merge `.claude/settings.local.json`** in each chosen checkout (`{}` if absent). Never replace: keep other keys, append to arrays without duplicates, 2-space indentation.
 
    ```json
    {
@@ -92,81 +87,46 @@ Everything below is installed per **checkout** — the main checkout and each li
    }
    ```
 
-   - If the user chose to run git hosting commands outside the sandbox, also merge:
+   Also merge, depending on the answers:
 
-     ```json
-     {
-       "permissions": {
-         "ask": [
-           "Bash(gh api *)", "Bash(gh auth *)", "Bash(gh secret *)", "Bash(gh repo delete *)",
-           "Bash(glab api *)", "Bash(glab auth *)", "Bash(glab variable *)", "Bash(glab repo delete *)"
-         ]
-       },
-       "sandbox": {
-         "excludedCommands": [
-           "gh *", "glab *",
-           "git push", "git push *", "git pull", "git pull *", "git fetch", "git fetch *"
-         ]
-       }
-     }
-     ```
+   | When | `permissions.ask` | `sandbox.excludedCommands` |
+   | ---- | ----------------- | -------------------------- |
+   | Git hosting outside the sandbox | `Bash(gh api *)`, `Bash(gh auth *)`, `Bash(gh secret *)`, `Bash(gh repo delete *)`, `Bash(glab api *)`, `Bash(glab auth *)`, `Bash(glab variable *)`, `Bash(glab repo delete *)` | `gh *`, `glab *`, `git push`, `git push *`, `git pull`, `git pull *`, `git fetch`, `git fetch *` |
+   | Sandbox on (always, read-only: the sandbox blocks the `claude` binary, breaking step 3) | | `claude --version`, `claude -v` (exact forms only, so no unsandboxed agent session) |
+   | `open` outside the sandbox | `Bash(open -a *)`, `Bash(open -b *)`, `Bash(open *://*)` | `open`, `open *`, `xdg-open`, `xdg-open *` |
 
-     Excluded commands still go through permission rules and the PreToolUse hook, and `allowUnsandboxedCommands: false` doesn't stop them (it only stops the model asking to skip the sandbox). A call leaves the sandbox only when every command in it matches, and never when it uses `cd`, `$(...)`, redirections, `xargs` or `eval`.
-   - When the sandbox is chosen, always also merge the version check (no question: it is read-only). The sandbox blocks running the `claude` binary (`operation not permitted`), which breaks the prerequisite check in step 3:
+   Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches, never with `cd`, `$(...)`, redirections, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
-     ```json
-     {
-       "sandbox": {
-         "excludedCommands": ["claude --version", "claude -v"]
-       }
-     }
-     ```
+   - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
+   - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
+   - Skip the hook entry if one with the same `command` exists.
+   - Once installed, the hook asks before edits to settings files and itself, so expect prompts on a re-run.
 
-     Only these exact forms are excluded. `claude` with any other argument (`claude -p ...`, `claude mcp ...`) stays sandboxed, so it can't start an unsandboxed agent session.
-   - If the user chose to run `open` outside the sandbox, also merge (appending to any existing `ask` / `excludedCommands` arrays, without duplicates):
+6. **`.worktreeinclude`** in the main checkout root (gitignore syntax; Claude Code copies files that match it and are gitignored into new worktrees): append the three paths unless listed.
+   - If it doesn't exist, create it and add `.worktreeinclude` (unanchored: the hook reads a leading `/` as absolute) to the shared exclude.
+   - If it is tracked, it is shared: show the lines and ask first. If declined, skip and say new worktrees won't get a copy.
 
-     ```json
-     {
-       "permissions": {
-         "ask": ["Bash(open -a *)", "Bash(open -b *)", "Bash(open *://*)"]
-       },
-       "sandbox": {
-         "excludedCommands": ["open", "open *", "xdg-open", "xdg-open *"]
-       }
-     }
-     ```
+7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs`. It checks ~80 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
+   - Exit 2 with `could not create a scratch ...` or `temp dir ... is not usable`: stop and report. Never point `TMPDIR` at a real directory: the script writes fake secrets there and deletes it.
+   - `rm:` errors on paths outside `$TMPDIR`: stop immediately, tell the user, run nothing else.
 
-     `open` can launch any app or URL, so launching an app (`-a`, `-b`) or a URL prompts; opening a plain file path, such as a generated HTML page in `$TMPDIR`, does not. Same exclusion rules as above: the PreToolUse hook still applies, and a call leaves the sandbox only when every command in it matches.
-   - Omit `additionalDirectories` for project-only, and `sandbox` if the user declined it. Relative `additionalDirectories` resolve against each checkout, so prefer absolute or `~` paths when installing into several.
-   - Keep the `deny` entries in this order: a `!` negation only carves exceptions out of rules listed before it in the same file. If the file already has a `deny` list, append the block as one contiguous group.
-   - Skip the hook entry if one with the same `command` already exists.
-   - Once the hook is installed it asks before any edit to a checkout's `.claude/settings*.json`, the hook itself, or `~/.claude/settings.json` — on a re-run, expect those prompts.
-
-6. **Update `.worktreeinclude`** in the main checkout's root (gitignore syntax; Claude Code copies files that match it *and* are gitignored into each worktree it creates). Append `.claude/settings.local.json`, `.claude/hooks/guardrails.mjs` and `.claude/rules/guardrails.md` unless already listed.
-   - If the file doesn't exist, create it and add `.worktreeinclude` to the shared `info/exclude` (unanchored: the hook reads a leading `/` as an absolute path), so it stays personal.
-   - If it is tracked (`git ls-files --error-unmatch .worktreeinclude`), it is shared with the team: show the three lines and ask before editing it. If the user declines, skip this step and say new Claude Code worktrees won't get a copy.
-
-7. **Verify.** Run this skill's `scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` (the copies in the worktrees are identical). It builds a throwaway project under `$TMPDIR` and checks ~80 allow/deny/ask cases. Report any failure verbatim instead of claiming success.
-   - If it exits 2 with `could not create a scratch ...` or `temp dir ... is not usable`, stop and report it. Never work around it by pointing `TMPDIR` at the project or any other real directory: the script writes fake secrets into the scratch dir and deletes it afterwards.
-   - If a run prints `rm:` errors on paths outside `$TMPDIR`, stop right away and tell the user. Don't run anything else in the project.
-
-8. **Report.** List the files changed per checkout (and that none of them are tracked by git), the allowed roots, whether the sandbox is on, and the limitations below. Note that a fresh clone, or a worktree made later with `git worktree add`, won't have the guardrails; re-run the skill there. Tell the user hooks and the sandbox load at session start, so they must restart Claude Code; if the sandbox is on, suggest `/sandbox` → Config to review the effective read/write lists.
+8. **Report** the files changed per checkout (none tracked), the roots, sandbox on/off, and the limitations below. A fresh clone or a later `git worktree add` needs a re-run. Hooks and the sandbox load at session start: restart Claude Code. With the sandbox, suggest `/sandbox` → Config to review the effective lists.
 
 ## Hook behavior
 
-- **scope** — allowed: the project (`$CLAUDE_PROJECT_DIR`, which includes its `.claude/worktrees/`), `permissions.additionalDirectories` from the project's `settings.local.json` / `settings.json` and the user's `~/.claude/settings.json` (relative entries resolve against the project), the temp dirs (`/tmp`, `$TMPDIR`), `/dev/null`-style devices, and Claude Code's own `~/.claude` (or `$CLAUDE_CONFIG_DIR`) for every tool, reads and writes alike. Symlinks are followed. Glob patterns with absolute or `..` prefixes are checked. In Bash: absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and any command run from an out-of-scope working directory unless it starts with `cd <in-scope dir>`. A program run by absolute path from `/usr/bin`, `/usr/local/bin`, `/bin`, `/sbin`, `/usr/libexec` or `/opt/homebrew/bin` (`/usr/bin/python3 x.py`) is allowed in command position; its arguments are still checked.
-- **env** — blocks names matching `.env`, `.env.*`, `*.env` (case-insensitive) except `.env*.example|.sample|.template|.dist`; Bash wildcards that could expand to one (`.env*`, `.e?v`, `.e[n]v`); quote-split names (`.e''nv`); symlinks pointing at one; Grep `glob` filters. Glob patterns are not checked (they only list names). Also blocks `.credentials.json` (Claude Code's OAuth tokens on Linux/Windows) and `.claude.json` (MCP server configs, which can hold API keys in `env` / `headers`) wherever they sit, so they stay blocked even if the home folder is added to `additionalDirectories`.
-- **self** — `ask` (not deny) on writes to any checkout's `.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/guardrails.mjs` (the project's and its worktrees') and the user's `~/.claude/settings.json` (which can set `disableAllHooks`), including Bash commands naming them, so the user can still approve legitimate changes.
-- Malformed input or any internal error exits 2, which blocks the call (fail closed).
+- **scope:** allows the project (with `.claude/worktrees/`), `additionalDirectories` from project and user settings, temp dirs, devices, and `~/.claude` (or `$CLAUDE_CONFIG_DIR`). Follows symlinks and checks absolute or `..` Glob patterns. In Bash it checks absolute, `~`, `$HOME` and `..` paths, bare `cd`/`pushd`, and commands run from an out-of-scope directory unless they start with `cd <in-scope dir>`. Programs from the system bin dirs and `/opt/homebrew/bin` are allowed in command position; their arguments are still checked.
+- **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). Also blocks `.credentials.json` and `.claude.json` anywhere.
+- **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
+- Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
-## Limitations — state these to the user
+## Limitations: tell the user
 
-- Without the sandbox, the Bash checks are a **heuristic** on command text: paths built at runtime (`$(...)`, variables, `eval`, scripts that open files internally) and recursive reads like `grep -r KEY .` get past them. A model trying to evade them could. With the sandbox on, the OS enforces the `Read`/`Edit` deny rules and the read block on every Bash command.
-- Directories added with `/add-dir` for the current session only aren't visible to the hook; they're still denied for writes and Bash until they're in a settings file's `additionalDirectories` (the deny message names both files).
-- Absolute paths inside quoted strings (`grep "/api/users"`) and programs outside the system bin dirs (`/Applications/...`, `~/.local/bin/...`) are treated as out-of-scope paths and denied. Rephrase the command (use the program's name from `PATH`) or run it yourself.
-- Env vars already loaded into the shell (direnv, `export`) are visible to `env` / `printenv`; the guardrails protect files, not the environment. The sandbox's `credentials.envVars` setting can scrub them.
-- Hooks don't apply to MCP tools; their file access is up to each server.
-- With git hosting commands excluded from the sandbox, `gh` and `glab` act with your full account and `git push` reaches any remote. Only the `ask` rules stand between Claude and the subcommands they list; anything else (`gh pr merge`, `gh release delete`, `git push --force`) runs under your normal permission mode. Add more `ask` rules if you need them.
-- With `open` excluded from the sandbox, it can open any file path without a prompt, and the OS then runs the default app for that file type, outside the sandbox. Only app (`-a`, `-b`) and URL arguments prompt. Add more `ask` rules if you need them.
-- The hook allows `~/.claude`, but with the sandbox on, the OS still limits Bash there: it can read only the subfolders Claude Code opens (plugins, skills, agents, rules, commands) and can't write anywhere in `~/.claude`. Use the Read/Edit tools for other files, such as `~/.claude/settings.json`.
-- A linked worktree outside the main checkout (`git worktree add ../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there (it doesn't name the shared `.git` paths on the command line, and the sandbox allows its writes).
+- Without the sandbox, Bash checks are a heuristic on command text: runtime paths (`$(...)`, variables, `eval`, scripts) and recursive reads (`grep -r KEY .`) get past them. With it, the OS enforces the deny rules and read block on every command.
+- Directories added with `/add-dir` for the session only are invisible to the hook until they're in a settings file's `additionalDirectories`.
+- Absolute paths in quoted strings (`grep "/api/users"`) and programs outside the system bin dirs (`~/.local/bin/...`) are denied. Use the program name from `PATH`, rephrase, or run it yourself.
+- Env vars already in the shell are visible to `env`; the guardrails protect files. The sandbox's `credentials.envVars` can scrub them.
+- Hooks don't apply to MCP tools.
+- With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode.
+- With `open` excluded, any file path opens without a prompt in its default app, outside the sandbox.
+- With the sandbox, Bash can only read the `~/.claude` subfolders Claude Code opens (plugins, skills, agents, rules, commands) and write none of it. Use Read/Edit for files like `~/.claude/settings.json`.
+- A linked worktree outside the main checkout (`../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there.
