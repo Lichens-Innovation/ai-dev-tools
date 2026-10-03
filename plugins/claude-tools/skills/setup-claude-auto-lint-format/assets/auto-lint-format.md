@@ -1,8 +1,7 @@
 # Auto lint and format
 
-<!-- Template: fill from .claude/hooks/auto-lint-format.json. Keep it to about 6 lines: it loads every session. -->
+<!-- Template: fill from .claude/hooks/auto-lint-format.json. Keep it this short: it loads every session. -->
 
-A hook runs the formatter and linter (<tools, e.g. `ruff`, `eslint`, `prettier`>) after every `Write`, `Edit` or `MultiEdit` on <extensions, e.g. `*.py`, `*.ts`, `*.tsx`>, and fixes style in place. Don't run them yourself on those files: no message from the hook means the file is clean, and it reports only what you must fix, so there is no need to run them again to confirm.
+A hook runs <tools, e.g. `ruff`, `eslint`, `prettier`> after every Write/Edit/MultiEdit on <extensions, e.g. `*.py`, `*.ts`> and fixes style in place. Don't run them on those files: no hook message means the file is clean.
 
-- Not covered, so run them yourself when relevant: files changed through Bash, <file types with no rule>, <extra checks the hook does not run, e.g. whole-project type checking, tests, a full `just lint` before finishing>.
-- Run them when the user asks.
+Not covered, run them yourself: files changed through Bash, <file types with no rule>, <whole-project checks, e.g. type checking, tests, a full `just lint` before finishing>.
