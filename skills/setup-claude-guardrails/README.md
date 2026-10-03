@@ -39,7 +39,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Message text:** commit messages and PR titles/bodies with no `$` or backticks (`git commit -m`, `git commit -F - <<'EOF'`, `gh`/`glab` `--title`/`--body`/`--notes`/`--description`). They only get stored, so paths and `.env` in them are words, not file access. File flags (`-F`, `--body-file`, `git commit -t`) are still checked.
 - **Paths that can't exist:** `/api/users` in a grep pattern (top-level dir missing, and `/` not writable).
 - **`process.env` / `import.meta.env`** in a pattern, unless a file by that name exists.
-- **Git hosting and `open` outside the sandbox** (optional): `gh`, `glab`, `git push|pull|fetch`, `open` use the Keychain, SSH agent and network. Risky subcommands (`gh api`, `gh auth`, `open -a`, ...) ask. A call leaves the sandbox only if every command in it is excluded: `git push && gh pr create --body '…'` works; a heredoc, pipe, `cd` or `$(...)` keeps it inside.
+- **Git hosting and `open` outside the sandbox** (optional): `gh`, `glab`, `git push|pull|fetch`, `open` use the Keychain, SSH agent and network. Risky subcommands (`gh api`, `gh auth`, `open -a`, ...) ask. A call leaves the sandbox only if every command in it is excluded: `git push && gh pr create --body '…'` works; a heredoc, pipe, `cd` or `$(...)` keeps it inside, and so does a body with backticks or `$` (the rule says to use `--body-file`).
 
 ## Decided against (keep in mind for future reviews)
 
