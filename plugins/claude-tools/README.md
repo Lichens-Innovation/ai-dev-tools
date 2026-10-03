@@ -19,6 +19,10 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   (root, `apps/frontend`, `packages/ui`, ...), writes `.claude/rules/use-just-commands.md` listing the
   recipes and telling Claude to always use them, plus a per-level hook config. One shared `PreToolUse`
   hook denies the non-just equivalents (`uv`, `docker`, `pnpm test`, ...) with a message naming the recipe.
+- **setup-claude-auto-lint-format** — detects the project's linters and formatters (ruff, eslint, prettier,
+  biome, ...) and installs a `PostToolUse` hook that runs them on every file Claude or its subagents write
+  or edit. Silent when the file is clean; only lint/format problems are sent back to Claude to fix.
+  Optionally adds a rule so Claude doesn't run those tools itself.
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
@@ -40,6 +44,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 - `/claude-light` — apply the light-mode local settings to the current project.
 - `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project.
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
+- `/setup-claude-auto-lint-format` — lint and format every file Claude edits, reporting only problems.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
 - `/help-server` — start the help server and open its dashboard in the browser.
 - `/manage-marketplace` — ask about plugin/marketplace install, update, or removal commands.
