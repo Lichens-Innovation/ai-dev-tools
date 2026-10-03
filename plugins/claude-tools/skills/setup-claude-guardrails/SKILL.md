@@ -13,7 +13,8 @@ Install layered guardrails into `.claude/settings.local.json`. They are personal
 | `blockReadsOutsideWorkingDirectories` | Claude Code | `Read`, `Grep`, `Glob`, `LSP` outside the project + `additionalDirectories` |
 | `deny` `Read(...)` / `Edit(...)` rules | Claude Code | env files and Claude Code's credentials, for every file tool (also fed into the sandbox) |
 | `sandbox` (optional) | the OS (Seatbelt / bubblewrap) | what Bash commands and their children can read and write |
-| `PreToolUse` hook `scripts/guardrails.mjs` | heuristic on tool input | out-of-scope writes and Bash paths, env files (wildcards, case, symlinks), and asks before edits to the guardrails |
+| `PreToolUse` hook `scripts/guardrails.mjs` | heuristic on tool input | out-of-scope writes and Bash paths, env files (wildcards, case, symlinks), and asks before edits to the guardrails; with the sandbox, denies calls that can't leave it |
+| `PostToolUseFailure` hook (same script) | matches error text | after a sandbox failure, tells Claude the cause and the fix, and to suggest improving the guardrail if it keeps costing steps |
 
 The native layers are the real enforcement; the hook catches mistakes where nothing else would (e.g. `bypassPermissions`).
 
@@ -37,7 +38,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
    - the hook and rule exist and are identical to this skill's copies;
-   - settings have the hook entry with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
+   - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
@@ -82,6 +83,12 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
            "matcher": "Read|Write|Edit|MultiEdit|NotebookEdit|Glob|Grep|LSP|Bash|Monitor",
            "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.mjs\"" }]
          }
+       ],
+       "PostToolUseFailure": [
+         {
+           "matcher": "Bash",
+           "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.mjs\"" }]
+         }
        ]
      }
    }
@@ -99,7 +106,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
    - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
    - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
-   - Skip the hook entry if one with the same `command` exists.
+   - Skip a hook entry if that event already has one with the same `command`.
    - Once installed, the hook asks before edits to settings files and itself, so expect prompts on a re-run.
 
 6. **`.worktreeinclude`** in the main checkout root (gitignore syntax; Claude Code copies files that match it and are gitignored into new worktrees): append the three paths unless listed.
@@ -118,6 +125,8 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - **messages:** text a command only stores is skipped when it has no `$` or backticks: `git commit|tag|merge|stash|notes -m`, a heredoc read by them (quoted delimiter, or no expansion in it, and not piped), and `gh`/`glab` `--title`, `--body`, `--notes`, `--description`. Commands with `$(...)`, backticks or unbalanced quotes are scanned whole. File flags (`-F`, `--body-file`, `git commit -t`) are always checked.
 - **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). `process.env` and `import.meta.env` count only if such a file exists. Also blocks `.credentials.json` and `.claude.json` anywhere.
 - **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
+- **sandbox exit:** with the sandbox on and `excludedCommands` set, denies a call that starts with an excluded command (`gh`, `git push`, `open`, ...) but also holds a backtick, `$(...)`, heredoc, pipe or another command: it would stay in the sandbox and fail on credentials or the network. The message gives the fix (split the call, `--body-file`). Redirections aren't detected.
+- **failure hints:** the `PostToolUseFailure` entry runs the same script on a failed Bash call. Only if the error matches a known sandbox signature (`proxy requires authentication`, `Could not read from remote repository`, `Operation not permitted`, the `open` Launch Services errors) it adds context with the cause and the fix, plus a line telling Claude to suggest improving the guardrail if it keeps costing steps or is unclear. Other failures get nothing.
 - Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
 ## Limitations: tell the user
@@ -127,6 +136,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - Outside message text, a quoted string naming a real path outside scope (`grep "/etc/hosts" README.md`) and programs outside the system bin dirs (`~/.local/bin/...`) are denied. Use the program name from `PATH`, rephrase, or run it yourself.
 - Env vars already in the shell are visible to `env`; the guardrails protect files. The sandbox's `credentials.envVars` can scrub them.
 - Hooks don't apply to MCP tools.
+- The `PostToolUseFailure` payload isn't fully specified in Claude Code's docs: the hook scans all of it for the error text. If a sandbox failure ever shows no hint, check that the event fires for failed Bash calls and where the error text sits.
 - With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode.
 - With `open` excluded, any file path opens without a prompt in its default app, outside the sandbox.
 - With the sandbox, Bash can only read the `~/.claude` subfolders Claude Code opens (plugins, skills, agents, rules, commands) and write none of it. Use Read/Edit for files like `~/.claude/settings.json`.
