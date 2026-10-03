@@ -203,6 +203,62 @@ check ask   Write '{"file_path":"'"$PROJECT"'/.claude/hooks/guardrails.mjs"}'
 check ask   Bash  '{"command":"rm .claude/hooks/guardrails.mjs"}'
 check allow Read  '{"file_path":"'"$PROJECT"'/.claude/settings.json"}'
 
+echo "sandbox exit"
+# A project with the sandbox on and git hosting / open excluded: a call mixing an excluded command
+# with anything else would stay in the sandbox, so the hook says so before it fails on the network.
+SBX="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX"' EXIT
+mkdir -p "$SBX/.claude"
+cat > "$SBX/.claude/settings.local.json" <<'JSON'
+{ "sandbox": { "enabled": true, "allowUnsandboxedCommands": false,
+  "excludedCommands": ["gh *", "glab *", "git push", "git push *", "git pull", "git pull *", "git fetch", "git fetch *", "open", "open *"] } }
+JSON
+sbx() { CLAUDE_PROJECT_DIR="$SBX" check "$1" "$2" "$3" "$SBX"; }
+sbx allow Bash '{"command":"git push -u origin HEAD"}'
+sbx allow Bash '{"command":"git push -u origin HEAD && gh pr create --title x --body-file /tmp/claude-501/body.md"}'
+sbx allow Bash '{"command":"gh pr view 3"}'
+sbx allow Bash '{"command":"gh pr create --title '"$Q"'a | b'"$Q"' --body '"$Q"'x; y'"$Q"'"}'
+sbx allow Bash '{"command":"git commit -m x && npm test"}'
+sbx allow Bash '{"command":"git status | grep x"}'
+sbx allow Bash '{"command":"npm test | tee out.txt"}'
+sbx deny  Bash "{\"command\":\"git push -u origin HEAD && gh pr create --title x --body ${Q}See ${B}.claude/rules${B}${Q}\"}"
+sbx deny  Bash '{"command":"gh pr create --title x --body \"$(cat body.md)\""}'
+sbx deny  Bash '{"command":"gh pr create --title x --body-file - <<EOF\nbody\nEOF"}'
+sbx deny  Bash '{"command":"gh pr list | head"}'
+sbx deny  Bash '{"command":"git commit -m x && git push"}'
+sbx deny  Bash '{"command":"cd src && git push"}'
+sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
+sbx deny  Bash '{"command":"open ~/x.html && echo done"}'
+CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"git commit -m x && git push"}'
+
+echo "failure hints"
+# hint_check <expected: hint|none> <command> <error text> [expected text in the hint]
+hint_check() {
+  local expected="$1" cmd="$2" err="$3" want="${4:-}" out actual
+  out="$(jq -cn --arg c "$cmd" --arg e "$err" \
+    '{hook_event_name:"PostToolUseFailure",tool_name:"Bash",tool_input:{command:$c},error:$e}' | node "$SCRIPT" 2>/dev/null)"
+  if [[ "$out" == *'"hookEventName":"PostToolUseFailure"'* && "$out" == *'"additionalContext"'* ]]; then actual="hint"; else actual="none"; fi
+  if [ "$actual" = "$expected" ] && { [ -z "$want" ] || [[ "$out" == *"$want"* ]]; }; then
+    printf '  ok    %-5s %s\n' "$expected" "$cmd"
+  else
+    printf '  FAIL  expected %s%s, got %s: %s\n' "$expected" "${want:+ with \"$want\"}" "$actual" "$out"
+    failures=$((failures + 1))
+  fi
+}
+PROXY='Received disconnect from UNKNOWN port 65535:1: This proxy requires authentication, and this client did not offer an authentication method'
+hint_check hint 'git push -u origin HEAD' "$PROXY" '--body-file'
+hint_check hint 'git push -u origin HEAD && gh pr create --fill' 'fatal: Could not read from remote repository.' 'ask the user to run it with !'
+hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.github.com' 'sandbox'
+hint_check hint 'open /tmp/x.html' 'LSOpenURLsWithRole() failed with error -10822' 'run with !'
+hint_check hint 'touch /etc/x' 'touch: /etc/x: Operation not permitted' 'sandbox restriction'
+hint_check hint 'git push' "$PROXY" 'setup-claude-guardrails'
+hint_check none 'npm test' 'Error: 3 tests failed'
+hint_check none 'npm test' "$PROXY"
+hint_check none 'git push' 'rejected: non-fast-forward'
+hint_check none 'git commit -m "fix: could not read from remote repository"' 'nothing to commit'
+echo '{"hook_event_name":"PostToolUseFailure","tool_name":"Read","tool_input":{"file_path":"x"}}' | node "$SCRIPT" >/dev/null 2>&1 \
+  && echo "  ok    non-Bash failure exits 0" || { echo "  FAIL  non-Bash failure did not exit 0"; failures=$((failures + 1)); }
+
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?
 if [ $rc -eq 2 ]; then echo "  ok    malformed input exits 2"; else echo "  FAIL  malformed input exited $rc"; failures=$((failures + 1)); fi

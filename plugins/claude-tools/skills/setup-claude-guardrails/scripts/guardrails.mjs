@@ -283,8 +283,53 @@ const globBase = (pattern) => {
 
 // ----------------------------------------------------------------------------------------------
 
+// --- Failure hints -------------------------------------------------------------------------------
+// PostToolUseFailure: a command that failed on a sandbox limit gets a short explanation and the fix as
+// extra context, so the model corrects itself instead of retrying. The error text field isn't
+// specified in Claude Code's docs, so the whole payload (minus the command) is scanned.
+
+const FAILURE_HINTS = [
+  {
+    program: /^\s*(?:\w+=\S*\s+)*(?:git\s+(?:push|pull|fetch)|gh|glab)\b/,
+    error: /proxy requires authentication|Could not read from remote repository|Could not resolve host/i,
+    hint:
+      "The call ran inside the sandbox, where git and gh can't authenticate. A backtick, $(...), heredoc, pipe, cd or any " +
+      "other command in the call is the usual reason it stayed there. Rebuild it as only excluded commands joined by && " +
+      "(a body with code goes in a file made with Write, real path /tmp/claude-<uid>/..., passed with --body-file) and retry " +
+      "once. If it fails again, ask the user to run it with !.",
+  },
+  {
+    program: /^\s*(?:\w+=\S*\s+)*(?:open|osascript|xdg-open)\b/,
+    error: /Operation not permitted|LSOpenURLsWithRole|kLSServerCommunicationErr|-10822|-600\b|-54\b/i,
+    hint: "The sandbox blocks open and osascript. Don't retry: give the user the exact command to run with !.",
+  },
+  {
+    error: /Operation not permitted|Read-only file system/i,
+    hint:
+      "A sandbox restriction blocked this command. Don't retry it as is: use $TMPDIR for temp files, stay inside the " +
+      "project, and tell the user which restriction it hit if the task needs it.",
+  },
+];
+
+const FRICTION =
+  " If this guardrail keeps costing you steps, or the rule in .claude/rules/guardrails.md didn't make this clear, finish the " +
+  "task, then tell the user and suggest improving it (the setup-claude-guardrails skill ships the rule and the hook).";
+
+const failureHint = (input) => {
+  const command = typeof input.tool_input?.command === "string" ? input.tool_input.command : "";
+  const output = JSON.stringify({ ...input, tool_input: undefined });
+  const found = FAILURE_HINTS.find((h) => (!h.program || h.program.test(command)) && h.error.test(output));
+  if (!found) return;
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: { hookEventName: "PostToolUseFailure", additionalContext: `[guardrails] ${found.hint}${FRICTION}` },
+    })
+  );
+};
+
 const main = () => {
   const input = JSON.parse(fs.readFileSync(0, "utf8"));
+  if (input.hook_event_name === "PostToolUseFailure") return failureHint(input);
   const { tool_name: tool, tool_input: args = {} } = input;
   const projectDir = realish(path.resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd()));
   const cwd = realish(path.resolve(input.cwd || projectDir));
@@ -450,6 +495,48 @@ const main = () => {
       `${protectedHit.startsWith(projectDir + path.sep) ? path.relative(projectDir, protectedHit) : protectedHit} ` +
         `configures the guardrails. Confirm this change is intended.`
     );
+  }
+
+  // --- sandbox exit ----------------------------------------------------------------------------
+
+  // `gh`, `git push` and `open` run outside the sandbox only when every command in the call is one of
+  // sandbox.excludedCommands, joined by `&&`. Anything else keeps the whole call inside, where they
+  // fail on credentials or the network. Say so before the call runs instead of after it fails.
+  const sandboxes = settingsFiles.map((f) => readJson(f).sandbox ?? {});
+  const excluded = sandboxes
+    .flatMap((s) => (s.excludedCommands ?? []).filter((e) => typeof e === "string"))
+    .map((e) => e.replace(/\s*\*$/, "").split(/\s+/).filter(Boolean))
+    .filter((e) => e.length);
+  if (command !== null && excluded.length && sandboxes.some((s) => s.enabled === true)) {
+    const lexed = lexCommand(command);
+    const hasSubstitution = /`|\$\(/.test(command);
+    // lexed is null for backticks, $(...) or unbalanced quotes: without a substitution, a command we can't judge.
+    if (lexed || hasSubstitution) {
+      const program = (words) => {
+        const at = words.findIndex((w) => !/^\w+=/.test(w));
+        return at < 0 ? [] : words.slice(at);
+      };
+      const isExcluded = (words) => excluded.some((e) => e.every((w, i) => program(words)[i] === w));
+      const simple = lexed ? lexed.segments.map((s) => s.words.map((w) => w.value)).filter((w) => w.length) : [];
+      const aimed = lexed ? simple.some(isExcluded) : isExcluded(command.trim().split(/\s+/));
+      const reasons = [];
+      if (hasSubstitution) reasons.push("a backtick or `$(...)`");
+      if (lexed?.heredocs.length) reasons.push("a heredoc");
+      if (lexed?.segments.some((s) => s.piped)) reasons.push("a pipe");
+      const others = simple.filter((w) => !isExcluded(w)).map((w) => program(w)[0]);
+      if (others.length) reasons.push(`other commands (${[...new Set(others)].join(", ")})`);
+      if (aimed && reasons.length) {
+        respond(
+          "deny",
+          "sandbox",
+          `This call contains ${reasons.join(" and ")}, so it stays inside the sandbox, where git push / gh / glab / open ` +
+            `fail on credentials or the network. Only a call made entirely of excluded commands joined by && runs outside. ` +
+            `Run the other commands in a separate call, and put a PR or commit body that has backticks, $ or a heredoc in a ` +
+            `file made with Write (real path /tmp/claude-<uid>/..., not $TMPDIR) and pass it with --body-file. ` +
+            `If that is not possible, ask the user to run the command with !.`
+        );
+      }
+    }
   }
 };
 
