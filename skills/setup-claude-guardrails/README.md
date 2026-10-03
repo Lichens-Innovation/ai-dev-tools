@@ -26,6 +26,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Env files:** `.env`, `.env.*`, `*.env` in any case, through wildcards, quote tricks, symlinks, `git show HEAD:.env` and Grep `glob` filters.
 - **Claude Code secrets:** `.credentials.json` and `~/.claude.json` (OAuth tokens, MCP API keys).
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
+- **Calls that can't leave the sandbox:** an excluded command (`gh`, `git push`, `open`) mixed with a backtick, `$(...)`, heredoc, pipe or other command. Denied up front, with the fix in the message, instead of failing later on the proxy.
 - **Ask, don't block:** edits to any checkout's `.claude/settings*.json`, the hook itself and `~/.claude/settings.json` (it can turn hooks off).
 - **Fail closed:** malformed input or a hook error blocks the call.
 
@@ -38,7 +39,19 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **`process.env` / `import.meta.env`** in a pattern, unless a file by that name exists.
 - **Git hosting and `open` outside the sandbox** (optional): `gh`, `glab`, `git push|pull|fetch`, `open` use the Keychain, SSH agent and network. Risky subcommands (`gh api`, `gh auth`, `open -a`, ...) ask. A call leaves the sandbox only if every command in it is excluded: `git push && gh pr create --body '…'` works; a heredoc, pipe, `cd` or `$(...)` keeps it inside.
 
+## Teaching Claude from mistakes
+
+The rule is always in context and still gets missed, so repeated mistakes are fixed where they happen, in this order:
+
+1. **Prevent:** the `PreToolUse` hook denies the known bad shape with the fix in the message (the model reads denial text closely).
+2. **Explain after a failure:** the `PostToolUseFailure` hook matches known sandbox error text and adds the cause and fix as context. It also tells Claude it may suggest improving the guardrail if it keeps costing steps or is unclear: that is the feedback loop for this skill.
+3. **Rule:** `assets/guardrails.md` carries the symptom (the error text), not only the do's and don'ts.
+
+Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mistake repeats.
+
 ## Decided against (keep in mind for future reviews)
+
+- **Re-injecting the whole rule on every denial or failure:** noise. The hint carries only the relevant fix.
 
 - **Commit, push and PR in one call:** `git commit` would run outside the sandbox, and so would the repo's git hooks (husky, lint-staged). Two calls is the floor.
 - **Skipping the hook's Bash path checks when the sandbox is on:** the sandbox still lets Bash read `/etc`, `/usr` and `/var/folders`, which holds other apps' temp files.
