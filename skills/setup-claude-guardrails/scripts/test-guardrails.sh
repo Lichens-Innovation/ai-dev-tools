@@ -203,23 +203,6 @@ check ask   Write '{"file_path":"'"$PROJECT"'/.claude/hooks/guardrails.mjs"}'
 check ask   Bash  '{"command":"rm .claude/hooks/guardrails.mjs"}'
 check allow Read  '{"file_path":"'"$PROJECT"'/.claude/settings.json"}'
 
-echo "escape"
-mkdir -p "$PROJECT/docs" "$PROJECT/Evil.app" && touch "$PROJECT/docs/index.html" "$PROJECT/run.command"
-printf '#!/bin/sh\n' > "$PROJECT/docs/page.html" && chmod +x "$PROJECT/docs/page.html"
-check ask   Bash  '{"command":"git push --receive-pack=./x.sh origin main"}'
-check ask   Bash  '{"command":"git fetch origin --upload-pack ./x.sh"}'
-check ask   Bash  '{"command":"git push --exec=./x.sh origin"}'
-check ask   Bash  '{"command":"GIT_SSH_COMMAND=./x.sh git push"}'
-check ask   Bash  '{"command":"env GIT_CONFIG_GLOBAL=x.cfg git pull"}'
-check allow Bash  '{"command":"git push -u origin HEAD && git fetch --prune"}'
-check ask   Bash  '{"command":"open run.command"}'
-check ask   Bash  '{"command":"open Evil.app"}'
-check ask   Bash  '{"command":"open docs/page.html"}'
-check ask   Bash  '{"command":"xdg-open build/tool"}'
-check allow Bash  '{"command":"open docs/index.html"}'
-check allow Bash  '{"command":"open -R src"}'
-check allow Bash  '{"command":"open https://example.com"}'
-
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?
 if [ $rc -eq 2 ]; then echo "  ok    malformed input exits 2"; else echo "  FAIL  malformed input exited $rc"; failures=$((failures + 1)); fi

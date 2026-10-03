@@ -4,14 +4,13 @@
 // Registered once in .claude/settings.local.json (personal, untracked):
 //   node "$CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.mjs"
 //
-// Runs four checks on every matched tool call:
+// Runs three checks on every matched tool call:
 //   scope — deny paths outside the project + permissions.additionalDirectories (+ temp dirs and
 //           Claude Code's own ~/.claude)
 //   env   — deny .env files, except .env*.example / .sample / .template / .dist, and Claude Code's
 //           ~/.claude/.credentials.json and ~/.claude.json
 //   self  — ask before anything writes this hook, a checkout's .claude/settings*.json (project or
 //           worktree) or the user's ~/.claude/settings.json
-//   escape — ask before git or open (possibly excluded from the sandbox) start another program
 //
 // Commit and PR message text (git commit -m, gh pr create --body, ...) is left out of the checks.
 //
@@ -450,54 +449,6 @@ const main = () => {
       "self",
       `${protectedHit.startsWith(projectDir + path.sep) ? path.relative(projectDir, protectedHit) : protectedHit} ` +
         `configures the guardrails. Confirm this change is intended.`
-    );
-  }
-
-  // --- escape ----------------------------------------------------------------------------------
-
-  // git push|pull|fetch and open may be excluded from the sandbox. Ask before the forms that make
-  // them start a program, which could be a file Claude wrote: git's transport-command flags and
-  // GIT_SSH* overrides, and open on anything but a page, document, image or plain directory.
-  // A call the lexer doesn't follow ($(...), backticks) stays sandboxed, so it isn't checked.
-  const GIT_RUNS_PROGRAM = /^--(?:upload-pack|receive-pack|exec)(?:=|$)/;
-  const GIT_PROGRAM_ENV = /^GIT_(?:SSH|SSH_COMMAND|PROXY_COMMAND|EXEC_PATH|ASKPASS|CONFIG\w*)=/;
-  const OPEN_SAFE = /\.(?:html?|pdf|png|jpe?g|gif|svg|webp|md|txt|csv|json|log)$/i;
-  // Flags and URLs are left to the permission rules (`open -a *`, `open *://*`).
-  const opensProgram = (arg) => {
-    if (arg.startsWith("-") || arg.includes("://")) return false;
-    const target = resolvePath(arg);
-    let stat = null;
-    try {
-      stat = fs.statSync(target);
-    } catch {}
-    if (stat?.isDirectory()) return /\.app$/i.test(target);
-    return !OPEN_SAFE.test(target) || (stat !== null && (stat.mode & 0o111) !== 0);
-  };
-  const escapeHit = (scanned === null ? null : lexCommand(scanned))?.segments
-    .map(({ words }) => {
-      const at = words.findIndex((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value));
-      if (at < 0) return null;
-      const program = path.basename(words[at].value);
-      const args = words.slice(at + 1).map((w) => w.value);
-      if (program === "git") {
-        const env = words.slice(0, at).find((w) => GIT_PROGRAM_ENV.test(w.value));
-        if (env) return `${env.value.split("=")[0]}=… git`;
-        const flag = args.find((a) => GIT_RUNS_PROGRAM.test(a));
-        if (flag) return `git ${flag.split("=")[0]}`;
-      }
-      if (program === "open" || program === "xdg-open") {
-        const target = args.find(opensProgram);
-        if (target) return `${program} ${target}`;
-      }
-      return null;
-    })
-    .find(Boolean);
-  if (escapeHit) {
-    respond(
-      "ask",
-      "escape",
-      `\`${escapeHit}\` starts a program, outside the sandbox when the command is excluded from it. ` +
-        `Confirm it runs nothing Claude wrote.`
     );
   }
 };

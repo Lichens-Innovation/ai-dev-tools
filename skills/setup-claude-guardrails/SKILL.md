@@ -37,16 +37,16 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
    - the hook and rule exist and are identical to this skill's copies;
-   - settings have the hook entry with the same `command`, all 18 `deny` entries from step 5 plus the 8 per extra root, and `blockReadsOutsideWorkingDirectories`; with the sandbox, also `failIfUnavailable` and the sandbox temp dir in `additionalDirectories`, and the `ask` entries from step 5's table for each exclusion;
+   - settings have the hook entry with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
-   **All in place:** report the setup (roots from `additionalDirectories` other than the temp dir, sandbox on/off, git hosting and `open` exclusions, hook up to date, which checkouts). Ask one question: keep it as is (recommended; stop, no tests) or reconfigure (step 2, current values as defaults). **Partial:** list the gaps and fill only those, current values as defaults. **None:** continue.
+   **All in place:** report the setup (roots from `additionalDirectories`, sandbox on/off, git hosting and `open` exclusions, hook up to date, which checkouts). Ask one question: keep it as is (recommended; stop, no tests) or reconfigure (step 2, current values as defaults). **Partial:** list the gaps and fill only those, current values as defaults. **None:** continue.
 
 2. **Ask** in one `AskUserQuestion` call:
    - "Which directories may Claude access?": project only (recommended), or project + others (e.g. `~/Documents/gits`). If none are named, ask for the paths before writing.
    - "Enable the Bash sandbox?": Yes, strict (recommended: OS-enforced; network needs per-domain approval, no unsandboxed fallback), or No (hook heuristics only).
-   - Sandbox only: "Run git hosting commands outside the sandbox?": Yes (`gh`, `glab`, `git push`/`pull`/`fetch` use your Keychain, SSH agent and network; risky subcommands prompt; repo git hooks outside `.git/hooks`, such as husky's, run unsandboxed too), or No (they fail in the sandbox; run them with `!`). No recommendation: it trades isolation for convenience.
+   - Sandbox only: "Run git hosting commands outside the sandbox?": Yes (`gh`, `glab`, `git push`/`pull`/`fetch` use your Keychain, SSH agent and network; risky subcommands prompt), or No (they fail in the sandbox; run them with `!`). No recommendation: it trades isolation for convenience.
    - Sandbox only: "Run `open` outside the sandbox?": Yes (recommended on macOS: the sandbox blocks `open`, so skills like `/claude-light` can't open a page; apps and URLs still prompt), or No (run `! open <path>` yourself).
    - Linked worktrees only: "Install in which checkouts?": all (recommended), or the current one.
 
@@ -75,7 +75,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
          "Read(~/.claude.json)", "Edit(~/.claude.json)"
        ]
      },
-     "sandbox": { "enabled": true, "allowUnsandboxedCommands": false, "failIfUnavailable": true },
+     "sandbox": { "enabled": true, "allowUnsandboxedCommands": false },
      "hooks": {
        "PreToolUse": [
          {
@@ -91,17 +91,14 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
    | When | `permissions.ask` | `sandbox.excludedCommands` |
    | ---- | ----------------- | -------------------------- |
-   | Git hosting outside the sandbox | `Bash(gh api *)`, `Bash(gh auth *)`, `Bash(gh secret *)`, `Bash(gh repo delete *)`, `Bash(gh alias *)`, `Bash(gh extension *)`, `Bash(gh ext *)`, `Bash(glab api *)`, `Bash(glab auth *)`, `Bash(glab variable *)`, `Bash(glab repo delete *)`, `Bash(glab alias *)` (aliases and extensions run shell commands) | `gh *`, `glab *`, `git push`, `git push *`, `git pull`, `git pull *`, `git fetch`, `git fetch *` |
+   | Git hosting outside the sandbox | `Bash(gh api *)`, `Bash(gh auth *)`, `Bash(gh secret *)`, `Bash(gh repo delete *)`, `Bash(glab api *)`, `Bash(glab auth *)`, `Bash(glab variable *)`, `Bash(glab repo delete *)` | `gh *`, `glab *`, `git push`, `git push *`, `git pull`, `git pull *`, `git fetch`, `git fetch *` |
    | Sandbox on (always, read-only: the sandbox blocks the `claude` binary, breaking step 3) | | `claude --version`, `claude -v` (exact forms only, so no unsandboxed agent session) |
    | `open` outside the sandbox | `Bash(open -a *)`, `Bash(open -b *)`, `Bash(open *://*)` | `open`, `open *`, `xdg-open`, `xdg-open *` |
 
-   Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. `open` on a page, document, image or plain directory doesn't prompt; the hook asks for anything else.
+   Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
-   - With the sandbox, add its temp dir to `additionalDirectories` so `Read` can open what Bash writes to `$TMPDIR` (`blockReadsOutsideWorkingDirectories` refuses it otherwise): `realpath` of `${CLAUDE_CODE_TMPDIR:-/tmp}/claude-$(id -u)` (macOS: `/private/tmp/claude-501`). Sandboxed Bash can already read and write it.
-   - `failIfUnavailable` makes Claude Code exit at startup when the sandbox can't start, instead of running Bash unsandboxed.
-   - Omit `additionalDirectories` for project-only without the sandbox, and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
+   - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
    - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
-   - **Env files in extra roots:** the relative rules above only match under the session's directory, so a sibling repo's `.env` would be readable by sandboxed Bash (`grep -r KEY ../other`). For each extra root (not the temp dir), append `Read(<root>/**/<name>)` for each name in `.env`, `*.env`, `.env.local`, `.env.*.local`, `.env.production`, `.env.development`, `.env.staging`, `.env.test`. Write `<root>` as `~/...` under the home directory, else `//<absolute path>`; never relative or single `/` (it anchors at the settings file). No `.env.*`: a `!` negation can't carve out of `~/`/`//` rules, so it would block `.env.example` too. A `Read` deny also blocks Edit and Write on the path and feeds the sandbox's `denyRead`.
    - Skip the hook entry if one with the same `command` exists.
    - Once installed, the hook asks before edits to settings files and itself, so expect prompts on a re-run.
 
@@ -121,7 +118,6 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - **messages:** text a command only stores is skipped when it has no `$` or backticks: `git commit|tag|merge|stash|notes -m`, a heredoc read by them (quoted delimiter, or no expansion in it, and not piped), and `gh`/`glab` `--title`, `--body`, `--notes`, `--description`. Commands with `$(...)`, backticks or unbalanced quotes are scanned whole. File flags (`-F`, `--body-file`, `git commit -t`) are always checked.
 - **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). `process.env` and `import.meta.env` count only if such a file exists. Also blocks `.credentials.json` and `.claude.json` anywhere.
 - **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
-- **escape:** asks before `git` with `--upload-pack`, `--receive-pack`, `--exec` or a `GIT_SSH*`/`GIT_CONFIG*`/`GIT_EXEC_PATH`/`GIT_ASKPASS` prefix, and before `open`/`xdg-open` of a `.app`, an executable file, or anything that isn't a page, document, image or directory. Excluded from the sandbox, these would start a program Claude could have written.
 - Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
 ## Limitations: tell the user
@@ -130,9 +126,8 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - Directories added with `/add-dir` for the session only are invisible to the hook until they're in a settings file's `additionalDirectories`.
 - Outside message text, a quoted string naming a real path outside scope (`grep "/etc/hosts" README.md`) and programs outside the system bin dirs (`~/.local/bin/...`) are denied. Use the program name from `PATH`, rephrase, or run it yourself.
 - Env vars already in the shell are visible to `env`; the guardrails protect files. The sandbox's `credentials.envVars` can scrub them.
-- In extra roots, only the common env names are denied natively; other `.env.*` files there (`.env.prod`) are blocked by the hook only, so a recursive read in Bash can reach them.
 - Hooks don't apply to MCP tools.
-- With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode. Git hooks run outside the sandbox too: the sandbox protects `.git/hooks`, but not a `core.hooksPath` folder in the repo (husky's `.husky/`), which Claude can edit before a push or pull.
-- With `open` excluded, pages, documents, images and directories open without a prompt in their default app, outside the sandbox.
+- With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode.
+- With `open` excluded, any file path opens without a prompt in its default app, outside the sandbox.
 - With the sandbox, Bash can only read the `~/.claude` subfolders Claude Code opens (plugins, skills, agents, rules, commands) and write none of it. Use Read/Edit for files like `~/.claude/settings.json`.
 - A linked worktree outside the main checkout (`../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there.
