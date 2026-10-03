@@ -15,6 +15,10 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   inside a scoped directory (the project, or a parent like `~/Documents/gits`) and block access
   to `.env` files (except `.env*.example`). It also installs `.claude/rules/guardrails.md`, a rule
   telling Claude which tools to avoid and how to phrase commands so the hook doesn't reject them.
+- **setup-claude-just-usage** — reads the repository's justfiles and, for each level that has one
+  (root, `apps/frontend`, `packages/ui`, ...), writes `.claude/rules/use-just-commands.md` listing the
+  recipes and telling Claude to always use them, plus a per-level hook config. One shared `PreToolUse`
+  hook denies the non-just equivalents (`uv`, `docker`, `pnpm test`, ...) with a message naming the recipe.
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
@@ -35,6 +39,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 
 - `/claude-light` — apply the light-mode local settings to the current project.
 - `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project.
+- `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
 - `/help-server` — start the help server and open its dashboard in the browser.
 - `/manage-marketplace` — ask about plugin/marketplace install, update, or removal commands.
