@@ -26,7 +26,7 @@ const items = (inventory.items ?? [])
     type: i.type,
     name: i.name,
     group: String(i.group ?? "other"),
-    plugin: i.plugin ? String(i.plugin) : "",
+    plugin: i.plugin && i.type !== "plugin" ? String(i.plugin) : "",
     description: String(i.description ?? ""),
     enabled: i.enabled !== false,
     tokens: Number.isFinite(i.tokens) ? i.tokens : Math.ceil((i.name.length + String(i.description ?? "").length) / 4),
