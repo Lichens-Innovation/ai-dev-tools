@@ -136,9 +136,9 @@
     - [❌ Avoid manually typing the children prop](#-avoid-manually-typing-the-children-prop)
     - [✅ Prefer using PropsWithChildren for typing children props](#-prefer-using-propswithchildren-for-typing-children-props)
     - [ℹ️ Explanation](#ℹ️-explanation-24)
-  - [*LOW* Use ElementRef Type Helper for Typing Refs](#low-use-elementref-type-helper-for-typing-refs)
+  - [*LOW* Use ComponentRef Type Helper for Typing Refs](#low-use-componentref-type-helper-for-typing-refs)
     - [❌ Avoid typing refs directly with element type names](#-avoid-typing-refs-directly-with-element-type-names)
-    - [✅ Prefer using the ElementRef type helper for typing refs](#-prefer-using-the-elementref-type-helper-for-typing-refs)
+    - [✅ Prefer using the ComponentRef type helper for typing refs](#-prefer-using-the-componentref-type-helper-for-typing-refs)
     - [ℹ️ Explanation](#ℹ️-explanation-25)
   - [*LOW* Use explicit boolean conditions for conditional rendering](#low-use-explicit-boolean-conditions-for-conditional-rendering)
     - [❌ Avoid implicit boolean conversion with non-boolean values](#-avoid-implicit-boolean-conversion-with-non-boolean-values)
@@ -1984,7 +1984,7 @@ const HeaderPage: React.FC<PropsWithChildren<PageProps>> = ({ children, ...pageP
 
 You don't have to type the children prop manually. Instead, you can use PropsWithChildren to simplify the typings. This makes your code cleaner and reduces the chance of errors.
 
-## *LOW* Use ElementRef Type Helper for Typing Refs
+## *LOW* Use ComponentRef Type Helper for Typing Refs
 
 ### ❌ Avoid typing refs directly with element type names
 
@@ -1992,15 +1992,15 @@ You don't have to type the children prop manually. Instead, you can use PropsWit
 const ref = useRef<HTMLDivElement>(null);
 ```
 
-### ✅ Prefer using the ElementRef type helper for typing refs
+### ✅ Prefer using the ComponentRef type helper for typing refs
 
 ```tsx
-const ref = useRef<ElementRef<"div">>(null);
+const ref = useRef<ComponentRef<"div">>(null);
 ```
 
 ### ℹ️ Explanation
 
-Typing refs directly with element type names can be cumbersome and error-prone, as it requires remembering the exact type name of the element. Instead, use the `ElementRef` type helper, which simplifies the process by allowing you to use the element's name directly. This approach is more straightforward and reduces the likelihood of mistakes.
+Typing refs directly with element type names can be cumbersome and error-prone, as it requires remembering the exact type name of the element. Instead, use the `ComponentRef` type helper, which simplifies the process by allowing you to use the element's name directly. This approach is more straightforward and reduces the likelihood of mistakes.
 
 ## *LOW* Use explicit boolean conditions for conditional rendering
 
