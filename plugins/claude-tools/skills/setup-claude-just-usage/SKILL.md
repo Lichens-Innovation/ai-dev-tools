@@ -28,9 +28,11 @@ How the hook decides: for each command in a Bash call (split on `;`, `&&`, `|`, 
 
 1. **Prerequisites.** `just --version` and `node --version` >= 18; stop and say what is missing otherwise. Work from the git root (`git rev-parse --show-toplevel`).
 
-2. **Find the levels.** `git ls-files` for files named `justfile`, `Justfile` or `.justfile` (any depth; ignore vendored dirs like `node_modules`). Each parent directory is a level. If none is tracked, `find` the same names, skipping `node_modules`, `.git`, `.venv`, `target`, `dist`. No justfile at all: stop and say so.
+2. **Find the levels.** `git ls-files` for files named `justfile`, `Justfile` or `.justfile` (any depth; ignore vendored dirs like `node_modules`). Each parent directory is a level. If none is tracked, `find` the same names, skipping `node_modules`, `.git`, `.venv`, `target`, `dist`. No justfile at all: if the repo uses pnpm, offer to create a root `justfile` from `assets/pnpm-recipes.just` (step 3); otherwise stop and say so.
 
 3. **Read each level.** In that directory run `just --list --unsorted` (shows imports and `mod` recipes with doc comments) and `just --dump --dump-format json` for the bodies, parameters and `[private]` flags. Skip private recipes and the `default` recipe that only lists. For every recipe note: name, parameters, doc comment, and the program(s) its body runs. Note shared programs across recipes (`uv`, `docker`, `pnpm`).
+
+   **Offer missing pnpm recipes.** For a level that uses pnpm (`pnpm-lock.yaml` or `pnpm-workspace.yaml` at or above it, or `"packageManager": "pnpm@..."`), compare its recipes with `assets/pnpm-recipes.just`: `install`, `dev`, `build`, `lint`, `check`, `typecheck`, `test`, `format` and `audit`. Propose a recipe only if it is missing (by name, or by another recipe already running the same `pnpm` command) and its script exists in that level's `package.json` (`audit` and `install` need none). Keep the user's existing recipes and names untouched. Show the proposed recipes in step 5; once accepted, append them to the level's justfile (copied from the asset, doc comments included) before step 4 reads it, and re-run `just --list --unsorted`. `just audit -i` runs `pnpm audit --fix=update --interactive`, plain `just audit` the same without `--interactive`. Needs `just` >= 1.46 (option arguments); if older, write `audit *args` with `pnpm audit --fix=update {{args}}` and tell the user to call `just audit --interactive`.
 
 4. **Derive the blocked commands** per level, from the recipe bodies. These are the proposal; show it in step 5.
    - Block a **program** (`docker`, `uv`, `atlas`, `ruff`) when the recipes cover its usage in this project. Block a **program + subcommand** (`pnpm test`, `cargo clippy`, `uv run pytest`) when the program is also used for other things that have no recipe (`pnpm install`, `cargo add`).
@@ -41,7 +43,7 @@ How the hook decides: for each command in a Bash call (split on `;`, `&&`, `|`, 
    - If the existing rules or hooks say something different for a recipe (e.g. an LSP replaces `just check-types`), keep that: add a `just check-types` entry whose message says what to use instead, and mention it in the rule.
 
 5. **Ask** in one `AskUserQuestion` call, showing per level the recipes and the blocked commands (compact, one line each):
-   - "Install these levels and blocked commands?": yes (recommended), or adjust (user edits the list; apply and show the result again).
+   - "Install these levels and blocked commands?" (with any pnpm recipes to add to a justfile, listed per level): yes (recommended), or adjust (user edits the list; apply and show the result again).
    - If `.claude/settings.json` is untracked or gitignored: "Where to register the hook?": `settings.json` (recommended if tracked) or `settings.local.json`.
 
 6. **Write the files.**
