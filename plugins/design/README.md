@@ -28,8 +28,8 @@ In Claude Design, change the palette card, or ask for a proposal of a component 
 (`proposals/<name>.html`, see [`references/proposals.md`](./references/proposals.md)). Set its
 manifest `status` to `approved`, then in Claude Code run `/design-loop`.
 
-To design a whole page, bring it in first: `/design-loop add the Home page to Claude Design` (or
-`/design-screens`). It rebuilds the page as a mockup from the synced components, checked against
+To design a whole page, bring it in first: `/design-refresh add the Home page` (or tell
+`/design-loop` to). It rebuilds the page as a mockup from the synced components, checked against
 the running app, with no change to the app ([`references/screens.md`](./references/screens.md)).
 Propose changes in `proposals/screens/<name>.html` and approve them like a component.
 
@@ -45,9 +45,8 @@ after implementing): it tells you when the components are behind their code (the
 | `design-palette` | Creates or migrates the canonical theme palette (light/dark inputs → scales → semantic tokens), generates one theme shared by web and React Native plus namespaced Tailwind utilities (`text-noa-muted`), copies the generator (`palette.ts`, Node 22.18+) into the repo with a `palette` package script, audits contrast, and provides a live palette card for Claude Design. Used by `design-init`. |
 | `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                                                                                                                                                            |
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                                                                                                                                                        |
-| `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to the two skills below.                                                                                                                                        |
-| `design-screens` | Adds, refreshes or fixes app screens in Claude Design as mockups built from the synced components, checked against screenshots of the running app, then asks until the mockup is faithful enough.                                                                                                                                                                                                     |
-| `design-refresh` | Brings Claude Design up to date: says when the components need a `/design-sync`, then rebuilds stale screen mockups and offers new screens.                                                                                                                                                                                                                                                           |
+| `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to `design-refresh`.                                                                                                                                        |
+| `design-refresh` | The one skill for updating Claude Design: says when the components need a `/design-sync`, rebuilds stale screen mockups, offers new screens, and adds a named page or fixes a mockup, checked against screenshots of the running app.                                                                                                                                                                                                                                                           |
 
 ## The contract
 

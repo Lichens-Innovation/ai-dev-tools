@@ -15,7 +15,7 @@ so every card in the project shares:
   card, the project's start page. To its right, in the navbar and the sidebar, a Tailwind icon
   opens the [Tailwind classes card](#tailwind-classes-card) when the project has one.
 - **Hamburger button and sidebar**: the palette link, then **Pages** (the screen mockups, from
-  `screens/index.json`, written by `design-screens`), then every other card grouped as in the
+  `screens/index.json`, written by `design-refresh`), then every other card grouped as in the
   Design System view, from the `_ds_manifest.json` Claude Design compiles at the project root.
   A click opens that page in place. The sidebar starts open on wide screens and remembers its
   state; on narrow screens it covers the page and closes after a pick. Proposals are not listed.

@@ -1,7 +1,6 @@
 ---
 name: design-palette
-description: "Creates or migrates the canonical CSS theme palette: brand/base/status inputs per light and dark mode, generated faint→intense scales, a reference-only semantic layer, a var()-only theme shared by web and React Native, Tailwind v4 utilities, and a contrast audit. Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
-disable-model-invocation: true
+description: "Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
 ---
 
 # Design Palette

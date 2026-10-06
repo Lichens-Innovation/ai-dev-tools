@@ -10,7 +10,7 @@ same way, from a mockup: see [`screens.md`](./screens.md).
 | ------------------------------- | --------------------------- | ------------------------------------------------ |
 | `components/<group>/<Name>/…`   | `/design sync`, from code   | Reference: how the component looks in code today |
 | `proposals/<name>.html`         | Claude Design               | Target: the synced component plus the change     |
-| `screens/<name>.html`           | `design-screens`, from code | Reference: a screen rebuilt from the components  |
+| `screens/<name>.html`           | `design-refresh`, from code | Reference: a screen rebuilt from the components  |
 | `proposals/screens/<name>.html` | Claude Design               | Target: the screen mockup plus the change        |
 | `Palette.dc.html`               | `design-init`, then edited  | Target for the palette (inputs prop)             |
 | `Tailwind.html`                 | `design-init`, read only    | Reference: every palette Tailwind class          |

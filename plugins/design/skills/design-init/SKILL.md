@@ -1,6 +1,6 @@
 ---
 name: design-init
-description: "One-time setup for running the design loop in an existing React or React Native project. Creates the canonical palette, sets up Storybook/Chromatic/MCP, creates (or binds) the Claude Design project, seeds it with the palette card, reconciles palette inputs between the two, and writes design.manifest.json. Use when the user wants to set up a project for the Claude Design loop, onboard an existing project, or asks how to get started with the design plugin."
+description: "One-time setup for running the design loop in an existing React or React Native project."
 disable-model-invocation: true
 ---
 
@@ -25,19 +25,20 @@ this skill produces must satisfy the preconditions in §6.
    exists, and whether a Claude Design project is already bound. Report the gap list.
 
 1b. **Prerequisites and choices.**
-   - **Prerequisites** (`prerequisites.fixes`, Node 22.18+ for `palette.ts`): list each change you
-     would make (e.g. set `disableBundledSkills` to `false` in `<file>`, remove `DesignSync` from
-     `permissions.deny`), then ask before applying any. JSON settings cannot hold a comment, so
-     explain the change in your reply instead. Settings edits need a new session: say so. When
-     the Claude Design MCP is missing, give the user the README command; do not run it.
-   - **Tailwind**, when a UI package lacks it: ask (`AskUserQuestion`) between adding Tailwind
-     (v4, following the framework's own Tailwind guide, namespaced palette utilities) and using
-     the palette **without** Tailwind (no namespace, no Tailwind outputs or card). Keep the
-     answer for steps 2 and 6.
-   - **Chromatic**, when absent: ask whether to install it, stating it is **optional** (an
-     external account and token, and quota use). Without it, `design-loop` skips its publish
-     step and contract §6's Chromatic precondition is waived. Skip the question when it is
-     already installed.
+
+- **Prerequisites** (`prerequisites.fixes`, Node 22.18+ for `palette.ts`): list each change you
+  would make (e.g. set `disableBundledSkills` to `false` in `<file>`, remove `DesignSync` from
+  `permissions.deny`), then ask before applying any. JSON settings cannot hold a comment, so
+  explain the change in your reply instead. Settings edits need a new session: say so. When
+  the Claude Design MCP is missing, give the user the README command; do not run it.
+- **Tailwind**, when a UI package lacks it: ask (`AskUserQuestion`) between adding Tailwind
+  (v4, following the framework's own Tailwind guide, namespaced palette utilities) and using
+  the palette **without** Tailwind (no namespace, no Tailwind outputs or card). Keep the
+  answer for steps 2 and 6.
+- **Chromatic**, when absent: ask whether to install it, stating it is **optional** (an
+  external account and token, and quota use). Without it, `design-loop` skips its publish
+  step and contract §6's Chromatic precondition is waived. Skip the question when it is
+  already installed.
 
 2. **Palette (sub-skill).** Invoke **`design-palette`** (steps 1–6 only: targets, inputs,
    generation, audit), passing the Tailwind choice. Result: the canonical inputs file plus
@@ -56,7 +57,7 @@ this skill produces must satisfy the preconditions in §6.
      it connects at session start and only works while Storybook runs.
 
 3b. **Chromatic (sub-skill).** When chosen in 1b (or already present), invoke **`chromatic-init`**
-   once Storybook exists.
+once Storybook exists.
 
 4. **Create or bind the Claude Design project.** `DesignSync list_projects`.
    - **Default: create a new project** for this repo with `DesignSync create_project` (`name`:
@@ -109,8 +110,8 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 
    Upload to the project root (the Pages list only shows root files, and the Design System view
    labels each card by its file name): `DesignSync finalize_plan` (`writes: ["Palette.dc.html",
-   "design-nav.js", "thumbnail.html", "Tailwind.html"]`, `deletes: []`, `localDir:
-   /tmp/design-init`), then `DesignSync write_files` with that `planId` and one
+"design-nav.js", "thumbnail.html", "Tailwind.html"]`, `deletes: []`, `localDir:
+/tmp/design-init`), then `DesignSync write_files` with that `planId` and one
    `{ path, localPath }` per file (`Palette.dc.html` ← `palette.html`, `Tailwind.html` ←
    `tailwind.html`, the others same name). Drop `Tailwind.html` when it wasn't copied. It has no
    palette code or inputs of its own (it reads them from `Palette.dc.html` through the navbar),
@@ -171,7 +172,7 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
     many components have a card. Next: `/design sync` the first target, then re-run
     `design-init` to map the cards and set up proposals. Then, in Claude Design, edit the palette
     card or ask for a component proposal (`proposals/<name>.html`), approve it in the manifest,
-    and run `design-loop`. Whole pages: `design-screens`; keeping Claude Design current:
+    and run `design-loop`. Whole pages and keeping Claude Design current:
     `design-refresh`.
 
 Never overwrite an existing palette, card, or manifest without confirming; show diffs.

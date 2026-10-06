@@ -1,7 +1,6 @@
 ---
 name: storybook-init
-description: "Installs and configures Storybook in a React or React Native project (including each UI app of a monorepo), wires up the Storybook MCP server, and confirms Playwright can screenshot a running Storybook - the render + knowledge half of the design loop. Used by design-init, or directly when the user wants to add Storybook or configure the Storybook MCP. Use when the user asks to add Storybook, set up component stories, or configure the Storybook MCP."
-disable-model-invocation: true
+description: "Installs and configures Storybook in a React or React Native project. Used by design-init, or directly when the user wants to add Storybook or configure the Storybook MCP."
 ---
 
 # Storybook Init
@@ -30,7 +29,7 @@ row. A normal repo has exactly one (root, `:6006`, key `default`).
    Playwright, and a Storybook MCP entry. Only add what's missing (idempotent).
 
 2. **Install Storybook (CLI, not MCP).** The Storybook MCP cannot bootstrap Storybook — its tools
-   operate against a *running* Storybook, so it's chicken-and-egg. Run the CLI **from the target
+   operate against a _running_ Storybook, so it's chicken-and-egg. Run the CLI **from the target
    directory** (it detects the framework/builder there):
 
    ```bash
@@ -72,7 +71,7 @@ row. A normal repo has exactly one (root, `:6006`, key `default`).
    (`tools/list`) rather than guessing.
 
 5. **Confirm Playwright screenshots.** Ensure Playwright is installed (`npm i -D playwright &&
-   npx playwright install chromium`) and can capture a single story from the running Storybook via
+npx playwright install chromium`) and can capture a single story from the running Storybook via
    `<url>/iframe.html?id=<storyId>&viewMode=story`. `design-loop`'s `scripts/screenshot.mjs` takes
    the URL as an argument, so one install serves every target.
 
@@ -104,6 +103,7 @@ row. A normal repo has exactly one (root, `:6006`, key `default`).
 auth. Claude Code connects to MCP servers once, at session start; if the Storybook wasn't running
 then, the connection is refused and Claude Code falls back to an OAuth attempt the server doesn't
 support (hence the 404). Fix:
+
 1. Start the target's Storybook (its `runCommand`). Probe it with
    `curl -s -o /dev/null -w "%{http_code}\n" -X POST <url>/mcp -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'`
    — expect `200`; if nothing answers, check the port (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).

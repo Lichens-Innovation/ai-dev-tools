@@ -1,6 +1,6 @@
 ---
 name: design-loop
-description: "Runs the Claude Design -> React implementation loop: reads an approved component or screen proposal (or the palette card) from a Claude Design project, implements it in the mapped component or screen using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Also routes design requests: adding or refreshing a page in Claude Design (design-screens) and bringing Claude Design up to date (design-refresh). Use when the user says a component, a screen (or the palette) is ready to implement, asks to sync approved Claude Design changes into code, asks to add a page to Claude Design, or wants to run the design loop."
+description: "Runs the Claude Design -> React implementation loop: takes a design update from a Claude Design project, implements it in the mapped component or screen using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component, a screen (or the palette) is ready to implement, or wants to run the design loop."
 disable-model-invocation: true
 ---
 
@@ -58,12 +58,9 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 ### 0. Route the request
 
 - **Add or refresh a page (screen) in Claude Design** ("add the Home page", "mock the settings
-  screen") → this is not implementation: follow
-  [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md) in add mode (refresh mode
-  for a screen that already has a row; fix mode when the user says its mockup doesn't match the
-  real page), then stop.
-- **Bring Claude Design up to date** ("refresh Claude Design", "sync the design project") →
-  follow [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md), then stop.
+  screen", or its mockup doesn't match the real page) or **bring Claude Design up to date**
+  ("refresh Claude Design", "sync the design project") → this is not implementation: follow
+  [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md), then stop.
 - **Otherwise**, implement (steps 1–11). First a quick staleness check, as `design-refresh`
   step 1 does for components: if the code changed since the last sync, say so and suggest
   `/design-sync` (only the user can start it). It is not required to implement already-approved proposals, but

@@ -1,7 +1,7 @@
 # Design Loop — Shared Contract
 
 The single source of agreement for every skill in the `design` plugin. `design-init`,
-`design-palette`, `storybook-init`, `design-screens`, `design-refresh` and `design-loop` all
+`design-palette`, `storybook-init`, `design-refresh` and `design-loop` all
 depend on the definitions here.
 Change this doc first; then bring the skills into line with it.
 
@@ -16,7 +16,7 @@ Change this doc first; then bring the skills into line with it.
               └──────────────────────────────────────────────────────────────┘
 
   1. SYNC UP    canonical CSS + component catalog ──/design sync──▶ Claude Design project
-                screens rebuilt as mockups from the synced components ──design-screens──▶
+                screens rebuilt as mockups from the synced components ──design-refresh──▶
                 (design-refresh runs both, only for what changed)
   2. EXPLORE    you + claude.ai/design iterate the palette card, component and screen proposals
                 (proposals/<name>.html: the synced component + the change; fast, no source churn)
