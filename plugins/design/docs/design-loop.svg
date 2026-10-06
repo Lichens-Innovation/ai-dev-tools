@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 540" width="1000" height="540" font-family="system-ui, -apple-system, Segoe UI, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">The design loop</title>
+  <desc id="d">Sync the code to Claude Design, explore proposals there, approve one, implement it in code with design-loop, publish to Chromatic, then re-sync Claude Design with design-refresh.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="540" rx="12" fill="#ffffff"/>
+  <text x="30" y="40" font-size="22" font-weight="700" fill="#0f172a">The design loop</text>
+
+  <!-- 1 Sync up -->
+  <rect x="30" y="70" width="260" height="120" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="48" y="100" font-size="16" font-weight="700" fill="#0f172a">1 · Sync up</text>
+  <text x="48" y="126" font-size="13" fill="#1e293b">/design-refresh (Claude Code)</text>
+  <text x="48" y="146" font-size="13" fill="#1e293b">Components and screen mockups</text>
+  <text x="48" y="166" font-size="13" fill="#1e293b">land in Claude Design</text>
+
+  <!-- 2 Explore -->
+  <rect x="370" y="70" width="260" height="120" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="388" y="100" font-size="16" font-weight="700" fill="#0f172a">2 · Explore</text>
+  <text x="388" y="126" font-size="13" fill="#1e293b">In Claude Design</text>
+  <text x="388" y="146" font-size="13" fill="#1e293b">Iterate palette, component and</text>
+  <text x="388" y="166" font-size="13" fill="#1e293b">screen proposals, fast</text>
+
+  <!-- 3 Approve -->
+  <rect x="710" y="70" width="260" height="120" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="728" y="100" font-size="16" font-weight="700" fill="#0f172a">3 · Approve</text>
+  <text x="728" y="126" font-size="13" fill="#1e293b">You, the first time only</text>
+  <text x="728" y="146" font-size="13" fill="#1e293b">/design-loop asks, then records</text>
+  <text x="728" y="166" font-size="13" fill="#1e293b">status: approved in the manifest</text>
+
+  <!-- 4 Implement -->
+  <rect x="560" y="270" width="410" height="230" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="578" y="300" font-size="16" font-weight="700" fill="#0f172a">4 · Implement — /design-loop (Claude Code)</text>
+  <text x="578" y="332" font-size="13" fill="#1e293b">a. Read the approved proposal</text>
+  <text x="578" y="360" font-size="13" fill="#1e293b">b. Reconcile the canonical CSS tokens</text>
+  <text x="578" y="388" font-size="13" fill="#1e293b">c. Edit the component code</text>
+  <text x="578" y="416" font-size="13" fill="#1e293b">d. Screenshot and compare (Playwright)</text>
+  <text x="578" y="444" font-size="13" fill="#1e293b">e. Validate (Storybook MCP: a11y + tests)</text>
+  <path d="M900 412 H920 V384 H904" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="578" y="476" font-size="12" font-style="italic" fill="#334155">c and d repeat until the pixels match the proposal</text>
+
+  <!-- Publish -->
+  <rect x="300" y="330" width="200" height="110" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="318" y="360" font-size="16" font-weight="700" fill="#0f172a">Publish</text>
+  <text x="318" y="386" font-size="13" fill="#1e293b">Chromatic</text>
+  <text x="318" y="406" font-size="13" fill="#1e293b">Visual diff and team</text>
+  <text x="318" y="426" font-size="13" fill="#1e293b">approval</text>
+
+  <!-- Arrows -->
+  <path d="M290 130 H368" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M630 130 H708" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M840 190 V268" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M560 385 H502" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M300 385 H160 V192" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Re-sync label -->
+  <text x="30" y="420" font-size="13" font-weight="700" fill="#0f172a">5 · Re-sync with /design-refresh</text>
+  <text x="30" y="440" font-size="13" fill="#1e293b">so Claude Design shows the new code,</text>
+  <text x="30" y="460" font-size="13" fill="#1e293b">then back to step 2</text>
+
+  <!-- Legend -->
+  <g font-size="12" fill="#334155">
+    <rect x="30" y="500" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="52" y="512">Claude Design</text>
+    <rect x="160" y="500" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="182" y="512">Claude Code</text>
+    <rect x="285" y="500" width="14" height="14" rx="3" fill="#fef3c7" stroke="#d97706"/>
+    <text x="307" y="512">You</text>
+    <rect x="360" y="500" width="14" height="14" rx="3" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="382" y="512">Chromatic</text>
+  </g>
+</svg>

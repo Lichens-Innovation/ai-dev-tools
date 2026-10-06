@@ -1,0 +1,8 @@
+# Skill, agent and rule markdown is hand-formatted (nested lists, wrapped lines).
+# The sync workflow copies it to the root, so the copies are ignored too.
+plugins/**/skills/**/*.md
+plugins/**/agents/**/*.md
+plugins/**/rules/**/*.md
+skills/
+agents/
+rules/

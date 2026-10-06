@@ -1,14 +1,15 @@
 ---
 name: design-refresh
-description: "Brings the Claude Design project up to date with the code: checks whether the synced components are behind their code (and asks the user to run /design-sync when they are), rebuilds the screen mockups whose code changed, and offers screens that have no mockup yet. Use when the user wants Claude Design refreshed or up to date before designing, or after design-loop applied changes."
-disable-model-invocation: true
+description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, and adds a named page or fixes a mockup that differs from the real page. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, or asks to add, mock or fix a page or screen in Claude Design."
 ---
 
 # Design Refresh
 
 One entry point to make Claude Design match the repo: the synced components (through
-`/design-sync`, run by the user) and the screen mockups (through `design-screens`). Cheap when
-nothing changed.
+`/design-sync`, run by the user) and the screen mockups (through
+[`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md)). Cheap when nothing
+changed. It also takes the targeted requests: add a named page, or fix a mockup that differs from
+the real page.
 
 ## Shared contract
 
@@ -70,13 +71,16 @@ them the project has never been synced: point at `design-init`, then a first `/d
    `localDir: /tmp/design-refresh`, then `write_files`). Upload the navbar with the Tailwind card:
    the card needs the navbar's palette engine and adds itself to its sidebar. Neither needs a sync.
 
-4. **Screens.** Follow [`design-screens`](${CLAUDE_SKILL_DIR}/../design-screens/SKILL.md):
-   refresh mode for the stale rows, one run for all of them.
+4. **Screens.** Follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
+   with `<screenshot.mjs>` = `${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`: refresh
+   mode for the stale rows, one run for all of them. When the user named a page ("add the Home
+   page") or said a mockup doesn't match the real page, run add mode or fix mode for those screens
+   instead of the offer in step 5, after the component check in step 1 (and step 2 if stale).
 
 5. **Offer new screens, last.** List the app's routes (its router) that have no `screens[]` row.
    If there are any, ask whether to add some now (`AskUserQuestion`, multi-select, with a "Not
    now" option; name the rest in the question when there are more than fit). Build the chosen
-   ones with `design-screens` in add mode. Record nothing for the others: they are offered again
+   ones in add mode (same file). Record nothing for the others: they are offered again
    next time, so the user adds screens as they start working on them.
 
 6. **Report**: whether the components are current (or waiting on `/design-sync`), the navbar,
