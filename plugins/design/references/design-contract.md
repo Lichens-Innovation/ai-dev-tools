@@ -290,7 +290,7 @@ vendoring step. Never write generated tokens by hand. Full model:
   component has at least one story in its target.
 - Each of those targets' Storybook MCP server is configured and reachable.
 - Playwright is installed and can screenshot a running Storybook.
-- Chromatic is wired for publish, one project per target.
+- Chromatic, when the user chose it (optional), is wired for publish, one project per target.
 - `design.manifest.json` exists and its `designProjectId` resolves via `DesignSync`.
 - The local `/design sync` output (`ds-bundle/`) matches the project: same `bundleSha12` in its
   `_ds_sync.json` and in the project's. `design-loop` renders proposals against it.

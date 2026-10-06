@@ -42,9 +42,9 @@ server `storybook`). Below, `<url>` and "the target's MCP" always mean that reso
 
 Verify contract §6. Concretely: `design.manifest.json` exists at the repo root; for every target
 used by a stale approved component (not a screen), Storybook is running (its `runCommand`, reachable at its
-`url`) and its MCP server is reachable; Playwright is installed; Chromatic is wired. If any is
-missing, **stop** and point the user at `design-init` rather than guessing — start a target's
-`runCommand` only if the user asks.
+`url`) and its MCP server is reachable; Playwright is installed; Chromatic is wired (unless the target has no `chromatic` script: the
+user declined it). If any is missing, **stop** and point the user at `design-init` rather than
+guessing; start a target's `runCommand` only if the user asks.
 
 If a target's Storybook MCP server is unreachable (`ECONNREFUSED`, or an "Authenticate" prompt
 failing with `Dynamic Client Registration rejected (HTTP 404)`), it's not an auth issue: the
@@ -95,43 +95,9 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 
 ### 1b. The palette item (when approved and stale)
 
-Every component consumes its tokens, so its task (step 2) runs **before** the components.
-
-`<palette.ts>` is the repo's copy (`palette.script`) when set, checked against the plugin's
-[`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts) first, else the
-plugin's (contract §5).
-
-1. Step 1 saved the card as `/tmp/design-loop/palette.target.html`. Show what changed:
-
-   ```bash
-   node <palette.ts> <localPath> --diff-card /tmp/design-loop/palette.target.html
-   ```
-
-2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
-   output in `palette.outputs`: `--theme <outputs.web>` (or `--web` when `outputs.web` equals
-   `localPath`), then `--scheme <outputs.scheme>`, `--mobile <outputs.mobile>` and
-   `--json <outputs.json>` for each one set. The inputs file receives the card's inputs. The same
-   run regenerates the project thumbnail (its title comes from the card):
-
-   ```bash
-   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] \
-     --thumbnail /tmp/design-loop/thumbnail.html
-   ```
-
-   Only inputs change by hand; never edit generated tokens. Report the audit it prints; propose
-   fixes for any `FAIL` but do not block.
-
-3. Converge and validate across **all** targets: `stories-changed` on each target, screenshot a
-   representative set of stories, `test-run`, then publish each target (steps 7–9).
-4. Upload `/tmp/design-loop/thumbnail.html` to `palette.thumbnailPath` (`DesignSync finalize_plan`
-   with `writes: [<thumbnailPath>]`, `deletes: []`, `localDir: /tmp/design-loop`, then
-   `write_files`). It is generated: never hand-edit it.
-
-5. Record `palette.lastImplementedHash` (step 10).
-
-The card (`palette.designPath`, `Palette.dc.html` at the project root) is read only: never
-upload it back, and never write or rewrite the project's `support.js`. The thumbnail is the only
-palette file `design-loop` uploads.
+Every component consumes its tokens, so the palette's task (step 2) runs **before** the
+components. For the palette item (diff, regenerate, converge all targets, upload the thumbnail),
+read [`references/palette-item.md`](references/palette-item.md); it does not touch the card.
 
 ### 2. Open the execution ledger
 
@@ -218,10 +184,9 @@ on structure, spacing and styling, not on its sample data.
      /tmp/design-loop/<name>.story.png
    ```
 
-4. `Read` both PNGs and compare them visually — colors, spacing, radii, type scale, states.
-   Judge convergence against the target, in each mode the proposal shows (screenshot the story
-   in dark too when the Storybook has a theme toolbar or a dark story). (Optionally add an objective delta with a pixel-diff
-   tool, but the primary judge is your visual read of both images.)
+4. `Read` both PNGs and compare them visually: colors, spacing, radii, type scale, states, in
+   each mode the proposal shows (screenshot the story in dark too when the Storybook has a theme
+   toolbar or a dark story).
 
 5. If they don't match, go back to **step 6**, adjust, and re-screenshot. Loop 6→7 until the
    render matches the target. **Narrate progress in the task update, do not create new tasks.**
@@ -234,7 +199,8 @@ Fix and re-run until green. For a screen, run the repo's checks for the touched 
 
 ### 9. Publish
 
-A screen whose edit changed no story has nothing to publish. Otherwise, publish per target, not
+A screen whose edit changed no story has nothing to publish, and neither does a target without a
+`chromatic` script (Chromatic is optional: skip this step, say so in the report). Otherwise, publish per target, not
 per component: when a component is the last stale one in its target for
 this run, publish that target (earlier components of the same target wait for this build). Run
 from the target's `dir`, with the token from its `chromaticTokenEnv`:
@@ -257,8 +223,8 @@ Per component: what changed, tokens added or snapped, test result, Chromatic bui
 which approved components were implemented, which were already up to date, and which had no
 proposal. Then offer to run
 [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md): the synced catalog and the
-mockups still show the old code until then. Keep the proposal; its hash is now `lastImplementedHash`, so a later edit to it is the
-next change. Never delete or edit it from here.
+mockups still show the old code until then. Keep the proposal (its hash is now
+`lastImplementedHash`, so a later edit to it is the next change); never delete or edit it here.
 
 ---
 
@@ -277,8 +243,7 @@ next change. Never delete or edit it from here.
 
 ## Notes
 
-- This skill **implements**; it does not decide look-and-feel. That happens in Claude Design.
-- Keep temp artifacts under `/tmp/design-loop/`; they're throwaway between runs.
-- `screenshot.mjs` renders both a live Storybook URL and a local target `.html` the same way, so
-  the two screenshots are comparable. Run it from the target's `dir`: it loads Playwright from the
+- Temp artifacts live under `/tmp/design-loop/` and are throwaway.
+- `screenshot.mjs` renders a live Storybook URL and a local target `.html` the same way, so the
+  two screenshots are comparable. Run it from the target's `dir`: it loads Playwright from the
   working directory.

@@ -69,11 +69,10 @@ Read before starting:
    Add the copy to the formatter and linter ignores: it must stay byte-identical to the plugin's.
    Raise the project's `engines.node` to `>=22.18` when it allows older versions. Outside a
    `"type": "module"` package, Node prints a harmless module-type warning; add `"type": "module"`
-   to that package when it has no other scripts that need CommonJS.
-   Record it in the manifest as `palette.script`, and the namespace as `palette.namespace`
-   (`design-init` writes them when it creates the manifest). On a later run, compare the copy with the plugin's first and, when they
-   differ, show the diff and ask before replacing it (contract §5). Adding the script is no
-   install: never run the package manager's install for it.
+   when no other script there needs CommonJS. The manifest records it as `palette.script` and the
+   namespace as `palette.namespace` (`design-init` writes them). On a later run, compare the copy
+   with the plugin's first and, when they differ, show the diff and ask before replacing it
+   (contract §5). Adding the script is no install: never run the package manager's install.
 
 6. **Generate.** Run the `palette` script (or the copy with the same flags).
 
@@ -98,9 +97,6 @@ Read before starting:
    takes them from it (and writes them into the inputs file), `--diff-card <card>` only prints the differences. `--title <name>` sets the
    card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
 
-   The script reads every `--name-lm` / `--name-dm` input, regenerates the rest of the file(s),
-   and prints the contrast audit. Re-run it after any input change.
-
 7. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input
    change that fixes it (usually nudging that color's lightness) and ask before applying.
    `WARN` lines are advisory; explain them in one line each. Also say which brand slots are unset:
@@ -110,8 +106,8 @@ Read before starting:
    reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md).
 
 9. **Report.** Canonical file path, the `palette` script, generated file(s), what each app
-   imports, input count, audit summary, and the reminder that the inputs block is canonical: Claude Design and Chromatic are
-   downstream, and `design-loop` reconciles changes back into the inputs.
+   imports, input count and audit summary. The inputs are canonical; Claude Design is downstream
+   and `design-loop` reconciles its changes back into them.
 
 ## Rules
 
@@ -121,9 +117,8 @@ Read before starting:
   state is a new token in `palette.ts`, not a one-off alpha.
 - Never hand-edit generated tokens; change an input and re-run.
 - Keep the structure: inputs → scales → semantic. Never flatten semantic tokens into hex.
-- Components use the namespaced classes only (`text-noa-muted`, `bg-noa-primary-subtle`). Don't
-  add project Tailwind aliases (`bg-surface`, `text-content`): they bring a second vocabulary
-  back. When a third-party kit forces its own names, alias those onto the theme token
-  (`--color-background: var(--bg)`), never onto a `--color-*` variable. react-native-css inlines a variable declared only once, in stylesheet
-  order, and Tailwind emits `--color-*` before the theme, so such an alias loses dark mode on
-  native.
+- Components use the namespaced classes only (`text-noa-muted`). Don't add project Tailwind
+  aliases (`bg-surface`, `text-content`): they bring a second vocabulary back. When a third-party
+  kit forces its own names, alias them onto the theme token (`--color-background: var(--bg)`),
+  never onto a `--color-*` variable (it loses dark mode on native, see
+  [palette-structure.md](references/palette-structure.md)).

@@ -19,7 +19,7 @@ Make sure that you have the Claude Design MCP installed and Claude Code's Design
 
 ## Installation
 
-In Claude Code, run `/design-init`. It runs `/storybook-init` and `/chromatic-init` for you; run
+In Claude Code, run `/design-init`. It checks the prerequisites above and what the project already has (Tailwind, Storybook, Chromatic), asks before changing anything, treats Tailwind and Chromatic as optional, and reviews an existing Storybook for the loop. It runs `/storybook-init` and `/chromatic-init` for you; run
 those directly only to (re)configure one piece.
 
 ## Usage
