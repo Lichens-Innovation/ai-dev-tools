@@ -159,16 +159,37 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
      `Typography` → `Text`, see its `titleMap`). A component it excluded keeps
      `designPath: null` and cannot be approved. Other targets sync later with another run.
    - Set up proposals ([`proposals.md`](${CLAUDE_SKILL_DIR}/../../references/proposals.md)) once
-     the first sync has written its wrapper package: give its design provider the side-by-side
-     `mode="both"` and the shared navbar hook (on `components/`, `proposals/` and `screens/`),
-     add the proposal conventions to its `readmeHeader`, and ask the user to run `/design sync`
-     again so both reach the project.
+     the first sync has run. Find the project's design provider first: a `provider` key in
+     `.design-sync/config.json`, else a provider in the package sources `/design sync` bundles
+     (`.design-sync/pkg/`, or the folder of the config's `entry`, e.g. `ds-lib/`; look for
+     `design-nav` or a `DesignProvider`/`ColorScheme` export).
+     - **Found:** give it the side-by-side `mode="both"` and the shared navbar hook (on
+       `components/`, `proposals/` and `screens/`), as in
+       [`design-provider.tsx`](${CLAUDE_SKILL_DIR}/templates/design-provider.tsx).
+     - **None** (apps without a `dist/`, whose package a build script generates, have none): say
+       so in the report, never skip it silently. Offer to scaffold it: copy
+       [`design-provider.tsx`](${CLAUDE_SKILL_DIR}/templates/design-provider.tsx) into the
+       package sources (for a generated package, into what its build script emits, so a rebuild
+       keeps it), export it from the entry, and register it as the sync's provider in
+       `.design-sync/config.json` the way `/design sync` expects (its `provider` option; if
+       unsure of the format, ask the user to run `/design sync` and say what it needs). A
+       registered provider **replaces** the Storybook preview decorators (the converter only uses
+       them when no provider is set), so read `.storybook/preview` first and make the provider
+       supply what they did (i18n init, UI kit provider, router): wrap `DesignProvider` around
+       them, or them inside it. Decline or failure: the fallback is `design-refresh`'s
+       `nav-tag.mjs`, which adds the navbar tag to each card after every sync (step 3b there).
+       The hook only fires on `*.claudeusercontent.com` hosts, an assumption nobody has
+       verified: after the first re-sync, check a card in Claude Design, and keep `nav-tag.mjs`
+       as the fallback until a re-synced card shows the navbar without the tag.
+     Then add the proposal conventions to the `readmeHeader`, and ask the user to run
+     `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
 
 10. **Report & next steps.** Palette file(s), what each app imports and audit summary,
     Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
-    many components have a card. Next: `/design sync` the first target, then re-run
+    many components have a card, and whether the design provider (with the navbar hook) is in
+    place, scaffolded or missing. Next: `/design sync` the first target, then re-run
     `design-init` to map the cards and set up proposals. That re-run is also what gives the synced
     cards their navbar (step 8 wires it into the provider, and a second `/design sync` ships it).
     Then, in Claude Design, edit the palette
