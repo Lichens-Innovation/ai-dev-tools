@@ -83,7 +83,4 @@ them the project has never been synced: point at `design-init`, then a first `/d
    the screens rebuilt or added, anything blocked, and the project link
    (`https://claude.ai/design/p/<designProjectId>`).
 
-## Notes
-
-- Order matters: mockups render the synced bundle, so the component sync comes first.
-- This skill never edits app code and never writes the synced files.
+This skill never edits app code and never writes the synced files.

@@ -6,24 +6,15 @@ disable-model-invocation: true
 
 # Storybook Init
 
-Installs and wires the **render + knowledge** stack for the design loop: Storybook (the render
-target), the Storybook MCP server (knowledge + tests), and Playwright (the screenshot "eyes").
-Chromatic is a separate concern — see the `chromatic-init` skill. Usually invoked by `design-init`.
+Installs the **render + knowledge** stack for the design loop: Storybook, the Storybook MCP
+server (knowledge + tests), and Playwright (screenshots). Chromatic is `chromatic-init`. Usually
+invoked by `design-init`. Needs Node.js 20+ and npm 10+ / pnpm 9+ / Yarn 4+.
 
-## Shared contract
-
-Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) — this skill
+Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md): this skill
 satisfies the render/knowledge preconditions in §6 and produces the **Storybook targets** of §2.
 
-## Targets
-
-This procedure sets up **one Storybook target**: a directory, a port, an MCP server entry, and a
-row in the manifest's `storybooks` map. A normal repo has exactly one — the root, `:6006`, key
-`default` — and steps 1–7 below are all it needs.
-
-## Prerequisites
-
-- **Node.js 20+**, and npm 10+ / pnpm 9+ / Yarn 4+.
+Steps 1–7 set up **one target**: a directory, a port, an MCP entry, and a `storybooks` manifest
+row. A normal repo has exactly one (root, `:6006`, key `default`).
 
 ## Workflow
 
@@ -47,10 +38,10 @@ row in the manifest's `storybooks` map. A normal repo has exactly one — the ro
    # pnpm: pnpm create storybook@latest --features docs test a11y ai --yes --no-dev
    ```
 
-   Leave `--type` off so the CLI detects the project type (React, Next.js, …). `--yes --no-dev` keeps it non-interactive and skips auto-launching the dev server (step 3 does
-   that on the right port). `docs test a11y` gives `test-run` something to run; `ai` adds `@storybook/addon-mcp`,
-   which serves the MCP from the dev server itself. The CLI installs deps, adds `storybook` /
-   `build-storybook` scripts, creates `.storybook/`, and scaffolds example stories.
+   Leave `--type` off so the CLI detects the project type. `--yes --no-dev` keeps it
+   non-interactive and skips launching the dev server (step 3 does that on the right port).
+   `docs test a11y` gives `test-run` something to run; `ai` adds `@storybook/addon-mcp`, which
+   serves the MCP from the dev server itself.
 
    **Review what it wrote** — it edits files it doesn't own:
    - Pin versions: it writes `latest` / `^x` ranges. Match the repo's pinning policy and any

@@ -85,14 +85,8 @@ get_file` its `mockupPath`, check its hash first (step 5), and edit that copy. R
    description runs fix mode on that screen (steps 2–8), then asks again. Stop when the user says
    it's enough. Refresh mode doesn't ask: it runs inside `design-refresh`.
 
-## Stop conditions
-
-- The dev server or the login is not working → stop and say which.
-- The screen needs a component the kit doesn't export → build that part from the screen's own
-  markup with tokens, and list it as a known difference.
-- The remote mockup was edited in Claude Design → ask (step 5).
-
 ## Notes
 
-- Never edit the app's code from this skill.
-- Keep temp files under `/tmp/design-screens/`; they are throwaway.
+- A screen needing a component the kit doesn't export: build that part from the screen's own
+  markup with tokens, and list it as a known difference.
+- Temp files live under `/tmp/design-screens/` and are throwaway.
