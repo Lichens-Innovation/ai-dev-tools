@@ -1,6 +1,8 @@
 // Design provider for `/design sync`: wraps every synced card, proposal and screen mockup.
 // Copy it into the package `/design sync` bundles, export it, and register it as the sync's provider.
-// Adapt the imports to the project's React setup; nothing else needs to change.
+// Adapt the imports to the project's React setup.
+// A registered provider REPLACES the Storybook preview decorators in `/design sync`: this one must also supply what
+// they did (i18n init, UI kit provider, router...). Wrap `children` in those where DesignProvider renders them.
 //
 // - light (default): renders exactly like Storybook. `/design sync` grades each card against its story.
 // - dark: the same, with the dark scheme.
@@ -9,6 +11,7 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 
 type Mode = "light" | "dark";
+const designNav = () => (window as Window & { designNav?: { mode: Mode } }).designNav;
 
 const ColorScheme = ({ mode, children }: { mode: Mode; children: ReactNode }) => {
   useLayoutEffect(() => {
@@ -39,13 +42,14 @@ const designNavRoot = () => {
 
 // The navbar's light/dark switch, or null when the page has no navbar.
 const useDesignNavMode = (): Mode | null => {
-  const [mode, setMode] = useState<Mode | null>(() => (window as any).designNav?.mode ?? null);
+  const [mode, setMode] = useState<Mode | null>(() => designNav()?.mode ?? null);
   useEffect(() => {
     const root = designNavRoot();
     if (!root) return;
     const onMode = (e: Event) => setMode((e as CustomEvent<{ mode: Mode }>).detail.mode);
     window.addEventListener("design-nav:mode", onMode);
-    if ((window as any).designNav) setMode((window as any).designNav.mode);
+    const nav = designNav();
+    if (nav) setMode(nav.mode);
     else if (!document.querySelector("script[data-design-nav]")) {
       const script = document.createElement("script");
       script.src = new URL("design-nav.js", root).href;

@@ -172,9 +172,15 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
        package sources (for a generated package, into what its build script emits, so a rebuild
        keeps it), export it from the entry, and register it as the sync's provider in
        `.design-sync/config.json` the way `/design sync` expects (its `provider` option; if
-       unsure of the format, ask the user to run `/design sync` and say what it needs). Decline
-       or failure: the fallback is `design-refresh`'s `nav-tag.mjs`, which adds the navbar tag
-       to each card after every sync (step 3b there).
+       unsure of the format, ask the user to run `/design sync` and say what it needs). A
+       registered provider **replaces** the Storybook preview decorators (the converter only uses
+       them when no provider is set), so read `.storybook/preview` first and make the provider
+       supply what they did (i18n init, UI kit provider, router): wrap `DesignProvider` around
+       them, or them inside it. Decline or failure: the fallback is `design-refresh`'s
+       `nav-tag.mjs`, which adds the navbar tag to each card after every sync (step 3b there).
+       The hook only fires on `*.claudeusercontent.com` hosts, an assumption nobody has
+       verified: after the first re-sync, check a card in Claude Design, and keep `nav-tag.mjs`
+       as the fallback until a re-synced card shows the navbar without the tag.
      Then add the proposal conventions to the `readmeHeader`, and ask the user to run
      `/design sync` again so both reach the project.
 
