@@ -51,9 +51,13 @@ same way, from a mockup: see [`screens.md`](./screens.md).
 
 The provider in `/design sync`'s wrapper package (its `provider` config) can render the content
 in a light and a dark panel. It is also the one hook that runs in every synced card and proposal:
-`/design sync` has no option to add markup to its cards, so the provider loads the project's
-shared navbar (`design-nav.js`, uploaded by `design-init` next to the palette card) and follows
-its light/dark switch. A mode scoped to a container works with the palette's scheme file:
+`/design sync` has no option to add markup to its cards, so the provider can load the project's
+shared navbar (`design-nav.js`, uploaded by `design-init` next to the palette card) and follow
+its light/dark switch. The hook only exists once `design-init` has run a second time, after the
+first `/design sync` wrote the wrapper package (its step 8 adds it to the provider): until then the
+synced cards show no navbar. `design-refresh` checks for it and, as a stopgap for cards that still
+don't load it, adds `<script src="../../../design-nav.js"></script>` (`scripts/nav-tag.mjs`; the
+script guards against double loading). A mode scoped to a container works with the palette's scheme file:
 `light-dark()` follows the nearest `color-scheme`, and a Tailwind `dark:` variant written as
 `&:where([data-theme="dark"], [data-theme="dark"] *)` matches any dark ancestor.
 
