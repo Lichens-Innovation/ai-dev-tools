@@ -11,6 +11,7 @@ Modeled on the `agents.md` rule + `agent_bash_validation.sh` hook of `lichens-or
 | `SKILL.md` | Install workflow (read only when the skill runs) |
 | `scripts/use-just-commands.mjs` | The hook, copied to `.claude/hooks/use-just-commands.mjs`; reads the per-level configs |
 | `assets/use-just-commands.md` | Template for each level's `.claude/rules/use-just-commands.md`; loads every session, so keep it short |
+| `assets/pnpm-recipes.just` | Starter pnpm recipes (`install`, `dev`, `build`, `lint`, `check`, `typecheck`, `test`, `format`, `audit`) the skill offers to append to a justfile when they are missing; `just audit -i` runs `pnpm audit --fix=update --interactive` |
 | `scripts/test-use-just-commands.sh` | Regression tests (~40 cases) in a throwaway two-level project; run after every hook change |
 
 ## Generated, per repository
