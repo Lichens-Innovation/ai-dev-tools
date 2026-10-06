@@ -170,8 +170,8 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
     Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
     many components have a card. Next: `/design sync` the first target, then re-run
     `design-init` to map the cards and set up proposals. Then, in Claude Design, edit the palette
-    card or ask for a component proposal (`proposals/<name>.html`), approve it in the manifest,
-    and run `design-loop`. Whole pages and keeping Claude Design current:
+    card or ask for a component proposal (`proposals/<name>.html`), and run `design-loop`
+    (it asks for your approval the first time). Whole pages and keeping Claude Design current:
     `design-refresh`.
 
 Never overwrite an existing palette, card, or manifest without confirming; show diffs.

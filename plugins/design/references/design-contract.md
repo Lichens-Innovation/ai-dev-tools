@@ -20,7 +20,7 @@ Change this doc first; then bring the skills into line with it.
                 (design-refresh runs both, only for what changed)
   2. EXPLORE    you + claude.ai/design iterate the palette card, component and screen proposals
                 (proposals/<name>.html: the synced component + the change; fast, no source churn)
-  3. APPROVE    you flip a component, a screen (or the palette) to `status: approved` in the manifest
+  3. APPROVE    design-loop asks you the first time (or you name the item); it sets `status: approved`
   ── IMPLEMENT (design-loop, in a Claude Code session) ───────────────────────────────
      a. READ TARGET   DesignSync get_file → the proposal (or palette card) from the Design project
      b. READ SYSTEM   Storybook MCP docs-show → real props / stories / token usage
@@ -215,9 +215,12 @@ Skills always resolve a component's target through these rules — never hardcod
 ## 4. The approval signal vs. the execution ledger (two layers, kept separate)
 
 - **Signal layer — durable truth.** "Is Button ready to implement?" lives in the manifest as
-  `status: approved`. You (or Claude Design) flip it. Your verbal _"implement Button, it's
-  ready"_ is only the **trigger** that tells the session to go read the manifest; the record
-  is in git, not the conversation.
+  `status: approved`. It is a one-time opt-in per item: the first time `design-loop` finds a
+  proposal for a `wip` item it asks you, then sets `approved` through `scripts/manifest.mjs`
+  (naming the item, _"implement Button"_, counts as the answer; you can also set it by hand).
+  Claude Design cannot write the manifest. Once `approved`, a later edit of the proposal is
+  detected by its hash against `lastImplementedHash`, with no new approval. The record is in git,
+  not the conversation.
 
 - **Execution layer — session work.** Once `design-loop` has the approved set, it uses
   **TaskCreate** to track the work: **one task per approved component or screen**. Tasks survive context

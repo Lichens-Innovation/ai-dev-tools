@@ -4,6 +4,8 @@ A plugin for running a **Claude Design ↔ Storybook/Chromatic** design-iteratio
 
 You explore look-and-feel fast and cheaply inside a [Claude Design](https://claude.ai/design) project, then a Claude Code session implements the approved result in your real components — grounded in your design tokens, verified with Playwright screenshots and Storybook tests, and published to Chromatic.
 
+![The design loop: sync up, explore in Claude Design, approve, implement with design-loop, publish to Chromatic, re-sync](./docs/design-loop.svg)
+
 ## Prerequisites
 
 Make sure that you have the Claude Design MCP installed and Claude Code's DesignSync enabled:
@@ -25,8 +27,10 @@ those directly only to (re)configure one piece.
 ## Usage
 
 In Claude Design, change the palette card, or ask for a proposal of a component change
-(`proposals/<name>.html`, see [`references/proposals.md`](./references/proposals.md)). Set its
-manifest `status` to `approved`, then in Claude Code run `/design-loop`.
+(`proposals/<name>.html`, see [`references/proposals.md`](./references/proposals.md)), then in
+Claude Code run `/design-loop`. The first time it finds a proposal it asks whether to implement
+it and records `status: approved` in `design.manifest.json`; after that, each new edit of the
+proposal is picked up without asking again.
 
 To design a whole page, bring it in first: `/design-refresh add the Home page` (or tell
 `/design-loop` to). It rebuilds the page as a mockup from the synced components, checked against
@@ -47,6 +51,7 @@ after implementing): it tells you when the components are behind their code (the
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                                                                                                                                                        |
 | `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to `design-refresh`.                                                                                                                                        |
 | `design-refresh` | The one skill for updating Claude Design: says when the components need a `/design-sync`, rebuilds stale screen mockups, offers new screens, and adds a named page or fixes a mockup, checked against screenshots of the running app.                                                                                                                                                                                                                                                           |
+| `design-help` | Shows this README in the browser, or in the console with `/design-help console`. Run it yourself. |
 
 ## The contract
 
