@@ -1,28 +1,21 @@
----
-name: design-screens
-description: "Adds, refreshes or fixes app screens (pages) in the Claude Design project as mockups: rebuilds each screen from the synced components with sample data, checked against screenshots of the running app, and uploads it to screens/<name>.html so its design can be explored in Claude Design. Use when the user asks to add a page or screen to Claude Design, to design a whole page, to refresh a screen's mockup, or to make a mockup match the real page more closely."
-disable-model-invocation: true
----
-
-# Design Screens
+# Screens workflow
 
 Brings app screens into Claude Design without changing the app: each one becomes a mockup built
-from the synced components. `design-loop` and `design-refresh` run this skill too: they read this
-file and follow it.
+from the synced components. `design-refresh` reads this file and follows it, for every screen
+request: the user never runs it on its own.
 
 ## Shared contract
 
-Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) (the
-`screens[]` rows, §2) and [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md) (the
-mockup, screenshots, sign-in). Below, `<screenshot.mjs>` is
-`${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`, run from the row's Storybook
-target `dir` (it loads Playwright from there).
+`design-refresh` has already read [`design-contract.md`](../../../references/design-contract.md)
+(the `screens[]` rows, §2). Read [`screens.md`](../../../references/screens.md) (the mockup,
+screenshots, sign-in). Below, `<screenshot.mjs>` is the path `design-refresh` gives, run from the
+row's Storybook target `dir` (it loads Playwright from there).
 
 ## Modes
 
-- **Add** (the user names screens, or `design-refresh` passes new ones): ask what the step needs,
+- **Add** (the user names screens, or the offer of new screens was accepted): ask what the step needs,
   then build.
-- **Refresh** (`design-refresh` passes rows whose `sourceHash` changed): no questions unless
+- **Refresh** (rows whose `sourceHash` changed): no questions unless
   something blocks; keep the row's states and viewport.
 - **Fix** (the user says an existing mockup differs from the real page, with or without a list of
   what): start from the current mockup instead of rebuilding it, and fix what the user lists,
@@ -33,7 +26,7 @@ target `dir` (it loads Playwright from there).
 - `design.manifest.json` exists and the project has synced components (`_ds_sync.json`);
   otherwise point at `design-init`.
 - The local `ds-bundle/` matches the project (`bundleSha12` in its `_ds_sync.json` and the
-  project's). Otherwise run `design-refresh` first: a mockup built on stale components shows the
+  project's), as `design-refresh` step 1 checks: a mockup built on stale components shows the
   wrong ones.
 - The app's dev server answers at the screen's `url`. Start it only if the user asks.
 - For an app behind a sign-in, `screensAuth` exists and is git-ignored. If it is missing, ask the
@@ -83,7 +76,7 @@ get_file` its `mockupPath`, check its hash first (step 5), and edit that copy. R
 9. **Iterate** (add and fix modes). Ask whether the mockup is faithful enough, per screen
    (`AskUserQuestion`: "Faithful enough" or describe what still differs from the real page). A
    description runs fix mode on that screen (steps 2–8), then asks again. Stop when the user says
-   it's enough. Refresh mode doesn't ask: it runs inside `design-refresh`.
+   it's enough. Refresh mode doesn't ask.
 
 ## Notes
 

@@ -1,7 +1,6 @@
 ---
 name: chromatic-init
-description: "Adds Chromatic visual testing to a Storybook project: installs the chromatic package, wires the CHROMATIC_PROJECT_TOKEN, adds a publish script, runs the baseline build, and optionally sets up CI publishing - the publish/approval gate of the design loop. Used by design-init, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow. Use when the user asks to add Chromatic, set up visual regression, or publish Storybook for review."
-disable-model-invocation: true
+description: "Adds Chromatic visual testing to a Storybook project. Used by design-init, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow."
 ---
 
 # Chromatic Init
