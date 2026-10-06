@@ -6,31 +6,19 @@ disable-model-invocation: true
 
 # Chromatic Init
 
-Wires **Chromatic** — the team-facing visual regression / approval gate at the end of the design
-loop (contract §1, step 4). Runs after Storybook exists (`storybook-init`). Usually invoked by
-`design-init`.
+Wires **Chromatic**, the visual regression / approval gate at the end of the design loop. Runs
+after `storybook-init`; usually invoked by `design-init`.
 
-## Shared contract
+Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md): Chromatic is
+the PUBLISH stage, which `design-loop` calls once a component's render has converged and tests pass.
 
-Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md) — Chromatic is
-the PUBLISH stage; `design-loop` calls it once a component's render has converged and tests pass.
+Set up **once per Storybook target** (contract §2): one Chromatic project, token and publish
+script each, so baselines and review queues stay independent. A single-Storybook repo uses
+`CHROMATIC_PROJECT_TOKEN`. With several targets, run steps 1–7 per target inside its `dir`, with
+the token env var named `CHROMATIC_PROJECT_TOKEN_<KEY>`.
 
-## Targets
-
-Chromatic is set up **once per Storybook target** (contract §2): one Chromatic project, one
-token, one publish script per target. A single-Storybook repo has one target at the root using
-`CHROMATIC_PROJECT_TOKEN` — steps 1–7 as written. With several targets (a monorepo), run steps
-1–7 once per target, inside the target's `dir`, and name each token env var after the target
-(`CHROMATIC_PROJECT_TOKEN_<KEY>`). Separate projects keep each target's baselines and review
-queue independent.
-
-## Prerequisites
-
-- **Storybook 6.5+** already installed and building (`storybook-init` first).
-- **Node 18/20/21+**.
-- A Chromatic account + **project token** — created at https://www.chromatic.com/start by linking
-  a GitHub/GitLab/Bitbucket repo (or email). The token identifies the Chromatic project.
-- `git` available (Chromatic associates commits with PRs/MRs).
+Prerequisites: Storybook 6.5+ installed and building; Node 18+; `git`; a Chromatic account and
+**project token** (https://www.chromatic.com/start, linking a GitHub/GitLab/Bitbucket repo).
 
 ## Workflow
 
@@ -63,12 +51,10 @@ queue independent.
    npx chromatic --project-token <token>   # first run; thereafter: CHROMATIC_PROJECT_TOKEN + npm run chromatic
    ```
 
-   Confirm the build succeeds and the Storybook is published; report the build URL.
-
-   Chromatic's setup page shows the same `npx chromatic --project-token=...` command; it only waits
-   for a first build, however it arrives. In a monorepo, don't run it at the repo root (there is
-   no Storybook there) — run it in the target's `dir`, or through the repo's wrapper. Prefer
-   reading the token from the env var over typing it on the command line (shell history).
+   Confirm the build succeeds and report the build URL. Chromatic's setup page only waits for a
+   first build, however it arrives. In a monorepo, run it in the target's `dir` or through the
+   repo's wrapper, not at the root (no Storybook there). Prefer the env var over typing the token
+   on the command line (shell history).
 
 6. **Ask about CI publishing.** Publishing is already covered without CI: `design-loop` publishes
    each target manually once a component converges. CI publishing adds a build — and its
@@ -87,8 +73,6 @@ queue independent.
 
 ## Notes
 
-- Keep the token out of version control — env var / secret only.
 - A wrapper that reads the token from `.env` should tolerate `export `, spaces around `=`, quotes
   and CRLF — a strict `^NAME=` match reports "not set" on a correctly filled file.
-- The first `chromatic` run has no baseline to diff against; it just establishes one. Diffs appear
-  on subsequent runs — which is exactly the `design-loop` publish step.
+- The first run only establishes a baseline; diffs appear on later runs (the `design-loop` publish step).
