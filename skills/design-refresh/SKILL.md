@@ -53,6 +53,22 @@ them the project has never been synced: point at `design-init`, then a first `/d
      [`tailwind-classes.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/tailwind-classes.html):
      different bytes mean an older Tailwind card, no file means the project has none yet.
 
+   - **Navbar on the cards.** The sync's cards have no navbar hook of their own: they get the
+     navbar only through the design provider, and only once `design-init` step 8 has wired it in
+     (its second run). The local checks (render check, comparison sheets) render each card alone,
+     so they never show a missing navbar. Check the local build:
+
+       ```bash
+       node ${CLAUDE_SKILL_DIR}/scripts/nav-tag.mjs ds-bundle
+       ```
+
+     It lists the cards that don't load `design-nav.js` (exit 1). Also look for the provider
+     hook: `grep -rl design-nav .design-sync --include='*.tsx' --include='*.jsx' --include='*.ts'
+     --include='*.js' --exclude-dir=node_modules --exclude-dir=types`. No match means the
+     wrapper package never got it: the real fix is `design-init` step 8 (re-run `design-init`,
+     then `/design-sync`), and step 3b below is only the stopgap. Any listed card, with
+     `design-nav.js` in the project, means step 3b applies once the build is current.
+
    Tell the user what you found in one short list. Nothing stale: say Claude Design is up to
    date and go to step 5.
 
@@ -60,7 +76,9 @@ them the project has never been synced: point at `design-init`, then a first `/d
    re-syncs only what changed; they approve its upload) and to run `/design-refresh` again when
    it finishes. Tell them the sync must keep the project's own files: `screens/`, `proposals/`,
    `Palette.dc.html`, `Tailwind.html`, `design-nav.js`, `thumbnail.html` and `support.js` are not from the sync
-   and must not be in its deletes. Then stop: the mockups render the synced bundle, so they wait
+   and must not be in its deletes. Also warn them that a plan approved earlier in the session
+   expires: after a sync, upload with a new plan, not an old plan ID (it fails with "Plan token is
+   missing or does not match this project"). A fresh `finalize_plan` returns an ID that works. Then stop: the mockups render the synced bundle, so they wait
    for the new one. Only when no stale screen needs the new bundle (they use only components that
    didn't change) may you go on to steps 3–4 first; say so.
 
@@ -70,6 +88,14 @@ them the project has never been synced: point at `design-init`, then a first `/d
    (`DesignSync finalize_plan` with `writes` naming those files, `deletes: []`,
    `localDir: /tmp/design-refresh`, then `write_files`). Upload the navbar with the Tailwind card:
    the card needs the navbar's palette engine and adds itself to its sidebar. Neither needs a sync.
+
+   **3b. Navbar tag on the cards** (when the step 1 check listed cards). On a current build,
+   run `node ${CLAUDE_SKILL_DIR}/scripts/nav-tag.mjs ds-bundle --fix`, then upload the changed
+   cards (`finalize_plan` with `writes` naming them, `deletes: []`, `localDir: ds-bundle`, then
+   `write_files`). Ask first: it edits every card. Each `/design-sync` rewrites the cards, so
+   this is needed again after every sync; say so in the report. The fixed bar pads the card body
+   down, so comparison sheets made without it may differ slightly in framing: re-grade with it
+   on if a grade matters.
 
 4. **Screens.** Follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
    with `<screenshot.mjs>` = `${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`: refresh
@@ -83,7 +109,8 @@ them the project has never been synced: point at `design-init`, then a first `/d
    ones in add mode (same file). Record nothing for the others: they are offered again
    next time, so the user adds screens as they start working on them.
 
-6. **Report**: whether the components are current (or waiting on `/design-sync`), the navbar,
+6. **Report**: whether the components are current (or waiting on `/design-sync`), the navbar
+   (and whether the cards load it),
    the screens rebuilt or added, anything blocked, and the project link
    (`https://claude.ai/design/p/<designProjectId>`).
 
