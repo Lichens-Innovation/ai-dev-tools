@@ -53,72 +53,14 @@ The provider in `/design sync`'s wrapper package (its `provider` config) can ren
 in a light and a dark panel. It is also the one hook that runs in every synced card and proposal:
 `/design sync` has no option to add markup to its cards, so the provider can load the project's
 shared navbar (`design-nav.js`, uploaded by `design-init` next to the palette card) and follow
-its light/dark switch. The hook only exists once `design-init` has run a second time, after the
-first `/design sync` wrote the wrapper package (its step 8 adds it to the provider): until then the
-synced cards show no navbar. `design-refresh` checks for it and, as a stopgap for cards that still
+its light/dark switch. The hook only exists once `design-init` has run a second time (its
+step 8 adds it to the project's provider, or scaffolds one when the sync has none): until then the
+synced cards show no navbar. The ready-made provider, with the side-by-side modes and the navbar
+hook, is [`design-provider.tsx`](../skills/design-init/templates/design-provider.tsx). `design-refresh` checks for it and, as a stopgap for cards that still
 don't load it, adds `<script src="../../../design-nav.js"></script>` (`scripts/nav-tag.mjs`; the
 script guards against double loading). A mode scoped to a container works with the palette's scheme file:
 `light-dark()` follows the nearest `color-scheme`, and a Tailwind `dark:` variant written as
 `&:where([data-theme="dark"], [data-theme="dark"] *)` matches any dark ancestor.
-
-```tsx
-const ModePanel = ({ mode, children }) => (
-  <div data-theme={mode} style={{ colorScheme: mode, background: "var(--bg)", color: "var(--text)", padding: 16 }}>
-    {children}
-  </div>
-);
-
-// Only in Claude Design, and only for synced cards, proposals and screen mockups: local renders (/design sync
-// grading, design-loop screenshots), ?story= captures and the designs Claude Design builds stay as is.
-const designNavRoot = () => {
-  if (!location.hostname.endsWith(".claudeusercontent.com") || new URLSearchParams(location.search).has("story"))
-    return null;
-  const bundle = document.querySelector('script[src*="_ds_bundle.js"]');
-  if (!bundle) return null;
-  const root = new URL("./", bundle.src);
-  const path = decodeURIComponent(location.pathname).slice(decodeURIComponent(root.pathname).length);
-  return /^(components|proposals|screens)\//.test(path) ? root : null;
-};
-
-// The navbar's light/dark switch, or null when the page has no navbar.
-const useDesignNavMode = () => {
-  const [mode, setMode] = useState(() => window.designNav?.mode ?? null);
-  useEffect(() => {
-    const root = designNavRoot();
-    if (!root) return;
-    const onMode = (e) => setMode(e.detail.mode);
-    window.addEventListener("design-nav:mode", onMode);
-    if (window.designNav) setMode(window.designNav.mode);
-    else if (!document.querySelector("script[data-design-nav]")) {
-      const script = document.createElement("script");
-      script.src = new URL("design-nav.js", root).href;
-      script.dataset.designNav = "";
-      document.head.append(script);
-    }
-    return () => window.removeEventListener("design-nav:mode", onMode);
-  }, []);
-  return mode;
-};
-
-// light / dark: set the mode on <html>, as the synced cards and Storybook do.
-// both: keep the page light and render the children in a light and a dark panel.
-// With the navbar, its switch picks the mode and "both" shows only that panel.
-export const DesignProvider = ({ mode = "light", children }) => {
-  const navMode = useDesignNavMode();
-  return (
-    <ColorScheme mode={navMode ?? (mode === "both" ? "light" : mode)}>
-      {mode === "both" && !navMode ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-          <ModePanel mode="light">{children}</ModePanel>
-          <ModePanel mode="dark">{children}</ModePanel>
-        </div>
-      ) : (
-        children
-      )}
-    </ColorScheme>
-  );
-};
-```
 
 Keep `light` (the default) rendering exactly like Storybook: `/design sync` grades each synced
 card against its story, and two panels or a navbar would not match. Grading renders run
