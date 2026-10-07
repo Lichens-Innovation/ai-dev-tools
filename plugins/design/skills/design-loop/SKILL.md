@@ -61,7 +61,13 @@ Storybook wasn't running when the session connected. Tell the user to start it a
   screen", or its mockup doesn't match the real page) or **bring Claude Design up to date**
   ("refresh Claude Design", "sync the design project") → this is not implementation: follow
   [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md), then stop.
-- **Otherwise**, implement (steps 1–11). First a quick staleness check, as `design-refresh`
+- **Otherwise**, implement (steps 1–11). First the plugin files: run
+  `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs check`. Exit 0: go on.
+  Exit 1 (a newer plugin than the project's copies): follow
+  [`plugin-files.md`](${CLAUDE_SKILL_DIR}/../design-refresh/references/plugin-files.md#update)
+  before implementing, so the palette runs the plugin's `palette.ts` and the cards its code.
+  Exit 3 (an older plugin here): tell the user to update the plugin and stop until they do or
+  say to go on. Then a quick staleness check, as `design-refresh`
   step 1 does for components: if the code changed since the last sync, say so and suggest
   `/design-sync` (only the user can start it). It is not required to implement already-approved proposals, but
   the user should refresh before designing the next change.

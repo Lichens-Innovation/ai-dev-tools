@@ -38,7 +38,16 @@ so every card in the project shares:
   is kept in its own draft beside the colors; **Reset** drops both. Names are fixed: components
   compile against them. Breakpoints are read only, since media queries cannot read `var()`.
   `window.designNav.tokens` is the drafted values, `setTokens(tokens)` replaces them, and the
-  `design-nav:palette` event carries `{ inputs, tokens }`.
+  `design-nav:palette` event carries `{ inputs, tokens, overrides }`.
+- **Advanced view**: the footer's **Advanced** button (remembered per project; turning it on
+  opens the panel) adds every generated token, grouped as neutrals then one group per color,
+  with its swatch and value in the current mode. A semantic token gets a picker of the token it
+  references: **auto** is the generated reference, any other choice is a
+  [token override](palette-structure.md#token-overrides), the same in both modes. Choices that
+  would loop are not offered. An override re-themes the cards live, counts in the audit badge,
+  joins the request as an `override` line and has its own draft; the row's × goes back to the
+  saved reference and **Reset** drops it with the rest. `window.designNav.overrides` is the
+  drafted `{ token: target }`, `setOverrides(overrides)` replaces it (invalid ones are ignored).
 
 The card's **Tokens** section (shown when the card has tokens) groups the same values as Type,
 Spacing, Shape, Breakpoints and Other, each with a live sample (a bar for spacing, a box for a
@@ -63,12 +72,14 @@ both files beside it. It is plain HTML, without `support.js`.
 ## Where the colors and tokens live
 
 The card reads the project palette from its `inputs` prop (`{ "primary": { "lm": "#…", "dm": "#…" }, … }`)
-and the hand-authored token values from its `tokens` prop (`{ "spacing-md": "1rem", … }`), both
-written by `palette.ts --to-card`. Swatch, field and footer edits are a draft; to keep them, paste
+the hand-authored token values from its `tokens` prop (`{ "spacing-md": "1rem", … }`) and the
+token overrides from its `overrides` prop (`{ "link": "info-text" }`), all written by
+`palette.ts --to-card`. Its Semantic section marks an overridden token with "(override)". Swatch, field and footer edits are a draft; to keep them, paste
 the footer's **Copy request** in Claude Design's chat (or paste the card's **Export → Inputs JSON**
-into `inputs`). The card's `inputs` and `tokens` are what `design-loop` applies when the palette
+into `inputs`). The card's `inputs`, `tokens` and `overrides` are what `design-loop` applies when the palette
 is approved: `--from-card` rewrites the values in the inputs file in place and ignores a token
-name the file lacks (add new tokens to the file, then re-seed the card).
+name the file lacks (add new tokens to the file, then re-seed the card); it adds, rewrites or
+removes override lines in the overrides block and fails, writing nothing, on an invalid one.
 A component may not use the input its name suggests (a "primary" button can be filled with
 `--secondary`): the footer shows which input moves it.
 
@@ -87,6 +98,10 @@ A component may not use the input its name suggests (a "primary" button can be f
 4. Record the card in the manifest's `palette` entry (contract §2). Approving the palette card
    triggers `design-loop` to copy the approved inputs back into the canonical file and re-run
    `palette.ts`.
+
+A newer plugin brings a newer card: `design-refresh` (and `design-loop` before implementing) puts
+the plugin's card code in place and keeps the card's data (`data-props`), with the navbar beside
+it ([plugin-files.md](../../design-refresh/references/plugin-files.md)).
 
 The first line, `<!-- @dsCard group="Colors" -->`, files the card under **Colors** in the Design
 System view. Keep it when editing the card.

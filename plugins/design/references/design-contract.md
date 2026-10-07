@@ -64,6 +64,7 @@ queries. None exist yet — YAGNI.)
 {
   "designProjectId": "uuid-of-claude-design-project",
   "reconcileRule": "canonical-wins",
+  "pluginVersion": "0.4.0",
   "palette": {
     "localPath": "packages/theme/src/theme.inputs.css",
     "outputs": {
@@ -115,6 +116,7 @@ queries. None exist yet — YAGNI.)
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `designProjectId`                  | The Claude Design project this repo is bound to (from `DesignSync list_projects`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `reconcileRule`                    | Default token-reconciliation policy — see §5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `pluginVersion`                    | The design plugin version the project's copies of its files (`palette.script`, `design-nav.js`, `Tailwind.html`, the palette card's code) were last brought to. Written by `design-refresh/scripts/plugin-files.mjs stamp` (from `design-init`, `design-refresh`); `design-loop` and `design-refresh` compare it with the plugin's and update the copies when it is behind ([plugin-files.md](../skills/design-refresh/references/plugin-files.md)).                                                                                                                                                          |
 | `palette`                          | The palette card: `localPath` is the canonical inputs file, `designPath` the card in the Design project. Same `status` / `lastImplementedHash` semantics as a component. Created by `design-init`.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `palette.outputs`                  | Generated files. `web`: the theme, shared by web and React Native (its own file, or `localPath` in a one-file layout). `scheme`: the browser-only mode file, set whenever there is a web target (may equal `web` in a web-only project). `mobile`: the Tailwind utilities (equals `localPath` in a one-file mobile-only project). `json`: optional resolved values. `sass`: optional Sass names for every token (Sass projects, e.g. `generated/_tokens.scss`). Flags: `--theme <web>`, or `--web` when `web` equals `localPath`; `--scheme <scheme>`, `--mobile <mobile>`, `--json <json>`, `--sass <sass>`. |
 | `palette.script`                   | The repo's copy of `palette.ts` (Node 22.18+ runs it as is), next to the inputs (the package that holds `localPath`), with a `palette` script in that package's `package.json` that regenerates `outputs`: developers without the plugin run it. The skills run this copy, and keep it identical to the plugin's (see §5). `null` in a project set up before it existed.                                                                                                                                                                                                                                      |
@@ -281,18 +283,22 @@ is into the theme and the Sass file. They are canonical too. The palette card ca
 values (its `tokens` prop), never their names or the breakpoints; a new token is added to the
 canonical file by hand. Tailwind projects have none: Tailwind's theme is their scale.
 
+**Token overrides.** An optional last block of the canonical file re-points a semantic token to
+another generated token, the same in both modes (`--link: var(--info-text);`). They are canonical
+too, hand-edited or taken from the palette card's `overrides` prop; `palette.ts` applies them to
+every output and rejects a value token, an unknown target or a loop.
+
 Reconciliation therefore means: map a Design color to a **semantic token**, and a spacing, size
 or breakpoint to the project's scale (its hand-authored tokens, or Tailwind's); if the palette
-itself changed (approved palette card), copy the new **inputs** and token values into the
+itself changed (approved palette card), copy the new **inputs**, token values and overrides into the
 canonical file and re-run `palette.ts`. A spacing or size with no close step follows `reconcileRule` like a color: ask, or
 add a hand-authored token.
 
 **Which `palette.ts` runs.** When `palette.script` is set, run that copy (with `--namespace
-<palette.namespace>` when set). Before running it, compare it with the plugin's
-`design-palette/scripts/palette.ts`: when they differ, show the user the diff and ask to replace
-the repo copy with the plugin's (an edit made in the repo is lost otherwise; propose moving it
-into the plugin). Without `palette.script`, run the plugin's and offer `design-palette`'s
-vendoring step. Never write generated tokens by hand. Full model:
+<palette.namespace>` when set). The plugin-files check that starts `design-loop` and
+`design-refresh` keeps it identical to the plugin's `design-palette/scripts/palette.ts`, asking
+before replacing an edited copy ([plugin-files.md](../skills/design-refresh/references/plugin-files.md)).
+Without `palette.script`, run the plugin's and offer `design-palette`'s vendoring step. Never write generated tokens by hand. Full model:
 [`palette-structure.md`](../skills/design-palette/references/palette-structure.md).
 
 ---

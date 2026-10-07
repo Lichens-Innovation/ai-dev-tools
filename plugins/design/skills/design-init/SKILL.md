@@ -129,7 +129,9 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
    `outputs`: the `web`, `scheme`, `mobile`, `json` and `sass` files from `design-palette` step 1,
    `script`: the repo's `palette.ts` copy, `namespace`: the one chosen (Tailwind targets),
    `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
-   `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
+   `lastImplementedHash`: `shasum -a 256` of the uploaded card), `pluginVersion` (written by
+   `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs stamp` once the file
+   exists: the plugin version its copies come from), and a `components[]` row per
    discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
    id such as `ui-button--default` from the target's `index.json`, not the component id
    `ui-button`: `iframe.html?id=` renders only a story, `designPath`: its synced card, or `null`

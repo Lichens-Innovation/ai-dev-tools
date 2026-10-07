@@ -38,6 +38,25 @@ block out: Tailwind's own theme holds the scale (`palette.ts` warns when `--mobi
 Claude Design's palette card edits their values (its `tokens` prop), not their names, and shows
 breakpoints read only ([preview card](preview-card.md#where-the-colors-and-tokens-live)).
 
+### Token overrides
+
+A last, optional `:root` block of the inputs file (under the `/* Token overrides` comment)
+re-points a **semantic** token, one that references another (`--link`, `--text-muted`,
+`--primary-text`, `--text-on-primary`…), to another generated token, the same in both modes:
+
+```css
+:root {
+  --link: var(--info-text);
+}
+```
+
+The target is mode-aware, so `--link` follows `--info-text` in light and dark. `palette.ts`
+applies it everywhere (theme, scheme, Tailwind, Sass, JSON) and the audit checks the result. It
+fails on a token that holds a value (`--bg`, the scales), an unknown target, or a loop (`--link`
+→ `--link-hover` → `--link`). Related tokens are not moved along: re-point `--link-hover` too
+if it should follow. Delete the line to go back to the generated reference. The palette card's
+`overrides` prop holds them (`{ "link": "info-text" }`); the footer's **Advanced** view edits it.
+
 ## Generated files
 
 `palette.ts` computes every token as a hex per mode, the same values the audit checks, and writes:
@@ -82,7 +101,8 @@ The theme CSS must still be loaded at runtime (the same imports as any web app).
 }
 ```
 
-Only the inputs are hand-edited; the rest is regenerated on every run.
+Only the inputs, hand-authored tokens and token overrides are hand-edited; the rest is
+regenerated on every run.
 
 ### Shared theme package (web and mobile in one repo)
 
@@ -99,7 +119,9 @@ packages/theme/
   package's `palette` script: `"palette": "node scripts/palette.ts src/theme.inputs.css --theme
 src/generated/theme.css --scheme src/generated/scheme.css --mobile src/generated/tailwind.css
 --json src/generated/palette.json --namespace noa"`. Node 22.18+, no dependencies. Keep it out of the
-  formatter and linter too, so it stays byte-identical to the plugin's.
+  formatter and linter too, so it stays byte-identical to the plugin's: `design-loop` and
+  `design-refresh` compare it with the plugin's and offer the newer one
+  ([plugin-files.md](../../design-refresh/references/plugin-files.md)).
 - Apps import the package's export names, never a `generated/` path, so the layout can change
   without touching them.
 - Add `generated/` to the formatter's and linter's ignore files: a reformatted output turns every

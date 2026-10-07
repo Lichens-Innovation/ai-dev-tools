@@ -17,7 +17,8 @@ plugin's (contract §5).
    `localPath`), then `--scheme <outputs.scheme>`, `--mobile <outputs.mobile>` and
    `--json <outputs.json>` and `--sass <outputs.sass>` for each one set. The inputs file receives
    the card's inputs and its hand-authored token values (rewritten in place; a token name the file
-   lacks is ignored, and an invalid value stops the run). `font-inverted` and `border` stay
+   lacks is ignored, and an invalid value stops the run) and its token overrides (added, rewritten
+   or removed in the overrides block; an invalid one stops the run). `font-inverted` and `border` stay
    derived when the file leaves them out and the card did not change them. The same run
    regenerates the project thumbnail (its title comes from the card):
 
@@ -26,7 +27,7 @@ plugin's (contract §5).
      --thumbnail /tmp/design-loop/thumbnail.html
    ```
 
-   Only inputs and hand-authored tokens change by hand; never edit generated tokens. Report the audit it prints; propose
+   Only inputs, hand-authored tokens and token overrides change by hand; never edit generated tokens. Report the audit it prints; propose
    fixes for any `FAIL` but do not block.
 
 3. Converge and validate across **all** targets: `stories-changed` on each target, screenshot a

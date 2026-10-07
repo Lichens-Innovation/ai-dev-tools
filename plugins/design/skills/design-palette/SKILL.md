@@ -57,8 +57,9 @@ Read before starting:
    what the project already uses. With Tailwind, skip them: its theme holds the scale.
 
 4. **Write the inputs** into the canonical file (the inputs file, or the one file) using
-   [`templates/theme.inputs.css`](templates/theme.inputs.css). Inputs and hand-authored tokens are
-   the only hand-edited values (drop the template's hand-authored block for Tailwind targets).
+   [`templates/theme.inputs.css`](templates/theme.inputs.css). Inputs, hand-authored tokens and token
+   overrides (its last block, empty by default) are the only hand-edited values (drop the
+   template's hand-authored block for Tailwind targets).
 
 5. **Put the generator in the repo.** Copy [`scripts/palette.ts`](scripts/palette.ts) (Node 22.18+,
    which runs it as is; no dependencies) into the package that holds the inputs, as `scripts/palette.ts`, and add a
@@ -108,8 +109,9 @@ Read before starting:
    set `document.documentElement.style.colorScheme = mode`. react-native-css turns `light-dark()`
    into arrays that Reanimated rejects, so it stays off React Native.
 
-   Card sync: `--to-card <card>` writes the inputs and the hand-authored token values into the
-   palette card, which edits both (token values only, never names or breakpoints);
+   Card sync: `--to-card <card>` writes the inputs, the hand-authored token values and the
+   [token overrides](references/palette-structure.md#token-overrides) into the palette card, which
+   edits all three (token values only, never names or breakpoints);
    `--from-card <card>` takes them from it (and writes them into the inputs file),
    `--diff-card <card>` only prints the differences. `--title <name>` sets the
    card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
@@ -135,7 +137,8 @@ Read before starting:
 - In Sass, no math or color functions on the token names: `calc()`, or the palette's scale step.
 - No opacity modifiers on palette classes (`bg-noa-hover/50`): use the state's token. A missing
   state is a new token in `palette.ts`, not a one-off alpha.
-- Never hand-edit generated tokens; change an input and re-run.
+- Never hand-edit generated tokens; change an input, or re-point a semantic token with a token
+  override in the inputs file, and re-run.
 - Keep the structure: inputs → scales → semantic. Never flatten semantic tokens into hex.
 - Components use the namespaced classes only (`text-noa-muted`). Don't add project Tailwind
   aliases (`bg-surface`, `text-content`): they bring a second vocabulary back. When a third-party

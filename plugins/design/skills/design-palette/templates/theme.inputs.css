@@ -55,3 +55,10 @@
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
 }
+
+/* Token overrides (optional): re-point a semantic token of the theme to another token, the same in both modes.
+   Only the tokens that reference another one (--link, --text-muted, --primary-text, --text-on-primary…);
+   the value is var(--<token>). Delete a line to go back to the generated reference. */
+:root {
+  /* --link: var(--info-text); */
+}
