@@ -1,13 +1,14 @@
 ---
 name: design-refresh
-description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, and adds a named page or fixes a mockup that differs from the real page. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, or asks to add, mock or fix a page or screen in Claude Design."
+description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, adds a named page or fixes a mockup that differs from the real page, and brings the project's copies of the plugin's files (palette.ts, the proposal conventions, the navbar, the palette and Tailwind cards) up to a newer plugin version. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, after updating the design plugin, or asks to add, mock or fix a page or screen in Claude Design."
 ---
 
 # Design Refresh
 
 One entry point to make Claude Design match the repo: the synced components (through
-`/design-sync`, run by the user) and the screen mockups (through
-[`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md)). Cheap when nothing
+`/design-sync`, run by the user), the screen mockups (through
+[`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md)) and the project's
+copies of the plugin's own files (through [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md)). Cheap when nothing
 changed. It also takes the targeted requests: add a named page, or fix a mockup that differs from
 the real page.
 
@@ -46,12 +47,11 @@ them the project has never been synced: point at `design-init`, then a first `/d
 
    - **Screens.** For each `screens[]` row, recompute `sourceHash` (screens.md): a different
      value means its mockup is stale.
-   - **Shared navbar.** `DesignSync get_file design-nav.js` and compare it with the plugin's
-     [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js): different
-     bytes mean the project runs an older navbar. When the manifest has a `palette.namespace`, do
-     the same for `Tailwind.html` against
-     [`tailwind-classes.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/tailwind-classes.html):
-     different bytes mean an older Tailwind card, no file means the project has none yet.
+   - **Plugin files** (`palette.ts`, the conventions in the readme header, the navbar, the
+     palette and Tailwind cards): run
+     `node ${CLAUDE_SKILL_DIR}/scripts/plugin-files.mjs check`
+     ([`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#check)). Exit 1 means
+     step 3 applies; exit 3, an older plugin here than the project's: say so and skip step 3.
 
    - **Navbar on the cards.** The sync's cards have no navbar hook of their own: they get the
      navbar only through the design provider, and only once `design-init` step 8 has wired it in
@@ -82,12 +82,11 @@ them the project has never been synced: point at `design-init`, then a first `/d
    for the new one. Only when no stale screen needs the new bundle (they use only components that
    didn't change) may you go on to steps 3–4 first; say so.
 
-3. **Navbar and Tailwind card** (when older or missing). Show the user what changed and ask
-   before replacing a file: someone may have edited it in Claude Design. On yes, copy the
-   templates to `/tmp/design-refresh/` and upload them to `design-nav.js` and `Tailwind.html`
-   (`DesignSync finalize_plan` with `writes` naming those files, `deletes: []`,
-   `localDir: /tmp/design-refresh`, then `write_files`). Upload the navbar with the Tailwind card:
-   the card needs the navbar's palette engine and adds itself to its sidebar. Neither needs a sync.
+3. **Plugin files** (when the check asked for an update). Follow
+   [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#update): `palette.ts`, the
+   conventions, then the navbar, palette card and Tailwind card in Claude Design (asking before
+   replacing each), then stamp the manifest. Only the conventions need a sync, to publish them:
+   update them before handing the sync to the user (step 2), so one sync carries both.
 
    **3b. Navbar tag on the cards** (when the step 1 check listed cards). On a current build,
    run `node ${CLAUDE_SKILL_DIR}/scripts/nav-tag.mjs ds-bundle --fix`, then upload the changed
@@ -109,8 +108,9 @@ them the project has never been synced: point at `design-init`, then a first `/d
    ones in add mode (same file). Record nothing for the others: they are offered again
    next time, so the user adds screens as they start working on them.
 
-6. **Report**: whether the components are current (or waiting on `/design-sync`), the navbar
-   (and whether the cards load it),
+6. **Report**: whether the components are current (or waiting on `/design-sync`), the plugin
+   files updated or kept (whether the cards load the navbar, and that changed conventions reach
+   Claude Design with the next `/design-sync`),
    the screens rebuilt or added, anything blocked, and the project link
    (`https://claude.ai/design/p/<designProjectId>`).
 

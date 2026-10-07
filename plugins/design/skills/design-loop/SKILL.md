@@ -61,7 +61,13 @@ Storybook wasn't running when the session connected. Tell the user to start it a
   screen", or its mockup doesn't match the real page) or **bring Claude Design up to date**
   ("refresh Claude Design", "sync the design project") → this is not implementation: follow
   [`design-refresh`](${CLAUDE_SKILL_DIR}/../design-refresh/SKILL.md), then stop.
-- **Otherwise**, implement (steps 1–11). First a quick staleness check, as `design-refresh`
+- **Otherwise**, implement (steps 1–11). First the plugin files: run
+  `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs check`. Exit 0: go on.
+  Exit 1 (a newer plugin than the project's copies): follow
+  [`plugin-files.md`](${CLAUDE_SKILL_DIR}/../design-refresh/references/plugin-files.md#update)
+  before implementing, so the palette runs the plugin's `palette.ts` and the cards its code.
+  Exit 3 (an older plugin here): tell the user to update the plugin and stop until they do or
+  say to go on. Then a quick staleness check, as `design-refresh`
   step 1 does for components: if the code changed since the last sync, say so and suggest
   `/design-sync` (only the user can start it). It is not required to implement already-approved proposals, but
   the user should refresh before designing the next change.
@@ -145,22 +151,30 @@ screen's layout may be restructured, the kit components only used through their 
 Take the values from the proposal's overrides and map them onto the **canonical CSS palette** per
 `reconcileRule` (contract §5):
 
-- `canonical-wins` (default): snap each value to the nearest existing **semantic** token. If a
-  value has no close token, **stop and ask** the user before adding one.
+- `canonical-wins` (default): snap each color to the nearest existing **semantic** token, and
+  each spacing, size, radius or breakpoint to the nearest step of the project's scale (its
+  hand-authored tokens, or Tailwind's). If a value has no close token, **stop and ask** the user
+  before adding one.
 - `extend`: add the new value as a new token, following the palette's existing naming structure
-  (raw scale vs. semantic).
+  (raw scale vs. semantic; a hand-authored token with a Tailwind name for non-color values).
 
-Never flatten semantic tokens into raw hex. Edit the palette file, not the component, for token
-changes.
+Never flatten semantic tokens into raw hex, nor a scale step into a literal. Edit the palette
+file, not the component, for token changes.
 
 ### 6. Edit the component
 
 Update `localPath` to consume the tokens. Express each override in the component's own terms (the
 variant map, a prop, a token), scoped like the proposal, not as a copied selector. Match the
-surrounding code style, naming, and idioms.
+surrounding code style, naming, and idioms. Write the token the way the codebase does:
+
+| Styling                       | A token                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| Tailwind                      | the namespaced class (`text-noa-muted`), Tailwind's scale for spacing     |
+| Sass (`palette.outputs.sass`) | the name from the module the file already `@use`s: `t.$text-muted`, `t.$spacing-md`, `@include t.mq(sm)` |
+| Plain CSS, CSS modules        | `var(--text-muted)`, `var(--spacing-md)`                                  |
 
 For a screen, edit its `sources`: JSX structure, layout and classes, in the codebase's styling
-(Tailwind utilities on the semantic tokens, not inline styles copied from the proposal). Keep its
+(the table above, not inline styles copied from the proposal). Keep its
 data flow, props and behaviour as they are; never edit a kit component from a screen proposal.
 
 ### 7. See & converge (the visual loop)

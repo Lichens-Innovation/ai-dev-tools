@@ -15,15 +15,19 @@ plugin's (contract §5).
 2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
    output in `palette.outputs`: `--theme <outputs.web>` (or `--web` when `outputs.web` equals
    `localPath`), then `--scheme <outputs.scheme>`, `--mobile <outputs.mobile>` and
-   `--json <outputs.json>` for each one set. The inputs file receives the card's inputs. The same
-   run regenerates the project thumbnail (its title comes from the card):
+   `--json <outputs.json>` and `--sass <outputs.sass>` for each one set. The inputs file receives
+   the card's inputs and its hand-authored token values (rewritten in place; a token name the file
+   lacks is ignored, and an invalid value stops the run) and its token overrides (added, rewritten
+   or removed in the overrides block; an invalid one stops the run). `font-inverted` and `border` stay
+   derived when the file leaves them out and the card did not change them. The same run
+   regenerates the project thumbnail (its title comes from the card):
 
    ```bash
-   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] \
+   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] [--sass <outputs.sass>] \
      --thumbnail /tmp/design-loop/thumbnail.html
    ```
 
-   Only inputs change by hand; never edit generated tokens. Report the audit it prints; propose
+   Only inputs, hand-authored tokens and token overrides change by hand; never edit generated tokens. Report the audit it prints; propose
    fixes for any `FAIL` but do not block.
 
 3. Converge and validate across **all** targets: `stories-changed` on each target, screenshot a

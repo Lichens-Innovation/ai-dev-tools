@@ -32,8 +32,9 @@ this skill produces must satisfy the preconditions in §6.
      the Claude Design MCP is missing, give the user the README command; do not run it.
    - **Tailwind**, when a UI package lacks it: ask (`AskUserQuestion`) between adding Tailwind
      (v4, following the framework's own Tailwind guide, namespaced palette utilities) and using
-     the palette **without** Tailwind (no namespace, no Tailwind outputs or card). Keep the
-     answer for steps 2 and 6.
+     the palette **without** Tailwind (no namespace, no Tailwind outputs or card; hand-authored
+     spacing, type and breakpoint tokens instead, and the Sass file when the package's `sass` is
+     true). Keep the answer for steps 2 and 6.
    - **Chromatic**, when absent: ask whether to install it, stating it is **optional** (an
      external account and token, and quota use). Without it, `design-loop` skips its publish
      step and contract §6's Chromatic precondition is waived. Skip the question when it is
@@ -87,7 +88,7 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
      - **repo wins** (default, `canonical-wins`): step 6 overwrites the card.
      - **Design wins**: `palette.ts <canonical> --from-card /tmp/design-init/remote-palette.html`
        with the output flags for the targets chosen in `design-palette` step 1 (`--theme <file>`
-       or `--web`, `--scheme <file>`, `--mobile <file> --namespace <name>`, `--json <file>`), report the audit, then run
+       or `--web`, `--scheme <file>`, `--mobile <file> --namespace <name>`, `--json <file>`, `--sass <file>`), report the audit, then run
        step 6 so both sides match.
 
    Never merge silently.
@@ -125,10 +126,12 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
-   `outputs`: the `web`, `scheme`, `mobile` and `json` files from `design-palette` step 1,
+   `outputs`: the `web`, `scheme`, `mobile`, `json` and `sass` files from `design-palette` step 1,
    `script`: the repo's `palette.ts` copy, `namespace`: the one chosen (Tailwind targets),
    `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
-   `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per
+   `lastImplementedHash`: `shasum -a 256` of the uploaded card), `pluginVersion` (written by
+   `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs stamp` once the file
+   exists: the plugin version its copies come from), and a `components[]` row per
    discovered component (`wip`, `lastImplementedHash: null`, `storyId`: its main story, a story
    id such as `ui-button--default` from the target's `index.json`, not the component id
    `ui-button`: `iframe.html?id=` renders only a story, `designPath`: its synced card, or `null`
@@ -181,8 +184,12 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
        The hook only fires on `*.claudeusercontent.com` hosts, an assumption nobody has
        verified: after the first re-sync, check a card in Claude Design, and keep `nav-tag.mjs`
        as the fallback until a re-synced card shows the navbar without the tag.
-     Then add the proposal conventions to the `readmeHeader`, and ask the user to run
-     `/design sync` again so both reach the project.
+     Then add the proposal conventions to the `readmeHeader`: the output of
+     `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs conventions`, markers
+     included, fitted to the project (the provider's name), with the project's own notes outside
+     the markers ([`conventions.md`](${CLAUDE_SKILL_DIR}/../../references/conventions.md)); the
+     start marker's hash stays, so a later plugin can tell when the text changed. Ask the user to
+     run `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
 

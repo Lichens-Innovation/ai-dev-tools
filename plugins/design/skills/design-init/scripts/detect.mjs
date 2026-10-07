@@ -49,19 +49,20 @@ for (const g of globs) {
   else if (existsSync(join(abs, 'package.json'))) dirs.add(abs);
 }
 
-function countStories(dir) {
+function countFiles(dir, re) {
   let n = 0;
   const walk = (d, depth) => {
     if (depth > 6 || n >= 50) return;
     for (const e of readdirSync(d, { withFileTypes: true })) {
       if (e.name === 'node_modules' || e.name.startsWith('.') && e.name !== '.storybook' || e.name === 'storybook-static' || e.name === 'dist') continue;
       if (e.isDirectory()) walk(join(d, e.name), depth + 1);
-      else if (/\.stories\.(t|j)sx?$|\.stories\.mdx$/.test(e.name)) n++;
+      else if (re.test(e.name)) n++;
     }
   };
   try { walk(dir, 0); } catch { /* unreadable dir */ }
   return n;
 }
+const countStories = dir => countFiles(dir, /\.stories\.(t|j)sx?$|\.stories\.mdx$/);
 
 const mcpEntries = Object.entries(readJson(join(root, '.mcp.json'))?.mcpServers ?? {}).filter(([k, v]) => k.startsWith('storybook') || String(v?.url ?? '').endsWith('/mcp'));
 
@@ -101,6 +102,8 @@ const packages = [...dirs].map((dir) => {
     react: Boolean(deps.react),
     mobile,
     tailwind: { installed: Boolean(deps.tailwindcss), version: deps.tailwindcss ?? null, integrations: has(/^@tailwindcss\/|^nativewind$|^react-native-css$/) },
+    // A dependency, or .scss files compiled by a sass hoisted from another package
+    sass: Boolean(deps.sass || deps['sass-embedded']) || countFiles(dir, /\.scss$/) > 0,
     storybook: { installed: sbInstalled, version: sbVersion, config: mainFile ? relative(root, mainFile) : null, frameworks, addons, stories, scripts: { storybook: scripts.storybook ?? null, build: scripts['build-storybook'] ?? null }, issues },
     chromatic: { installed: Boolean(deps.chromatic), script: scripts.chromatic ?? null },
     playwright: Boolean(has(/^playwright/).length || deps['@playwright/test']),

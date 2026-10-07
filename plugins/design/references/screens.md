@@ -106,3 +106,7 @@ screens, add `screens` to its path check (`/^(components|proposals|screens)\//`)
 footer can re-theme a screen live. The sidebar lists the screens under **Pages**, from
 `screens/index.json` (Claude Design's card list doesn't include them): every upload of
 `design-refresh` rewrites it from the manifest's `screens[]`.
+
+Claude Design reloads the file in its URL after each change (usually `Palette.dc.html`), not the
+page the navbar led to. The navbar remembers that page per browser tab and goes back to it; a file
+picked in Claude Design's file list replaces it.

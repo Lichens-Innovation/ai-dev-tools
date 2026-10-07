@@ -1,6 +1,7 @@
 # Palette structure
 
-Three layers. Components only touch layer 3.
+Three color layers; components only touch layer 3. Spacing, type and breakpoints are
+[hand-authored tokens](#hand-authored-tokens-non-color) beside them.
 
 ```
 1. Inputs     --primary-lm / --primary-dm …      hand-edited, one value per mode
@@ -18,6 +19,44 @@ Three layers. Components only touch layer 3.
 
 Every input has `-lm` (light mode) and `-dm` (dark mode).
 
+### Hand-authored tokens (non-color)
+
+Every other custom property of the inputs file is a **hand-authored token**: spacing, type, radius,
+breakpoints… The same in both modes, never derived: `palette.ts` copies them as is into the theme
+(a last `:root` block) and into the Sass file. Name them like Tailwind v4's theme variables, so a
+project has one vocabulary with or without Tailwind:
+
+| Group       | Names                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Spacing     | `--spacing-xs` … `--spacing-xl`: one scale for padding, margin and gap                     |
+| Type        | `--text-sm`, `--text-base`, `--text-lg`…, `--font-sans`, `--font-mono`, `--font-weight-*`, `--leading-*` |
+| Shape       | `--radius-*`, `--shadow-*` (a shadow color is the `--shadow` token)                        |
+| Breakpoints | `--breakpoint-sm`…: literal values only, the Sass file turns them into media queries       |
+
+A name the palette generates (`--text-muted`, `--bg-soft`…) is an error. Tailwind projects leave the
+block out: Tailwind's own theme holds the scale (`palette.ts` warns when `--mobile` finds one).
+Claude Design's palette card edits their values (its `tokens` prop), not their names, and shows
+breakpoints read only ([preview card](preview-card.md#where-the-colors-and-tokens-live)).
+
+### Token overrides
+
+A last, optional `:root` block of the inputs file (under the `/* Token overrides` comment)
+re-points a **semantic** token, one that references another (`--link`, `--text-muted`,
+`--primary-text`, `--text-on-primary`…), to another generated token, the same in both modes:
+
+```css
+:root {
+  --link: var(--info-text);
+}
+```
+
+The target is mode-aware, so `--link` follows `--info-text` in light and dark. `palette.ts`
+applies it everywhere (theme, scheme, Tailwind, Sass, JSON) and the audit checks the result. It
+fails on a token that holds a value (`--bg`, the scales), an unknown target, or a loop (`--link`
+→ `--link-hover` → `--link`). Related tokens are not moved along: re-point `--link-hover` too
+if it should follow. Delete the line to go back to the generated reference. The palette card's
+`overrides` prop holds them (`{ "link": "info-text" }`); the footer's **Advanced** view edits it.
+
 ## Generated files
 
 `palette.ts` computes every token as a hex per mode, the same values the audit checks, and writes:
@@ -28,6 +67,21 @@ Every input has `-lm` (light mode) and `-dm` (dark mode).
 | scheme   | `color-scheme: light dark` and `--X: light-dark(<light>, <dark>)` for every token that changes, so `color-scheme` on `<html>` forces a mode    | browsers only           |
 | Tailwind | `@import "tailwindcss"` and `@theme inline { … }` with the namespaced names ([Tailwind names](#tailwind-names))                                | Tailwind and NativeWind |
 | JSON     | `{ "X": { "light": "#…", "dark": "#…" } }`, references resolved                                                                                | code without CSS vars   |
+| Sass     | `$X: var(--X)` for every token and hand-authored token; breakpoints as literals, a `$breakpoints` map and an `mq($name)` mixin               | Sass projects           |
+
+### Sass projects
+
+`--sass <file>` (e.g. `generated/_tokens.scss`) gives Sass a typed handle on the theme:
+`@use "<theme>/tokens" as t; color: t.$text-muted;` compiles to `var(--text-muted)`, so the value stays
+live (dark mode, the scheme file) and a misspelled name fails the build with `Undefined variable`.
+The theme CSS must still be loaded at runtime (the same imports as any web app).
+
+- No Sass math or color functions on these names (`t.$spacing-sm * 2`, `color.scale(t.$primary, …)`):
+  they are `var()`, not values. Use `calc()`, or the scale step the palette already has
+  (`t.$primary-strong`).
+- Breakpoints are the exception: `t.$breakpoint-sm` is the literal, and `@include t.mq(sm) { … }`
+  writes `@media (min-width: …)`.
+- Values only Sass needs (a navbar height used in `calc()`) stay in the project's own Sass.
 
 ```css
 :root {
@@ -47,7 +101,8 @@ Every input has `-lm` (light mode) and `-dm` (dark mode).
 }
 ```
 
-Only the inputs are hand-edited; the rest is regenerated on every run.
+Only the inputs, hand-authored tokens and token overrides are hand-edited; the rest is
+regenerated on every run.
 
 ### Shared theme package (web and mobile in one repo)
 
@@ -57,14 +112,16 @@ packages/theme/
 └── src/
     ├── theme.inputs.css   the inputs (canonical, manifest palette.localPath)
     ├── palette.ts         typed reader of generated/palette.json, only if JS needs hex values
-    └── generated/         never edited: theme.css, scheme.css, tailwind.css, palette.json
+    └── generated/         never edited: theme.css, scheme.css, tailwind.css, palette.json, _tokens.scss
 ```
 
 - `scripts/palette.ts` is the repo's copy of the generator (manifest `palette.script`), run by the
   package's `palette` script: `"palette": "node scripts/palette.ts src/theme.inputs.css --theme
 src/generated/theme.css --scheme src/generated/scheme.css --mobile src/generated/tailwind.css
 --json src/generated/palette.json --namespace noa"`. Node 22.18+, no dependencies. Keep it out of the
-  formatter and linter too, so it stays byte-identical to the plugin's.
+  formatter and linter too, so it stays byte-identical to the plugin's: `design-loop` and
+  `design-refresh` compare it with the plugin's and offer the newer one
+  ([plugin-files.md](../../design-refresh/references/plugin-files.md)).
 - Apps import the package's export names, never a `generated/` path, so the layout can change
   without touching them.
 - Add `generated/` to the formatter's and linter's ignore files: a reformatted output turns every
