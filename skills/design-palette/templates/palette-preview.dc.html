@@ -104,7 +104,7 @@ input,select,textarea,button{font:inherit;color:inherit}
       <div style="display:flex;flex-direction:column;gap:12px;padding-top:8px">
         <div>
           <div style="font-weight:600;font-size:15px">Semantic</div>
-          <div style="font-size:12px;color:var(--text-muted)">What components use, and what each token points to in {{ modeName }} mode.</div>
+          <div style="font-size:12px;color:var(--text-muted)">What components use, and what each token points to in {{ modeName }} mode. To re-point one, use Advanced in the Palette footer.</div>
         </div>
         <div style="display:flex;flex-direction:column">
           <sc-for list="{{ semRows }}" as="g" hint-placeholder-count="6">
@@ -162,6 +162,40 @@ input,select,textarea,button{font:inherit;color:inherit}
         </div>
       </div>
     </section>
+
+    <sc-if value="{{ hasTokens }}" hint-placeholder-val="{{ false }}">
+    <section id="tokens" data-screen-label="Tokens" data-nav-section="Tokens" style="display:flex;flex-direction:column;gap:20px;max-width:1120px">
+      <div>
+        <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Tokens</h2>
+        <p style="margin:4px 0 0;color:var(--text-muted);max-width:60ch;text-wrap:pretty">The hand-authored tokens of the inputs file, the same in both modes. Edit a value to try it here and on every card; keep it like a color, with the Palette footer's Copy request. Names are fixed: components compile against them.</p>
+      </div>
+      <sc-for list="{{ tokenGroups }}" as="g" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px">
+            <span style="font-weight:600;font-size:15px">{{ g.title }}</span>
+            <span style="font-size:12px;color:var(--text-muted)">{{ g.note }}</span>
+          </div>
+          <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:minmax(120px,220px) minmax(0,1fr) minmax(140px,260px);gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--border)">
+              <span title="--{{ t.name }}" style="font:500 12px 'IBM Plex Mono',monospace;overflow-wrap:anywhere">--{{ t.name }}</span>
+              <div style="min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
+                <sc-if value="{{ t.bar }}" hint-placeholder-val="{{ false }}">
+                  <div style="height:12px;border-radius:2px;background:var(--primary);{{ t.sample }}"></div>
+                </sc-if>
+                <sc-if value="{{ t.box }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:48px;height:32px;border:2px solid var(--primary);background:var(--primary-bg);{{ t.sample }}"></div>
+                </sc-if>
+                <sc-if value="{{ t.text }}" hint-placeholder-val="{{ false }}">
+                  <span style="{{ t.sample }}">{{ t.sampleText }}</span>
+                </sc-if>
+              </div>
+              <input value="{{ t.value }}" onChange="{{ t.onChange }}" disabled="{{ t.readOnly }}" title="{{ t.hint }}" spellcheck="false" style="height:32px;min-width:0;padding:0 8px;border-radius:6px;border:1px solid {{ t.border }};background:var(--bg-elevated);font:400 12px 'IBM Plex Mono',monospace;opacity:{{ t.op }}">
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </section>
+    </sc-if>
 
     <section id="components" data-screen-label="Components" data-nav-section="Components" style="display:flex;flex-direction:column;gap:20px;max-width:1120px">
       <h2 style="margin:0;font-size:22px;letter-spacing:-0.01em">Components</h2>
@@ -284,7 +318,7 @@ input,select,textarea,button{font:inherit;color:inherit}
   </div>
 </sc-if>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;namespace&quot;:{&quot;editor&quot;:null,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Palette&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;project&quot;,&quot;plum&quot;,&quot;triad&quot;,&quot;twoTone&quot;],&quot;default&quot;:&quot;project&quot;,&quot;tsType&quot;:&quot;'project'|'plum'|'triad'|'twoTone'&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;namespace&quot;:{&quot;editor&quot;:null,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;inputs&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, { lm: string; dm: string }&gt; | null&quot;},&quot;tokens&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, string&gt; | null&quot;},&quot;overrides&quot;:{&quot;editor&quot;:null,&quot;default&quot;:null,&quot;tsType&quot;:&quot;Record&lt;string, string&gt; | null&quot;}}">
 const BRAND = ['primary','secondary','tertiary','quaternary','quinary'];
 const PRESETS = {
   plum:    { brand:[['#401f3e','#8a5585'],['#3f2e56','#705e9b'],['#453f78','#7d76c9'],['#759aab','#8fb3c3'],['#faf2a1','#f3ea94']], font:['#1f1a24','#eee8f0'], background:['#fbfaf8','#17131a'] },
@@ -380,15 +414,18 @@ const famOf = t => { if (t.startsWith('text-on-')) return t.slice(8); if (t === 
 const intentsOf = families;
 
 const BASE_INPUTS = ['font', 'font-inverted', 'background', 'border'];
-function fromInputs(o) {
+// overrides: semantic tokens re-pointed to another token, the same in both modes ({ link: 'info-text' }).
+function fromInputs(o, overrides = {}) {
   const g = n => o[n] ? { light: o[n].lm ?? o[n].dm, dark: o[n].dm ?? o[n].lm } : null;
   const brand = []; BRAND.forEach((n, i) => { const v = g(n); if (v) brand[i] = v; });
   const font = g('font'), background = g('background'), status = {};
   Object.keys(o).filter(n => !BRAND.includes(n) && !BASE_INPUTS.includes(n)).forEach(n => { status[n] = g(n); });
   return { brand: brand.filter(Boolean), font, background, status: Object.keys(status).length ? status : mapObj(STATUS, pair),
     fontInverted: g('font-inverted') ?? { ...background },
-    border: g('border') ?? { light: mixHex(font.light, 14, background.light), dark: mixHex(font.dark, 14, background.dark) } };
+    border: g('border') ?? { light: mixHex(font.light, 14, background.light), dark: mixHex(font.dark, 14, background.dark) }, overrides: { ...(overrides || {}) } };
 }
+// Only the semantic tokens (the ones that reference another token) can be overridden.
+const overridable = p => tokensFor({ ...p, overrides: {} }, 'light').filter(([, v]) => v.startsWith('var(--color-')).map(([k]) => k);
 function toInputs(p) {
   const o = {};
   [...p.brand.map((_, i) => BRAND[i]), ...BASE_INPUTS, ...Object.keys(p.status)].forEach(n => { o[n] = { lm: baseHex(p, n, 'light'), dm: baseHex(p, n, 'dark') }; });
@@ -450,7 +487,8 @@ function tokensFor(p, m) {
   const sh = (x, o) => { const [l,a,b2] = hexToLab(x); return labToHex([l + o.sign * o.d, a, b2]); };
   families(p).forEach(n => { const x = baseHex(p,n,m), s = scaleHex(p,n,m,'soft'); T.push([n + '-hover', sh(x, hoverMix(x, false, false))], [n + '-active', sh(x, hoverMix(x, false, true))], [n + '-bg-active', sh(s, hoverMix(s, false, false))]); });
   T.push(['overlay', lm ? '#00000073' : '#000000a6'], ['shadow', lm ? f + '2e' : '#0000008c']);
-  return T;
+  const o = p.overrides || {};
+  return T.map(([k, v]) => o[k] && v.startsWith('var(--color-') ? [k, ref(o[k])] : [k, v]);
 }
 // Same names as palette.ts: text-<ns>-muted, bg-<ns>-elevated, bg-<ns>-primary-subtle… (see its comment).
 const ROLE_NS = { text:'--text-color-', bg:'--background-color-', border:'--border-color-' };
@@ -492,6 +530,24 @@ const SEM_ROWS = [
   { title:'Effects', note:'own alpha', kind:'fx', tokens:[['overlay', 'black, per mode'], ['shadow', 'per mode']] }
 ];
 const MISSING = 'background:transparent;border:1px dashed var(--border-strong)';
+// Hand-authored tokens (the tokens prop, { name: value }), grouped by their Tailwind name. `show` picks the sample.
+const TOKEN_GROUPS = [
+  { title:'Type', note:'--font-*, --text-*, --leading-*', test: n => /^(font|text|leading|tracking)-/.test(n) },
+  { title:'Spacing', note:'padding, margin and gap', test: n => n.startsWith('spacing-') },
+  { title:'Shape', note:'--radius-*', test: n => n.startsWith('radius-') },
+  { title:'Breakpoints', note:'read only: media queries cannot read var(), edit them in the inputs file', test: n => n.startsWith('breakpoint-') },
+  { title:'Other', note:'no preview', test: () => true }
+];
+const validToken = v => typeof v === 'string' && v.trim() !== '' && !/[;{}]/.test(v);
+const tokenShow = n => n.includes('--') ? null
+  : n.startsWith('font-weight-') ? ['text', 'font-weight:var(--' + n + ')', 'Aa']
+  : n.startsWith('font-') ? ['text', 'font-family:var(--' + n + ')', 'The quick brown fox jumps']
+  : n.startsWith('text-') ? ['text', 'font-size:var(--' + n + ');line-height:1.2', 'Aa Heading']
+  : n.startsWith('leading-') ? ['text', 'line-height:var(--' + n + ')', 'Line height']
+  : n.startsWith('tracking-') ? ['text', 'letter-spacing:var(--' + n + ')', 'Letter spacing']
+  : n.startsWith('spacing-') ? ['bar', 'width:var(--' + n + ')']
+  : n.startsWith('radius-') ? ['box', 'border-radius:var(--' + n + ')'] : null;
+const tokensCss = t => { const e = Object.entries(t || {}).filter(([, v]) => validToken(v)); return e.length ? ':root {\n' + e.map(([n, v]) => '  --' + n + ': ' + v.trim() + ';').join('\n') + '\n}' : ''; };
 const semStyle = (kind, t) => kind === 'bg' ? 'background:var(--' + t + ');box-shadow:inset 0 0 0 1px var(--border)'
   : kind === 'line' ? 'background:var(--bg);border:2px solid var(--' + t + ')'
   : kind === 'text' ? 'color:var(--' + t + ');background:' + (t === 'text-inverted' ? 'var(--text)' : 'var(--bg)') + ';box-shadow:inset 0 0 0 1px var(--border)'
@@ -517,12 +573,17 @@ class Component extends DCLogic {
     super(props);
     const preset = props.preset ?? (hasInputs(props.inputs) ? 'project' : 'plum');
     const shared = preset === 'project' && window.designNav?.palette;
-    this.state = { mode: window.designNav?.mode ?? props.mode ?? 'light', preset, pal: shared ? fromInputs(shared) : this.palFor(preset), pop:null, modal:null, copied:false, tab:'web', auditAll:false };
-    // The shared navbar (design-nav.js) owns the light/dark switch and the palette draft its footer edits; follow both.
+    this.state = { mode: window.designNav?.mode ?? props.mode ?? 'light', preset, pal: shared ? fromInputs(shared, window.designNav.overrides ?? props.overrides) : this.palFor(preset), tokens: { ...(props.tokens || {}), ...(window.designNav?.tokens || {}) }, pop:null, modal:null, copied:false, tab:'web', auditAll:false };
+    // The shared navbar (design-nav.js) owns the light/dark switch and the palette draft its footer edits (inputs, token
+    // values, overrides); follow both.
     this.onNavMode = e => this.setState({ mode: e.detail.mode });
-    this.onNavPalette = e => { const o = e.detail.inputs; if (this.state.preset === 'project' && o && JSON.stringify(o) !== JSON.stringify(toInputs(this.state.pal))) this.setState({ pal: fromInputs(o) }); };
+    this.onNavPalette = e => {
+      const o = e.detail.inputs, t = e.detail.tokens, ov = e.detail.overrides ?? this.state.pal.overrides;
+      if (this.state.preset === 'project' && o && (JSON.stringify(o) !== JSON.stringify(toInputs(this.state.pal)) || JSON.stringify(ov) !== JSON.stringify(this.state.pal.overrides))) this.setState({ pal: fromInputs(o, ov) });
+      if (t && JSON.stringify(t) !== JSON.stringify(this.state.tokens)) this.setState({ tokens: t });
+    };
   }
-  palFor(key) { return key === 'project' && hasInputs(this.props.inputs) ? fromInputs(this.props.inputs) : fromPreset(key === 'project' ? 'plum' : key); }
+  palFor(key) { return key === 'project' && hasInputs(this.props.inputs) ? fromInputs(this.props.inputs, this.props.overrides) : fromPreset(key === 'project' ? 'plum' : key); }
   componentDidMount() {
     this.inject();
     window.addEventListener('design-nav:mode', this.onNavMode);
@@ -531,7 +592,8 @@ class Component extends DCLogic {
   }
   componentWillUnmount() { window.removeEventListener('design-nav:mode', this.onNavMode); window.removeEventListener('design-nav:palette', this.onNavPalette); }
   componentDidUpdate(prev) {
-    if (prev.preset !== this.props.preset || prev.inputs !== this.props.inputs) { const preset = this.props.preset ?? (hasInputs(this.props.inputs) ? 'project' : 'plum'); this.setState({ preset, pal: this.palFor(preset) }); }
+    if (prev.preset !== this.props.preset || prev.inputs !== this.props.inputs || prev.overrides !== this.props.overrides) { const preset = this.props.preset ?? (hasInputs(this.props.inputs) ? 'project' : 'plum'); this.setState({ preset, pal: this.palFor(preset) }); }
+    if (prev.tokens !== this.props.tokens) this.setState({ tokens: { ...(this.props.tokens || {}) } });
     if (prev.mode !== this.props.mode) { const mode = this.props.mode ?? 'light'; if (window.designNav) window.designNav.setMode(mode); else this.setState({ mode }); }
     this.inject();
   }
@@ -543,7 +605,11 @@ class Component extends DCLogic {
     document.documentElement.style.colorScheme = this.state.mode;
     document.documentElement.dataset.theme = this.state.mode;
   }
-  webCss() { return buildWebCss(this.state.pal) + '\n\n' + buildSchemeCss(this.state.pal); }
+  webCss() { const t = tokensCss(this.tokens()); return buildWebCss(this.state.pal) + '\n\n' + buildSchemeCss(this.state.pal) + (t ? '\n\n' + t : ''); }
+  // The token values in use: a value being typed that is not valid CSS yet keeps the saved one.
+  tokens() { const saved = this.props.tokens || {}; return Object.fromEntries(Object.keys(saved).map(n => [n, validToken(this.state.tokens[n]) ? this.state.tokens[n].trim() : saved[n]])); }
+  // A valid value joins the shared draft (design-nav.js themes the other cards with it); an invalid one stays in the field.
+  setToken(n, v) { this.setState(s => ({ tokens: { ...s.tokens, [n]: v } }), () => { if (validToken(v)) window.designNav?.setTokens?.(this.tokens()); }); }
   setPal(fn) { this.setState(s => ({ pal: fn(JSON.parse(JSON.stringify(s.pal))) }), () => { if (this.state.preset === 'project') window.designNav?.setPalette?.(toInputs(this.state.pal)); }); }
   row(name, entry, get, extra = {}) {
     const m = this.state.mode, hex = entry[m];
@@ -582,12 +648,23 @@ class Component extends DCLogic {
       webTabBg: s.tab === 'web' ? 'var(--bg-elevated)' : 'transparent', mobileTabBg: s.tab === 'mobile' ? 'var(--bg-elevated)' : 'transparent',
       setWeb: () => this.setState({ tab:'web', copied:false }), setMobile: () => this.setState({ tab:'mobile', copied:false }),
       title: this.props.title || 'Palette',
+      ...(() => {
+        const names = Object.keys(this.props.tokens || {}), left = new Set(names);
+        const tokenGroups = TOKEN_GROUPS.map(g => ({ title: g.title, note: g.note, rows: names.filter(n => left.has(n) && g.test(n) && left.delete(n)).map(n => {
+          const show = tokenShow(n), bp = n.startsWith('breakpoint-'), v = s.tokens[n] ?? '', ok = validToken(v);
+          return { name: n, value: v, readOnly: bp, op: bp ? 0.6 : 1, border: ok ? (v.trim() !== this.props.tokens[n] ? 'var(--primary)' : 'var(--border-input)') : 'var(--danger)',
+            hint: bp ? 'Media queries cannot read var(): edit it in the inputs file' : ok ? '--' + n : 'Not a valid value: empty, or with ; { }',
+            bar: show?.[0] === 'bar', box: show?.[0] === 'box', text: show?.[0] === 'text', sample: show?.[1] ?? '', sampleText: show?.[2] ?? '',
+            onChange: e => this.setToken(n, e.target.value) };
+        }) })).filter(g => g.rows.length);
+        return { tokenGroups, hasTokens: tokenGroups.length > 0 };
+      })(),
       groups, auditItems, auditEmpty: auditItems.length === 0,
       auditSummary: 'Light: ' + cnt('light','fail') + ' fail, ' + cnt('light','warn') + ' warn · Dark: ' + cnt('dark','fail') + ' fail, ' + cnt('dark','warn') + ' warn · ' + audit.filter(c => c.m === 'light').length + ' light / ' + audit.filter(c => c.m === 'dark').length + ' dark checks',
       auditToggleLabel: s.auditAll ? 'Show issues only' : 'Show all checks', toggleAuditAll: () => this.setState(st => ({ auditAll: !st.auditAll })),
       modeName: s.mode,
-      semRows: SEM_ROWS.map(g => ({ title:g.title, note:g.note, tokens: g.tokens.map(([t, map, needs]) => { const miss = needs && !p.status[needs];
-        return { name:t, map: miss ? 'needs a ' + needs + ' status color' : '→ ' + map, style: miss ? MISSING : semStyle(g.kind, t), sample: !miss && g.kind === 'text' ? 'Aa' : '', op: miss ? 0.6 : 1 }; }) })),
+      semRows: SEM_ROWS.map(g => ({ title:g.title, note:g.note, tokens: g.tokens.map(([t, map, needs]) => { const miss = needs && !p.status[needs], ov = p.overrides?.[t];
+        return { name:t, map: miss ? 'needs a ' + needs + ' status color' : ov ? '→ --' + ov + ' (override)' : '→ ' + map, style: miss ? MISSING : semStyle(g.kind, t), sample: !miss && g.kind === 'text' ? 'Aa' : '', op: miss ? 0.6 : 1 }; }) })),
       ...(() => {
         const ks = families(p), m = s.mode, sign = hm => 'L ' + (hm.sign > 0 ? '+' : '−') + hm.d;
         const mapOf = (k, r) => {
@@ -601,8 +678,8 @@ class Component extends DCLogic {
             case 'text': return '→ --' + textRef(p, k, m);
             default: return r.tok === 'text-on-X' ? '→ --' + onRef(p, k, m) : 'input';
           } };
-        const cell = (k, r) => { const v = 'var(--' + (r.tok === 'X' ? k : r.tok === 'text-on-X' ? 'text-on-' + k : k + r.tok) + ')';
-          return { name: r.tok === 'X' ? '--' + k : r.tok === 'text-on-X' ? '--text-on-' + k : '--' + k + r.tok, map: mapOf(k, r),
+        const cell = (k, r) => { const t = r.tok === 'X' ? k : r.tok === 'text-on-X' ? 'text-on-' + k : k + r.tok, v = 'var(--' + t + ')', ov = p.overrides?.[t];
+          return { name: '--' + t, map: ov ? '→ --' + ov + ' (override)' : mapOf(k, r),
             sample: r.kind === 'on' || r.kind === 'text' ? 'Aa' : '',
             style: r.kind === 'bg' ? 'background:' + v + ';box-shadow:inset 0 0 0 1px var(--border)'
               : r.kind === 'line' ? 'background:var(--bg);border:2px solid ' + v

@@ -1,6 +1,6 @@
 ---
 name: design-palette
-description: "Creates or migrates the canonical CSS theme palette: light/dark inputs, generated scales, semantic tokens shared by web and React Native, Tailwind v4 utilities and a contrast audit. Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
+description: "Creates or migrates the canonical CSS theme palette: light/dark inputs, generated scales, semantic tokens shared by web and React Native, hand-authored spacing/type/breakpoint tokens, Tailwind v4 utilities or Sass names, and a contrast audit. Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
 ---
 
 # Design Palette
@@ -24,7 +24,12 @@ Read before starting:
    generated/scheme.css       browser-only mode switch (web targets)        --scheme
    generated/tailwind.css     Tailwind v4 utilities (Tailwind targets)      --mobile
    generated/palette.json     resolved hex values (optional, for JS)        --json
+   generated/_tokens.scss     Sass names for every token (Sass targets)     --sass
    ```
+
+   Ask whether the web side uses Sass (a `sass` or `sass-embedded` dependency, `*.scss` files):
+   it then gets `--sass`, and the components keep `@use`-ing a theme module instead of writing
+   `var()` by hand ([Sass projects](references/palette-structure.md#sass-projects)).
 
    For Tailwind targets, also ask for the namespace: a short project name (e.g. `noa`) that every
    palette class carries: `text-noa-muted`, `bg-noa-elevated`, `bg-noa-primary-subtle`
@@ -46,9 +51,15 @@ Read before starting:
      (defaults to a 14% font-into-background mix).
    - status: `info`, `danger`, `success`, `warning` (defaults in the template).
 
+   Without Tailwind, also collect the **hand-authored tokens** (one value, both modes): fonts, type
+   sizes, one spacing scale for padding, margin and gap, radius, breakpoints. Use Tailwind v4 names
+   ([table](references/palette-structure.md#hand-authored-tokens-non-color)); take the values from
+   what the project already uses. With Tailwind, skip them: its theme holds the scale.
+
 4. **Write the inputs** into the canonical file (the inputs file, or the one file) using
-   [`templates/theme.inputs.css`](templates/theme.inputs.css). Inputs are the only hand-edited
-   values.
+   [`templates/theme.inputs.css`](templates/theme.inputs.css). Inputs, hand-authored tokens and token
+   overrides (its last block, empty by default) are the only hand-edited values (drop the
+   template's hand-authored block for Tailwind targets).
 
 5. **Put the generator in the repo.** Copy [`scripts/palette.ts`](scripts/palette.ts) (Node 22.18+,
    which runs it as is; no dependencies) into the package that holds the inputs, as `scripts/palette.ts`, and add a
@@ -60,6 +71,9 @@ Read before starting:
    node scripts/palette.ts src/theme.inputs.css --theme src/generated/theme.css \
      --scheme src/generated/scheme.css --mobile src/generated/tailwind.css \
      --json src/generated/palette.json --namespace noa
+   # Sass web project, no Tailwind
+   node scripts/palette.ts src/theme.inputs.css --theme src/generated/theme.css \
+     --scheme src/generated/scheme.css --sass src/generated/_tokens.scss
    # one file: web only / mobile only
    node scripts/palette.ts theme.css --web --scheme theme.css
    node scripts/palette.ts tailwind.css --mobile tailwind.css
@@ -87,13 +101,19 @@ Read before starting:
    | React Native (NativeWind)   | `tailwind.css`, `theme.css`; never the scheme file      |
    | React Native Storybook      | the app's global CSS, then `scheme.css`                 |
 
+   Sass partials `@use` the Sass file (through the package's export, or a module that forwards
+   it) and still need the CSS imports above at runtime: the Sass names are `var()`.
+
    The theme has plain values and `var()` only and switches dark mode with
    `prefers-color-scheme`. The scheme file adds `light-dark()` so a browser can force a mode:
    set `document.documentElement.style.colorScheme = mode`. react-native-css turns `light-dark()`
    into arrays that Reanimated rejects, so it stays off React Native.
 
-   Card sync: `--to-card <card>` writes the inputs into the palette card, `--from-card <card>`
-   takes them from it (and writes them into the inputs file), `--diff-card <card>` only prints the differences. `--title <name>` sets the
+   Card sync: `--to-card <card>` writes the inputs, the hand-authored token values and the
+   [token overrides](references/palette-structure.md#token-overrides) into the palette card, which
+   edits all three (token values only, never names or breakpoints);
+   `--from-card <card>` takes them from it (and writes them into the inputs file),
+   `--diff-card <card>` only prints the differences. `--title <name>` sets the
    card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
 
 7. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input
@@ -112,9 +132,13 @@ Read before starting:
 
 - Components consume **semantic tokens only** (`--bg`, `--border`, `--text-muted`,
   `--primary-bg`, `--text-on-primary`…). Raw scale steps are for rare one-offs.
+- Spacing, type, radius and breakpoints come from the hand-authored tokens (or Tailwind's scale),
+  not from literals in components. One spacing scale serves padding, margin and gap.
+- In Sass, no math or color functions on the token names: `calc()`, or the palette's scale step.
 - No opacity modifiers on palette classes (`bg-noa-hover/50`): use the state's token. A missing
   state is a new token in `palette.ts`, not a one-off alpha.
-- Never hand-edit generated tokens; change an input and re-run.
+- Never hand-edit generated tokens; change an input, or re-point a semantic token with a token
+  override in the inputs file, and re-run.
 - Keep the structure: inputs → scales → semantic. Never flatten semantic tokens into hex.
 - Components use the namespaced classes only (`text-noa-muted`). Don't add project Tailwind
   aliases (`bg-surface`, `text-content`): they bring a second vocabulary back. When a third-party
