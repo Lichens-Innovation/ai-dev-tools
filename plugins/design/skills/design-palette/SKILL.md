@@ -108,8 +108,10 @@ Read before starting:
    set `document.documentElement.style.colorScheme = mode`. react-native-css turns `light-dark()`
    into arrays that Reanimated rejects, so it stays off React Native.
 
-   Card sync: `--to-card <card>` writes the inputs into the palette card, `--from-card <card>`
-   takes them from it (and writes them into the inputs file), `--diff-card <card>` only prints the differences. `--title <name>` sets the
+   Card sync: `--to-card <card>` writes the inputs and the hand-authored token values into the
+   palette card, which edits both (token values only, never names or breakpoints);
+   `--from-card <card>` takes them from it (and writes them into the inputs file),
+   `--diff-card <card>` only prints the differences. `--title <name>` sets the
    card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
 
 7. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input

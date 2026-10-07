@@ -35,7 +35,8 @@ project has one vocabulary with or without Tailwind:
 
 A name the palette generates (`--text-muted`, `--bg-soft`…) is an error. Tailwind projects leave the
 block out: Tailwind's own theme holds the scale (`palette.ts` warns when `--mobile` finds one).
-Claude Design's palette card only edits the color inputs.
+Claude Design's palette card edits their values (its `tokens` prop), not their names, and shows
+breakpoints read only ([preview card](preview-card.md#where-the-colors-and-tokens-live)).
 
 ## Generated files
 

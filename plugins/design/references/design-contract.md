@@ -197,7 +197,7 @@ Skills always resolve a component's target through these rules — never hardcod
    is made on its proposal.
 3. **"What happens when Design invents a value?"** → the reconciliation rule (§5).
 4. **"Where does the palette live?"** → both places, kept equal: the canonical inputs file
-   (`palette.localPath`) and the palette card's `inputs` prop (`palette.designPath`).
+   (`palette.localPath`) and the palette card's `inputs` and `tokens` props (`palette.designPath`).
    `design-init` seeds the card from the repo; an approved card flows back through `design-loop`.
    The card lives at the project root as `Palette.dc.html`: the Pages list only shows root
    files, and the Design System view labels each card by its file name. Two tools write the
@@ -277,13 +277,14 @@ dark values switch through `prefers-color-scheme`; the browser-only scheme file 
 
 **Hand-authored tokens.** Any other custom property of the canonical file (spacing, type, radius,
 breakpoints, with Tailwind v4 names: `--spacing-md`, `--text-lg`, `--breakpoint-sm`) is copied as
-is into the theme and the Sass file. They are canonical too, edited by hand, not by the palette
-card. Tailwind projects have none: Tailwind's theme is their scale.
+is into the theme and the Sass file. They are canonical too. The palette card can change their
+values (its `tokens` prop), never their names or the breakpoints; a new token is added to the
+canonical file by hand. Tailwind projects have none: Tailwind's theme is their scale.
 
 Reconciliation therefore means: map a Design color to a **semantic token**, and a spacing, size
 or breakpoint to the project's scale (its hand-authored tokens, or Tailwind's); if the palette
-itself changed (approved palette card), copy the new **inputs** into the canonical file and re-run
-`palette.ts`. A spacing or size with no close step follows `reconcileRule` like a color: ask, or
+itself changed (approved palette card), copy the new **inputs** and token values into the
+canonical file and re-run `palette.ts`. A spacing or size with no close step follows `reconcileRule` like a color: ask, or
 add a hand-authored token.
 
 **Which `palette.ts` runs.** When `palette.script` is set, run that copy (with `--namespace
