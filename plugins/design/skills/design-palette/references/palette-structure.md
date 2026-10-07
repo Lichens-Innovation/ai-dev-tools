@@ -1,6 +1,7 @@
 # Palette structure
 
-Three layers. Components only touch layer 3.
+Three color layers; components only touch layer 3. Spacing, type and breakpoints are
+[hand-authored tokens](#hand-authored-tokens-non-color) beside them.
 
 ```
 1. Inputs     --primary-lm / --primary-dm …      hand-edited, one value per mode
@@ -18,6 +19,24 @@ Three layers. Components only touch layer 3.
 
 Every input has `-lm` (light mode) and `-dm` (dark mode).
 
+### Hand-authored tokens (non-color)
+
+Every other custom property of the inputs file is a **hand-authored token**: spacing, type, radius,
+breakpoints… The same in both modes, never derived: `palette.ts` copies them as is into the theme
+(a last `:root` block) and into the Sass file. Name them like Tailwind v4's theme variables, so a
+project has one vocabulary with or without Tailwind:
+
+| Group       | Names                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| Spacing     | `--spacing-xs` … `--spacing-xl`: one scale for padding, margin and gap                     |
+| Type        | `--text-sm`, `--text-base`, `--text-lg`…, `--font-sans`, `--font-mono`, `--font-weight-*`, `--leading-*` |
+| Shape       | `--radius-*`, `--shadow-*` (a shadow color is the `--shadow` token)                        |
+| Breakpoints | `--breakpoint-sm`…: literal values only, the Sass file turns them into media queries       |
+
+A name the palette generates (`--text-muted`, `--bg-soft`…) is an error. Tailwind projects leave the
+block out: Tailwind's own theme holds the scale (`palette.ts` warns when `--mobile` finds one).
+Claude Design's palette card only edits the color inputs.
+
 ## Generated files
 
 `palette.ts` computes every token as a hex per mode, the same values the audit checks, and writes:
@@ -28,6 +47,21 @@ Every input has `-lm` (light mode) and `-dm` (dark mode).
 | scheme   | `color-scheme: light dark` and `--X: light-dark(<light>, <dark>)` for every token that changes, so `color-scheme` on `<html>` forces a mode    | browsers only           |
 | Tailwind | `@import "tailwindcss"` and `@theme inline { … }` with the namespaced names ([Tailwind names](#tailwind-names))                                | Tailwind and NativeWind |
 | JSON     | `{ "X": { "light": "#…", "dark": "#…" } }`, references resolved                                                                                | code without CSS vars   |
+| Sass     | `$X: var(--X)` for every token and hand-authored token; breakpoints as literals, a `$breakpoints` map and an `mq($name)` mixin               | Sass projects           |
+
+### Sass projects
+
+`--sass <file>` (e.g. `generated/_tokens.scss`) gives Sass a typed handle on the theme:
+`@use "<theme>/tokens" as t; color: t.$text-muted;` compiles to `var(--text-muted)`, so the value stays
+live (dark mode, the scheme file) and a misspelled name fails the build with `Undefined variable`.
+The theme CSS must still be loaded at runtime (the same imports as any web app).
+
+- No Sass math or color functions on these names (`t.$spacing-sm * 2`, `color.scale(t.$primary, …)`):
+  they are `var()`, not values. Use `calc()`, or the scale step the palette already has
+  (`t.$primary-strong`).
+- Breakpoints are the exception: `t.$breakpoint-sm` is the literal, and `@include t.mq(sm) { … }`
+  writes `@media (min-width: …)`.
+- Values only Sass needs (a navbar height used in `calc()`) stay in the project's own Sass.
 
 ```css
 :root {
@@ -57,7 +91,7 @@ packages/theme/
 └── src/
     ├── theme.inputs.css   the inputs (canonical, manifest palette.localPath)
     ├── palette.ts         typed reader of generated/palette.json, only if JS needs hex values
-    └── generated/         never edited: theme.css, scheme.css, tailwind.css, palette.json
+    └── generated/         never edited: theme.css, scheme.css, tailwind.css, palette.json, _tokens.scss
 ```
 
 - `scripts/palette.ts` is the repo's copy of the generator (manifest `palette.script`), run by the

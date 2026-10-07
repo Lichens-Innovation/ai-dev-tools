@@ -32,8 +32,9 @@ this skill produces must satisfy the preconditions in §6.
      the Claude Design MCP is missing, give the user the README command; do not run it.
    - **Tailwind**, when a UI package lacks it: ask (`AskUserQuestion`) between adding Tailwind
      (v4, following the framework's own Tailwind guide, namespaced palette utilities) and using
-     the palette **without** Tailwind (no namespace, no Tailwind outputs or card). Keep the
-     answer for steps 2 and 6.
+     the palette **without** Tailwind (no namespace, no Tailwind outputs or card; hand-authored
+     spacing, type and breakpoint tokens instead, and the Sass file when the package's `sass` is
+     true). Keep the answer for steps 2 and 6.
    - **Chromatic**, when absent: ask whether to install it, stating it is **optional** (an
      external account and token, and quota use). Without it, `design-loop` skips its publish
      step and contract §6's Chromatic precondition is waived. Skip the question when it is
@@ -87,7 +88,7 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
      - **repo wins** (default, `canonical-wins`): step 6 overwrites the card.
      - **Design wins**: `palette.ts <canonical> --from-card /tmp/design-init/remote-palette.html`
        with the output flags for the targets chosen in `design-palette` step 1 (`--theme <file>`
-       or `--web`, `--scheme <file>`, `--mobile <file> --namespace <name>`, `--json <file>`), report the audit, then run
+       or `--web`, `--scheme <file>`, `--mobile <file> --namespace <name>`, `--json <file>`, `--sass <file>`), report the audit, then run
        step 6 so both sides match.
 
    Never merge silently.
@@ -125,7 +126,7 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 
 7. **Write the manifest.** Create or update `design.manifest.json` (contract §2): `designProjectId`,
    `reconcileRule` (`canonical-wins`), the `palette` entry (`localPath`: the canonical file,
-   `outputs`: the `web`, `scheme`, `mobile` and `json` files from `design-palette` step 1,
+   `outputs`: the `web`, `scheme`, `mobile`, `json` and `sass` files from `design-palette` step 1,
    `script`: the repo's `palette.ts` copy, `namespace`: the one chosen (Tailwind targets),
    `designPath: "Palette.dc.html"`, `thumbnailPath: "thumbnail.html"`, `status: "wip"`,
    `lastImplementedHash`: `shasum -a 256` of the uploaded card), and a `components[]` row per

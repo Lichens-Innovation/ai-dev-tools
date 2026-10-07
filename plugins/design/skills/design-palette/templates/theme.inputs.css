@@ -28,3 +28,30 @@
   --warning-lm: #d99a17;
   --warning-dm: #e8b53c;
 }
+
+/* Hand-authored tokens: spacing, type, radius, breakpoints… Same in both modes, copied as is into the theme (and
+   the Sass names with --sass). Tailwind v4 names, so the vocabulary is the same with or without Tailwind.
+   Tailwind projects: delete this block, Tailwind's own theme holds the scale. */
+:root {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 2rem;
+
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+
+  /* Literal values only: the Sass file turns them into media queries (@include mq(sm)) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+}

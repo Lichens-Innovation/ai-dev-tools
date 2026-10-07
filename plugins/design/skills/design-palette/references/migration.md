@@ -35,6 +35,23 @@ rewire component references to semantic tokens.
 `--x-light` / `--x-dark` (or `--prefix-x-light`) used to pick a mode → `--x-lm` / `--x-dm`.
 Drop the prefix; replace `light-dark(var(--x-light), var(--x-dark))` wrappers with `var(--x)`.
 
+### Sass variables (`$primary`, `$padding-md`, `$breakpoint-sm`)
+
+Sass values are compiled away: no dark mode, and Claude Design cannot see them. Keep Sass as the
+way components name tokens, not as where values live:
+
+1. Colors → inputs (one mode in the source: reuse it for both, flag the dark values). Map each
+   use to a semantic token by its **role**, not its old name: the same `$secondary` used as a
+   fill, a border and an outline becomes `$secondary`, `$secondary-border-strong`… A
+   `color.scale()` / `lighten()` on a theme color becomes the scale step it approximates.
+2. Spacing, type, radius, breakpoints → hand-authored tokens with Tailwind names. Merge duplicate
+   scales (`$padding-*`, `$margin-*`, `$gap-*` with the same values) into one `--spacing-*`.
+   Keep the units the project uses (`em` stays `em`): a unit change is a design change, ask first.
+3. Generate with `--sass`, point the module the partials already `@use` at the generated file
+   (forward it, beside the project's Sass-only values), and rename the references.
+   `@media (min-width: $x)` keeps working with the literal breakpoint, or becomes `@include mq(x)`.
+4. Load the theme and scheme CSS where the app (and its Storybook) loads its global styles.
+
 ### Raw scales (`--blue-500`, Tailwind `blue-*`)
 
 Choose one step per brand/status color as its input (usually the 500/600). Keep Tailwind's own

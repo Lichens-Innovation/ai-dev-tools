@@ -15,11 +15,12 @@ plugin's (contract §5).
 2. Apply the card's inputs to the canonical file (`palette.localPath`) and regenerate every
    output in `palette.outputs`: `--theme <outputs.web>` (or `--web` when `outputs.web` equals
    `localPath`), then `--scheme <outputs.scheme>`, `--mobile <outputs.mobile>` and
-   `--json <outputs.json>` for each one set. The inputs file receives the card's inputs. The same
-   run regenerates the project thumbnail (its title comes from the card):
+   `--json <outputs.json>` and `--sass <outputs.sass>` for each one set. The inputs file receives
+   the card's inputs (its hand-authored tokens stay as they are). The same run regenerates the
+   project thumbnail (its title comes from the card):
 
    ```bash
-   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] \
+   node <palette.ts> <localPath> --from-card /tmp/design-loop/palette.target.html [--theme <outputs.web> | --web] [--scheme <outputs.scheme>] [--mobile <outputs.mobile> --namespace <palette.namespace>] [--json <outputs.json>] [--sass <outputs.sass>] \
      --thumbnail /tmp/design-loop/thumbnail.html
    ```
 
