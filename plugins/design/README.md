@@ -40,8 +40,8 @@ Propose changes in `proposals/screens/<name>.html` and approve them like a compo
 Run `/design-refresh` to bring Claude Design up to date with the code (design-loop offers it
 after implementing): it tells you when the components are behind their code (then run
 `/design-sync`, which only you can start), and rebuilds the mockups whose screen changed.
-After updating the design plugin, it also offers the newer `palette.ts`, navbar and cards
-(`design.manifest.json` records the plugin version the project is at).
+After updating the design plugin, it also offers the newer `palette.ts`, proposal conventions,
+navbar and cards (`design.manifest.json` records the plugin version the project is at).
 
 ## Skills
 
@@ -52,7 +52,7 @@ After updating the design plugin, it also offers the newer `palette.ts`, navbar 
 | `storybook-init` | Installs Storybook, wires the Storybook MCP server, and confirms Playwright can screenshot stories. Used by `design-init`.                                                                                                                                                                                                                                                                            |
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                                                                                                                                                        |
 | `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette card) from Claude Design and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to `design-refresh`.                                                                                                                                        |
-| `design-refresh` | The one skill for updating Claude Design: says when the components need a `/design-sync`, rebuilds stale screen mockups, offers new screens, and adds a named page or fixes a mockup, checked against screenshots of the running app. After a plugin update it brings the project's copies of the plugin's files (`palette.ts`, the navbar, the palette and Tailwind cards) up to date, keeping the card's data; `design-loop` runs the same check before implementing.                         |
+| `design-refresh` | The one skill for updating Claude Design: says when the components need a `/design-sync`, rebuilds stale screen mockups, offers new screens, and adds a named page or fixes a mockup, checked against screenshots of the running app. After a plugin update it brings the project's copies of the plugin's files (`palette.ts`, the proposal conventions in the design-sync readme header, the navbar, the palette and Tailwind cards) up to date, keeping the card's data and the project's wording; `design-loop` runs the same check before implementing.                         |
 | `design-help` | Shows this README in the browser, or in the console with `/design-help console`. Run it yourself. |
 
 ## The contract

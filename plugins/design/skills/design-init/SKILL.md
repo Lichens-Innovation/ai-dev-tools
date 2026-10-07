@@ -184,8 +184,12 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
        The hook only fires on `*.claudeusercontent.com` hosts, an assumption nobody has
        verified: after the first re-sync, check a card in Claude Design, and keep `nav-tag.mjs`
        as the fallback until a re-synced card shows the navbar without the tag.
-     Then add the proposal conventions to the `readmeHeader`, and ask the user to run
-     `/design sync` again so both reach the project.
+     Then add the proposal conventions to the `readmeHeader`: the output of
+     `node ${CLAUDE_SKILL_DIR}/../design-refresh/scripts/plugin-files.mjs conventions`, markers
+     included, fitted to the project (the provider's name), with the project's own notes outside
+     the markers ([`conventions.md`](${CLAUDE_SKILL_DIR}/../../references/conventions.md)); the
+     start marker's hash stays, so a later plugin can tell when the text changed. Ask the user to
+     run `/design sync` again so both reach the project.
 
 9. **Verify preconditions.** Walk contract §6 and list anything still missing.
 

@@ -34,6 +34,28 @@ pf check; check "ahead exits 3" "$?" "3"; check "ahead: no update" "$(field .upd
 pf stamp; check "stamp refuses to downgrade" "$?" "2"
 rm palette.ts; node -e "const f='design.manifest.json',m=require('./'+f);m.pluginVersion='$version';require('fs').writeFileSync(f,JSON.stringify(m))"
 pf check; check "missing palette.ts" "$(field .paletteScript.state)" "missing"
+check "no readme header: no conventions" "$(field .conventions)" "null"
+cp "$palette" palette.ts
+
+# conventions: tracked by the hash in the readme header's start marker, not by the text.
+mkdir .design-sync
+echo '{ "readmeHeader": ".design-sync/conventions.md" }' > .design-sync/config.json
+pf check; check "missing header file exits 1" "$?" "1"; check "missing header file" "$(field .conventions.state)" "missing"
+printf '# Kit\n\n- Project note.\n' > .design-sync/conventions.md
+pf check; check "unmarked" "$(field .conventions.state)" "unmarked"
+pf mark; check "mark needs markers" "$?" "2"
+node "$script" conventions > block.md; check "conventions exits 0" "$?" "0"
+has "block has a hashed start marker" '<!-- design-plugin:conventions [0-9a-f]\{12\} -->' block.md
+has "block has the end marker" '<!-- /design-plugin:conventions -->' block.md
+{ printf '# Kit\n\n'; sed 's|design provider|RegloUI provider|' block.md; printf '\n- Project note.\n'; } > .design-sync/conventions.md
+pf check; check "fitted block is current" "$?" "0"; check "same" "$(field .conventions.state)" "same"
+sed -i.bak 's|conventions [0-9a-f]* -->|conventions 000000000000 -->|' .design-sync/conventions.md
+pf check; check "older block exits 1" "$?" "1"; check "differs" "$(field .conventions.state)" "differs"
+pf mark; check "mark exits 0" "$?" "0"
+pf check; check "marked block is current" "$(field .conventions.state)" "same"
+has "mark keeps the fitted text" 'RegloUI provider' .design-sync/conventions.md
+has "mark keeps the project note" 'Project note' .design-sync/conventions.md
+rm -r .design-sync
 
 # compare: a seeded card is the same code; an older navbar and card code differ.
 mkdir remote

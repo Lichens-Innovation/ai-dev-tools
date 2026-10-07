@@ -31,21 +31,9 @@ same way, from a mockup: see [`screens.md`](./screens.md).
 ## Conventions for Claude Design (design-sync readme header)
 
 `/design sync` publishes a README to the project from its `readmeHeader` file (e.g.
-`.design-sync/conventions.md`). Add these points so Claude Design follows the model:
-
-```markdown
-- **Always wrap in the design provider** and let it pick the mode; don't set a page background
-  in hex (use `var(--bg)`). Without it, a page follows the viewer's OS mode.
-- **Proposals for a component change** go in `proposals/<component>.html`. Render the synced
-  component inside the provider's side-by-side mode (`mode="both"`) and put the change in
-  page-local CSS or props, scoped to what changes. Never edit `components/`, `_ds_bundle.*` or
-  `styles.css`: they are synced from the repo and overwritten on every sync.
-- **Screens** (`screens/<name>.html`) are mockups of the app's pages, rebuilt from the code:
-  don't edit them. A screen change goes in `proposals/screens/<name>.html`, a copy of the mockup
-  with the change, in the same mode. Its layout may be restructured with the semantic tokens and
-  the synced components; its data is illustrative. A change to a component itself goes in that
-  component's proposal.
-```
+`.design-sync/conventions.md`). The points Claude Design needs to follow the model are in
+[`conventions.md`](./conventions.md): `design-init` copies its marked block into the
+`readmeHeader`, and `design-refresh` brings it up to date after a plugin update.
 
 ## Side-by-side modes and the navbar in the design provider
 

@@ -1,6 +1,6 @@
 ---
 name: design-refresh
-description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, adds a named page or fixes a mockup that differs from the real page, and brings the project's copies of the plugin's files (palette.ts, the navbar, the palette and Tailwind cards) up to a newer plugin version. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, after updating the design plugin, or asks to add, mock or fix a page or screen in Claude Design."
+description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, adds a named page or fixes a mockup that differs from the real page, and brings the project's copies of the plugin's files (palette.ts, the proposal conventions, the navbar, the palette and Tailwind cards) up to a newer plugin version. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, after updating the design plugin, or asks to add, mock or fix a page or screen in Claude Design."
 ---
 
 # Design Refresh
@@ -47,7 +47,8 @@ them the project has never been synced: point at `design-init`, then a first `/d
 
    - **Screens.** For each `screens[]` row, recompute `sourceHash` (screens.md): a different
      value means its mockup is stale.
-   - **Plugin files** (`palette.ts`, the navbar, the palette and Tailwind cards): run
+   - **Plugin files** (`palette.ts`, the conventions in the readme header, the navbar, the
+     palette and Tailwind cards): run
      `node ${CLAUDE_SKILL_DIR}/scripts/plugin-files.mjs check`
      ([`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#check)). Exit 1 means
      step 3 applies; exit 3, an older plugin here than the project's: say so and skip step 3.
@@ -82,9 +83,10 @@ them the project has never been synced: point at `design-init`, then a first `/d
    didn't change) may you go on to steps 3–4 first; say so.
 
 3. **Plugin files** (when the check asked for an update). Follow
-   [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#update): `palette.ts`, then
-   the navbar, palette card and Tailwind card in Claude Design (asking before replacing each),
-   then stamp the manifest. None needs a sync.
+   [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#update): `palette.ts`, the
+   conventions, then the navbar, palette card and Tailwind card in Claude Design (asking before
+   replacing each), then stamp the manifest. Only the conventions need a sync, to publish them:
+   update them before handing the sync to the user (step 2), so one sync carries both.
 
    **3b. Navbar tag on the cards** (when the step 1 check listed cards). On a current build,
    run `node ${CLAUDE_SKILL_DIR}/scripts/nav-tag.mjs ds-bundle --fix`, then upload the changed
@@ -107,7 +109,8 @@ them the project has never been synced: point at `design-init`, then a first `/d
    next time, so the user adds screens as they start working on them.
 
 6. **Report**: whether the components are current (or waiting on `/design-sync`), the plugin
-   files updated or kept (and whether the cards load the navbar),
+   files updated or kept (whether the cards load the navbar, and that changed conventions reach
+   Claude Design with the next `/design-sync`),
    the screens rebuilt or added, anything blocked, and the project link
    (`https://claude.ai/design/p/<designProjectId>`).
 
