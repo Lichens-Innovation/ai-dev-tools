@@ -12,14 +12,17 @@
 // Palette footer: tweaks the palette inputs live on any card. It reads the inputs and the palette engine from the
 // project's Palette.dc.html, keeps the changes as a per-project draft and turns them into a request to paste in
 // Claude Design's chat. window.designNav.palette is the drafted inputs; setPalette(inputs) replaces them and a
-// 'design-nav:palette' event ({ detail: { inputs } }) follows each change. The palette card shares the draft.
+// 'design-nav:palette' event ({ detail: { inputs, tokens } }) follows each change. The palette card shares the draft.
+// The footer also edits the values of the card's hand-authored tokens (spacing, type…, the same in both modes):
+// window.designNav.tokens is the drafted { name: value }, setTokens(tokens) replaces them. Breakpoints are read only:
+// media queries cannot read var(), so a live value would show nothing.
 // window.designNav.engine is that palette engine (null until Palette.dc.html is read) and .namespace the card's Tailwind
 // namespace: the Tailwind card (Tailwind.html) lists its classes from them.
 (() => {
   if (window.designNav) return;
   const script = document.currentScript;
   const root = new URL('./', script ? script.src : location.href);
-  const KEY = 'design-nav', DRAFT = 'design-nav:palette', PALETTE = 'Palette.dc.html', TAILWIND = 'Tailwind.html', SCREENS = 'screens/index.json', BAR = 56, SIDE = 280, WIDE = 900;
+  const KEY = 'design-nav', DRAFT = 'design-nav:palette', TDRAFT = 'design-nav:tokens', PALETTE = 'Palette.dc.html', TAILWIND = 'Tailwind.html', SCREENS = 'screens/index.json', BAR = 56, SIDE = 280, WIDE = 900;
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
   const save = o => { try { localStorage.setItem(KEY, JSON.stringify({ ...load(), ...o })); } catch {} };
   const saved = load();
@@ -43,7 +46,9 @@
     get palette() { return P.base ? merged() : null; },
     get engine() { return P.base ? P.eng : null; },
     get namespace() { return P.ns; },
-    setPalette(inputs) { if (P.base && inputs) setDraft(diff(inputs)); }
+    setPalette(inputs) { if (P.base && inputs) setDraft(diff(inputs)); },
+    get tokens() { return P.base ? mergedTokens() : null; },
+    setTokens(tokens) { if (P.base && tokens) setTokenDraft(tdiff(tokens)); }
   };
   window.dispatchEvent(new CustomEvent('design-nav:mode', { detail: { mode: state.mode } }));
 
@@ -124,6 +129,9 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
 .dn-row button{flex:none;width:24px;height:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--text-muted,#6b7280);font-size:16px;line-height:1;cursor:pointer;visibility:hidden}
 .dn-row[data-changed] button{visibility:visible}
 .dn-row button:hover{background:var(--bg-hover,#f3f4f6);color:inherit}
+.dn-row.dn-tok label{flex:0 1 auto;max-width:55%}
+.dn-row.dn-tok input[type=text]{flex:1 1 0;width:auto;min-width:0}
+.dn-row.dn-tok input[type=text]:disabled{opacity:.6;cursor:not-allowed}
 .dn-req{display:block;width:100%;margin-top:6px;padding:8px;border:1px solid var(--border,#e5e7eb);border-radius:8px;background:var(--bg-inset,#f9fafb);color:inherit;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
 @media (max-width:640px){.dn-foot-status{display:none}.dn-foot-head{justify-content:flex-end}.dn-foot-toggle{margin-right:auto}}`;
 
@@ -164,8 +172,9 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
   function toggleSide() { state.open = !state.open; if (wide()) save({ open: state.open }); layout(); render(); }
 
   // Palette footer. P.base: the inputs saved in Palette.dc.html ({ name: { lm, dm } }); P.draft: the changes to them
-  // ({ name: { lm?, dm? } }, null for a removed input), kept per project in localStorage.
-  const P = { eng: null, base: null, ns: '', draft: {}, open: saved.palette === true, rows: new Map(), queued: false };
+  // ({ name: { lm?, dm? } }, null for a removed input), kept per project in localStorage. P.tbase: the saved
+  // hand-authored token values ({ name: value }); P.tdraft: the changed ones.
+  const P = { eng: null, base: null, ns: '', draft: {}, tbase: {}, tdraft: {}, open: saved.palette === true, rows: new Map(), trows: new Map(), queued: false };
   const norm = h => { h = String(h || '').trim().toLowerCase(); if (/^#[0-9a-f]{3}$/.test(h)) h = '#' + [...h.slice(1)].map(c => c + c).join(''); return h; };
   const isHex = h => /^#[0-9a-f]{6}$/.test(norm(h));
   const mk = () => state.mode === 'dark' ? 'dm' : 'lm';
@@ -191,6 +200,21 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     try { Object.keys(d).length ? localStorage.setItem(DRAFT, JSON.stringify(d)) : localStorage.removeItem(DRAFT); } catch {}
     paletteChanged();
   }
+  const isBreakpoint = n => n.startsWith('breakpoint-');
+  const validToken = v => typeof v === 'string' && v.trim() !== '' && !/[;{}]/.test(v);
+  const mergedTokens = () => ({ ...P.tbase, ...P.tdraft });
+  function tdiff(tokens) {
+    const d = {};
+    Object.keys(P.tbase).forEach(n => { const v = tokens[n]; if (!isBreakpoint(n) && validToken(v) && v.trim() !== P.tbase[n]) d[n] = v.trim(); });
+    return d;
+  }
+  function setTokenDraft(d) {
+    if (JSON.stringify(d) === JSON.stringify(P.tdraft)) return;
+    P.tdraft = d;
+    try { Object.keys(d).length ? localStorage.setItem(TDRAFT, JSON.stringify(d)) : localStorage.removeItem(TDRAFT); } catch {}
+    paletteChanged();
+  }
+  function setToken(n, v) { if (validToken(v)) setTokenDraft(tdiff({ ...mergedTokens(), [n]: v })); }
   function setInput(n, m, hex) { const o = merged(); if (!o[n] || !isHex(hex)) return; o[n][m] = norm(hex); setDraft(diff(o)); }
   function paletteChanged() {
     if (P.queued) return;
@@ -198,27 +222,29 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     requestAnimationFrame(() => {
       P.queued = false;
       applyPalette(); updateFoot();
-      window.dispatchEvent(new CustomEvent('design-nav:palette', { detail: { inputs: merged() } }));
+      window.dispatchEvent(new CustomEvent('design-nav:palette', { detail: { inputs: merged(), tokens: mergedTokens() } }));
     });
   }
-  // The palette card themes itself from the same draft; every other page gets the regenerated tokens here, after the
-  // project's own stylesheets.
+  // The palette card themes itself from the same draft; every other page gets the regenerated tokens and the drafted
+  // token values here, after the project's own stylesheets.
   function applyPalette() {
     let st = document.getElementById('design-nav-palette');
-    const own = here !== PALETTE && Object.keys(P.draft).length > 0;
-    if (!own) { if (st) st.textContent = ''; return; }
+    const colors = Object.keys(P.draft).length > 0, tokens = Object.entries(P.tdraft);
+    if (here === PALETTE || (!colors && !tokens.length)) { if (st) st.textContent = ''; return; }
     if (!st) st = el('style', { id: 'design-nav-palette' });
     const p = P.eng.fromInputs(merged());
-    st.textContent = P.eng.buildWebCss(p) + '\n' + P.eng.buildSchemeCss(p);
+    st.textContent = (colors ? P.eng.buildWebCss(p) + '\n' + P.eng.buildSchemeCss(p) + '\n' : '') +
+      (tokens.length ? ':root {\n' + tokens.map(([n, v]) => '  --' + n + ': ' + v + ';').join('\n') + '\n}' : '');
     document.head.append(st);
   }
   function changes() {
     const mode = m => m === 'lm' ? 'light' : 'dark';
     return Object.entries(P.draft).flatMap(([n, v]) => v === null ? ['- remove the ' + n + ' input']
       : !P.base[n] ? ['- add a ' + n + ' input: light ' + v.lm + ', dark ' + v.dm]
-      : Object.entries(v).map(([m, hex]) => '- ' + n + ', ' + mode(m) + ' mode: ' + P.base[n][m] + ' → ' + hex));
+      : Object.entries(v).map(([m, hex]) => '- ' + n + ', ' + mode(m) + ' mode: ' + P.base[n][m] + ' → ' + hex))
+      .concat(Object.entries(P.tdraft).map(([n, v]) => '- token ' + n + ': ' + P.tbase[n] + ' → ' + v));
   }
-  const request = () => ['Update the palette in Palette.dc.html: change these values in the default of its `inputs` prop (data-props) and leave the rest of the file as is.', ...changes()].join('\n');
+  const request = () => ['Update the palette in Palette.dc.html: change these values in the default of its `inputs` prop (colors) and of its `tokens` prop (token values), both in data-props, and leave the rest of the file as is.', ...changes()].join('\n');
   function copyRequest(btn) {
     const text = request(), req = foot.querySelector('.dn-req');
     const done = () => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy request'; }, 2000); };
@@ -247,17 +273,38 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       const row = el('div', { className: 'dn-row' }, [color, el('label', { htmlFor: id, textContent: label[n] || n, title: '--' + n + '-' + mk() }), text, reset]);
       P.rows.set(n, { row, color, text });
       return row;
-    }))]));
+    }))]), ...tokenRows());
+  }
+  // Hand-authored tokens: one text field per value, the same in both modes. Breakpoints are shown read only.
+  function tokenRows() {
+    const t = mergedTokens(), names = Object.keys(t);
+    P.trows = new Map();
+    if (!names.length) return [];
+    return [el('div', { className: 'dn-group', textContent: 'Tokens · both modes', style: 'padding:12px 0 6px' }), el('div', { className: 'dn-rows' }, names.map(n => {
+      const id = 'dn-tok-' + n, bp = isBreakpoint(n);
+      const text = el('input', { type: 'text', id, spellcheck: false, disabled: bp, ariaLabel: n + ' value',
+        title: bp ? 'Media queries cannot read var(): edit it in the inputs file' : '--' + n,
+        oninput: e => setToken(n, e.target.value), onblur: () => updateFoot() });
+      const reset = el('button', { type: 'button', textContent: '×', title: 'Back to the saved value', ariaLabel: 'Reset ' + n, onclick: () => setToken(n, P.tbase[n]) });
+      const row = el('div', { className: 'dn-row dn-tok' }, [el('label', { htmlFor: id, textContent: n, title: '--' + n }), text, reset]);
+      P.trows.set(n, { row, text });
+      return row;
+    }))];
   }
   function updateFoot() {
     if (!foot) return;
     const o = merged(), m = mk(), n = changes().length;
-    if (Object.keys(o).join() !== [...P.rows.keys()].join()) buildRows();
+    if (Object.keys(o).join() !== [...P.rows.keys()].join() || Object.keys(P.tbase).join() !== [...P.trows.keys()].join()) buildRows();
     P.rows.forEach((r, name) => {
       const v = norm(o[name][m]);
       if (document.activeElement !== r.text) r.text.value = v;
       if (document.activeElement !== r.color) r.color.value = v;
       r.row.toggleAttribute('data-changed', !!(P.draft[name] && P.draft[name][m]) || !P.base[name]);
+    });
+    const t = mergedTokens();
+    P.trows.forEach((r, name) => {
+      if (document.activeElement !== r.text) r.text.value = t[name];
+      r.row.toggleAttribute('data-changed', name in P.tdraft);
     });
     const fails = P.eng.runAudit(P.eng.fromInputs(o)).filter(c => !c.pass && c.level === 'fail');
     const status = foot.querySelector('.dn-foot-status');
@@ -275,10 +322,10 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     toggle.setAttribute('aria-expanded', String(P.open));
     const copy = el('button', { className: 'dn-btn dn-primary', type: 'button', textContent: 'Copy request', title: 'Copy a request to paste in Claude Design\'s chat', onclick: () => copyRequest(copy) });
     copy.dataset.needsChanges = '';
-    const resetAll = el('button', { className: 'dn-btn', type: 'button', textContent: 'Reset', title: 'Back to the colors saved in Palette.dc.html', onclick: () => setDraft({}) });
+    const resetAll = el('button', { className: 'dn-btn', type: 'button', textContent: 'Reset', title: 'Back to the colors and tokens saved in Palette.dc.html', onclick: () => { setDraft({}); setTokenDraft({}); } });
     resetAll.dataset.needsChanges = '';
     const note = el('p', { className: 'dn-foot-note' });
-    note.innerHTML = 'Editing the <b class="dn-foot-mode"></b> mode value of each input; the navbar switch picks the mode. Changes stay in this browser until Palette.dc.html is updated: copy the request, paste it in Claude Design\'s chat, then run <code>design-loop</code> in the repo.';
+    note.innerHTML = 'Editing the <b class="dn-foot-mode"></b> mode value of each input (the navbar switch picks the mode); token values apply to both modes. Changes stay in this browser until Palette.dc.html is updated: copy the request, paste it in Claude Design\'s chat, then run <code>design-loop</code> in the repo.';
     foot = el('section', { className: 'dn-foot', ariaLabel: 'Palette' }, [
       el('div', { className: 'dn-foot-head' }, [toggle, el('div', { className: 'dn-foot-status' }), resetAll, copy]),
       el('div', { className: 'dn-foot-body' }, [el('div', { className: 'dn-foot-rows' }), note, el('textarea', { className: 'dn-req', readOnly: true, rows: 3, ariaLabel: 'Request for Claude Design' })])
@@ -298,9 +345,13 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       if (end < 0) return;
       const eng = new Function(code.slice(0, end) + '\nreturn { BRAND, fromInputs, buildWebCss, buildSchemeCss, runAudit, hasInputs, families, tokensFor, resolver, namespacedNames };')();
       if (!eng.hasInputs(inputs)) return;
+      const tokens = props.tokens && props.tokens.default;
       P.eng = eng; P.base = inputs; P.ns = (props.namespace && props.namespace.default) || '';
+      P.tbase = tokens && typeof tokens === 'object' && !Array.isArray(tokens) ? tokens : {};
       try { const d = JSON.parse(localStorage.getItem(DRAFT)); if (d && typeof d === 'object' && !Array.isArray(d)) P.draft = d; } catch {}
+      try { const d = JSON.parse(localStorage.getItem(TDRAFT)); if (d && typeof d === 'object' && !Array.isArray(d)) P.tdraft = d; } catch {}
       P.draft = diff(merged()); // drops the changes Palette.dc.html already has
+      P.tdraft = tdiff(mergedTokens());
       mountFoot(); paletteChanged();
     }).catch(() => {});
   }

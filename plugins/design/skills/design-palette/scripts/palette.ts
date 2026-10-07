@@ -271,11 +271,24 @@ function readCardProps(html: string): CardProps {
 }
 function writeCardProps(html: string, props: CardProps) { return html.replace(/data-props="[^"]*"/, 'data-props="' + esc(JSON.stringify(props)) + '"'); }
 function cardInputs(html: string) { return (readCardProps(html).inputs?.default ?? null) as Inputs | null; }
-function withCardInputs(html: string, inputs: Inputs, title?: string, ns?: string) {
+// The card's hand-authored token values ({ "spacing-md": "1em" }): it edits the values of the inputs file's tokens, never
+// their names, since components compile against them.
+type Tokens = Record<string, string>;
+function cardTokens(html: string) { return (readCardProps(html).tokens?.default ?? null) as Tokens | null; }
+const badToken = (v: unknown) => typeof v !== 'string' || !v.trim() || /[;{}]/.test(v);
+const applyTokens = (extras: Extra[], t: Tokens) => extras.map(([n, v]): Extra => [n, t[n] === undefined ? v : t[n].replace(/\s+/g, ' ').trim()]);
+function diffTokens(from: Extra[], to: Tokens) {
+  const out: string[] = [], names = new Set(from.map(([n]) => n));
+  applyTokens(from, to).forEach(([n, v], i) => { if (v !== from[i][1]) out.push('~ --' + n + '  ' + from[i][1] + ' -> ' + v); });
+  Object.keys(to).filter(n => !names.has(n)).forEach(n => out.push('? --' + n + ' is not in the inputs file: ignored (add it there first)'));
+  return out;
+}
+function withCardInputs(html: string, inputs: Inputs, title?: string, ns?: string, tokens?: Tokens) {
   const props = readCardProps(html);
   if (title) props.title = { editor: 'text', default: title, tsType: 'string' };
   if (ns) props.namespace = { editor: null, default: ns, tsType: 'string' };
   props.inputs = { editor: null, default: inputs, tsType: 'Record<string, { lm: string; dm: string }> | null' };
+  if (tokens) props.tokens = { editor: null, default: Object.keys(tokens).length ? tokens : null, tsType: 'Record<string, string> | null' };
   if (props.preset) props.preset.default = 'project';
   return writeCardProps(html, props);
 }
@@ -292,6 +305,12 @@ function withInputs(css: string, o: Inputs) {
   if (!add.length) return out;
   const i = out.lastIndexOf('}');
   return out.slice(0, i) + add.join('\n') + '\n' + out.slice(i);
+}
+// Rewrites the hand-authored token values of an inputs file in place, keeping its comments and order.
+function withTokens(css: string, extras: Extra[]) {
+  const v = Object.fromEntries(extras);
+  return css.replace(/^([ \t]*--([a-z][a-z0-9-]*)\s*:\s*)([^;{}]+?)(\s*;)/gm, (line: string, head: string, n: string, _old: string, tail: string) =>
+    n in v && !/-(lm|dm)$/.test(n) ? head + v[n] + tail : line);
 }
 function diffInputs(from: Partial<Inputs>, to: Partial<Inputs>) {
   const out: string[] = [];
@@ -331,9 +350,11 @@ const USAGE = [
   '  --json <file>         write every token resolved to a hex per mode, for code that cannot read CSS variables',
   '  --sass <file>         write Sass names for every token ($text-muted: var(--text-muted)) and the breakpoints as',
   '                        literal values with an mq() mixin, for Sass projects (load the theme CSS too)',
-  '  --to-card <card>      write the inputs into the Claude Design palette card (data-props "inputs")',
-  '  --from-card <card>    take the inputs from the palette card (prints the diff), write them into <inputs.css>, then generate',
-  '  --diff-card <card>    print the input diff between <inputs.css> and the card, write nothing',
+  '  --to-card <card>      write the inputs and hand-authored token values into the Claude Design palette card',
+  '                        (data-props "inputs" and "tokens")',
+  '  --from-card <card>    take the inputs and token values from the palette card (prints the diff), write them into',
+  '                        <inputs.css>, then generate. Token names the inputs file lacks are ignored',
+  '  --diff-card <card>    print the input and token diff between <inputs.css> and the card, write nothing',
   '  --thumbnail <file>    write the Claude Design project thumbnail (primary + status strip)',
   '  --title <name>        project name for --to-card and --thumbnail (default: the --from-card card\'s title)',
   '  --audit-only          print the contrast audit, write nothing',
@@ -369,11 +390,11 @@ if (isMain) {
 
   try {
     let inputs = readThemeInputs(read(input));
-    const extras = readExtras(read(input));
+    let extras = readExtras(read(input));
     if (diffCard) {
-      const ci = cardInputs(read(diffCard));
+      const html = read(diffCard), ci = cardInputs(html), ct = cardTokens(html);
       if (!ci) { console.log('card has no inputs yet'); process.exit(0); }
-      const d = diffInputs(inputs, ci);
+      const d = [...diffInputs(inputs, ci), ...(ct ? diffTokens(extras, ct) : [])];
       console.log(d.length ? 'theme -> card differences:\n' + d.join('\n') : 'theme and card inputs match');
       process.exit(0);
     }
@@ -384,6 +405,14 @@ if (isMain) {
       const d = diffInputs(inputs, ci);
       console.log(d.length ? 'applying card inputs:\n' + d.join('\n') : 'card inputs already match the theme');
       inputs = mapObj(ci, v => ({ lm: v.lm && normHex(v.lm), dm: v.dm && normHex(v.dm) }));
+      const ct = cardTokens(html);
+      if (ct) {
+        const bad = Object.keys(ct).filter(n => badToken(ct[n]));
+        if (bad.length) fail('the palette card has invalid token values (empty, or with ; { }): --' + bad.join(', --'));
+        const td = diffTokens(extras, ct);
+        console.log(td.length ? 'applying card tokens:\n' + td.join('\n') : 'card tokens already match the inputs file');
+        extras = applyTokens(extras, ct);
+      }
     }
     requireInputs(inputs, fromCard ? fromCard : input);
     const p = fromInputs(inputs);
@@ -391,7 +420,7 @@ if (isMain) {
     if (clash.length) fail(clash.join(', ') + ' in ' + input + (clash.length > 1 ? ' are' : ' is') + ' generated: rename (hand-authored tokens use Tailwind names: --spacing-md, --text-lg, --breakpoint-sm)');
 
     if (!has('--audit-only')) {
-      if (fromCard && theme !== input && mobile !== input) { fs.writeFileSync(input, withInputs(read(input), toInputs(p))); console.log('wrote the card inputs into ' + input); }
+      if (fromCard && theme !== input && mobile !== input) { fs.writeFileSync(input, withTokens(withInputs(read(input), toInputs(p)), extras)); console.log('wrote the card inputs and tokens into ' + input); }
       if (theme) {
         const css = theme === input ? buildWebCss(p, extras) : buildWebCss(p, extras, input).replace(/^\/\*[^]*?\*\//, '/* Generated by design-palette/scripts/palette.ts from ' + input + '. Do not edit: change the inputs there and re-run.\n   Plain values and var() only, so web and React Native (NativeWind) can share this file. */');
         fs.writeFileSync(theme, css + (scheme === theme ? '\n\n' + buildSchemeCss(p) : '') + '\n'); console.log('wrote ' + theme + (scheme === theme ? ' (theme + scheme)' : ' (theme)'));
@@ -405,7 +434,7 @@ if (isMain) {
       }
       if (json) { fs.writeFileSync(json, buildJson(p) + '\n'); console.log('wrote ' + json + ' (json)'); }
       if (sass) { fs.writeFileSync(sass, buildSass(p, extras, input) + '\n'); console.log('wrote ' + sass + ' (sass, ' + extras.length + ' hand-authored)'); }
-      if (toCard) { fs.writeFileSync(toCard, withCardInputs(read(toCard), toInputs(p), title, ns)); console.log('wrote inputs into ' + toCard); }
+      if (toCard) { fs.writeFileSync(toCard, withCardInputs(read(toCard), toInputs(p), title, ns, Object.fromEntries(extras))); console.log('wrote inputs' + (extras.length ? ' and ' + extras.length + ' tokens' : '') + ' into ' + toCard); }
       const thumb = opt('--thumbnail');
       if (thumb) { fs.writeFileSync(thumb, buildThumbnail(p, title)); console.log('wrote ' + thumb + ' (thumbnail)'); }
       if (!theme && !scheme && !mobile && !json && !sass && !toCard && !thumb) console.log('nothing written: pass --web, --theme <file>, --scheme <file>, --mobile <file>, --json <file>, --sass <file>, --to-card <card> or --thumbnail <file>');
@@ -416,4 +445,4 @@ if (isMain) {
   } catch (e) { fail((e as Error).message); }
 }
 
-export { readExtras, buildSass, namespacedNames, buildThumbnail, readThemeInputs, withInputs, fromInputs, toInputs, buildWebCss, buildSchemeCss, buildTailwindCss, buildJson, runAudit, diffInputs, withCardInputs, cardInputs };
+export { readExtras, buildSass, namespacedNames, buildThumbnail, readThemeInputs, withInputs, fromInputs, toInputs, buildWebCss, buildSchemeCss, buildTailwindCss, buildJson, runAudit, diffInputs, withCardInputs, cardInputs, cardTokens, diffTokens, applyTokens, withTokens };
