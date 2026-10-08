@@ -109,4 +109,6 @@ footer can re-theme a screen live. The sidebar lists the screens under **Pages**
 
 Claude Design reloads the file in its URL after each change (usually `Palette.dc.html`), not the
 page the navbar led to. The navbar remembers that page per browser tab and goes back to it; a file
-picked in Claude Design's file list replaces it.
+picked in Claude Design's file list replaces it. The browser's back and forward buttons and links
+inside a card never redirect. Picking the same file again in the file list looks like a reload: use
+the navbar to get back to it.
