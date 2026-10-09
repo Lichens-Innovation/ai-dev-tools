@@ -1,11 +1,20 @@
 ---
 name: design-refresh
-description: "The one skill for updating Claude Design from the code: checks whether the synced components are behind their code, rebuilds stale screen mockups, offers screens that have no mockup yet, adds a named page or fixes a mockup that differs from the real page, and brings the project's copies of the plugin's files (palette.ts, the proposal conventions, the navbar, the palette and Tailwind cards) up to a newer plugin version. Use when the user wants Claude Design refreshed or up to date before designing, after design-loop applied changes, after updating the design plugin, or asks to add, mock or fix a page or screen in Claude Design."
+description: "The one skill for updating the design backend from the code: checks whether the references (Claude Design's synced components, or the local studio's captured pages) are behind their code, rebuilds stale screen mockups or re-captures them, offers screens that have no mockup yet, adds a named page or fixes a mockup that differs from the real page, and brings the project's copies of the plugin's files (palette.ts, and for Claude Design the proposal conventions, the navbar, the palette and Tailwind cards) up to a newer plugin version. Use when the user wants Claude Design or the local design studio refreshed or up to date before designing, after design-loop applied changes, after updating the design plugin, or asks to add, mock, capture or fix a page or screen."
 ---
 
 # Design Refresh
 
-One entry point to make Claude Design match the repo: the synced components (through
+One entry point to make the design backend match the repo. The manifest's `backend` (missing means
+`claude-design`) decides how: this skill calls the **Check references** and **Refresh references**
+operations of contract §8, done as the backend's doc says
+([`claude-design.md`](${CLAUDE_SKILL_DIR}/../../references/backends/claude-design.md),
+[`local.md`](${CLAUDE_SKILL_DIR}/../../references/backends/local.md)); read the one that applies.
+For the local studio that is `local-backend.mjs check` and re-capturing with `capture.mjs`: no
+`/design-sync`, no uploads, and the steps below that only concern Claude Design (the navbar tag,
+the plugin files other than `palette.ts`, `ds-bundle/`) do not apply.
+
+For Claude Design: the synced components (through
 `/design-sync`, run by the user), the screen mockups (through
 [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md)) and the project's
 copies of the plugin's own files (through [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md)). Cheap when nothing
@@ -23,12 +32,15 @@ hands it to the user, and does the rest.
 
 ## Preconditions
 
-`design.manifest.json` exists and `.design-sync/config.json` has `projectId` and `pkg`. Without
-them the project has never been synced: point at `design-init`, then a first `/design-sync`.
+`design.manifest.json` exists. Claude Design: `.design-sync/config.json` has `projectId` and `pkg`;
+without them the project has never been synced: point at `design-init`, then a first
+`/design-sync`. Local: the studio's `design/` folder exists and the Storybook (or app) to capture
+from is running; start it only if the user asks.
 
 ## Workflow
 
-1. **What is stale.**
+1. **What is stale** (**Check references**; for the local backend run `local-backend.mjs check`
+   and read its states, then go to step 4 for what to re-capture).
    - **Components.** They are current when all of these hold:
      - the local `ds-bundle/_ds_sync.json` exists and its `bundleSha12` equals the project's
        (`DesignSync get_file _ds_sync.json`): the last build is the one uploaded;
@@ -96,7 +108,10 @@ them the project has never been synced: point at `design-init`, then a first `/d
    down, so comparison sheets made without it may differ slightly in framing: re-grade with it
    on if a grade matters.
 
-4. **Screens.** Follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
+4. **Screens** (local backend: **Refresh references** for components and screens, by re-capturing
+   as `local.md` says; a screen is added with `capture.mjs screen` on a running app, after warning
+   that the snapshot holds the app's dev data, see `local-studio.md#sample-data`. Then skip to
+   step 6). Claude Design: follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
    with `<screenshot.mjs>` = `${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`: refresh
    mode for the stale rows, one run for all of them. When the user named a page ("add the Home
    page") or said a mockup doesn't match the real page, run add mode or fix mode for those screens

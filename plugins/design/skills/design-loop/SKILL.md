@@ -1,12 +1,12 @@
 ---
 name: design-loop
-description: "Runs the Claude Design -> React implementation loop: takes an approved component or screen proposal (or the palette card) from a Claude Design project, implements it in the mapped component or screen using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component, a screen (or the palette) is ready to implement, or wants to run the design loop."
+description: "Runs the design -> React implementation loop: takes an approved component or screen proposal (or the palette) from the project's design backend (Claude Design, or the local design studio), implements it in the mapped component or screen using the canonical CSS tokens, converges via Playwright screenshots + Storybook MCP tests, and publishes to Chromatic. Use when the user says a component, a screen (or the palette) is ready to implement, or wants to run the design loop."
 disable-model-invocation: true
 ---
 
 # Design Loop
 
-The runtime skill. Turns an **approved** Claude Design target into implemented, validated React
+The runtime skill. Turns an **approved** design target into implemented, validated React
 code. Assumes the project was already set up with `design-init`.
 
 ## Shared contract
@@ -18,15 +18,24 @@ depends on. Do not re-derive them here. Components change through proposals:
 of their mockup: [`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md). Below,
 "component" also means a screen (a `screens[]` row) unless a step says otherwise.
 
+## Backend
+
+The manifest's `backend` (`node <manifest.mjs> items` prints it; missing means `claude-design`)
+says where the design lives. This skill never touches that store itself: it calls the **backend
+operations** of contract §8 (**List targets**, **Fetch target**, **Stage render**), each done as
+the backend's doc says: [`claude-design.md`](${CLAUDE_SKILL_DIR}/../../references/backends/claude-design.md)
+or [`local.md`](${CLAUDE_SKILL_DIR}/../../references/backends/local.md). Read the one that applies
+before step 1.
+
 ## Tools this skill drives
 
 | Purpose                              | Mechanism                                            |
 | ------------------------------------ | ---------------------------------------------------- |
 | Read approved set + write back state | `scripts/manifest.mjs` on `design.manifest.json`     |
-| Read design target                   | `DesignSync get_file` (`proposalPath`, palette card) |
+| List and read design targets         | the backend's operations: List targets, Fetch target |
 | Read component API                   | Storybook MCP `docs-show`                            |
 | Which stories changed                | Storybook MCP `stories-changed`                      |
-| Render for comparison                | `scripts/screenshot.mjs` (Playwright)                |
+| Render for comparison                | Stage render, then `scripts/screenshot.mjs` (Playwright) |
 | Validate                             | Storybook MCP `test-run`                             |
 | Publish                              | `chromatic` per target                               |
 | Track work                           | `TaskCreate` / `TaskUpdate` (one task per component) |
@@ -40,7 +49,7 @@ server `storybook`). Below, `<url>` and "the target's MCP" always mean that reso
 
 ## Preconditions
 
-Verify contract §6. Concretely: `design.manifest.json` exists at the repo root; for every target
+Verify contract §6 (for the project's backend). Concretely: `design.manifest.json` exists at the repo root; for every target
 used by a stale approved component (not a screen), Storybook is running (its `runCommand`, reachable at its
 `url`) and its MCP server is reachable; Playwright is installed; Chromatic is wired (unless the target has no `chromatic` script: the
 user declined it). If any is missing, **stop** and point the user at `design-init` rather than
@@ -67,9 +76,10 @@ Storybook wasn't running when the session connected. Tell the user to start it a
   [`plugin-files.md`](${CLAUDE_SKILL_DIR}/../design-refresh/references/plugin-files.md#update)
   before implementing, so the palette runs the plugin's `palette.ts` and the cards its code.
   Exit 3 (an older plugin here): tell the user to update the plugin and stop until they do or
-  say to go on. Then a quick staleness check, as `design-refresh`
-  step 1 does for components: if the code changed since the last sync, say so and suggest
-  `/design-sync` (only the user can start it). It is not required to implement already-approved proposals, but
+  say to go on. Then a quick **Check references** (the backend operation, as `design-refresh`
+  step 1 does): if the code changed since the references were made, say so and suggest the
+  refresh (`/design-sync` for Claude Design, which only the user can start; a re-capture for the
+  local studio). It is not required to implement already-approved proposals, but
   the user should refresh before designing the next change.
 
 ### 1. Select the work (read manifest, drift check, approval)
@@ -77,20 +87,18 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 `<manifest.mjs>` below is `${CLAUDE_SKILL_DIR}/scripts/manifest.mjs`: it reads and edits
 `design.manifest.json` so you don't rewrite the JSON yourself.
 
-1. Run `node <manifest.mjs> items`. It prints `designProjectId`, `reconcileRule` and one item per
-   component, screen (`screens[]`) and the palette (contract §2: one more item with the same
-   fields), each with its `status`, the `path` to fetch and its `lastImplementedHash`.
-2. **Candidates**: every `approved` item, plus every `wip` item that has a `path` and whose file
-   exists in the Design project (one `DesignSync list_files` of `proposals/`, plus the card for
-   the palette; skip the others, they have no proposal yet).
-3. For each candidate, determine **drift**: `DesignSync get_file` on its `path` (the proposal;
-   for the palette, its card), write the exact returned bytes to
-   `/tmp/design-loop/<name>.target.html`, and hash it with `node <manifest.mjs> hash <file>`.
+1. Run `node <manifest.mjs> items`. It prints `backend`, `designProjectId`, `reconcileRule` and one
+   item per component, screen (`screens[]`) and the palette (contract §2: one more item with the
+   same fields), each with its `status`, the `path` to fetch and its `lastImplementedHash`.
+2. **List targets** (backend operation). **Candidates**: every `approved` item, plus every `wip`
+   item whose proposal exists (the others have no proposal yet).
+3. For each candidate, determine **drift** with **Fetch target**: the target bytes at
+   `/tmp/design-loop/<name>.target.html` and their hash.
 
    An item is **stale** (needs work) when this hash differs from `lastImplementedHash` (including
    when it is `null`). Skip items whose hash matches: they're already implemented from the current
    target. An approved item whose proposal does not exist has nothing to implement: report it and
-   skip it. Never read its synced card (`designPath`) as a target; it only mirrors the code.
+   skip it. Never read a component's reference (`designPath`) as a target; it only mirrors the code.
 4. **Approval** (the first time only). Stale `wip` items are not approved yet:
    - Items the user named in the request ("implement Button") are approved by that: no question.
    - For the others, ask once with `AskUserQuestion` (multi-select, with a "Not now" option; name
@@ -109,7 +117,7 @@ Storybook wasn't running when the session connected. Tell the user to start it a
 
 Every component consumes its tokens, so the palette's task (step 2) runs **before** the
 components. For the palette item (diff, regenerate, converge all targets, upload the thumbnail),
-read [`references/palette-item.md`](references/palette-item.md); it does not touch the card.
+read [`references/palette-item.md`](references/palette-item.md); it never writes back the card.
 
 ### 2. Open the execution ledger
 
@@ -118,9 +126,13 @@ task = component, no per-substep subtasks). Then process each task: set it `in_p
 
 ### 3. Read the target
 
-You already fetched it in step 1 (`/tmp/design-loop/<name>.target.html`). A proposal renders the
-**synced** component (the current code) and applies the change on top, as page-local CSS
-overrides and/or props. The change is exactly those overrides and props:
+You already fetched it in step 1 (`/tmp/design-loop/<name>.target.html`). A proposal is the
+reference (the current code) plus a change, and the change is exactly the difference. How it is
+written depends on the backend: the list below is for a Claude Design proposal (page-local CSS
+overrides and props on the synced component); for the local studio, the data-studio rules and the
+DOM differences against the reference, read as in
+[`local-studio.md`](${CLAUDE_SKILL_DIR}/../../references/local-studio.md#reading-a-proposal-design-loop-step-3).
+In both cases:
 
 - List each override: its selector, what it matches in the synced component (the compiled
   classes come from `localPath`, e.g. `bg-button-surface` → the primary variant) and its values.
@@ -129,15 +141,13 @@ overrides and/or props. The change is exactly those overrides and props:
 - Look at both modes: proposals show a light and a dark panel. A change that only looks right in
   one mode is a finding to raise, not to guess.
 - For a screen, the change is the difference between the proposal and the mockup
-  (`DesignSync get_file` its `mockupPath` too, into `/tmp/design-loop/<name>.mockup.html`): list
+  (Fetch target also left it at `/tmp/design-loop/<name>.mockup.html`): list
   what moved, what was added or removed, the layout (flex or grid, gaps, widths) and the tokens,
   per state. The data is illustrative: implement layout and styling, never data. A mockup whose
   hash is not the row's `mockupHash` was rebuilt or edited since: say so before diffing.
 
-Stage the render for step 7: copy the local `/design sync` output folder (`ds-bundle/`) to
-`/tmp/design-loop/project/`, check its `_ds_sync.json` `bundleSha12` against the project's
-(`DesignSync get_file _ds_sync.json`; a mismatch means run `/design sync` first), and write the
-target to `/tmp/design-loop/project/<proposalPath>` so its relative links resolve.
+**Stage render** (backend operation) for step 7: it gives the URL or file to screenshot for the
+target. Keep it as `<target-render>`.
 
 ### 4. Read the system
 
@@ -181,15 +191,19 @@ data flow, props and behaviour as they are; never edit a kit component from a sc
 
 For a screen, steps 1–4 differ: the two sides are the proposal and the running app
 ([`screens.md`](${CLAUDE_SKILL_DIR}/../../references/screens.md), "Rendering and screenshots"):
-screenshot the proposal with both panels, and the app's `url` in light and dark at the row's
+screenshot the proposal with both panels (a local studio page: once per mode, with `--theme`),
+and the app's `url` in light and dark at the row's
 `viewport`, and compare each half with its mode. The proposal's layout is approximate: converge
 on structure, spacing and styling, not on its sample data.
 
 1. Screenshot the **design target**:
 
    ```bash
-   cd <dir> && node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs /tmp/design-loop/project/<proposalPath> /tmp/design-loop/<name>.target.png
+   cd <dir> && node ${CLAUDE_SKILL_DIR}/scripts/screenshot.mjs <target-render> /tmp/design-loop/<name>.target.png
    ```
+
+   For the local backend, run it twice, with `--theme light` and `--theme dark`
+   (`<name>.target.light.png`, `<name>.target.dark.png`): a studio page has one panel.
 
 2. Find the changed stories: the target's Storybook MCP `stories-changed` → the `storyId`s
    your edit touched (cross-check against the manifest's `storyId`). A token edit in a palette
@@ -254,7 +268,8 @@ mockups still show the old code until then. Keep the proposal (its hash is now
 - The render won't converge because the target uses something outside the token system → stop and
   raise it (contract §5) instead of hard-coding a one-off value.
 - A proposal override matches more than the change it describes → stop and ask which part is meant.
-- The local `ds-bundle/` does not match the project's bundle → stop and offer `design-refresh`.
+- Stage render fails (Claude Design: the local `ds-bundle/` does not match the project's bundle;
+  local: the studio does not answer) → stop and offer `design-refresh`, or `/design-studio`.
 - A screen proposal changes a kit component, needs a component the kit doesn't have, or shows
   data the screen doesn't load → stop and ask: the first two are component work, the last a
   product change.
@@ -263,6 +278,6 @@ mockups still show the old code until then. Keep the proposal (its hash is now
 ## Notes
 
 - Temp artifacts live under `/tmp/design-loop/` and are throwaway.
-- `screenshot.mjs` renders a live Storybook URL and a local target `.html` the same way, so the
-  two screenshots are comparable. Run it from the target's `dir`: it loads Playwright from the
+- `screenshot.mjs` renders a live Storybook URL, a studio URL and a local target `.html` the same
+  way, so the two screenshots are comparable. Run it from the target's `dir`: it loads Playwright from the
   working directory.
