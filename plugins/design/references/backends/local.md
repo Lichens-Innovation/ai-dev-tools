@@ -64,7 +64,8 @@ cd <dir> && node <capture.mjs> component <name> --storybook-url <url> --story-id
 cd <dir> && node <capture.mjs> screen <name> --url <url> --viewport <viewport> [--storage-state <screensAuth>] --manifest <repo>/design.manifest.json
 ```
 
-Capture rewrites the reference, its assets and its `design/index.json` row (and a screen's
+A new screen needs its `screens[]` row first (local paths, contract §2): `capture.mjs` refuses a
+name the manifest does not have. Capture rewrites the reference, its assets and its `design/index.json` row (and a screen's
 `mockupHash`, `sourceHash`). It exits 3 on an `edited` reference: tell the user, and re-run with
 `--force` only if they say the edit can go (a change belongs in the proposal). A screen capture
 warns that the snapshot holds whatever data the dev app shows: see
