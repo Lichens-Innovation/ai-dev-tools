@@ -108,10 +108,20 @@ from is running; start it only if the user asks.
    down, so comparison sheets made without it may differ slightly in framing: re-grade with it
    on if a grade matters.
 
-4. **Screens** (local backend: **Refresh references** for components and screens, by re-capturing
-   as `local.md` says; a screen is added with `capture.mjs screen` on a running app, after warning
-   that the snapshot holds the app's dev data, see `local-studio.md#sample-data`. Then skip to
-   step 6). Claude Design: follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
+4. **Screens.** Local backend: **Refresh references** for the stale components and screens, by
+   re-capturing as `local.md` says. To **add** a screen (named by the user, or chosen in step 5):
+   1. Resolve it as [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md)
+      step 1 does (route, `sources`, states, viewport, `url`, asking when ambiguous), with its
+      preconditions on the dev server and `screensAuth`.
+   2. Record its `screens[]` row first (`capture.mjs` captures only a row that exists): `name`,
+      `storybook`, `route`, `url`, `sources`, `viewport`, `states`, `mockupPath:
+      "design/screens/<kebab-name>.html"`, `proposalPath:
+      "design/proposals/screens/<kebab-name>.html"`, `status: "wip"`, `lastImplementedHash:
+      null`. Keep every other field and row as is.
+   3. Warn that the snapshot holds the app's dev data (`local-studio.md#sample-data`), then run
+      `capture.mjs screen` (it writes the reference, `mockupHash` and `sourceHash`).
+
+   Then go on with step 5, and skip the Claude Design mockup work. Claude Design: follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
    with `<screenshot.mjs>` = `${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`: refresh
    mode for the stale rows, one run for all of them. When the user named a page ("add the Home
    page") or said a mockup doesn't match the real page, run add mode or fix mode for those screens

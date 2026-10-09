@@ -1,6 +1,6 @@
 {
   "name": "design",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Design <-> Storybook/Chromatic iteration loop with two backends, Claude Design or a local design studio: iterate look-and-feel there, then implement and visually validate the result in a React or React Native codebase.",
   "author": {
     "name": "Samuel Daigle",
