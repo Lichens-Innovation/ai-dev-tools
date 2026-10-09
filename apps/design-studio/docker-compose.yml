@@ -1,0 +1,24 @@
+# One container per target project. Start it with a per-project name so several projects can run side by side:
+#
+#   PROJECT_DIR=/path/to/project STUDIO_PORT=3009 docker compose -p design-<name> up --build
+#
+# PROJECT_DIR is mounted read-write at /project; the app serves http://localhost:$STUDIO_PORT.
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: apps/design-studio/Dockerfile
+    restart: unless-stopped
+    # Files the studio writes into the project belong to you, not root.
+    user: '${HOST_UID:-1000}:${HOST_GID:-1000}'
+    # Loopback only: the MCP endpoint writes into the project, so it must not be reachable from the network.
+    ports:
+      - '127.0.0.1:${STUDIO_PORT:-3009}:${STUDIO_PORT:-3009}'
+    volumes:
+      - ${PROJECT_DIR:?set PROJECT_DIR to the project folder}:/project
+    environment:
+      - NODE_ENV=development
+      - STUDIO_PORT=${STUDIO_PORT:-3009}
+      - PROJECT_ROOT=/project
+      - CI=true
+    command: ./node_modules/.bin/vite dev
