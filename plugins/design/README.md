@@ -7,7 +7,7 @@ A plugin for running a **design ↔ Storybook/Chromatic** design-iteration loop 
 
 Then a Claude Code session implements the approved result in your real components — grounded in your design tokens, verified with Playwright screenshots and Storybook tests, and published to Chromatic.
 
-The backend is chosen once, in `/design-init`, and recorded as `backend` (`"claude-design"` or `"local"`) in `design.manifest.json`. A project without `backend` is a Claude Design project, exactly as before.
+The backend is chosen once, in `/design-init`, and recorded as `backend` (`"claude-design"` or `"local"`) in `design.manifest.json`. A project without `backend` is a Claude Design project, exactly as before. To move a project to the other backend later, run `/design-switch-backend` (see [Switching backend](#switching-backend)).
 
 ![The design loop: sync up, explore in Claude Design, approve, implement with design-loop, publish to Chromatic, re-sync](./docs/design-loop.svg)
 
@@ -69,6 +69,15 @@ after implementing): it tells you when the components are behind their code (the
 After updating the design plugin, it also offers the newer `palette.ts`, proposal conventions,
 navbar and cards (`design.manifest.json` records the plugin version the project is at).
 
+### Switching backend
+
+Run `/design-switch-backend` to move a set-up project from Claude Design to the local studio, or back:
+
+1. It lists the proposals not implemented yet and offers to stop so you run `/design-loop` first. They are not carried over: a Claude Design proposal and a studio page do not translate, so they stay in the old backend.
+2. It shows how `design.manifest.json` will change and asks before writing it. The palette, components and screens keep their code side (files, stories, sources, routes). Their design paths become the new backend's, and every item goes back to `wip` with no implemented hash.
+3. Leaving local, it offers to stop the studio container and remove the `design-studio` MCP server. `design/` stays unless you ask to delete it. Leaving Claude Design, the Claude Design project is left as it is.
+4. Then run `/design-init`: it sets up the new backend (for local: `design/`, the captures and the studio; for Claude Design: the project, the palette card and `/design sync`). Add screens back with `/design-refresh add the <name> page`.
+
 ## Skills
 
 | Skill            | Role                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -79,6 +88,7 @@ navbar and cards (`design.manifest.json` records the plugin version the project 
 | `chromatic-init` | Adds Chromatic visual testing (the publish/approval gate). Runs after `storybook-init`. Used by `design-init`.                                                                                                                                                                                                                                                                                        |
 | `design-loop`    | The runtime skill. Reads an approved component or screen proposal (or the palette) from the project's backend, Claude Design or the local studio, and implements it in React, converging via screenshots + tests, then pushes to Chromatic. Routes page and refresh requests to `design-refresh`.                                                                                                     |
 | `design-refresh` | The one skill for updating the backend from the code. Local studio: reports which captured references are behind their code and re-captures them. Claude Design: says when the components need a `/design-sync`, rebuilds stale screen mockups, offers new screens, and adds a named page or fixes a mockup, checked against screenshots of the running app. After a plugin update it brings the project's copies of the plugin's files (`palette.ts`, the proposal conventions in the design-sync readme header, the navbar, the palette and Tailwind cards) up to date, keeping the card's data and the project's wording; `design-loop` runs the same check before implementing.                         |
+| `design-switch-backend` | Moves a set-up project to the other backend (Claude Design ↔ local studio): checks for unimplemented proposals, rewrites the manifest for the new backend, and hands over to `design-init` to set it up. Run it yourself. |
 | `design-help` | Shows this README in the browser, or in the console with `/design-help console`. Run it yourself. |
 
 ## Commands
