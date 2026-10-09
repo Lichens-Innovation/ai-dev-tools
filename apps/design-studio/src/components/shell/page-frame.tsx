@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { Picked } from '#/inspector/pick'
+import { attachPicker } from '#/inspector/picker'
 import { isEmpty } from '#/palette/draft'
 import type { Mode } from '#/palette/draft'
 import { usePalette } from '#/palette/palette-state'
@@ -32,9 +34,12 @@ export const renderPath = ({ kind, name }: PageRef, variant: Variant) => {
 export function PageFrame({
   page,
   variant,
+  onPick,
 }: {
   page: PageRef
   variant: Variant
+  /** When given, a click in the page picks that element (the token inspector's input). */
+  onPick?: (picked: Picked) => void
 }) {
   const shell = useShell()
   const palette = usePalette()
@@ -47,6 +52,15 @@ export function PageFrame({
     const doc = frames.current.get(mode)?.contentDocument
     if (doc?.documentElement) themeDocument(doc, mode, css)
   }
+
+  // A frame can finish loading before the page hydrates, so its onLoad never reaches us: pick up such frames here.
+  useEffect(() => {
+    if (!onPick) return
+    frames.current.forEach((frame) => {
+      const doc = frame.contentDocument
+      if (doc?.readyState === 'complete') attachPicker(doc, onPick)
+    })
+  }, [])
 
   // Re-theme on every change of mode, view or draft (a frame that is still loading is themed by its onLoad).
   useEffect(() => {
@@ -94,9 +108,11 @@ export function PageFrame({
             }}
             title={`${page.name} ${variant} (${mode})`}
             src={renderPath(page, variant)}
-            onLoad={() => {
+            onLoad={(e) => {
               apply(mode)
               setLoaded((n) => n + 1)
+              const doc = e.currentTarget.contentDocument
+              if (onPick && doc) attachPicker(doc, onPick)
             }}
             className="w-full flex-1 border-0 bg-white"
           />

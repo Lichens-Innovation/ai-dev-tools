@@ -60,6 +60,19 @@ keeps the draft. **Reset** drops the draft.
 A page can open the footer on a token by dispatching `window.dispatchEvent(new CustomEvent('design-studio:token',
 { detail: { token: 'link' } }))`.
 
+## Editor and token inspector
+
+A reference opens read only: click an element to inspect it. **Create proposal** copies it and opens the copy in the
+GrapesJS editor (select, move, resize, edit text, add elements, restyle). Edits are saved into the page body and its
+`<style data-studio>` block, the overrides the design loop reads. **Save** (Ctrl+S) checks the file did not change on
+disk since it was opened; if it did, choose **Reload** or **Overwrite**. When Claude writes the open proposal, a banner
+offers to reload it. Side by side, the editor shows light and a live copy shows dark.
+
+The side panel lists every style of the selected element that comes from a token: the token chain
+(`--primary → --blue-base`), its light and dark values and the class or rule it comes from. Raw values are flagged as
+matching a token or off-token. Click a token to open it in the palette footer; in a proposal, swap it for another
+token. MCP `get_selection` returns the same trace.
+
 ## MCP tools
 
 `list_pages`, `get_page`, `create_proposal`, `write_page` (proposals only; needs the `baseHash` of the last read),
@@ -70,7 +83,7 @@ A page can open the footer on a token by dispatching `window.dispatchEvent(new C
 | Route                | What it does                                                                     |
 | -------------------- | -------------------------------------------------------------------------------- |
 | `/`                  | List of pages                                                                    |
-| `/pages/$kind/$name` | A page's reference or proposal in an iframe, reloaded when its file changes      |
+| `/pages/$kind/$name` | A reference (read only, inspectable) or a proposal in the editor                 |
 | `/palette`           | The palette card: colors, contrast audit, semantic mapping, tokens, components   |
 | `/tailwind`          | The Tailwind classes card: every utility under the project's namespace           |
 | `/render/*`          | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright |

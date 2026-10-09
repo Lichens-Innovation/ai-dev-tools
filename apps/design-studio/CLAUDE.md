@@ -29,6 +29,9 @@ One deep module, `src/server/design-project.ts` (`openProject(root)`), holds all
 | `components/shell/`                           | Navbar, sidebar, page frame (one iframe per mode), palette footer                                       |
 | `components/palette/`, `components/tailwind/` | The `/palette` and `/tailwind` pages                                                                    |
 | `server/render.ts`                            | Safe static serving of `design/` for `/render/*`                                                        |
+| `inspector/`                                  | Token trace over the iframe CSSOM (`trace.ts`, pure), click picker, selection push to `/api/selection`  |
+| `editor/`                                     | Page file <-> editor: `page-document.ts` (body + `<style data-studio>`), `serialize.ts`, Style Manager  |
+| `components/editor/`                          | `PageEditor` (GrapesJS, lazy-loaded), `PageWorkspace` (toolbar, banners, save), `TokenInspector`        |
 
 Rules of `DesignProject`:
 
@@ -41,6 +44,12 @@ Rules of `DesignProject`:
 ## Palette in the UI
 
 The browser never re-implements the engine: `palette.preview(draft)` (a `DesignProject` function, `previewPalette` server function) runs the project's own `palette.ts` and returns css, resolved tokens, semantic references, audit and Tailwind classes for a draft, without writing. The draft is a diff against the saved palette, kept in localStorage (`design-studio:<root>:draft`); Save sends it with the `baseHash` the inputs were read at. The project's tokens (`--bg`, `--primary`…) exist only inside iframes and `[data-studio-theme]`; the studio's own chrome uses the shared `--bg-elev`, `--ink`, `--line` tokens: do not mix them.
+
+## Editor and token inspector
+
+A reference is shown in the plain page frame (read only, click to inspect); Create proposal copies it and opens GrapesJS (BSD-3) on the proposal. The project CSS goes to the canvas as `canvas.styles` (never parsed into the editor); the editor owns only the body and the rules of one page-local `<style data-studio>` block. `selectorManager.componentFirst` makes edits `#id` rules in that block. Save writes the body plus that block through `saveProposal` with the `baseHash`; a `Conflict` offers Reload or Overwrite, and an SSE change on the open file shows a reload banner (the workspace ignores its own saved hashes).
+
+`inspector/trace.ts` is pure and unit-tested in jsdom (`test/trace.test.ts`): winning declaration per property (importance, specificity, order, inline last), `var()` chains through `:root` and `[data-theme]` per mode, `literal`/`off-token` flags. Clicking a token dispatches `design-studio:token` (the palette footer listens). A swap in a proposal writes `var(--other)` into the data-studio block. The selection (page, selector, excerpt, trace) is pushed to the selection holder for MCP `get_selection`. jsdom drops `!important` on `var()` values, so tests use raw values there. Custom Style Manager types must be registered before `addSector`.
 
 ## Testing
 
