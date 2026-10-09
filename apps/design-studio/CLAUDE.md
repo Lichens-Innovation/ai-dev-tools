@@ -14,15 +14,21 @@ A local, single-user replacement for Claude Design in the design plugin's loop (
 
 One deep module, `src/server/design-project.ts` (`openProject(root)`), holds all the behaviour: pages, palette, watching. The UI server functions (`src/server/functions.ts`) and the MCP tools (`src/server/mcp.ts`) are thin over it. Keep it that way: a rule that matters to both belongs in `DesignProject`, not in a route or a tool.
 
-| File                       | What it does                                                                                           |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `server/design-project.ts` | `openProject`: `pages`, `palette`, `watch`. Errors are `Conflict`, `NotFound`, `Invalid` (`errors.ts`) |
-| `server/page-html.ts`      | Checks a page loads only from `design/assets`; rebases asset links for `proposals/screens`             |
-| `server/native-import.mjs` | Node's own `import()` for the project's `palette.ts` (Vite cannot transform it)                        |
-| `server/selection.ts`      | In-memory editor selection: the browser pushes, MCP `get_selection` reads. Not part of DesignProject   |
-| `server/hub.ts`            | Fan-out of watch events and `open_page` to the `/events` stream                                        |
-| `server/studio.ts`         | The process-wide singleton (project at `PROJECT_ROOT`, default `/project`, selection, hub)             |
-| `server/render.ts`         | Safe static serving of `design/` for `/render/*`                                                       |
+| File                                          | What it does                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `server/design-project.ts`                    | `openProject`: `pages`, `palette`, `watch`. Errors are `Conflict`, `NotFound`, `Invalid` (`errors.ts`)  |
+| `server/page-html.ts`                         | Checks a page loads only from `design/assets`; rebases asset links for `proposals/screens`              |
+| `server/native-import.mjs`                    | Node's own `import()` for the project's `palette.ts` (Vite cannot transform it)                         |
+| `server/selection.ts`                         | In-memory editor selection: the browser pushes, MCP `get_selection` reads. Not part of DesignProject    |
+| `server/hub.ts`                               | Fan-out of watch events and `open_page` to the `/events` stream                                         |
+| `server/studio.ts`                            | The process-wide singleton (project at `PROJECT_ROOT`, default `/project`, selection, hub)              |
+| `palette/draft.ts`                            | Pure draft logic: a diff against the saved palette (`Draft`), merge, rebase, count, validation          |
+| `palette/palette-state.tsx`                   | `PaletteProvider`/`usePalette`: the shared draft, debounced server preview, save, `design-studio:token` |
+| `palette/theme.ts`                            | Themes an iframe (`data-theme`, `color-scheme`, draft css) or scopes the css for the studio's own pages |
+| `studio/shell-state.tsx`                      | `ShellProvider`: mode, side by side, sidebar, footer, Advanced, remembered in localStorage per project  |
+| `components/shell/`                           | Navbar, sidebar, page frame (one iframe per mode), palette footer                                       |
+| `components/palette/`, `components/tailwind/` | The `/palette` and `/tailwind` pages                                                                    |
+| `server/render.ts`                            | Safe static serving of `design/` for `/render/*`                                                        |
 
 Rules of `DesignProject`:
 
@@ -31,6 +37,10 @@ Rules of `DesignProject`:
 - Writes are atomic (tmp + rename). The watcher ignores `*.tmp`.
 - `palette.save` imports the project's own `palette.ts` (manifest `palette.script`) and calls its exported functions, in the order its CLI does. If `palette.ts` changes its CLI flow, mirror it.
 - The filesystem and `palette.ts` are used directly, with no ports. Tests copy `test/fixtures/project` to a temp dir.
+
+## Palette in the UI
+
+The browser never re-implements the engine: `palette.preview(draft)` (a `DesignProject` function, `previewPalette` server function) runs the project's own `palette.ts` and returns css, resolved tokens, semantic references, audit and Tailwind classes for a draft, without writing. The draft is a diff against the saved palette, kept in localStorage (`design-studio:<root>:draft`); Save sends it with the `baseHash` the inputs were read at. The project's tokens (`--bg`, `--primary`…) exist only inside iframes and `[data-studio-theme]`; the studio's own chrome uses the shared `--bg-elev`, `--ink`, `--line` tokens: do not mix them.
 
 ## Testing
 

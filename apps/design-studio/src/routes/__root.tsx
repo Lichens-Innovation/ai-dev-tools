@@ -4,8 +4,20 @@ import {
   Scripts,
   createRootRoute,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { Navbar } from '#/components/shell/navbar'
+import { PaletteFooter } from '#/components/shell/palette-footer'
+import { Sidebar } from '#/components/shell/sidebar'
+import { PaletteProvider } from '#/palette/palette-state'
+import { getShell } from '#/server/functions'
+import {
+  BAR_HEIGHT,
+  SIDEBAR_WIDTH,
+  ShellProvider,
+  useShell,
+} from '#/studio/shell-state'
 import { connectStudioStream, onStudioMessage } from '#/studio-events'
 
 import appCss from '../styles.css?url'
@@ -19,6 +31,7 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: 'stylesheet', href: appCss }],
   }),
+  loader: () => getShell(),
   component: RootLayout,
   notFoundComponent: () => (
     <main className="p-6">
@@ -32,11 +45,32 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  const { root, pages, palette } = Route.useLoaderData()
+
+  return (
+    <ShellProvider root={root}>
+      <PaletteProvider initial={palette}>
+        <Studio pages={pages} />
+      </PaletteProvider>
+    </ShellProvider>
+  )
+}
+
+function Studio({
+  pages,
+}: {
+  pages: Awaited<ReturnType<typeof getShell>>['pages']
+}) {
   const navigate = useNavigate()
+  const router = useRouter()
+  const shell = useShell()
 
   useEffect(() => {
     const close = connectStudioStream()
     const off = onStudioMessage((message) => {
+      // A page was added, removed or got a proposal: the sidebar and the views read the new list.
+      if (message.type === 'change' && message.event.kind === 'page')
+        void router.invalidate()
       if (message.type !== 'open') return
       void navigate({
         to: '/pages/$kind/$name',
@@ -48,9 +82,25 @@ function RootLayout() {
       off()
       close()
     }
-  }, [navigate])
+  }, [navigate, router])
 
-  return <Outlet />
+  return (
+    <>
+      <Navbar />
+      <Sidebar pages={pages} />
+      <main
+        className="min-h-screen bg-(--bg) text-(--ink) transition-[padding] duration-200"
+        style={{
+          paddingTop: BAR_HEIGHT,
+          paddingBottom: 'var(--ds-footer-h, 0px)',
+          paddingLeft: shell.sidebar && shell.wide ? SIDEBAR_WIDTH : 0,
+        }}
+      >
+        <Outlet />
+      </main>
+      <PaletteFooter />
+    </>
+  )
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

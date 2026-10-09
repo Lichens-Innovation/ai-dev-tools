@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TailwindRouteImport } from './routes/tailwind'
+import { Route as PaletteRouteImport } from './routes/palette'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as IndexRouteImport } from './routes/index'
@@ -16,6 +18,16 @@ import { Route as RenderSplatRouteImport } from './routes/render.$'
 import { Route as ApiSelectionRouteImport } from './routes/api.selection'
 import { Route as PagesKindNameRouteImport } from './routes/pages.$kind.$name'
 
+const TailwindRoute = TailwindRouteImport.update({
+  id: '/tailwind',
+  path: '/tailwind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaletteRoute = PaletteRouteImport.update({
+  id: '/palette',
+  path: '/palette',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
@@ -51,6 +63,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/events': typeof EventsRoute
   '/mcp': typeof McpRoute
+  '/palette': typeof PaletteRoute
+  '/tailwind': typeof TailwindRoute
   '/api/selection': typeof ApiSelectionRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
@@ -59,6 +73,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/events': typeof EventsRoute
   '/mcp': typeof McpRoute
+  '/palette': typeof PaletteRoute
+  '/tailwind': typeof TailwindRoute
   '/api/selection': typeof ApiSelectionRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
@@ -68,6 +84,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/events': typeof EventsRoute
   '/mcp': typeof McpRoute
+  '/palette': typeof PaletteRoute
+  '/tailwind': typeof TailwindRoute
   '/api/selection': typeof ApiSelectionRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
@@ -78,6 +96,8 @@ export interface FileRouteTypes {
     | '/'
     | '/events'
     | '/mcp'
+    | '/palette'
+    | '/tailwind'
     | '/api/selection'
     | '/render/$'
     | '/pages/$kind/$name'
@@ -86,6 +106,8 @@ export interface FileRouteTypes {
     | '/'
     | '/events'
     | '/mcp'
+    | '/palette'
+    | '/tailwind'
     | '/api/selection'
     | '/render/$'
     | '/pages/$kind/$name'
@@ -94,6 +116,8 @@ export interface FileRouteTypes {
     | '/'
     | '/events'
     | '/mcp'
+    | '/palette'
+    | '/tailwind'
     | '/api/selection'
     | '/render/$'
     | '/pages/$kind/$name'
@@ -103,6 +127,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EventsRoute: typeof EventsRoute
   McpRoute: typeof McpRoute
+  PaletteRoute: typeof PaletteRoute
+  TailwindRoute: typeof TailwindRoute
   ApiSelectionRoute: typeof ApiSelectionRoute
   RenderSplatRoute: typeof RenderSplatRoute
   PagesKindNameRoute: typeof PagesKindNameRoute
@@ -110,6 +136,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tailwind': {
+      id: '/tailwind'
+      path: '/tailwind'
+      fullPath: '/tailwind'
+      preLoaderRoute: typeof TailwindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/palette': {
+      id: '/palette'
+      path: '/palette'
+      fullPath: '/palette'
+      preLoaderRoute: typeof PaletteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mcp': {
       id: '/mcp'
       path: '/mcp'
@@ -159,6 +199,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EventsRoute: EventsRoute,
   McpRoute: McpRoute,
+  PaletteRoute: PaletteRoute,
+  TailwindRoute: TailwindRoute,
   ApiSelectionRoute: ApiSelectionRoute,
   RenderSplatRoute: RenderSplatRoute,
   PagesKindNameRoute: PagesKindNameRoute,

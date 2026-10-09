@@ -44,6 +44,22 @@ design/
 Pages are full HTML documents linking `../assets/project.css` (`../../assets/` for proposals/screens). A page may
 load nothing but files under `design/assets`.
 
+## The shell
+
+Every page has a navbar (sidebar toggle, palette and Tailwind links, the section shortcuts of the open page, a
+light/dark switch, side by side), a sidebar listing the pages of `design/index.json` (each opens its proposal if
+there is one, else its reference) and a palette footer. The light/dark, side-by-side, sidebar and footer choices are
+remembered per project in the browser.
+
+The footer edits a draft of the palette: the colors of the current mode, the hand-authored tokens (both modes;
+breakpoints are read only) and, with Advanced, which token each semantic token points to. The draft re-themes the open
+page live and is shared with `/palette` and `/tailwind`. **Save** writes the inputs file and regenerates the outputs
+like the project's palette script; if the file changed on disk since it was read, it reports the conflict, reloads and
+keeps the draft. **Reset** drops the draft.
+
+A page can open the footer on a token by dispatching `window.dispatchEvent(new CustomEvent('design-studio:token',
+{ detail: { token: 'link' } }))`.
+
 ## MCP tools
 
 `list_pages`, `get_page`, `create_proposal`, `write_page` (proposals only; needs the `baseHash` of the last read),
@@ -55,6 +71,8 @@ load nothing but files under `design/assets`.
 | -------------------- | -------------------------------------------------------------------------------- |
 | `/`                  | List of pages                                                                    |
 | `/pages/$kind/$name` | A page's reference or proposal in an iframe, reloaded when its file changes      |
+| `/palette`           | The palette card: colors, contrast audit, semantic mapping, tokens, components   |
+| `/tailwind`          | The Tailwind classes card: every utility under the project's namespace           |
 | `/render/*`          | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright |
 | `/events`            | Server-sent events: file changes and `open_page` requests                        |
 | `/mcp`               | MCP, Streamable HTTP                                                             |
