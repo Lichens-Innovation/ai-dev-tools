@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Reads and updates design.manifest.json for design-loop, so the model doesn't rewrite the JSON.
 //
-//   node manifest.mjs items [--status wip|approved]   compact view: project, reconcileRule, rows
+//   node manifest.mjs items [--status wip|approved]   compact view: backend, project, reconcileRule, rows
 //   node manifest.mjs hash <file>                     SHA-256 (hex) of a file's bytes
 //   node manifest.mjs approve <name...>               set status "approved"
 //   node manifest.mjs implemented <name> <hash>       set lastImplementedHash
@@ -70,7 +70,7 @@ if (command === 'hash') {
       path: row[pathKey] ?? null,
       lastImplementedHash: row.lastImplementedHash ?? null,
     }));
-  console.log(JSON.stringify({ designProjectId: manifest.designProjectId, reconcileRule: manifest.reconcileRule, items }, null, 2));
+  console.log(JSON.stringify({ backend: manifest.backend ?? 'claude-design', designProjectId: manifest.designProjectId, reconcileRule: manifest.reconcileRule, items }, null, 2));
 } else if (command === 'approve') {
   if (rest.length === 0) fail('Usage: manifest.mjs approve <name...>');
   const manifest = load();

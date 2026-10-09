@@ -12,6 +12,8 @@ itself:
 | Conventions block | repo, readme header | `references/conventions.md`, fitted to the project (`/design sync` publishes it) |
 
 `design.manifest.json` records the plugin version they were last brought to (`pluginVersion`).
+With `backend: "local"` only `palette.script` is a copy (the cards and the conventions live in
+Claude Design): follow update step 1 and the stamp, skip the rest.
 `<plugin-files.mjs>` is `design-refresh/scripts/plugin-files.mjs` and `<manifest.mjs>`
 `design-loop/scripts/manifest.mjs`, both under the plugin's `skills/` (from a skill:
 `${CLAUDE_SKILL_DIR}/../<skill>/scripts/…`); run them from the repo root.

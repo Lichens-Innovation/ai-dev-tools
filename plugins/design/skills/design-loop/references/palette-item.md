@@ -2,6 +2,13 @@
 
 Loaded by `SKILL.md` step 1b when the manifest's `palette` entry is approved and stale.
 
+**Local backend:** the studio's palette save already wrote the inputs (`palette.localPath`) and
+regenerated every output, like step 2 below, and the palette has no card or thumbnail. Skip steps 1,
+2 and 4: there is no card to diff or upload (Fetch target gives nothing; the item's hash is the
+inputs file's). Review what the save changed with `git diff` on `palette.localPath` and
+`palette.outputs`, run the audit (`node <palette.ts> <localPath>` prints it), then do step 3 and
+step 5 (the hash recorded is the inputs file's, from List targets).
+
 `<palette.ts>` is the repo's copy (`palette.script`) when set, checked against the plugin's
 [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts) first, else the
 plugin's (contract §5).
@@ -38,6 +45,6 @@ plugin's (contract §5).
 
 5. Record `palette.lastImplementedHash` (step 10).
 
-The card (`palette.designPath`, `Palette.dc.html` at the project root) is read only: never
+(Claude Design) The card (`palette.designPath`, `Palette.dc.html` at the project root) is read only: never
 upload it back, and never write or rewrite the project's `support.js`. The thumbnail is the only
 palette file `design-loop` uploads.
