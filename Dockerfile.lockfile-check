@@ -9,6 +9,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Copy workspace package.json files so pnpm can resolve the workspaces
 COPY apps/help-server/package.json ./apps/help-server/
+COPY apps/design-studio/package.json ./apps/design-studio/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/styles/package.json ./packages/styles/
 COPY packages/eslint-config/package.json ./packages/eslint-config/

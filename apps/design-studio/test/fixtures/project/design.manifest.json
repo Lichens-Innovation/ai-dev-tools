@@ -1,0 +1,19 @@
+{
+  "reconcileRule": "canonical-wins",
+  "palette": {
+    "localPath": "theme/theme.inputs.css",
+    "outputs": {
+      "web": "theme/generated/theme.css",
+      "scheme": "theme/generated/scheme.css",
+      "mobile": "theme/generated/tailwind.css",
+      "json": "theme/generated/palette.json",
+      "sass": null
+    },
+    "script": "theme/scripts/palette.ts",
+    "namespace": "demo",
+    "status": "wip",
+    "lastImplementedHash": null
+  },
+  "components": [],
+  "screens": []
+}
