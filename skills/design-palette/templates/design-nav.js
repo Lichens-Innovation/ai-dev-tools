@@ -36,18 +36,27 @@
   const hrefOf = path => new URL(path.split('/').map(encodeURIComponent).join('/'), root).pathname + location.search;
 
   // Claude Design reloads the file in its URL (?file=…) after each change, not the card the navbar led to: back to that
-  // card. Per tab: ENTRY is the file Claude Design last opened, LAST the card shown, NAV the target of a navbar click.
-  // Claude Design opening another file (its file list) resets ENTRY, so that choice is kept.
+  // card. Per tab: ENTRY is the file Claude Design last opened, LAST the card shown, NAV the target of a link click (the
+  // navbar's or a card's). Claude Design opening another file (its file list) resets ENTRY, so that choice is kept; the
+  // browser's back and forward buttons never redirect. Reopening the entry file from the file list looks like a reload.
   const ENTRY = 'design-nav:entry', LAST = 'design-nav:last', NAV = 'design-nav:nav';
   const ss = { get: k => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch {} } };
-  const fromNav = ss.get(NAV) === here, last = ss.get(LAST);
+  const navType = (performance.getEntriesByType?.('navigation')[0] || {}).type;
+  const fromNav = ss.get(NAV) === here || navType === 'back_forward', last = ss.get(LAST);
   ss.set(NAV, '');
   if (!fromNav) {
     if (ss.get(ENTRY) === here && last && last !== here) { ss.set(NAV, last); location.replace(hrefOf(last)); return; }
     ss.set(ENTRY, here);
   }
   ss.set(LAST, here);
-  const navTo = (a, path) => { a.addEventListener('click', () => ss.set(NAV, path)); return a; };
+  document.addEventListener('click', e => {
+    const a = e.target instanceof Element && e.target.closest('a[href]');
+    if (!a || a.target === '_blank') return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !url.pathname.startsWith(root.pathname)) return;
+    const path = decodeURIComponent(url.pathname).slice(decodeURIComponent(root.pathname).length);
+    if (path !== here) ss.set(NAV, path);
+  }, true);
 
   const applyMode = () => { html.dataset.theme = state.mode; html.style.colorScheme = state.mode; };
   applyMode();
@@ -492,7 +501,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
     bar.querySelector('.dn-title').textContent = pageTitle();
     const nav = side.querySelector('nav');
     const link = (path, label, kids = []) => {
-      const a = navTo(el('a', { href: hrefOf(path), title: path }, [...kids, label]), path);
+      const a = el('a', { href: hrefOf(path), title: path }, [...kids, label]);
       if (path === here) a.setAttribute('aria-current', 'page');
       a.addEventListener('click', () => { if (!wide()) { state.open = false; render(); } });
       return a;
@@ -513,10 +522,10 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
   function mount() {
     html.setAttribute('data-design-nav', '');
     document.head.append(el('style', { textContent: css }));
-    const paletteLink = navTo(el('a', { className: 'dn-palette', href: hrefOf(PALETTE), title: 'Palette', ariaLabel: 'Palette' }, [paletteIcon()]), PALETTE);
+    const paletteLink = el('a', { className: 'dn-palette', href: hrefOf(PALETTE), title: 'Palette', ariaLabel: 'Palette' }, [paletteIcon()]);
     if (here === PALETTE) paletteLink.setAttribute('aria-current', 'page');
     // Shown by render() once the card list has Tailwind.html.
-    const tailwindLink = navTo(el('a', { className: 'dn-palette dn-tailwind', href: hrefOf(TAILWIND), title: 'Tailwind classes', ariaLabel: 'Tailwind classes', hidden: true }, [tailwindIcon()]), TAILWIND);
+    const tailwindLink = el('a', { className: 'dn-palette dn-tailwind', href: hrefOf(TAILWIND), title: 'Tailwind classes', ariaLabel: 'Tailwind classes', hidden: true }, [tailwindIcon()]);
     if (here === TAILWIND) tailwindLink.setAttribute('aria-current', 'page');
     bar = el('header', { className: 'dn-bar' }, [
       el('button', { className: 'dn-burger', type: 'button', title: 'Cards', ariaLabel: 'Toggle the card list', onclick: toggleSide }, [el('span'), el('span'), el('span')]),
