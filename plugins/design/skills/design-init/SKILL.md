@@ -27,8 +27,9 @@ this skill produces must satisfy the preconditions in §6.
    whether a project is already bound; for local, Docker answers (`docker info`) and the studio
    container is running. Report the gap list.
 
-1a. **Backend.** The manifest's `backend` when it has one (do not ask again; changing it is the
-   user's call). Otherwise ask (`AskUserQuestion`): **Claude Design** (explore in claude.ai/design;
+1a. **Backend.** An existing manifest decides: its `backend`, or `claude-design` when it has none
+   (contract §2). Do not ask again: moving a set-up project to the other backend is
+   `/design-switch-backend`. With no manifest yet, ask (`AskUserQuestion`): **Claude Design** (explore in claude.ai/design;
    needs the Claude Design MCP, DesignSync and `/design sync`) or **Local design studio** (a Docker
    container serves the project's `design/` folder; no account, nothing leaves the machine).
    Steps 4, 5, 6 and 8 are for Claude Design only; the local backend has its own steps L1 to L4
