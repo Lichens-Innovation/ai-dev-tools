@@ -274,6 +274,57 @@ describe('palette', () => {
   })
 })
 
+describe('palette preview', () => {
+  it('computes the theme, resolved tokens and references of a draft without writing', async () => {
+    const state = await project.palette.read()
+    const before = state.hash
+    const draft = {
+      inputs: { ...state.inputs, primary: { lm: '#1d4ed8', dm: '#93b4ff' } },
+      tokens: { ...state.tokens, 'spacing-md': '1.25rem' },
+      overrides: { link: 'info-text' },
+    }
+    const preview = await project.palette.preview(draft)
+    expect(preview.css).toContain('--primary-lm: #1d4ed8;')
+    expect(preview.css).toContain('--spacing-md: 1.25rem;')
+    expect(preview.css).toContain('light-dark(')
+    expect(preview.brand).toEqual(['primary', 'secondary'])
+    expect(preview.status).toEqual(['info', 'danger', 'success', 'warning'])
+    expect(preview.refs.light.link).toBe('info-text')
+    expect(preview.autoRefs.light.link).toBe('primary-text')
+    expect(preview.refs.light['bg-hover']).toBe('bg-faint')
+    expect(preview.overridable).toContain('link')
+    expect(preview.tokens.find((t) => t.name === 'primary')).toMatchObject({
+      light: '#1d4ed8',
+      dark: '#93b4ff',
+    })
+    expect(preview.classes?.text.length).toBeGreaterThan(0)
+    expect(preview.exports.mobile).toContain('@import "tailwindcss"')
+    expect((await project.palette.read()).hash).toBe(before)
+  })
+
+  it('ignores overrides the engine refuses and says why', async () => {
+    const state = await project.palette.read()
+    const preview = await project.palette.preview({
+      inputs: state.inputs,
+      tokens: state.tokens,
+      overrides: { primary: 'info' },
+    })
+    expect(preview.overrideErrors.length).toBeGreaterThan(0)
+    expect(preview.refs.light.primary).toBeUndefined()
+  })
+
+  it('rejects a draft that is not valid', async () => {
+    const state = await project.palette.read()
+    await expect(
+      project.palette.preview({
+        inputs: { ...state.inputs, primary: { lm: 'red', dm: '#fff' } },
+        tokens: state.tokens,
+        overrides: {},
+      }),
+    ).rejects.toMatchObject({ code: 'Invalid' })
+  })
+})
+
 describe('watch', () => {
   it('emits after an external write, once per change', async () => {
     const created = await project.pages.createProposal(button)
