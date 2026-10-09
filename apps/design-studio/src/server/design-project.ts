@@ -48,6 +48,36 @@ export interface PaletteCheck {
   pass: boolean
   level: 'fail' | 'warn'
 }
+/** What the browser needs to theme a page and draw the palette cards for a draft, computed by the project's palette.ts. */
+export interface Refs {
+  light: Record<string, string>
+  dark: Record<string, string>
+}
+
+export interface PalettePreview {
+  /** The theme, its browser scheme block and the hand-authored tokens: inject it to re-theme a page. */
+  css: string
+  /** Every generated token, resolved per mode. */
+  tokens: { name: string; light: string; dark: string }[]
+  /** What each semantic token references per mode (`link` -> `primary-text`); tokens holding a value are absent. */
+  refs: Refs
+  /** The same without the overrides: what "auto" means for each semantic token. */
+  autoRefs: Refs
+  /** The intents: brand slots in order, then the status colors. */
+  brand: string[]
+  status: string[]
+  audit: PaletteCheck[]
+  /** Semantic tokens that can be re-pointed. */
+  overridable: string[]
+  /** Why the overrides were refused (they are ignored in `css` and `tokens`). */
+  overrideErrors: string[]
+  namespace: string | null
+  /** Tailwind class names by role: [class name after the role prefix, token]. Null without a namespace. */
+  classes: Record<'text' | 'bg' | 'border', [string, string][]> | null
+  /** The card's other exports (its web export is `css`): mobile Tailwind and the inputs JSON. */
+  exports: { mobile: string; inputs: string }
+}
+
 export interface PaletteState extends PaletteDraft {
   namespace: string | null
   audit: PaletteCheck[]
@@ -85,6 +115,8 @@ export interface DesignProject {
       draft: PaletteDraft,
       baseHash: string,
     ) => Promise<{ audit: PaletteCheck[]; written: string[] }>
+    /** Runs the palette engine on a draft without writing anything. */
+    preview: (draft: PaletteDraft) => Promise<PalettePreview>
   }
   watch: (listener: (event: DesignEvent) => void) => () => void
   /** Resolves once the file watcher started by watch() is live: changes made after it are seen. */
@@ -95,6 +127,7 @@ export interface DesignProject {
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 const TOKEN_NAME = /^[a-z][a-z0-9-]*$/
+const BRAND = ['primary', 'secondary', 'tertiary', 'quaternary', 'quinary']
 
 const importPalette = (url: string): Promise<PaletteModule> => nativeImport(url)
 
@@ -128,6 +161,10 @@ interface PaletteModule {
   buildTailwindCss: (p: any, ns: string, themeCss: string) => string
   buildJson: (p: any) => string
   buildSass: (p: any, extras: [string, string][], from: string) => string
+  namespacedNames: (
+    p: any,
+    ns: string,
+  ) => { out: Record<'text' | 'bg' | 'border', [string, string][]> }
 }
 
 interface Manifest {
@@ -337,6 +374,54 @@ export function openProject(rootDir: string): DesignProject {
     return { inputs: inputs as PaletteInputs, extras, overrides }
   }
 
+  /** The draft's inputs, checked and normalised. */
+  function cleanInputs(draft: PaletteDraft): PaletteInputs {
+    const inputs: PaletteInputs = {}
+    for (const [name, value] of Object.entries(draft?.inputs ?? {})) {
+      if (!TOKEN_NAME.test(name)) throw invalid(`Bad input name "${name}"`)
+      for (const mode of ['lm', 'dm'] as const) {
+        if (typeof value?.[mode] !== 'string' || !HEX.test(value[mode])) {
+          throw invalid(
+            `--${name}-${mode}: "${String(value?.[mode])}" is not a hex color (#rgb or #rrggbb)`,
+          )
+        }
+      }
+      inputs[name] = {
+        lm: value.lm.toLowerCase(),
+        dm: value.dm.toLowerCase(),
+      }
+    }
+    const missing = ['primary', 'secondary', 'font', 'background'].filter(
+      (n) => !inputs[n],
+    )
+    if (missing.length)
+      throw invalid(`Missing required palette inputs: ${missing.join(', ')}`)
+    return inputs
+  }
+
+  /** The inputs file's hand-authored tokens with the draft's values; a token the file lacks is refused. */
+  function mergeTokens(
+    current: [string, string][],
+    draft: PaletteDraft,
+  ): [string, string][] {
+    const known = new Set(current.map(([n]) => n))
+    for (const [name, value] of Object.entries(draft.tokens ?? {})) {
+      if (!known.has(name))
+        throw invalid(
+          `--${name} is not a hand-authored token of the inputs file`,
+        )
+      if (typeof value !== 'string' || !value.trim() || /[;{}]/.test(value)) {
+        throw invalid(
+          `--${name}: token values cannot be empty or contain ; { }`,
+        )
+      }
+    }
+    return current.map(([n, v]): [string, string] => {
+      const next = draft.tokens?.[n]
+      return [n, next === undefined ? v : next.replace(/\s+/g, ' ').trim()]
+    })
+  }
+
   const palette: DesignProject['palette'] = {
     async read() {
       const { mod, inputsFile, namespace } = await loadPaletteSetup()
@@ -362,44 +447,8 @@ export function openProject(rootDir: string): DesignProject {
         throw conflict('The palette inputs changed since they were read')
 
       const current = analyse(mod, css)
-      const inputs: PaletteInputs = {}
-      for (const [name, value] of Object.entries(draft?.inputs ?? {})) {
-        if (!TOKEN_NAME.test(name)) throw invalid(`Bad input name "${name}"`)
-        for (const mode of ['lm', 'dm'] as const) {
-          if (typeof value?.[mode] !== 'string' || !HEX.test(value[mode])) {
-            throw invalid(
-              `--${name}-${mode}: "${String(value?.[mode])}" is not a hex color (#rgb or #rrggbb)`,
-            )
-          }
-        }
-        inputs[name] = {
-          lm: value.lm.toLowerCase(),
-          dm: value.dm.toLowerCase(),
-        }
-      }
-      const missing = ['primary', 'secondary', 'font', 'background'].filter(
-        (n) => !inputs[n],
-      )
-      if (missing.length)
-        throw invalid(`Missing required palette inputs: ${missing.join(', ')}`)
-
-      const knownTokens = new Set(current.extras.map(([n]) => n))
-      const tokenEntries = Object.entries(draft.tokens ?? {})
-      for (const [name, value] of tokenEntries) {
-        if (!knownTokens.has(name))
-          throw invalid(
-            `--${name} is not a hand-authored token of the inputs file`,
-          )
-        if (typeof value !== 'string' || !value.trim() || /[;{}]/.test(value)) {
-          throw invalid(
-            `--${name}: token values cannot be empty or contain ; { }`,
-          )
-        }
-      }
-      const extras = current.extras.map(([n, v]): [string, string] => {
-        const next = draft.tokens?.[n]
-        return [n, next === undefined ? v : next.replace(/\s+/g, ' ').trim()]
-      })
+      const inputs = cleanInputs(draft)
+      const extras = mergeTokens(current.extras, draft)
 
       const overrides = { ...(draft.overrides ?? {}) }
       const p = mod.fromInputs(inputs, overrides)
@@ -469,6 +518,69 @@ export function openProject(rootDir: string): DesignProject {
         )
 
       return { audit: mod.runAudit(p), written }
+    },
+
+    async preview(draft) {
+      const { mod, inputsFile, namespace } = await loadPaletteSetup()
+      const css = await readIfExists(inputsFile)
+      if (css === null) throw notFound('The palette inputs file does not exist')
+      const current = analyse(mod, css)
+      const inputs = cleanInputs(draft)
+      const extras = mergeTokens(current.extras, draft)
+      let overrides = { ...(draft.overrides ?? {}) }
+      const errors = mod.overrideErrors(mod.fromInputs(inputs), overrides)
+      const refused = errors.length > 0
+      if (refused) overrides = {}
+      const p = mod.fromInputs(inputs, overrides)
+
+      const webCss = mod.buildWebCss(p, extras)
+      const tokens = JSON.parse(mod.buildJson(p)) as Record<
+        string,
+        { light: string; dark: string }
+      >
+      // What a semantic token references is only in the generated stylesheet: `--link: var(--primary-text);`.
+      const refsOf = (sheet: string): Refs => {
+        const [lightPart = '', darkPart = ''] = sheet.split(
+          '@media (prefers-color-scheme: dark)',
+        )
+        const refsIn = (block: string) =>
+          Object.fromEntries(
+            [
+              ...block.matchAll(
+                /^\s*--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\);$/gm,
+              ),
+            ]
+              .filter(([, , target]) => !/-(?:lm|dm|light|dark)$/.test(target))
+              .map(([, name, target]) => [name, target]),
+          )
+        const light = refsIn(lightPart)
+        return { light, dark: { ...light, ...refsIn(darkPart) } }
+      }
+      const refs = refsOf(webCss)
+      const autoRefs = Object.keys(overrides).length
+        ? refsOf(mod.buildWebCss(mod.fromInputs(inputs), extras))
+        : refs
+      const base = ['font', 'font-inverted', 'background', 'border']
+      const names = Object.keys(inputs)
+      return {
+        css: webCss + '\n\n' + mod.buildSchemeCss(p),
+        tokens: Object.entries(tokens).map(([name, v]) => ({ name, ...v })),
+        refs,
+        autoRefs,
+        brand: BRAND.filter((n) => names.includes(n)),
+        status: names.filter((n) => !BRAND.includes(n) && !base.includes(n)),
+        audit: mod.runAudit(p),
+        overridable: mod.overridable(mod.fromInputs(inputs)),
+        overrideErrors: refused ? errors : [],
+        namespace,
+        classes: namespace ? mod.namespacedNames(p, namespace).out : null,
+        exports: {
+          mobile: namespace
+            ? mod.buildTailwindCss(p, namespace, webCss)
+            : '/* No Tailwind namespace yet: set palette.namespace in design.manifest.json. */',
+          inputs: JSON.stringify(inputs, null, 2),
+        },
+      }
     },
   }
 
