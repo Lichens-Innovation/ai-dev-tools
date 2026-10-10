@@ -107,3 +107,44 @@ export const savePageProposal = createServerFn({ method: 'POST' })
       ),
     ),
   )
+
+/** A blank page: an empty proposal (component or screen) to sketch a new design on. */
+export const createBlankPage = createServerFn({ method: 'POST' })
+  .validator(pageRef)
+  .handler(({ data }) =>
+    attempt(() => getStudio().project.pages.createBlank(data)),
+  )
+
+/** The sketch drawn over a proposal (Excalidraw's JSON) and the hash a later save is checked against. */
+export const getSketch = createServerFn({ method: 'GET' })
+  .validator(pageRef)
+  .handler(({ data }) => getStudio().project.sketch.read(data))
+
+export const saveSketch = createServerFn({ method: 'POST' })
+  .validator(pageRef.extend({ json: z.string(), baseHash: z.string() }))
+  .handler(({ data }) =>
+    attempt(() =>
+      getStudio().project.sketch.save(
+        { kind: data.kind, name: data.name },
+        data.json,
+        data.baseHash,
+      ),
+    ),
+  )
+
+export const listSketchRequests = createServerFn({ method: 'GET' })
+  .validator(pageRef)
+  .handler(({ data }) => getStudio().project.requests.list({ page: data }))
+
+/** Make real: records the request (ids and a PNG) for the selected shapes. */
+export const makeReal = createServerFn({ method: 'POST' })
+  .validator(pageRef.extend({ shapeIds: z.array(z.string()), png: z.string() }))
+  .handler(({ data }) =>
+    attempt(async () => ({
+      request: await getStudio().project.requests.create({
+        page: { kind: data.kind, name: data.name },
+        shapeIds: data.shapeIds,
+        png: data.png,
+      }),
+    })),
+  )

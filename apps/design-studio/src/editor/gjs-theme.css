@@ -63,3 +63,27 @@
   padding: 8px;
   width: 46%;
 }
+
+/* The sketch layer: Excalidraw is a transparent overlay and only its drawing surface stays. Its own toolbar,
+   menus, footer and help are replaced by the studio's toolbar. */
+.ds-sketch .excalidraw {
+  --color-surface-lowest: transparent;
+  background: transparent;
+}
+.ds-sketch .excalidraw .App-menu,
+.ds-sketch .excalidraw .App-bottom-bar,
+.ds-sketch .excalidraw .layer-ui__wrapper__top-right,
+.ds-sketch .excalidraw .layer-ui__wrapper__footer,
+.ds-sketch .excalidraw .help-icon,
+.ds-sketch .excalidraw .welcome-screen-center,
+.ds-sketch .excalidraw .main-menu-trigger,
+.ds-sketch .excalidraw .sidebar-trigger,
+.ds-sketch .excalidraw .App-toolbar-content,
+.ds-sketch .excalidraw .Island.App-toolbar,
+.ds-sketch .excalidraw .zen-mode-transition,
+.ds-sketch .excalidraw .scroll-back-to-content {
+  display: none !important;
+}
+.ds-sketch .excalidraw .excalidraw-textEditorContainer textarea {
+  color: inherit;
+}

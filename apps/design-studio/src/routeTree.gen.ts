@@ -15,8 +15,11 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RenderSplatRouteImport } from './routes/render.$'
+import { Route as ExcalidrawAssetsSplatRouteImport } from './routes/excalidraw-assets.$'
 import { Route as ApiSelectionRouteImport } from './routes/api.selection'
+import { Route as ApiRequestsRouteImport } from './routes/api.requests'
 import { Route as PagesKindNameRouteImport } from './routes/pages.$kind.$name'
+import { Route as ApiRequestsIdSentRouteImport } from './routes/api.requests.$id.sent'
 
 const TailwindRoute = TailwindRouteImport.update({
   id: '/tailwind',
@@ -48,15 +51,30 @@ const RenderSplatRoute = RenderSplatRouteImport.update({
   path: '/render/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExcalidrawAssetsSplatRoute = ExcalidrawAssetsSplatRouteImport.update({
+  id: '/excalidraw-assets/$',
+  path: '/excalidraw-assets/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSelectionRoute = ApiSelectionRouteImport.update({
   id: '/api/selection',
   path: '/api/selection',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRequestsRoute = ApiRequestsRouteImport.update({
+  id: '/api/requests',
+  path: '/api/requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PagesKindNameRoute = PagesKindNameRouteImport.update({
   id: '/pages/$kind/$name',
   path: '/pages/$kind/$name',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRequestsIdSentRoute = ApiRequestsIdSentRouteImport.update({
+  id: '/$id/sent',
+  path: '/$id/sent',
+  getParentRoute: () => ApiRequestsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -65,9 +83,12 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/palette': typeof PaletteRoute
   '/tailwind': typeof TailwindRoute
+  '/api/requests': typeof ApiRequestsRouteWithChildren
   '/api/selection': typeof ApiSelectionRoute
+  '/excalidraw-assets/$': typeof ExcalidrawAssetsSplatRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
+  '/api/requests/$id/sent': typeof ApiRequestsIdSentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,9 +96,12 @@ export interface FileRoutesByTo {
   '/mcp': typeof McpRoute
   '/palette': typeof PaletteRoute
   '/tailwind': typeof TailwindRoute
+  '/api/requests': typeof ApiRequestsRouteWithChildren
   '/api/selection': typeof ApiSelectionRoute
+  '/excalidraw-assets/$': typeof ExcalidrawAssetsSplatRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
+  '/api/requests/$id/sent': typeof ApiRequestsIdSentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,9 +110,12 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/palette': typeof PaletteRoute
   '/tailwind': typeof TailwindRoute
+  '/api/requests': typeof ApiRequestsRouteWithChildren
   '/api/selection': typeof ApiSelectionRoute
+  '/excalidraw-assets/$': typeof ExcalidrawAssetsSplatRoute
   '/render/$': typeof RenderSplatRoute
   '/pages/$kind/$name': typeof PagesKindNameRoute
+  '/api/requests/$id/sent': typeof ApiRequestsIdSentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -98,9 +125,12 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/palette'
     | '/tailwind'
+    | '/api/requests'
     | '/api/selection'
+    | '/excalidraw-assets/$'
     | '/render/$'
     | '/pages/$kind/$name'
+    | '/api/requests/$id/sent'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -108,9 +138,12 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/palette'
     | '/tailwind'
+    | '/api/requests'
     | '/api/selection'
+    | '/excalidraw-assets/$'
     | '/render/$'
     | '/pages/$kind/$name'
+    | '/api/requests/$id/sent'
   id:
     | '__root__'
     | '/'
@@ -118,9 +151,12 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/palette'
     | '/tailwind'
+    | '/api/requests'
     | '/api/selection'
+    | '/excalidraw-assets/$'
     | '/render/$'
     | '/pages/$kind/$name'
+    | '/api/requests/$id/sent'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,7 +165,9 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   PaletteRoute: typeof PaletteRoute
   TailwindRoute: typeof TailwindRoute
+  ApiRequestsRoute: typeof ApiRequestsRouteWithChildren
   ApiSelectionRoute: typeof ApiSelectionRoute
+  ExcalidrawAssetsSplatRoute: typeof ExcalidrawAssetsSplatRoute
   RenderSplatRoute: typeof RenderSplatRoute
   PagesKindNameRoute: typeof PagesKindNameRoute
 }
@@ -178,11 +216,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RenderSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/excalidraw-assets/$': {
+      id: '/excalidraw-assets/$'
+      path: '/excalidraw-assets/$'
+      fullPath: '/excalidraw-assets/$'
+      preLoaderRoute: typeof ExcalidrawAssetsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/selection': {
       id: '/api/selection'
       path: '/api/selection'
       fullPath: '/api/selection'
       preLoaderRoute: typeof ApiSelectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/requests': {
+      id: '/api/requests'
+      path: '/api/requests'
+      fullPath: '/api/requests'
+      preLoaderRoute: typeof ApiRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pages/$kind/$name': {
@@ -192,8 +244,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagesKindNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/requests/$id/sent': {
+      id: '/api/requests/$id/sent'
+      path: '/$id/sent'
+      fullPath: '/api/requests/$id/sent'
+      preLoaderRoute: typeof ApiRequestsIdSentRouteImport
+      parentRoute: typeof ApiRequestsRoute
+    }
   }
 }
+
+interface ApiRequestsRouteChildren {
+  ApiRequestsIdSentRoute: typeof ApiRequestsIdSentRoute
+}
+
+const ApiRequestsRouteChildren: ApiRequestsRouteChildren = {
+  ApiRequestsIdSentRoute: ApiRequestsIdSentRoute,
+}
+
+const ApiRequestsRouteWithChildren = ApiRequestsRoute._addFileChildren(
+  ApiRequestsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -201,7 +272,9 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   PaletteRoute: PaletteRoute,
   TailwindRoute: TailwindRoute,
+  ApiRequestsRoute: ApiRequestsRouteWithChildren,
   ApiSelectionRoute: ApiSelectionRoute,
+  ExcalidrawAssetsSplatRoute: ExcalidrawAssetsSplatRoute,
   RenderSplatRoute: RenderSplatRoute,
   PagesKindNameRoute: PagesKindNameRoute,
 }

@@ -23,7 +23,12 @@ export const Route = createFileRoute('/pages/$kind/$name')({
       deps.variant ?? (page.hasProposal ? 'proposal' : 'reference')
     try {
       const source = await getPageSource({ data: { kind, name, variant } })
-      return { variant, hasProposal: page.hasProposal, source }
+      return {
+        variant,
+        hasProposal: page.hasProposal,
+        hasReference: page.hasReference,
+        source,
+      }
     } catch {
       throw notFound()
     }
@@ -33,7 +38,7 @@ export const Route = createFileRoute('/pages/$kind/$name')({
 
 function PageView() {
   const { kind, name } = Route.useParams()
-  const { variant, hasProposal, source } = Route.useLoaderData()
+  const { variant, hasProposal, hasReference, source } = Route.useLoaderData()
   if (kind !== 'component' && kind !== 'screen') return null
 
   return (
@@ -47,6 +52,7 @@ function PageView() {
         page={{ kind, name }}
         variant={variant}
         hasProposal={hasProposal}
+        hasReference={hasReference}
         source={source}
       />
     </div>

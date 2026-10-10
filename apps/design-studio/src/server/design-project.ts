@@ -18,6 +18,14 @@ import { pathToFileURL } from 'node:url'
 import { conflict, invalid, notFound } from './errors'
 import { nativeImport } from './native-import.mjs'
 import { assertLoadsOnlyAssets, rebaseForScreenProposal } from './page-html'
+import {
+  EMPTY_SKETCH,
+  compactShapes,
+  liveIds,
+  parseScene,
+  removeShapes,
+} from './sketch'
+import type { CompactShape } from './sketch'
 
 export type PageKind = 'component' | 'screen'
 export interface PageRef {
@@ -27,9 +35,36 @@ export interface PageRef {
 export type PageVariant = 'reference' | 'proposal'
 
 export interface PageSummary extends PageRef {
+  /** False for a blank page: a proposal made from nothing, with no captured reference. */
+  hasReference: boolean
   hasProposal: boolean
-  referenceHash: string
+  referenceHash: string | null
   proposalHash: string | null
+}
+
+export type RequestStatus = 'pending' | 'sent' | 'done' | 'failed'
+
+/**
+ * A "Make real" request: ids and file references only, never free text taken from the page. The sketch's text is read
+ * by Claude through MCP (`get_sketch_request`), as the user's design notes.
+ */
+export interface SketchRequest {
+  id: string
+  page: PageRef
+  shapeIds: string[]
+  /** The PNG of the selection over the page, in design/requests/. */
+  png: string
+  status: RequestStatus
+  createdAt: string
+  updatedAt: string
+  /** What Claude said when it resolved the request: a summary (done) or a reason (failed). */
+  resolution?: string
+}
+
+export interface SketchRequestDetail {
+  request: SketchRequest
+  /** The selected shapes as they are in the sketch now (empty once they were removed). */
+  shapes: CompactShape[]
 }
 
 export interface ComponentReference {
@@ -101,6 +136,8 @@ export type DesignEvent =
       hash: string
     }
   | { kind: 'palette'; hash: string }
+  | { kind: 'sketch'; name: string; pageKind: PageKind; hash: string }
+  | { kind: 'request'; request: SketchRequest }
 
 export interface DesignProject {
   root: string
@@ -113,11 +150,45 @@ export interface DesignProject {
     /** The captured component references, named as in the manifest, for the editor's Add tab. */
     components: () => Promise<ComponentReference[]>
     createProposal: (ref: PageRef) => Promise<{ hash: string }>
+    /** A new, empty proposal with no reference: the page to sketch a new component or screen on. */
+    createBlank: (ref: PageRef) => Promise<{ hash: string }>
     saveProposal: (
       ref: PageRef,
       html: string,
       baseHash: string,
     ) => Promise<{ hash: string }>
+  }
+  /** The sketch drawn over a proposal, saved next to it as `<proposal>.excalidraw`. */
+  sketch: {
+    /** The file's content and hash; a proposal without a sketch reads as an empty one. */
+    read: (ref: PageRef) => Promise<{ json: string; hash: string }>
+    save: (
+      ref: PageRef,
+      json: string,
+      baseHash: string,
+    ) => Promise<{ hash: string }>
+  }
+  /** "Make real" requests, kept in design/requests/ (git-ignored). */
+  requests: {
+    create: (input: {
+      page: PageRef
+      shapeIds: string[]
+      /** The PNG, base64. */
+      png: string
+    }) => Promise<SketchRequest>
+    list: (filter?: {
+      status?: RequestStatus
+      page?: PageRef
+    }) => Promise<SketchRequest[]>
+    get: (id: string) => Promise<SketchRequestDetail>
+    png: (id: string) => Promise<Buffer>
+    /** The channel delivered it (pending -> sent). Later states are left alone. */
+    markSent: (id: string) => Promise<SketchRequest>
+    /** Done removes the request's shapes from the sketch. */
+    resolve: (
+      id: string,
+      outcome: { status: 'done' | 'failed'; note: string },
+    ) => Promise<SketchRequest>
   }
   palette: {
     read: () => Promise<PaletteState>
@@ -204,7 +275,10 @@ async function readIfExists(file: string): Promise<string | null> {
   }
 }
 
-async function writeAtomic(file: string, content: string): Promise<void> {
+async function writeAtomic(
+  file: string,
+  content: string | Buffer,
+): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true })
   const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`
   try {
@@ -269,19 +343,25 @@ export function openProject(rootDir: string): DesignProject {
       const kinds: PageKind[] = ['component', 'screen']
       const lists = await Promise.all(
         kinds.map(async (kind) => {
-          const names = (
-            await namesIn(kind === 'component' ? 'components' : 'screens')
-          ).sort()
+          const [references, proposals] = await Promise.all([
+            namesIn(kind === 'component' ? 'components' : 'screens'),
+            namesIn(kind === 'component' ? 'proposals' : 'proposals/screens'),
+          ])
+          // A proposal with no reference is a blank page.
+          const names = [...new Set([...references, ...proposals])].sort()
           return Promise.all(
             names.map(async (name): Promise<PageSummary> => {
               const ref = { kind, name }
-              const reference = await readPage(ref, 'reference')
+              const reference = await readPage(ref, 'reference').catch(
+                () => null,
+              )
               const proposal = await readPage(ref, 'proposal').catch(() => null)
               return {
                 kind,
                 name,
+                hasReference: reference !== null,
                 hasProposal: proposal !== null,
-                referenceHash: reference.hash,
+                referenceHash: reference?.hash ?? null,
                 proposalHash: proposal?.hash ?? null,
               }
             }),
@@ -333,6 +413,29 @@ export function openProject(rootDir: string): DesignProject {
       return { hash: hashOf(html) }
     },
 
+    async createBlank(ref) {
+      assertRef(ref)
+      for (const variant of ['reference', 'proposal'] as const)
+        if (existsSync(absPath(ref, variant)))
+          throw conflict(
+            `${ref.kind} "${ref.name}" already exists (${variant}): open it instead`,
+          )
+      const up = ref.kind === 'screen' ? '../../' : '../'
+      const html = `<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>${ref.name}</title>
+    <link rel="stylesheet" href="${up}assets/project.css" />
+  </head>
+  <body>
+  </body>
+</html>
+`
+      await writeAtomic(absPath(ref, 'proposal'), html)
+      return { hash: hashOf(html) }
+    },
+
     async saveProposal(ref, html, baseHash) {
       const current = await readPage(ref, 'proposal')
       if (typeof html !== 'string') throw invalid('html must be a string')
@@ -346,6 +449,207 @@ export function openProject(rootDir: string): DesignProject {
       await writeAtomic(absPath(ref, 'proposal'), html)
       return { hash: hashOf(html) }
     },
+  }
+
+  // --- sketch ------------------------------------------------------------
+
+  /** The sketch sits next to its proposal, same name, `.excalidraw`. */
+  const sketchFile = (ref: PageRef) =>
+    absPath(ref, 'proposal').replace(/\.html$/, '.excalidraw')
+
+  async function readSketch(ref: PageRef) {
+    assertRef(ref)
+    const json = (await readIfExists(sketchFile(ref))) ?? EMPTY_SKETCH
+    return { json, hash: hashOf(json) }
+  }
+
+  const sketch: DesignProject['sketch'] = {
+    read: readSketch,
+
+    async save(ref, json, baseHash) {
+      // A sketch belongs to a proposal: there is none to draw on without one.
+      await readPage(ref, 'proposal')
+      parseScene(json)
+      const current = await readSketch(ref)
+      if (current.hash !== baseHash) {
+        throw conflict(
+          `The sketch of ${ref.kind} "${ref.name}" changed since it was read (hash ${current.hash.slice(0, 8)}…)`,
+        )
+      }
+      await writeAtomic(sketchFile(ref), json)
+      return { hash: hashOf(json) }
+    },
+  }
+
+  // --- requests ----------------------------------------------------------
+
+  const requestsDir = path.join(designDir, 'requests')
+  const REQUEST_ID = /^rq-[0-9a-f]{8}$/
+  const PNG_MAGIC = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ])
+  const MAX_PNG_BYTES = 12 * 1024 * 1024
+  const SHAPE_ID = /^[A-Za-z0-9_-]{1,64}$/
+
+  const requestFile = (id: string, ext: 'json' | 'png') => {
+    if (typeof id !== 'string' || !REQUEST_ID.test(id))
+      throw invalid(`Bad request id "${String(id)}"`)
+    return path.join(requestsDir, `${id}.${ext}`)
+  }
+
+  async function readRequest(id: string): Promise<SketchRequest> {
+    const text = await readIfExists(requestFile(id, 'json'))
+    if (text === null) throw notFound(`No sketch request "${id}"`)
+    return JSON.parse(text) as SketchRequest
+  }
+
+  // Updates of one request are read-modify-write: one at a time, so "sent" never overwrites "done".
+  let chain: Promise<unknown> = Promise.resolve()
+  const serial = <T>(fn: () => Promise<T>): Promise<T> => {
+    const next = chain.then(fn, fn)
+    chain = next.catch(() => undefined)
+    return next
+  }
+
+  const emit = (event: DesignEvent) => {
+    for (const listener of [...listeners]) listener(event)
+  }
+
+  async function writeRequest(request: SketchRequest) {
+    await writeAtomic(
+      requestFile(request.id, 'json'),
+      JSON.stringify(request, null, 2) + '\n',
+    )
+    emit({ kind: 'request', request })
+  }
+
+  const requests: DesignProject['requests'] = {
+    create: ({ page, shapeIds, png }) =>
+      serial(async () => {
+        await readPage(page, 'proposal')
+        if (
+          !Array.isArray(shapeIds) ||
+          shapeIds.length === 0 ||
+          shapeIds.length > 500 ||
+          !shapeIds.every((id) => typeof id === 'string' && SHAPE_ID.test(id))
+        )
+          throw invalid('shapeIds must list 1 to 500 shape ids')
+        const scene = parseScene((await readSketch(page)).json)
+        const known = liveIds(scene)
+        const missing = shapeIds.filter((id) => !known.has(id))
+        if (missing.length)
+          throw invalid(
+            `Shapes not in the saved sketch (save it first): ${missing.slice(0, 5).join(', ')}`,
+          )
+        if (typeof png !== 'string') throw invalid('png must be base64')
+        const bytes = Buffer.from(png, 'base64')
+        if (bytes.length > MAX_PNG_BYTES) throw invalid('The PNG is too big')
+        if (!bytes.subarray(0, 8).equals(PNG_MAGIC))
+          throw invalid('png is not a PNG image')
+        const id = `rq-${randomBytes(4).toString('hex')}`
+        const now = new Date().toISOString()
+        const request: SketchRequest = {
+          id,
+          page: { kind: page.kind, name: page.name },
+          shapeIds: [...new Set(shapeIds)],
+          png: `${id}.png`,
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now,
+        }
+        await mkdir(requestsDir, { recursive: true })
+        // The folder ignores itself: requests are working files, not part of the design.
+        await writeFile(path.join(requestsDir, '.gitignore'), '*\n', {
+          flag: 'wx',
+        }).catch(() => undefined)
+        await writeAtomic(requestFile(id, 'png'), bytes)
+        await writeRequest(request)
+        return request
+      }),
+
+    async list(filter = {}) {
+      let names: string[]
+      try {
+        names = await readdir(requestsDir)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+        throw error
+      }
+      const all = await Promise.all(
+        names
+          .filter((n) => n.endsWith('.json'))
+          .map((n) =>
+            readRequest(n.slice(0, -'.json'.length)).catch(() => null),
+          ),
+      )
+      return all
+        .filter((r): r is SketchRequest => r !== null)
+        .filter((r) => !filter.status || r.status === filter.status)
+        .filter(
+          (r) =>
+            !filter.page ||
+            (r.page.kind === filter.page.kind &&
+              r.page.name === filter.page.name),
+        )
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    },
+
+    async get(id) {
+      const request = await readRequest(id)
+      const scene = parseScene((await readSketch(request.page)).json)
+      return { request, shapes: compactShapes(scene, request.shapeIds) }
+    },
+
+    async png(id) {
+      const request = await readRequest(id)
+      return readFile(requestFile(request.id, 'png'))
+    },
+
+    markSent: (id) =>
+      serial(async () => {
+        const request = await readRequest(id)
+        if (request.status !== 'pending') return request
+        const next = {
+          ...request,
+          status: 'sent' as const,
+          updatedAt: new Date().toISOString(),
+        }
+        await writeRequest(next)
+        return next
+      }),
+
+    resolve: (id, outcome) =>
+      serial(async () => {
+        const request = await readRequest(id)
+        if (request.status === 'done' || request.status === 'failed')
+          throw conflict(`Request ${id} is already ${request.status}`)
+        if (outcome?.status !== 'done' && outcome?.status !== 'failed')
+          throw invalid('status must be "done" or "failed"')
+        const note = typeof outcome.note === 'string' ? outcome.note.trim() : ''
+        if (!note)
+          throw invalid(
+            outcome.status === 'done'
+              ? 'A done request needs a short summary'
+              : 'A failed request needs a reason',
+          )
+        if (outcome.status === 'done') {
+          // The shapes became real elements: take them off the sketch.
+          const current = await readSketch(request.page)
+          const scene = parseScene(current.json)
+          const json =
+            JSON.stringify(removeShapes(scene, request.shapeIds), null, 2) +
+            '\n'
+          await writeAtomic(sketchFile(request.page), json)
+        }
+        const next: SketchRequest = {
+          ...request,
+          status: outcome.status,
+          resolution: note.slice(0, 1000),
+          updatedAt: new Date().toISOString(),
+        }
+        await writeRequest(next)
+        return next
+      }),
   }
 
   // --- palette -----------------------------------------------------------
@@ -634,6 +938,21 @@ export function openProject(rootDir: string): DesignProject {
     }
   }
 
+  function sketchOf(
+    file: string,
+  ): Omit<Extract<DesignEvent, { kind: 'sketch' }>, 'hash'> | null {
+    const rel = path.relative(designDir, file).split(path.sep).join('/')
+    const m = rel.match(
+      /^(proposals|proposals\/screens)\/([a-z0-9-]+)\.excalidraw$/,
+    )
+    if (!m) return null
+    return {
+      kind: 'sketch',
+      name: m[2],
+      pageKind: m[1] === 'proposals' ? 'component' : 'screen',
+    }
+  }
+
   function pageOf(
     file: string,
   ): Omit<Extract<DesignEvent, { kind: 'page' }>, 'hash'> | null {
@@ -661,13 +980,16 @@ export function openProject(rootDir: string): DesignProject {
     if (lastHash.get(file) === hash) return
     lastHash.set(file, hash)
     const page = pageOf(file)
+    const sk = sketchOf(file)
     const event: DesignEvent | null =
       file === inputsFile
         ? { kind: 'palette', hash }
         : page
           ? { ...page, hash }
-          : null
-    if (event) for (const listener of [...listeners]) listener(event)
+          : sk
+            ? { ...sk, hash }
+            : null
+    if (event) emit(event)
   }
 
   async function startWatching() {
@@ -690,6 +1012,8 @@ export function openProject(rootDir: string): DesignProject {
   return {
     root,
     pages,
+    sketch,
+    requests,
     palette,
     watching: () => starting ?? Promise.resolve(),
     watch(listener) {

@@ -32,11 +32,14 @@ export function PageWorkspace({
   page,
   variant,
   hasProposal,
+  hasReference,
   source,
 }: {
   page: PageRef
   variant: Variant
   hasProposal: boolean
+  /** False for a blank page: there is nothing captured to compare with. */
+  hasReference: boolean
   source: { html: string; hash: string }
 }) {
   const router = useRouter()
@@ -51,6 +54,10 @@ export function PageWorkspace({
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [picked, setPicked] = useState<Picked | null>(null)
   const { publish } = useInspected()
+
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  const reloadRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   const open = (target: 'reference' | 'proposal') =>
     navigate({
@@ -69,8 +76,20 @@ export function PageWorkspace({
   useEffect(() => {
     if (!editable) return
     return onStudioMessage((message) => {
-      if (message.type !== 'change' || message.event.kind !== 'page') return
+      if (message.type !== 'change') return
       const { event } = message
+      // Claude resolved a Make real request on this page as done: its change is in the proposal, so reload it.
+      if (
+        event.kind === 'request' &&
+        event.request.status === 'done' &&
+        event.request.page.kind === page.kind &&
+        event.request.page.name === page.name
+      ) {
+        if (dirtyRef.current) setExternal(true)
+        else void reloadRef.current()
+        return
+      }
+      if (event.kind !== 'page') return
       if (
         event.pageKind === page.kind &&
         event.name === page.name &&
@@ -125,6 +144,8 @@ export function PageWorkspace({
     setSession((n) => n + 1)
   }
 
+  reloadRef.current = reload
+
   const createProposal = async () => {
     const result = await createPageProposal({ data: page })
     // "Already exists" is fine: open it.
@@ -178,7 +199,8 @@ export function PageWorkspace({
           {page.kind} / {page.name}
         </span>
         {(['reference', 'proposal'] as const).map((v) =>
-          v === 'proposal' && !hasProposal ? (
+          v === 'reference' && !hasReference ? null : v === 'proposal' &&
+            !hasProposal ? (
             <span key={v} className="opacity-40" title="No proposal yet">
               {v}
             </span>

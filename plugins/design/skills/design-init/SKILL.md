@@ -162,7 +162,8 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 L1. **Create `design/`**: `design/assets/`, `design/components/`, `design/screens/`,
    `design/proposals/screens/` (a `.gitkeep` in each folder that would stay empty) and
    `design/index.json` as `{ "pages": [] }`. `design/` is committed; git-ignore `.design-screens/`
-   (the saved sign-in for screen captures). Never overwrite an existing `design/`. Screen captures
+   (the saved sign-in for screen captures) and `design/requests/` (the studio's Make real requests: ids
+   and PNGs, local to the machine; the studio also writes a `.gitignore` there). Never overwrite an existing `design/`. Screen captures
    anonymise the app's data with `@faker-js/faker`, resolved from the Storybook target's `dir` like
    Playwright: install it there as a dev dependency next to Playwright (`npm i -D @faker-js/faker`
    with the project's package manager) unless it is already present.

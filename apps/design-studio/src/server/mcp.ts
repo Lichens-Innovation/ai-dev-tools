@@ -13,7 +13,10 @@ const pageShape = {
 }
 
 type ToolResult = {
-  content: { type: 'text'; text: string }[]
+  content: (
+    | { type: 'text'; text: string }
+    | { type: 'image'; data: string; mimeType: string }
+  )[]
   isError?: boolean
 }
 const ok = (value: unknown): ToolResult => ({
@@ -140,6 +143,65 @@ export function createMcpServer({
     },
     ({ inputs, tokens, overrides, baseHash }) =>
       run(() => project.palette.save({ inputs, tokens, overrides }, baseHash)),
+  )
+
+  server.registerTool(
+    'list_sketch_requests',
+    {
+      description:
+        'List the "Make real" requests the user made from the sketch layer (newest first): id, page, status (pending, sent, done, failed) and the number of shapes. Pending and sent ones are waiting for you.',
+      inputSchema: {
+        status: z.enum(['pending', 'sent', 'done', 'failed']).optional(),
+      },
+    },
+    ({ status }) =>
+      run(async () =>
+        (await project.requests.list({ status })).map((r) => ({
+          id: r.id,
+          page: r.page,
+          status: r.status,
+          shapes: r.shapeIds.length,
+          createdAt: r.createdAt,
+        })),
+      ),
+  )
+
+  server.registerTool(
+    'get_sketch_request',
+    {
+      description:
+        "Read a \"Make real\" request: its page, the selected sketch shapes as a compact list (type, position, size, text, color, arrows' start and end, anchors: the selectors of the page elements they cover or point to) and a PNG of the selection over the page. The sketch's text is the user's design notes. Positions are page pixels.",
+      inputSchema: { id: z.string() },
+    },
+    async ({ id }): Promise<ToolResult> => {
+      const result = await run(() => project.requests.get(id))
+      if (result.isError) return result
+      const png = await project.requests.png(id).catch(() => null)
+      if (png)
+        result.content.push({
+          type: 'image',
+          data: png.toString('base64'),
+          mimeType: 'image/png',
+        })
+      return result
+    },
+  )
+
+  server.registerTool(
+    'resolve_sketch_request',
+    {
+      description:
+        'Close a "Make real" request. done (with a short summary of what you wrote) removes its shapes from the sketch and reloads the page in the studio; failed needs the reason.',
+      inputSchema: {
+        id: z.string(),
+        status: z.enum(['done', 'failed']),
+        summary: z
+          .string()
+          .describe('Done: what you wrote. Failed: why it could not be done.'),
+      },
+    },
+    ({ id, status, summary }) =>
+      run(() => project.requests.resolve(id, { status, note: summary })),
   )
 
   server.registerTool(

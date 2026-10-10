@@ -123,23 +123,46 @@ Each row has two separate actions, so changing one element is never confused wit
 
 MCP `get_selection` returns the same trace.
 
+## Sketch layer and Make real
+
+A transparent Excalidraw layer (loaded in the browser only) sits over the proposal in the editor. The toolbar's
+**Select** works on the page (GrapesJS); **Sketch**, **Rectangle**, **Pen**, **Text**, **Arrow** and **Eraser** hand the
+mouse and keyboard to the sketch, and **Hide sketch** toggles the layer. Excalidraw's own UI is hidden. Zoom and scroll
+follow the page and cannot be changed from the sketch; side by side shows the sketch over the light editor only.
+
+- **Anchors.** Shapes, arrow ends and text record the page element they cover or point to (a selector preferring ids,
+  plus an offset) in the element's `customData`, and follow it when the layout moves.
+- **Saved** as `<proposal>.excalidraw` next to the proposal (Excalidraw JSON, opens on excalidraw.com): autosave with an
+  atomic write and a changed-on-disk check (Reload or Overwrite).
+- **New blank page** (sidebar): an empty proposal, a component or a screen named by you, with only a sketch.
+- **Make real.** Select shapes and press it: the studio writes `design/requests/<id>.json` and a PNG of the selection over
+  the page (git-ignored). A badge on the shapes shows `Pending → Sent to Claude → Done | Failed`. **Copy command** puts
+  `/design-sketch <id>` on the clipboard, the fallback when the Claude Code channel is not on. The design plugin's channel
+  (`channel/design-channel.mjs`) follows `/events` and pushes new requests into the session; start Claude Code with
+  `claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools`.
+
 ## MCP tools
 
 `list_pages`, `get_page`, `create_proposal`, `write_page` (proposals only; needs the `baseHash` of the last read),
-`get_selection`, `get_palette`, `set_palette`, `open_page`.
+`get_selection`, `get_palette`, `set_palette`, `open_page`, and for Make real `list_sketch_requests`,
+`get_sketch_request` (compact shapes and the PNG) and `resolve_sketch_request` (`done` removes the shapes and reloads the
+page, `failed` keeps them).
 
 ## Routes
 
-| Route                | What it does                                                                     |
-| -------------------- | -------------------------------------------------------------------------------- |
-| `/`                  | List of pages                                                                    |
-| `/pages/$kind/$name` | A reference (read only, inspectable) or a proposal in the editor                 |
-| `/palette`           | The palette card: colors, contrast audit, semantic mapping, tokens, components   |
-| `/tailwind`          | The Tailwind classes card: every utility under the project's namespace           |
-| `/render/*`          | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright |
-| `/events`            | Server-sent events: file changes and `open_page` requests                        |
-| `/mcp`               | MCP, Streamable HTTP                                                             |
-| `/api/selection`     | `PUT` the editor selection (browser), `GET` it                                   |
+| Route                    | What it does                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `/`                      | List of pages                                                                    |
+| `/pages/$kind/$name`     | A reference (read only, inspectable) or a proposal in the editor                 |
+| `/palette`               | The palette card: colors, contrast audit, semantic mapping, tokens, components   |
+| `/tailwind`              | The Tailwind classes card: every utility under the project's namespace           |
+| `/render/*`              | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright |
+| `/events`                | Server-sent events: file changes and `open_page` requests                        |
+| `/mcp`                   | MCP, Streamable HTTP                                                             |
+| `/api/selection`         | `PUT` the editor selection (browser), `GET` it                                   |
+| `/api/requests`          | `GET` the requests (`?status=pending`), for the channel                          |
+| `/api/requests/$id/sent` | `POST`: the channel delivered it (`pending` becomes `sent`)                      |
+| `/excalidraw-assets/*`   | Excalidraw's fonts, served locally                                               |
 
 ## Develop
 

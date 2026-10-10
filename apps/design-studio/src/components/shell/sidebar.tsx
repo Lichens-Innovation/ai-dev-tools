@@ -1,4 +1,11 @@
-import { Link, useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
+import {
+  Link,
+  useNavigate,
+  useRouter,
+  useRouterState,
+} from '@tanstack/react-router'
+import { createBlankPage } from '#/server/functions'
 import type { PageSummary } from '#/server/design-project'
 import { usePalette } from '#/palette/palette-state'
 import { BAR_HEIGHT, SIDEBAR_WIDTH, useShell } from '#/studio/shell-state'
@@ -43,6 +50,91 @@ function Group({
         )
       })}
     </>
+  )
+}
+
+/** A blank page: a new empty proposal (component or screen) named by the user, with only a sketch on it. */
+function NewPage({ onPick }: { onPick: () => void }) {
+  const router = useRouter()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [kind, setKind] = useState<'screen' | 'component'>('screen')
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const field =
+    'h-8 rounded-md border border-(--line) bg-(--bg) px-2 text-[13px] text-(--ink)'
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mx-3 mt-2 h-8 cursor-pointer rounded-md border border-dashed border-(--line) px-3 text-left text-[13px] text-(--ink-2) hover:bg-(--bg-2)"
+      >
+        + New blank page
+      </button>
+    )
+  return (
+    <form
+      className="mx-3 mt-2 flex flex-col gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void createBlankPage({ data: { kind, name: name.trim() } })
+          .then(async (result) => {
+            if (!result.ok) return setError(result.message)
+            await router.invalidate()
+            setOpen(false)
+            setName('')
+            setError(null)
+            onPick()
+            await navigate({
+              to: '/pages/$kind/$name',
+              params: { kind, name: name.trim() },
+              search: { variant: 'proposal' },
+            })
+          })
+          .catch((err: unknown) =>
+            setError(err instanceof Error ? err.message : String(err)),
+          )
+      }}
+    >
+      <select
+        aria-label="Kind"
+        value={kind}
+        onChange={(e) => setKind(e.target.value as 'screen' | 'component')}
+        className={field}
+      >
+        <option value="screen">Screen</option>
+        <option value="component">Component</option>
+      </select>
+      <input
+        aria-label="Name (kebab-case)"
+        placeholder="name-in-kebab-case"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className={field}
+        required
+      />
+      {error && (
+        <p role="alert" className="text-xs text-(--red)">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-1.5">
+        <button
+          type="submit"
+          className="h-8 cursor-pointer rounded-md bg-(--primary) px-3 text-[13px] text-(--bg)"
+        >
+          Create
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="h-8 cursor-pointer rounded-md border border-(--line) px-3 text-[13px] text-(--ink)"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -100,6 +192,7 @@ export function Sidebar({ pages }: { pages: PageSummary[] }) {
             </Link>
           )}
         </div>
+        <NewPage onPick={onPick} />
         {pages.length === 0 && (
           <p className="px-4 py-2 text-[13px] text-(--ink-3)">
             No pages yet: the project has nothing in design/index.json.
