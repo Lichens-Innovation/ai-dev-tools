@@ -53,6 +53,30 @@ describe('pages: list and read', () => {
   })
 })
 
+describe('pages: components', () => {
+  it('lists the captured components under their catalog name', async () => {
+    const [one, ...rest] = await project.pages.components()
+    expect(rest).toEqual([])
+    expect(one).toMatchObject({ name: 'Button', page: 'button' })
+    expect(one.html).toContain('class="btn"')
+  })
+
+  it('falls back to the page name in Pascal case without a catalog', async () => {
+    await writeFile(path.join(root, 'design/index.json'), '{ nope')
+    expect((await project.pages.components()).map((c) => c.name)).toEqual([
+      'Button',
+    ])
+    await writeFile(
+      path.join(root, 'design/components/primary-button.html'),
+      '<body><button>x</button></body>',
+    )
+    expect((await project.pages.components()).map((c) => c.name)).toEqual([
+      'Button',
+      'PrimaryButton',
+    ])
+  })
+})
+
 describe('pages: proposals', () => {
   it('creates a proposal as a copy of the reference, once', async () => {
     const { hash } = await project.pages.createProposal(button)

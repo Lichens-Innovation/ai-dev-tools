@@ -32,6 +32,14 @@ export interface PageSummary extends PageRef {
   proposalHash: string | null
 }
 
+export interface ComponentReference {
+  /** The component's name in the manifest/catalog (`Button`): what `data-component` says. */
+  name: string
+  /** The reference page it was captured as. */
+  page: string
+  html: string
+}
+
 export type PaletteInputs = Record<string, { lm: string; dm: string }>
 export interface PaletteDraft {
   inputs: PaletteInputs
@@ -102,6 +110,8 @@ export interface DesignProject {
       ref: PageRef,
       variant: PageVariant,
     ) => Promise<{ html: string; hash: string }>
+    /** The captured component references, named as in the manifest, for the editor's Add tab. */
+    components: () => Promise<ComponentReference[]>
     createProposal: (ref: PageRef) => Promise<{ hash: string }>
     saveProposal: (
       ref: PageRef,
@@ -282,6 +292,32 @@ export function openProject(rootDir: string): DesignProject {
     },
 
     read: readPage,
+
+    async components() {
+      // The catalog names a component as the manifest does; a page missing from it gets its kebab name in Pascal case.
+      const names = new Map<string, string>()
+      try {
+        const index = JSON.parse(
+          (await readIfExists(path.join(designDir, 'index.json'))) ?? '{}',
+        ) as { pages?: { name?: unknown; reference?: unknown }[] }
+        for (const row of index.pages ?? [])
+          if (typeof row.name === 'string' && typeof row.reference === 'string')
+            names.set(row.reference, row.name)
+      } catch {
+        // An unreadable catalog only costs the names.
+      }
+      const pascal = (kebab: string) =>
+        kebab.replace(/(?:^|-)([a-z0-9])/g, (_, c: string) => c.toUpperCase())
+      const found = (await namesIn('components')).sort()
+      return Promise.all(
+        found.map(async (page) => ({
+          name: names.get(`components/${page}.html`) ?? pascal(page),
+          page,
+          html: (await readPage({ kind: 'component', name: page }, 'reference'))
+            .html,
+        })),
+      )
+    },
 
     async createProposal(ref) {
       const reference = await readPage(ref, 'reference')

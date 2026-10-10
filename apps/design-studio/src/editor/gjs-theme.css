@@ -8,6 +8,33 @@
   --gjs-font-color-active: var(--ink);
   --gjs-main-font: inherit;
   --gjs-font-size: 12px;
+  /* The line a dragged block would land on: easy to see on any page. */
+  --gjs-placeholder-background-color: #7c3aed;
+}
+.ds-gjs .gjs-placeholder-int {
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+}
+.ds-gjs .gjs-selected-parent {
+  outline: 2px dashed #7c3aed !important;
+}
+.ds-gjs .ds-align {
+  display: inline-flex;
+  align-items: center;
+}
+.ds-gjs .ds-preview {
+  position: relative;
+  height: 64px;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.ds-gjs .ds-preview iframe {
+  width: 400px;
+  height: 214px;
+  border: 0;
+  transform: scale(0.3);
+  transform-origin: 0 0;
 }
 .ds-gjs .gjs-editor-cont,
 .ds-gjs .gjs-cv-canvas {
