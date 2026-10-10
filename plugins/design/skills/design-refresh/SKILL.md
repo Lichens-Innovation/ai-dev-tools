@@ -118,8 +118,13 @@ from is running; start it only if the user asks.
       "design/screens/<kebab-name>.html"`, `proposalPath:
       "design/proposals/screens/<kebab-name>.html"`, `status: "wip"`, `lastImplementedHash:
       null`. Keep every other field and row as is.
-   3. Warn that the snapshot holds the app's dev data (`local-studio.md#sample-data`), then run
-      `capture.mjs screen` (it writes the reference, `mockupHash` and `sourceHash`).
+   3. Run `capture.mjs screen` (it writes the reference, `mockupHash` and `sourceHash`). It
+      anonymises the app's data (`local-studio.md#sample-data`): JSON personal fields are faked, the
+      row's `anonymize.redact` selectors cover server-rendered data (ask the user which elements
+      show names or emails in an SSR page), and a leftover email, phone or token fails the capture
+      with exit 4 and a list of matches: add a selector, a `keys` entry or an `allow` value to the
+      row's `anonymize` and re-run. Tell the user what it cannot know: data shown from non-JSON
+      sources it cannot see, such as images of people.
 
    Then go on with step 5, and skip the Claude Design mockup work. Claude Design: follow [`screens-workflow.md`](${CLAUDE_SKILL_DIR}/references/screens-workflow.md),
    with `<screenshot.mjs>` = `${CLAUDE_SKILL_DIR}/../design-loop/scripts/screenshot.mjs`: refresh

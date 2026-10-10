@@ -68,7 +68,8 @@ A new screen needs its `screens[]` row first (local paths, contract §2): `captu
 name the manifest does not have. Capture rewrites the reference, its assets and its `design/index.json` row (and a screen's
 `mockupHash`, `sourceHash`). It exits 3 on an `edited` reference: tell the user, and re-run with
 `--force` only if they say the edit can go (a change belongs in the proposal). A screen capture
-warns that the snapshot holds whatever data the dev app shows: see
-[sample data](../local-studio.md#sample-data). The proposals are never touched: a proposal
+anonymises the data the dev app shows (needs `@faker-js/faker` next to Playwright), and exits 4,
+writing nothing, when an email, phone or token is left: see
+[sample data](../local-studio.md#sample-data) and the row's `anonymize` (contract §2). The proposals are never touched: a proposal
 whose reference was re-captured keeps its own copy of the old body, so tell the user to
 re-create it from the new reference if the code change matters to it.

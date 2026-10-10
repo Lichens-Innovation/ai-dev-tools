@@ -162,7 +162,10 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 L1. **Create `design/`**: `design/assets/`, `design/components/`, `design/screens/`,
    `design/proposals/screens/` (a `.gitkeep` in each folder that would stay empty) and
    `design/index.json` as `{ "pages": [] }`. `design/` is committed; git-ignore `.design-screens/`
-   (the saved sign-in for screen captures). Never overwrite an existing `design/`.
+   (the saved sign-in for screen captures). Never overwrite an existing `design/`. Screen captures
+   anonymise the app's data with `@faker-js/faker`, resolved from the Storybook target's `dir` like
+   Playwright: install it there as a dev dependency next to Playwright (`npm i -D @faker-js/faker`
+   with the project's package manager) unless it is already present.
 
 L2. **Capture the mapped components.** Each Storybook target must be running (its `runCommand`; start
    it only if the user asks) with Playwright installed. For each component row, from its target's
