@@ -13,6 +13,11 @@ export const listPages = createServerFn({ method: 'GET' }).handler(async () =>
   getStudio().project.pages.list(),
 )
 
+/** The captured components, for the editor's Add tab. */
+export const listComponentReferences = createServerFn({
+  method: 'GET',
+}).handler(() => getStudio().project.pages.components())
+
 const paletteDraft = z.object({
   inputs: z.record(z.string(), z.object({ lm: z.string(), dm: z.string() })),
   tokens: z.record(z.string(), z.string()),

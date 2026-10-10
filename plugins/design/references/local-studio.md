@@ -44,6 +44,18 @@ with its token trace). The change lives in two places, and only these:
   (an edit of one element), `var(--token)` for a token swap.
 - **The body**: elements moved, added, removed or retexted.
 
+Moving works like Figma (drag the selected element, copy, paste, duplicate, Alt+arrows, line-up buttons, a Layers
+tab), but a drag never writes coordinates: a drop is an order in the body, a move into another box, `margin-left:
+auto` (or `margin-top: auto` in a column, both sides to centre) on the element, or the container's alignment
+(`display: flex` with `justify-content` or `align-items`) as a `data-studio` rule. Implement them as layout.
+
+**`data-component="<name>"`.** The Add tab lists the captured component references and inserts their real markup
+(the project's classes) with this attribute on the root, `<name>` being the component's name in the manifest
+(`design/index.json`). An element carrying it is an **instance of that manifest component**: `design-loop` implements
+it by using the component (its props or variant for what the element shows), never new markup copied from the
+proposal. Copies of the element keep the attribute. Several roots are wrapped in a `display: contents` box that
+carries it. Rules on that element (`#id`) are overrides of the instance, read like any other `data-studio` rule.
+
 `design-loop` implements exactly that difference: the data-studio rules, then the body diff against
 the reference. Everything else in the proposal is the reference.
 
@@ -52,6 +64,9 @@ the reference. Everything else in the proposal is the reference.
 - List each `data-studio` rule: its `#id` selector, which element of the reference it is (find the
   id in the body; its classes and place name the variant or state), and its values. A value written
   as `var(--x)` is already a token; a literal is reconciled like any value (contract §5).
+- An element with `data-component` in the body is a use of that component, whether the reference had it or the
+  user added it: find the component in the code and render it there (where it sits, with the props that match its
+  text and classes), instead of reproducing its markup.
 - Diff the body against the reference (`<name>.reference.html` / `<name>.mockup.html` from Fetch
   target): list what moved, what was added or removed, text changes, and for a screen the layout
   (flex or grid, gaps, widths). A DOM change is a structure change in the component's or screen's
