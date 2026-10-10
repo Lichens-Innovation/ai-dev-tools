@@ -14,12 +14,19 @@ export const WIDE = 900
 export const BAR_HEIGHT = 56
 export const SIDEBAR_WIDTH = 280
 
+export type FooterTab = 'palette' | 'full' | 'inspect'
+export const FOOTER_TABS: FooterTab[] = ['palette', 'full', 'inspect']
+/** The footer body's height range, in px. */
+export const FOOTER_MIN = 120
+
 interface Prefs {
   mode: Mode
   sideBySide: boolean
   sidebar: boolean
   footerOpen: boolean
-  advanced: boolean
+  footerTab: FooterTab
+  /** The footer body's height in px, or null for the default. */
+  footerHeight: number | null
 }
 
 const DEFAULTS: Prefs = {
@@ -27,7 +34,8 @@ const DEFAULTS: Prefs = {
   sideBySide: false,
   sidebar: true,
   footerOpen: false,
-  advanced: false,
+  footerTab: 'palette',
+  footerHeight: null,
 }
 
 const keyFor = (root: string) => `design-studio:${root}`
@@ -61,7 +69,8 @@ interface ShellState extends Prefs {
   setSideBySide: (on: boolean) => void
   setSidebar: (open: boolean) => void
   setFooterOpen: (open: boolean) => void
-  setAdvanced: (on: boolean) => void
+  setFooterTab: (tab: FooterTab) => void
+  setFooterHeight: (height: number | null) => void
 }
 
 const Context = createContext<ShellState | null>(null)
@@ -90,12 +99,23 @@ export function ShellProvider({
 
   useEffect(() => {
     const isWide = window.innerWidth >= WIDE
-    const saved = load(root)
+    const saved = load(root) as Partial<Prefs> & { advanced?: boolean }
     setWide(isWide)
     setPrefs({
       ...DEFAULTS,
       ...saved,
       mode: saved.mode === 'dark' ? 'dark' : 'light',
+      // `advanced` was the earlier name of the Full palette view.
+      footerTab: FOOTER_TABS.includes(saved.footerTab as FooterTab)
+        ? (saved.footerTab as FooterTab)
+        : saved.advanced
+          ? 'full'
+          : 'palette',
+      footerHeight:
+        typeof saved.footerHeight === 'number' &&
+        Number.isFinite(saved.footerHeight)
+          ? Math.max(FOOTER_MIN, saved.footerHeight)
+          : null,
       // A narrow screen starts with the sidebar closed.
       sidebar: isWide && saved.sidebar !== false,
     })
@@ -143,7 +163,8 @@ export function ShellProvider({
       setSideBySide: (sideBySide) => update({ sideBySide }),
       setSidebar: (sidebar) => update({ sidebar }),
       setFooterOpen: (footerOpen) => update({ footerOpen }),
-      setAdvanced: (advanced) => update({ advanced }),
+      setFooterTab: (footerTab) => update({ footerTab }),
+      setFooterHeight: (footerHeight) => update({ footerHeight }),
     }),
     [prefs, nav, root, ready, wide, update],
   )

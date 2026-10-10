@@ -10,6 +10,7 @@ import { useEffect } from 'react'
 import { Navbar } from '#/components/shell/navbar'
 import { PaletteFooter } from '#/components/shell/palette-footer'
 import { Sidebar } from '#/components/shell/sidebar'
+import { InspectProvider } from '#/inspector/inspect-state'
 import { PaletteProvider } from '#/palette/palette-state'
 import { getShell } from '#/server/functions'
 import {
@@ -50,7 +51,9 @@ function RootLayout() {
   return (
     <ShellProvider root={root}>
       <PaletteProvider initial={palette}>
-        <Studio pages={pages} />
+        <InspectProvider>
+          <Studio pages={pages} />
+        </InspectProvider>
       </PaletteProvider>
     </ShellProvider>
   )

@@ -455,7 +455,7 @@ export function Semantic({ pal, mode }: { pal: PaletteContext; mode: Mode }) {
         <div className={heading}>Semantic</div>
         <div className={muted}>
           What components use, and what each token points to in {mode} mode. To
-          re-point one, use Advanced in the Palette footer.
+          re-point one, use the Full palette tab of the footer.
         </div>
       </div>
       <div className="flex flex-col">
