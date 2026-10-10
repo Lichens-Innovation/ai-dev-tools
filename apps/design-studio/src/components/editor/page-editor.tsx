@@ -5,6 +5,7 @@ import { renderPath } from '#/components/shell/page-frame'
 import type { PageRef } from '#/components/shell/page-frame'
 import { componentMarkup } from '#/editor/component-ref'
 import { installGestures } from '#/editor/gestures'
+import { SketchLayer } from './sketch-layer'
 import { parsePage } from '#/editor/page-document'
 import { serializeEditor } from '#/editor/serialize'
 import {
@@ -115,6 +116,8 @@ export function PageEditor({
     Awaited<ReturnType<typeof listComponentReferences>>
   >([])
   const blockIds = useRef<string[]>([])
+  // True while a sketch tool is active: the page's keymaps (undo, copy, paste, arrows…) step aside.
+  const sketchOwns = useRef(false)
 
   const latest = useRef({ onDirty, onSave, onPick, page, root: shell.root })
   latest.current = { onDirty, onSave, onPick, page, root: shell.root }
@@ -160,7 +163,11 @@ export function PageEditor({
       })
       editorRef.current = editor
       fieldsRef.current = registerTokenFields(editor)
-      removeGestures = installGestures(editor, latest.current.root)
+      removeGestures = installGestures(
+        editor,
+        latest.current.root,
+        () => !sketchOwns.current,
+      )
       // The sectors come after the field types they use are registered.
       for (const sector of STYLE_SECTORS)
         editor.StyleManager.addSector(sector.name, sector)
@@ -312,6 +319,15 @@ export function PageEditor({
             className="w-full"
             style={{ height: shell.sideBySide ? 'calc(100% - 25px)' : '100%' }}
           />
+          {ready && (
+            <SketchLayer
+              page={page}
+              editor={editorRef.current}
+              onOwnsKeyboard={(owns) => {
+                sketchOwns.current = owns
+              }}
+            />
+          )}
           {failure && (
             <p
               role="alert"

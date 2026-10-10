@@ -338,12 +338,36 @@ export function insertClip(editor: Editor, clip: Clip) {
  * Keyboard and toolbar gestures, and free dragging in every canvas frame. `root` keys the clipboard kept in the
  * browser. Returns what removes them.
  */
-export function installGestures(editor: Editor, root: string) {
+export function installGestures(
+  editor: Editor,
+  root: string,
+  /** False while the sketch layer has the keyboard: the page's keys then do nothing. */
+  ownsKeyboard: () => boolean = () => true,
+) {
   const editing = () => !!editor.getSelected()?.getEl()?.isContentEditable
   const handler = (run: () => void) => () => {
-    if (!editing()) run()
+    if (!editing() && ownsKeyboard()) run()
   }
   const keymaps = editor.Keymaps
+  // Undo and redo are the page's too, until the sketch layer takes the keyboard (it has its own history).
+  keymaps.remove('core:undo')
+  keymaps.remove('core:redo')
+  keymaps.add(
+    'core:undo',
+    '⌘+z, ctrl+z',
+    () => {
+      if (ownsKeyboard()) editor.UndoManager.undo()
+    },
+    { prevent: true },
+  )
+  keymaps.add(
+    'core:redo',
+    '⌘+shift+z, ctrl+shift+z',
+    () => {
+      if (ownsKeyboard()) editor.UndoManager.redo()
+    },
+    { prevent: true },
+  )
   // GrapesJS's own copy and paste keep their clipboard in memory; ours survive a change of page.
   keymaps.remove('core:copy')
   keymaps.remove('core:paste')

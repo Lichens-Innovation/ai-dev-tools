@@ -365,7 +365,8 @@ describe('watch', () => {
       pageKind: 'component',
       variant: 'proposal',
     })
-    expect(events[0]?.hash).not.toBe(created.hash)
+    expect(events[0]).toHaveProperty('hash')
+    expect((events[0] as { hash: string }).hash).not.toBe(created.hash)
 
     await writeFile(
       path.join(root, 'theme/theme.inputs.css'),

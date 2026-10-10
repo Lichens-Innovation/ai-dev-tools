@@ -32,6 +32,9 @@ One deep module, `src/server/design-project.ts` (`openProject(root)`), holds all
 | `inspector/`                                  | Token trace over the iframe CSSOM (`trace.ts`, pure), click picker, selection push to `/api/selection`                 |
 | `editor/`                                     | Page file <-> editor: `page-document.ts` (body + `<style data-studio>`), `serialize.ts`, Style Manager                 |
 | `editor/` (gestures)                          | `drop.ts` (pure drop -> layout), `gestures.ts` (free drag, keys, line-up), `clipboard.ts`, `component-ref.ts`          |
+| `server/sketch.ts`                            | Pure sketch-file helpers: validate a scene, compact shapes for Claude, remove shapes (JSON only, no Excalidraw)        |
+| `sketch/`                                     | `anchors.ts` (selectors, anchoring, pure + jsdom tests), `view.ts` (page frame -> Excalidraw view), `capture.ts` (PNG) |
+| `components/editor/sketch-layer.tsx`          | The Excalidraw overlay, toolbar, autosave, anchoring loop, badges, Make real                                           |
 | `components/editor/`                          | `PageEditor` (GrapesJS, lazy-loaded), `PageWorkspace` (toolbar, banners, save)                                         |
 
 Rules of `DesignProject`:
@@ -57,6 +60,12 @@ A reference is shown in the plain page frame (read only, click to inspect); Crea
 `editor/drop.ts` is pure and unit-tested (`test/drop.test.ts`): `resolveDrop` turns a pointer position over measured boxes (`Level`) into a `Drop` (`between` at an index, `push` end/centre, `align` for an only child), `dropStyle` into the declarations it writes (margins `auto`, `display:flex`, `justify-content`/`align-items`, never a positional property), `markerFor` into what the live marker shows. `editor/gestures.ts` measures the canvas, draws the ghost and marker in the frame document, and applies a drop with `performDrop` (move + style in one synchronous tick, so GrapesJS fuses it into one undo step); it also owns the keymaps (our own copy/paste replace `core:copy`/`core:paste`, Ctrl+D, Alt+arrows) and the line-up toolbar buttons. `test/gestures.test.ts` runs the real `grapesjs` headless in jsdom. `data-component` is plain markup: `component-ref.ts` adds it to the root of an inserted reference (`componentMarkup`) and names layer rows; copies keep it because they are attributes. The Add tab's components come from `DesignProject.pages.components()` (name from `design/index.json`, else the page name in Pascal case). The clipboard lives in localStorage (`design-studio:<root>:clipboard`), with ids remapped on paste so rules never collide.
 
 Gotchas: GrapesJS builds canvas elements in the editor's window, so `instanceof HTMLElement` against the frame's window is false (use `nodeType`); do not call `editor.refresh()` in code the headless tests run; moved elements must not get an empty rule (it leaves an `id` in the file), so style is written only when it changes.
+
+## Sketch layer and requests
+
+`DesignProject` owns `sketch.{read,save}` (`<proposal>.excalidraw`, atomic, `baseHash` Conflict), `pages.createBlank` and `requests.{create,list,get,png,markSent,resolve}` (`design/requests/<id>.json` + `.png`, ids `rq-<8 hex>`, a `.gitignore` written there; updates are serialised so `sent` never overwrites `done`). Request events go out on `/events`. `sketch-layer.tsx` is client only (Excalidraw is dynamically imported, fonts come from `/excalidraw-assets/`): the canvas frame drives Excalidraw's scroll/zoom every frame (never the reverse), `anchors.ts` keeps shapes on their page elements (`customData.anchor`/`endAnchor`), and a sketch tool being active makes `gestures.ts` yield its keymaps (`ownsKeyboard`). The channel (`plugins/design/channel/design-channel.mjs`) consumes `/events`, `/api/requests` and `POST /api/requests/:id/sent`: keep them stable. Requests carry ids and file references only, never text from the page.
+
+Gotcha: GrapesJS auto-ids (`i1a2`) are not kept in the saved file, so anchors never use them as selectors.
 
 ## Testing
 

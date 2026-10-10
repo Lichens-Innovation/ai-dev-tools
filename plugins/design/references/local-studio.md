@@ -13,6 +13,8 @@ that backend. The operations the skills call are in [`backends/local.md`](./back
 | `design/proposals/screens/<name>.html` | the studio                       | Target: the screen plus the change                |
 | `design/assets/project.css`, `design/assets/<hash>.<ext>` | `capture.mjs` | The captured stylesheets, images and fonts |
 | `design/index.json`                 | `capture.mjs`                       | The catalog: one row per captured page            |
+| `design/proposals/<name>.excalidraw` (screens: `proposals/screens/`) | the studio (sketch layer) | The sketch drawn over a proposal (Excalidraw JSON) |
+| `design/requests/<id>.json`, `<id>.png` | the studio (Make real)          | A request for Claude: git-ignored, ids and a PNG  |
 
 `<name>` is kebab-case (`primary-button`). `design/` is committed. The palette has no file: its card
 is the studio's `/palette` page, which edits the canonical inputs file and regenerates the outputs
@@ -58,6 +60,35 @@ carries it. Rules on that element (`#id`) are overrides of the instance, read li
 
 `design-loop` implements exactly that difference: the data-studio rules, then the body diff against
 the reference. Everything else in the proposal is the reference.
+
+## Sketch and Make real
+
+A transparent Excalidraw layer sits over the editor. The toolbar's **Select** works on the page; **Rectangle**,
+**Pen**, **Text**, **Arrow** and **Eraser** (and **Sketch**, to move shapes) give the mouse and keyboard to the
+sketch. A toggle hides the layer. Zoom and scroll are locked to the page, and side by side shows the sketch over
+the light editor only. Shapes, arrow ends and text remember the page element they cover (a selector preferring
+ids, plus an offset) and follow it when the layout moves. The sketch autosaves to `<proposal>.excalidraw` (atomic
+write, `Conflict` when it changed on disk). A **blank page** (sidebar, **New blank page**) is an empty proposal
+named by the user with no reference, to sketch a new component or screen from nothing.
+
+Select shapes and press **Make real**: the studio records a request (see the contract, §2) with a PNG of the
+selection over the page, and shows its status as a badge on the shapes. Claude reads it with the MCP tools
+`list_sketch_requests`, `get_sketch_request` (compact shapes and the PNG) and `resolve_sketch_request`
+(`done` removes the shapes and reloads the page, `failed` keeps them). The **`design-sketch`** skill does that.
+
+**The channel.** The design plugin ships a Claude Code channel (`channel/design-channel.mjs`, declared in the
+plugin's `.mcp.json` as the `design` server). It reads `design.manifest.json` from the cwd, stays idle unless
+`backend` is `local`, follows the studio's `/events` at `127.0.0.1:<studio.port>` (reconnecting) and pushes each
+new request into the session as a `<channel source="design" request_id="…" page="…">` event, then marks it
+`sent`. A request stays `sent` until Claude resolves it. Channels are a research preview: start Claude Code with
+
+```bash
+claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools
+```
+
+Without that flag nothing is pushed: the request stays `pending`, and **Copy command** in the studio puts
+`/design-sketch <id>` on the clipboard to paste into the session. The channel is one way (no tools): Claude
+answers through the studio MCP.
 
 ## Reading a proposal (design-loop step 3)
 
