@@ -3,13 +3,17 @@ import type { RefObject } from 'react'
 import type { Component, Editor } from 'grapesjs'
 import { renderPath } from '#/components/shell/page-frame'
 import type { PageRef } from '#/components/shell/page-frame'
+import { componentMarkup } from '#/editor/component-ref'
+import { installGestures } from '#/editor/gestures'
 import { parsePage } from '#/editor/page-document'
 import { serializeEditor } from '#/editor/serialize'
 import {
   BLOCKS,
+  COMPONENTS_CATEGORY,
   STYLE_SECTORS,
   registerTokenFields,
 } from '#/editor/style-fields'
+import { listComponentReferences } from '#/server/functions'
 import { swapToken } from '#/inspector/inspect'
 import { pick } from '#/inspector/pick'
 import type { Picked } from '#/inspector/pick'
@@ -21,6 +25,8 @@ import type { Mode } from '#/palette/draft'
 import { usePalette } from '#/palette/palette-state'
 import { themeDocument } from '#/palette/theme'
 import { useShell } from '#/studio/shell-state'
+import { LayersPanel } from './layers-panel'
+import { ShortcutsHint } from './shortcuts-hint'
 
 /** What the page toolbar can ask of the open editor. */
 export interface EditorController {
@@ -34,7 +40,7 @@ export interface EditorController {
   swap: (row: TraceRow, token: string) => void
 }
 
-type Tab = 'style' | 'blocks'
+type Tab = 'style' | 'blocks' | 'layers'
 
 const dirOf = (page: PageRef) =>
   renderPath(page, 'proposal').replace(/[^/]*$/, '')
@@ -105,9 +111,13 @@ export function PageEditor({
   const [tab, setTab] = useState<Tab>('style')
   const [mirror, setMirror] = useState(html)
   const [failure, setFailure] = useState<string | null>(null)
+  const [refs, setRefs] = useState<
+    Awaited<ReturnType<typeof listComponentReferences>>
+  >([])
+  const blockIds = useRef<string[]>([])
 
-  const latest = useRef({ onDirty, onSave, onPick, page })
-  latest.current = { onDirty, onSave, onPick, page }
+  const latest = useRef({ onDirty, onSave, onPick, page, root: shell.root })
+  latest.current = { onDirty, onSave, onPick, page, root: shell.root }
 
   const css = palette && !isEmpty(palette.draft) ? palette.preview.css : null
   // Side by side: the editor shows light, a live copy shows dark.
@@ -117,6 +127,7 @@ export function PageEditor({
     let disposed = false
     let editor: Editor | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
+    let removeGestures: (() => void) | undefined
     const open = async () => {
       const [{ default: grapesjs }] = await Promise.all([
         import('grapesjs'),
@@ -149,6 +160,7 @@ export function PageEditor({
       })
       editorRef.current = editor
       fieldsRef.current = registerTokenFields(editor)
+      removeGestures = installGestures(editor, latest.current.root)
       // The sectors come after the field types they use are registered.
       for (const sector of STYLE_SECTORS)
         editor.StyleManager.addSector(sector.name, sector)
@@ -232,6 +244,7 @@ export function PageEditor({
     return () => {
       disposed = true
       clearTimeout(timer)
+      removeGestures?.()
       controller.current = null
       latest.current.onPick(null)
       pushSelection(null, null)
@@ -250,9 +263,34 @@ export function PageEditor({
     fieldsRef.current?.refresh(listTokens(doc))
   }, [ready, mode, css])
 
+  // The project's captured components, for the Add tab.
+  useEffect(() => {
+    listComponentReferences()
+      .then(setRefs)
+      .catch(() => setRefs([]))
+  }, [])
+
+  // They become blocks: the real markup with data-component on its root, and a small preview of the reference.
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor || !ready) return
+    for (const id of blockIds.current) editor.Blocks.remove(id)
+    blockIds.current = refs.map((ref) => {
+      const id = `component-${ref.page}`
+      editor.Blocks.add(id, {
+        label: ref.name,
+        category: COMPONENTS_CATEGORY,
+        media: `<div class="ds-preview"><iframe src="${renderPath({ kind: 'component', name: ref.page }, 'reference')}" title="${ref.name.replace(/[&"<>]/g, (c) => `&#${c.charCodeAt(0)};`)}" tabindex="-1" loading="lazy" sandbox="allow-same-origin"></iframe></div>`,
+        content: componentMarkup(ref.name, ref.html),
+      })
+      return id
+    })
+  }, [refs, ready])
+
   const tabs: [Tab, string][] = [
     ['style', 'Style'],
     ['blocks', 'Add'],
+    ['layers', 'Layers'],
   ]
 
   return (
@@ -313,10 +351,14 @@ export function PageEditor({
               {label}
             </button>
           ))}
+          <ShortcutsHint />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div ref={styleRef} hidden={tab !== 'style'} />
           <div ref={blocksRef} hidden={tab !== 'blocks'} />
+          {tab === 'layers' && ready && editorRef.current && (
+            <LayersPanel editor={editorRef.current} />
+          )}
         </div>
       </aside>
     </div>

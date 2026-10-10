@@ -74,7 +74,35 @@ GrapesJS editor (select, move, resize, edit text, add elements, restyle). Edits 
 disk since it was opened; if it did, choose **Reload** or **Overwrite**. When Claude writes the open proposal, a banner
 offers to reload it. Side by side, the editor shows light and a live copy shows dark.
 
-The editor's side panel keeps GrapesJS's own panels (Style, Add). The token trace of the selected element is the
+### Moving, copying and adding
+
+Editing a proposal works like moving things in Figma. The result is always a layout the design loop can implement
+(order in the DOM, `margin: auto`, the container's alignment, written as `data-studio` rules), never `position:
+absolute`, `top` or `left`.
+
+- **Drag the selected element** itself (not only the toolbar's move icon). It follows the cursor freely, and a marker
+  shows the drop: a line between two elements, a dashed box when it goes into another box, a line at the far end or
+  the middle of its row when it will be pushed there. On release: between two elements it is moved there in the order;
+  into another box it is moved into it at that spot; at the far end of its row (or column) it gets `margin-left: auto`
+  (`margin-top` in a column), at the centre both margins; as the only child of its box, the box's alignment
+  (`justify-content`, or `align-items` in a column) changes. A plain box is made a flex box when the push needs it.
+  Moving an element forgets an earlier push. Esc cancels a drag.
+- **Add tab**: **Components** lists the project's captured component references, each with a small preview. Dragging
+  one in inserts its real markup (the project's classes, so it looks right at once) with `data-component="<name>"`
+  (the name in `design/index.json`) on its root. Copies of an element carrying `data-component` keep it. The plain HTML
+  blocks stay under **Elements**.
+- **Copy, paste, duplicate**: Ctrl+C / Ctrl+V (a paste goes after the selected element), Ctrl+D duplicates in place.
+  The clipboard (markup and the rules of the element's ids) is kept in the browser per project, so an element copied
+  in one proposal can be pasted into another.
+- **Keyboard**: Alt+arrows move the selection before or after its siblings; Delete removes; Ctrl+Z / Ctrl+Shift+Z undo
+  and redo. Each gesture above is one undo step.
+- **Line-up buttons** on the selection's toolbar set its container's alignment: start, centre, end, space between
+  ("push this to the right").
+- **Layers tab**: the element tree, named by `data-component` where present. Click selects; drag a row above, below or
+  into another, with the same rules as the canvas.
+- The **?** next to the tabs lists these shortcuts.
+
+The editor's side panel has the Style, Add and Layers tabs. The token trace of the selected element is the
 footer's **Inspect** tab, a full-width table that works on a reference (click to inspect) and on a proposal (the
 editor's selection); with nothing selected it says how to select. Each row has the property, the token chain
 (`--primary → --blue-base`), the light and dark values, the class or rule it comes from, and a flag when the value is a

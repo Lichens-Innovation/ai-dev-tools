@@ -180,4 +180,15 @@ export const BLOCKS = [
     label: 'Input',
     content: '<input type="text" placeholder="Text" />',
   },
-].map((b) => ({ ...b, category: 'Elements' }))
+].map((b) => ({
+  ...b,
+  category: { id: 'elements', label: 'Elements', order: 1 },
+}))
+
+/** The project's captured components come first in the Add tab. */
+export const COMPONENTS_CATEGORY = {
+  id: 'components',
+  label: 'Components',
+  order: 0,
+  open: true,
+}

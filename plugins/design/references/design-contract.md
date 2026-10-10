@@ -404,3 +404,8 @@ of the references from Storybook and the app (`capture.mjs`) and by designing in
 (editor, token inspector, palette footer, or Claude writing proposals through the studio MCP);
 `READ TARGET` reads `design/proposals/<name>.html`; there is no card diff for the palette (the
 studio's save already wrote the inputs and outputs); and `RESYNC` is a re-capture.
+
+In a local proposal, an element carrying `data-component="<name>"` is an instance of the manifest component
+`<name>` (the studio's Add tab puts it on the markup it inserts, and copies keep it): `design-loop` implements it with
+that component, not with new markup. Moves in the studio are layout only (DOM order, `margin: auto`, the container's
+alignment in the `data-studio` block), never coordinates. See [`local-studio.md`](./local-studio.md).
