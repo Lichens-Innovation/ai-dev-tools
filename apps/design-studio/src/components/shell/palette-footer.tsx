@@ -4,8 +4,21 @@ import type { Mode } from '#/palette/draft'
 import { usePalette } from '#/palette/palette-state'
 import type { PaletteContext } from '#/palette/palette-state'
 import { HexField, TokenField } from '#/components/palette/fields'
-import { SIDEBAR_WIDTH, useShell } from '#/studio/shell-state'
+import { FOOTER_MIN, SIDEBAR_WIDTH, useShell } from '#/studio/shell-state'
+import type { FooterTab } from '#/studio/shell-state'
 import { Chevron } from './icons'
+import { InspectTab } from './inspect-tab'
+import { useInspected } from '#/inspector/inspect-state'
+
+const TAB_LABELS: [FooterTab, string, string][] = [
+  ['palette', 'Palette', 'The colors of the current mode'],
+  [
+    'full',
+    'Full palette',
+    'Every generated token, and the semantic mapping to re-point',
+  ],
+  ['inspect', 'Inspect', 'The tokens the selected element uses'],
+]
 
 const BASE = ['font', 'font-inverted', 'background', 'border']
 const LABELS: Record<string, string> = {
@@ -376,6 +389,16 @@ export function PaletteFooter() {
     }
   }, [pal === null])
 
+  // Picking an element with the footer closed opens it on Inspect: otherwise the click shows nothing. Keyed on the
+  // element, since an edit republishes the same selection.
+  const element = useInspected().picked?.element ?? null
+  const { footerOpen, setFooterOpen, setFooterTab } = shell
+  useEffect(() => {
+    if (!element || footerOpen) return
+    setFooterTab('inspect')
+    setFooterOpen(true)
+  }, [element])
+
   // A design-studio:token event opens the footer on that token.
   const focus = pal?.focus
   useEffect(() => {
@@ -399,7 +422,34 @@ export function PaletteFooter() {
         )
     })
     return () => cancelAnimationFrame(frame)
-  }, [focus, shell.footerOpen, shell.advanced])
+  }, [focus, shell.footerOpen, shell.footerTab])
+
+  /** Drag the top edge to resize the body; the arrow keys do the same by steps. */
+  const [dragHeight, setDragHeight] = useState<number | null>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const maxHeight = () => Math.round(window.innerHeight * 0.8)
+  const clamp = (h: number) =>
+    Math.max(FOOTER_MIN, Math.min(maxHeight(), Math.round(h)))
+  const startResize = (e: React.PointerEvent) => {
+    const from = body.current?.offsetHeight
+    if (from === undefined) return
+    e.preventDefault()
+    const startY = e.clientY
+    let last = from
+    const move = (m: PointerEvent) => {
+      last = clamp(from + startY - m.clientY)
+      setDragHeight(last)
+    }
+    const end = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      setDragHeight(null)
+      shell.setFooterHeight(last)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+  }
+  const bodyHeight = dragHeight ?? shell.footerHeight
 
   if (!pal) return null
   const saving = pal.status.kind === 'saving'
@@ -411,6 +461,28 @@ export function PaletteFooter() {
       className="fixed right-0 bottom-0 left-0 z-20 border-t border-(--line) bg-(--bg-elev) text-sm text-(--ink) shadow-[0_-2px_8px_rgba(0,0,0,0.08)] transition-[left] duration-200"
       style={{ left: shell.sidebar && shell.wide ? SIDEBAR_WIDTH : 0 }}
     >
+      {shell.footerOpen && (
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize the footer"
+          aria-valuenow={bodyHeight ?? undefined}
+          aria-valuemin={FOOTER_MIN}
+          tabIndex={0}
+          title="Drag to resize (double-click: default height)"
+          onPointerDown={startResize}
+          onDoubleClick={() => shell.setFooterHeight(null)}
+          onKeyDown={(e) => {
+            const now = body.current?.offsetHeight ?? FOOTER_MIN
+            if (e.key === 'ArrowUp') shell.setFooterHeight(clamp(now + 40))
+            else if (e.key === 'ArrowDown')
+              shell.setFooterHeight(clamp(now - 40))
+            else return
+            e.preventDefault()
+          }}
+          className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize touch-none hover:bg-(--primary-dim) focus-visible:bg-(--primary-dim)"
+        />
+      )}
       <div className="flex h-12 items-center gap-2 px-4">
         <button
           type="button"
@@ -423,18 +495,30 @@ export function PaletteFooter() {
         </button>
         <Status pal={pal} />
         <span className="flex-1 sm:hidden" />
-        <button
-          type="button"
-          aria-pressed={shell.advanced}
-          title="Show every generated token and re-point the semantic ones"
-          onClick={() => {
-            shell.setAdvanced(!shell.advanced)
-            if (!shell.advanced) shell.setFooterOpen(true)
-          }}
-          className={button}
+        <div
+          role="tablist"
+          aria-label="Footer views"
+          className="flex flex-none gap-1"
         >
-          Advanced
-        </button>
+          {TAB_LABELS.map(([id, name, hint]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`ds-tab-${id}`}
+              aria-selected={shell.footerOpen && shell.footerTab === id}
+              aria-controls="ds-footer-body"
+              title={hint}
+              onClick={() => {
+                shell.setFooterTab(id)
+                shell.setFooterOpen(true)
+              }}
+              className="h-8 cursor-pointer rounded-lg px-3 font-medium whitespace-nowrap hover:bg-(--bg-2) aria-selected:bg-(--bg-3)"
+            >
+              {name}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           disabled={!pal.changes}
@@ -456,16 +540,35 @@ export function PaletteFooter() {
       </div>
       <Message pal={pal} />
       {shell.footerOpen && (
-        <div className="max-h-[min(45vh,420px)] overflow-y-auto border-t border-(--line) px-4 pt-1 pb-4">
-          <InputRows pal={pal} mode={shell.mode} />
-          <TokenRows pal={pal} />
-          {shell.advanced && <GeneratedRows pal={pal} mode={shell.mode} />}
-          <p className="mt-2.5 text-[13px] text-(--ink-3)">
-            Editing the <b>{shell.mode}</b> mode value of each input (the navbar
-            switch picks the mode); token values apply to both modes. The draft
-            stays in this browser until you save: Save writes the inputs file
-            and regenerates the theme files of the project.
-          </p>
+        <div
+          ref={body}
+          id="ds-footer-body"
+          role="tabpanel"
+          aria-labelledby={`ds-tab-${shell.footerTab}`}
+          className="overflow-y-auto border-t border-(--line) px-4 pt-1 pb-4"
+          style={
+            bodyHeight === null
+              ? { maxHeight: 'min(45vh, 420px)' }
+              : { height: bodyHeight, maxHeight: '80vh' }
+          }
+        >
+          {shell.footerTab === 'inspect' ? (
+            <InspectTab pal={pal} />
+          ) : (
+            <>
+              <InputRows pal={pal} mode={shell.mode} />
+              <TokenRows pal={pal} />
+              {shell.footerTab === 'full' && (
+                <GeneratedRows pal={pal} mode={shell.mode} />
+              )}
+              <p className="mt-2.5 text-[13px] text-(--ink-3)">
+                Editing the <b>{shell.mode}</b> mode value of each input (the
+                navbar switch picks the mode); token values apply to both modes.
+                The draft stays in this browser until you save: Save writes the
+                inputs file and regenerates the theme files of the project.
+              </p>
+            </>
+          )}
         </div>
       )}
     </section>

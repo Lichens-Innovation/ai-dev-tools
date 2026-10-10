@@ -178,8 +178,9 @@ function Loaded({
         token in toPalette(saved, draft).inputs ||
         token in toPalette(saved, draft).tokens
       shell.setFooterOpen(true)
-      // A generated token only shows in the Advanced view.
-      if (!handled) shell.setAdvanced(true)
+      // A generated token only shows in the Full palette; Inspect has no token fields to land on.
+      if (!handled) shell.setFooterTab('full')
+      else if (shell.footerTab === 'inspect') shell.setFooterTab('palette')
       setFocus({ token, nonce: Date.now() })
     }
     window.addEventListener(TOKEN_EVENT, onToken)

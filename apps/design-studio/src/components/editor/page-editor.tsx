@@ -10,6 +10,7 @@ import {
   STYLE_SECTORS,
   registerTokenFields,
 } from '#/editor/style-fields'
+import { swapToken } from '#/inspector/inspect'
 import { pick } from '#/inspector/pick'
 import type { Picked } from '#/inspector/pick'
 import { pushSelection } from '#/inspector/selection-client'
@@ -20,7 +21,6 @@ import type { Mode } from '#/palette/draft'
 import { usePalette } from '#/palette/palette-state'
 import { themeDocument } from '#/palette/theme'
 import { useShell } from '#/studio/shell-state'
-import { TokenInspector, swapToken } from './token-inspector'
 
 /** What the page toolbar can ask of the open editor. */
 export interface EditorController {
@@ -30,9 +30,11 @@ export interface EditorController {
   redo: () => void
   /** Forget the unsaved changes (after a save). */
   markClean: () => void
+  /** Reads the selected element's `row` from another token: an override for that element only. */
+  swap: (row: TraceRow, token: string) => void
 }
 
-type Tab = 'tokens' | 'style' | 'blocks'
+type Tab = 'style' | 'blocks'
 
 const dirOf = (page: PageRef) =>
   renderPath(page, 'proposal').replace(/[^/]*$/, '')
@@ -82,12 +84,15 @@ export function PageEditor({
   controller,
   onDirty,
   onSave,
+  onPick,
 }: {
   page: PageRef
   html: string
   controller: RefObject<EditorController | null>
   onDirty: (dirty: boolean) => void
   onSave: () => void
+  /** The editor's selection changed (null: nothing selected), for the footer's Inspect tab. */
+  onPick: (picked: Picked | null) => void
 }) {
   const shell = useShell()
   const palette = usePalette()
@@ -97,13 +102,12 @@ export function PageEditor({
   const editorRef = useRef<Editor | null>(null)
   const fieldsRef = useRef<ReturnType<typeof registerTokenFields> | null>(null)
   const [ready, setReady] = useState(false)
-  const [tab, setTab] = useState<Tab>('tokens')
-  const [picked, setPicked] = useState<Picked | null>(null)
+  const [tab, setTab] = useState<Tab>('style')
   const [mirror, setMirror] = useState(html)
   const [failure, setFailure] = useState<string | null>(null)
 
-  const latest = useRef({ onDirty, onSave, page })
-  latest.current = { onDirty, onSave, page }
+  const latest = useRef({ onDirty, onSave, onPick, page })
+  latest.current = { onDirty, onSave, onPick, page }
 
   const css = palette && !isEmpty(palette.draft) ? palette.preview.css : null
   // Side by side: the editor shows light, a live copy shows dark.
@@ -165,7 +169,7 @@ export function PageEditor({
                 html: selected.toHTML({ cleanId: true } as never),
               })
             : null
-        setPicked(next)
+        latest.current.onPick(next)
         pushSelection({ ...latest.current.page, variant: 'proposal' }, next)
       }
       const refreshTokens = () => {
@@ -215,6 +219,11 @@ export function PageEditor({
         markClean: () => {
           baseline = serializeEditor(current, html)
         },
+        swap: (row, token) => {
+          current
+            .getSelected()
+            ?.addStyle({ [row.property]: swapToken(row.declared, token) })
+        },
       }
     }
     open().catch((error: unknown) =>
@@ -224,6 +233,7 @@ export function PageEditor({
       disposed = true
       clearTimeout(timer)
       controller.current = null
+      latest.current.onPick(null)
       pushSelection(null, null)
       editor?.destroy()
       editorRef.current = null
@@ -240,14 +250,7 @@ export function PageEditor({
     fieldsRef.current?.refresh(listTokens(doc))
   }, [ready, mode, css])
 
-  const swap = (row: TraceRow, token: string) => {
-    editorRef.current
-      ?.getSelected()
-      ?.addStyle({ [row.property]: swapToken(row.declared, token) })
-  }
-
   const tabs: [Tab, string][] = [
-    ['tokens', 'Tokens'],
     ['style', 'Style'],
     ['blocks', 'Add'],
   ]
@@ -312,9 +315,6 @@ export function PageEditor({
           ))}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div hidden={tab !== 'tokens'}>
-            <TokenInspector picked={picked} onSwap={swap} />
-          </div>
           <div ref={styleRef} hidden={tab !== 'style'} />
           <div ref={blocksRef} hidden={tab !== 'blocks'} />
         </div>
