@@ -63,17 +63,56 @@ the reference. Everything else in the proposal is the reference.
 ## Sample data
 
 A component reference shows the story's own sample data. A **screen** reference shows whatever the
-running dev app showed, and `design/` is committed, so it can contain real names, emails, messages
+running dev app showed, and `design/` is committed, so it could hold real names, emails, messages
 or documents. The same rule as for Claude Design mockups ([`screens.md`](./screens.md): sample
-data, never real data) applies, but nothing rewrites the data for you:
+data, never real data) applies, and `capture.mjs screen` enforces it in three layers (components
+captured from Storybook are not touched). It needs `@faker-js/faker`, resolved from the working
+directory like Playwright (`npm i -D @faker-js/faker`; `design-init` installs it); without it the
+capture stops.
 
-- Capture a screen from an app running on **seeded sample data** (a fixtures database, a demo
-  account); never on a copy of production.
+1. **JSON is rewritten before it renders.** The app's JSON responses (`fetch`/XHR) are intercepted
+   and every string under a personal key becomes a fake: `name`, `firstName`, `lastName`,
+   `fullName`, `displayName`, `username`, `email`, `phone`, `mobile`, `address`, `street`, `city`,
+   `zip`/`postalCode`, `company`, avatar and photo URLs, and the same words at the end of a
+   compound key (`customerName`, `billing_address`), matched case-insensitively. Fakes are
+   deterministic (seeded from a hash of the real value): the same value gives the same fake
+   everywhere in the snapshot, and an unchanged screen re-captures byte for byte. A fake keeps the
+   value's type and roughly its length.
+2. **Server-rendered data is redacted by selector.** Data written into the HTML by the server (an
+   SSR first load) never goes through JSON. List its elements in `anonymize.redact`: their text
+   (and `value`, `placeholder`, `alt`, `title`, `aria-label`) is replaced by a fake of the same
+   kind and length (an email by an email, a phone by a phone, and so on). A value already seen in
+   the JSON gets the same fake. Text outside the selectors is untouched.
+3. **A final check scans the snapshot** (text and attributes) for emails, phone numbers and
+   token-like strings (JWTs, `Bearer …`, long hex or base64). A match the anonymiser did not
+   produce and `anonymize.allow` does not list fails the capture with **exit code 4**: nothing is
+   written, and each match is listed with the element it was found in. Fix it with a selector in
+   `redact`, a key in `keys`, or a literal in `allow`.
+
+The screen's manifest row takes an optional `anonymize` object:
+
+```json
+"anonymize": {
+  "keys": ["owner", "contactLine"],
+  "redact": [".account-owner", "[data-testid=billing-email]"],
+  "allow": ["support@example.com"]
+}
+```
+
+`keys`: extra JSON keys to fake. `redact`: CSS selectors for server-rendered data. `allow`:
+literal values that are fine to commit (a support address in the footer).
+
+What it cannot know: personal data that does not pass through JSON or a selector you listed, such
+as GraphQL-over-non-JSON, server-sent pages with names in free text outside the selectors, names
+inside images (a photo of a person, a chart label drawn in a canvas), or a name under a key that
+does not look personal and is not in `keys`. The final check only catches emails, phones and
+tokens, not names. So still:
+
+- Capture a screen from an app running on **seeded sample data** where you can; avoid a copy of
+  production.
 - Use the saved sign-in (`screensAuth`) of a demo user, git-ignored.
-- Read the captured file before the commit. If it holds real data, fix the source data and
+- Read the captured file before the commit. If it holds real data, add the key or selector and
   re-capture, then remove the old file from history if it was already pushed.
-
-`capture.mjs` prints this warning on every screen capture.
 
 ## Staleness and re-capture
 

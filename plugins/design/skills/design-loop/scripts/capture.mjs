@@ -21,13 +21,25 @@
  * A reference whose hash is no longer the one recorded at capture was edited by hand: the script
  * refuses to overwrite it (exit 3) unless --force is given.
  *
- * Requires Playwright (installed by storybook-init). Run it from the Storybook target's dir (or the
- * app's): Playwright resolves from the working directory, like screenshot.mjs.
+ * A screen is captured from the running app, so it is anonymised in three layers (anonymize.mjs;
+ * the row's optional `anonymize: { keys, redact, allow }`, references/local-studio.md#sample-data):
+ *   1. the app's JSON responses are rewritten while it loads: personal string fields (by key name,
+ *      plus `keys`) become deterministic fakes from @faker-js/faker;
+ *   2. the text of the elements matching `redact` (CSS selectors) is replaced, for data the server
+ *      rendered into the HTML;
+ *   3. a final check scans the snapshot for emails, phone numbers and tokens the anonymiser did not
+ *      produce and that `allow` does not list: any match exits 4, writes nothing, and lists them.
+ * Components captured from Storybook are not anonymised.
+ *
+ * Requires Playwright (installed by storybook-init), and @faker-js/faker for a screen (installed by
+ * design-init). Run it from the Storybook target's dir (or the app's): both resolve from the
+ * working directory, like screenshot.mjs.
  */
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { SKIP_ATTRS, createAnonymizer } from './anonymize.mjs';
 import { fileHash, findRow, insideDesign, kebab, loadManifest, readIndex, sha256, sourceHashOf } from './local-backend.mjs';
 
 const ASSET_TYPES = {
@@ -95,7 +107,7 @@ export function mergeSheets(existing, owner, sheets) {
 // --- reading the page ---------------------------------------------------------------------------
 
 /** Runs in the page: the body's children as html with every url turned into an @@asset:n@@ token. */
-function snapshotPage() {
+function snapshotPage(skipAttrs) {
   const urls = [];
   const token = (raw) => {
     if (!raw || raw.startsWith('#') || /^data:/i.test(raw)) return raw;
@@ -144,6 +156,28 @@ function snapshotPage() {
   // An anchor's href is a link, not something the page loads; only javascript: urls go.
   for (const a of root.querySelectorAll('a[href]')) if (/^\s*javascript:/i.test(a.getAttribute('href'))) a.removeAttribute('href');
 
+  // What the final check scans: every text and attribute value of the snapshot, with its element.
+  const describe = (el) => {
+    const path = [];
+    for (let n = el; n && n !== root && path.length < 3; n = n.parentElement) {
+      const cls = [...n.classList].slice(0, 2).map((c) => `.${c}`).join('');
+      path.unshift(`${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ''}${cls}`);
+    }
+    return path.join(' > ');
+  };
+  const candidates = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeValue.trim()) candidates.push({ value: n.nodeValue, where: `text of ${describe(n.parentElement)}` });
+  }
+  for (const el of root.querySelectorAll('*')) {
+    for (const a of el.attributes) {
+      if (!skipAttrs.includes(a.name.toLowerCase()) && a.value.trim()) {
+        candidates.push({ value: a.value, where: `attribute ${a.name} of ${describe(el)}` });
+      }
+    }
+  }
+
   const sheets = [];
   const visit = (sheet, depth = 0) => {
     const base = sheet.href || document.baseURI;
@@ -169,12 +203,43 @@ function snapshotPage() {
       .map((a) => [a.name, a.value]);
   return {
     html: root.innerHTML,
+    candidates,
     urls,
     sheets,
     title: document.title,
     htmlAttrs: attrs(document.documentElement),
     bodyAttrs: attrs(document.body),
   };
+}
+
+/** Runs in the page: the text nodes and value-like attributes under the elements matching the selectors. */
+function collectRedactable(selectors) {
+  const nodes = new Set();
+  const matched = selectors.map((selector) => {
+    const els = document.querySelectorAll(selector);
+    for (const el of els) {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n.nodeValue.trim() && !/^(script|style|noscript)$/i.test(n.parentElement?.tagName ?? '')) nodes.add(n);
+      }
+      for (const e of [el, ...el.querySelectorAll('*')]) {
+        for (const name of ['value', 'placeholder', 'alt', 'title', 'aria-label']) if (e.getAttribute(name)?.trim()) nodes.add({ el: e, name });
+      }
+    }
+    return els.length;
+  });
+  window.__designRedacted = [...nodes];
+  return { matched, values: window.__designRedacted.map((n) => (n.el ? n.el.getAttribute(n.name) : n.nodeValue)) };
+}
+
+/** Runs in the page: puts the fakes back, in the order collectRedactable returned the texts. */
+function applyRedacted(fakes) {
+  window.__designRedacted.forEach((n, i) => {
+    if (n.el) {
+      n.el.setAttribute(n.name, fakes[i]);
+      if (n.name === 'value') n.el.value = fakes[i];
+    } else n.nodeValue = fakes[i];
+  });
 }
 
 // --- assets -----------------------------------------------------------------------------------
@@ -346,12 +411,22 @@ async function main() {
     fail(`Playwright not found from ${process.cwd()}. Run from the Storybook target's dir, or install it there.`, 2);
   }
 
+  let anonymizer = null;
+  const anonymize = found.row.anonymize ?? {};
   if (kind === 'screen') {
-    console.warn(
-      `WARNING: ${relative(root, referenceFile)} is captured from the running app and contains whatever real dev data the screen shows. ` +
-        'design/ is committed: capture on seeded sample data, never on real customers, emails or documents. ' +
-        'See references/local-studio.md#sample-data.',
-    );
+    for (const field of ['keys', 'redact', 'allow']) {
+      const list = anonymize[field];
+      if (list !== undefined && !(Array.isArray(list) && list.every((v) => typeof v === 'string'))) {
+        fail(`screens[].anonymize.${field} of "${name}" must be an array of strings.`, 2);
+      }
+    }
+    let faker;
+    try {
+      ({ faker } = createRequire(join(process.cwd(), 'noop.js'))('@faker-js/faker'));
+    } catch {
+      fail(`@faker-js/faker not found from ${process.cwd()}. A screen capture anonymises the app's data with it: run \`npm i -D @faker-js/faker\` there (next to Playwright).`, 2);
+    }
+    anonymizer = createAnonymizer(faker, { keys: anonymize.keys, allow: anonymize.allow });
   }
 
   const browser = await chromium.launch();
@@ -362,6 +437,28 @@ async function main() {
       ...(storageState && { storageState }),
     });
     const tab = await context.newPage();
+    if (anonymizer) {
+      // Layer 1: the app's JSON, rewritten before it renders.
+      await tab.route('**/*', async (route) => {
+        if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.continue();
+        let response;
+        try {
+          response = await route.fetch();
+        } catch {
+          return route.continue();
+        }
+        let body;
+        try {
+          if (/json/i.test(response.headers()['content-type'] ?? '')) body = JSON.stringify(anonymizer.json(JSON.parse(await response.text())));
+        } catch {
+          body = undefined;
+        }
+        const headers = { ...response.headers() };
+        delete headers['content-length'];
+        delete headers['content-encoding'];
+        return route.fulfill({ status: response.status(), headers, ...(body === undefined ? { body: await response.body() } : { body }) });
+      });
+    }
     const url = kind === 'component' ? `${storybookUrl.replace(/\/+$/, '')}/iframe.html?id=${encodeURIComponent(storyId)}&viewMode=story` : appUrl;
     const response = await tab.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
     if (!response?.ok()) fail(`${url} answered ${response?.status() ?? 'nothing'}.`, 2);
@@ -373,8 +470,37 @@ async function main() {
     }
     await tab.evaluate(() => document.fonts?.ready);
 
-    const snap = await tab.evaluate(snapshotPage);
+    if (anonymizer && anonymize.redact?.length) {
+      // Layer 2: server-rendered data, by selector. The texts come out, are faked here, and go back by index.
+      const texts = await tab
+        .evaluate(collectRedactable, anonymize.redact)
+        .catch((error) => fail(`anonymize.redact of "${name}": ${error.message}`, 2));
+      for (const [i, selector] of anonymize.redact.entries()) {
+        if (!texts.matched[i]) console.warn(`anonymize.redact: "${selector}" matches nothing on ${url}.`);
+      }
+      await tab.evaluate(applyRedacted, texts.values.map((v) => anonymizer.text(v)));
+    }
+
+    const snap = await tab.evaluate(snapshotPage, [...SKIP_ATTRS]);
     if (!snap.html.trim()) fail(`${url} has no visible content to capture.`, 2);
+
+    if (anonymizer) {
+      // Layer 3: nothing is written unless the snapshot is clean.
+      const candidates = [
+        { value: snap.title, where: 'the page title' },
+        ...[...snap.htmlAttrs.map((a) => ['html', a]), ...snap.bodyAttrs.map((a) => ['body', a])].map(([tag, [attr, value]]) => ({ value, where: `attribute ${attr} of ${tag}` })),
+        ...snap.candidates,
+      ];
+      const left = anonymizer.findings(candidates);
+      if (left.length > 0) {
+        fail(
+          `${url} still shows ${left.length} personal-looking value(s) after anonymising; nothing was written:\n` +
+            left.map((f) => `  ${f.kind} "${f.match}" in ${f.where}`).join('\n') +
+            `\nAdd a selector to screens[].anonymize.redact (server-rendered data), a JSON key to anonymize.keys, or the value to anonymize.allow if it is fine to commit ("${name}" in the manifest).`,
+          4,
+        );
+      }
+    }
 
     const assets = createAssets(designDir, context, tab);
     const sheets = [];

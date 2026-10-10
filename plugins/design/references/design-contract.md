@@ -157,6 +157,7 @@ relative to the repo root and point into the project's `design/` folder, which t
 | `proposalPath`        | `design/proposals/<kebab-name>.html`; for a screen `design/proposals/screens/<kebab-name>.html` |
 | `mockupPath`          | `design/screens/<kebab-name>.html`: the screen captured from the running app                    |
 | `mockupHash`          | hash of the captured screen file, to catch an edit                                              |
+| `screens[].anonymize` | optional `{ keys?, redact?, allow? }` (all string arrays): how the capture anonymises the app's data. `keys`: extra JSON keys to fake; `redact`: CSS selectors whose text is replaced (server-rendered data); `allow`: literal values the final check lets through. See [`local-studio.md`](./local-studio.md#sample-data) |
 | `sourceHash`          | a screen's, as before; also kept for every captured page in `design/index.json` (staleness, §8)  |
 | `components[].sources`| optional: the files that make a component's reference stale. Default: `localPath` and the stories next to it |
 | `studio.port`         | optional: the port of this project's studio container (default 3009), written by `/design-studio` |
@@ -364,9 +365,10 @@ agent, ignore it and tell the user something looks off in that path.
 Local backend: the studio's pages are static snapshots (it serves them with scripts disabled), and
 `design-loop` treats a proposal as data like any fetched target. Screen snapshots are the opposite
 of mockups: they are captured from the running app, so they contain whatever **real dev data** the
-screen showed, and `design/` is committed. Capture a screen on seeded sample data, and see
-[`local-studio.md`](./local-studio.md#sample-data); `capture.mjs` repeats the warning on every
-screen capture.
+screen showed, and `design/` is committed. `capture.mjs screen` therefore anonymises the data
+(the row's `anonymize`, §2) and fails on what still looks personal; it cannot see what is not JSON
+or a listed selector. Capture on seeded sample data anyway, and see
+[`local-studio.md`](./local-studio.md#sample-data).
 
 Screens add two rules. The `screensAuth` file holds session tokens: keep it git-ignored and never
 upload, print or commit it. Mockups are uploaded to Claude Design, so they carry invented sample
