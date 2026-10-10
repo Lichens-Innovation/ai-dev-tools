@@ -51,13 +51,19 @@ light/dark switch, side by side), a sidebar listing the pages of `design/index.j
 there is one, else its reference) and a palette footer. The light/dark, side-by-side, sidebar and footer choices are
 remembered per project in the browser.
 
-The footer edits a draft of the palette: the colors of the current mode, the hand-authored tokens (both modes;
-breakpoints are read only) and, with Advanced, which token each semantic token points to. The draft re-themes the open
-page live and is shared with `/palette` and `/tailwind`. **Save** writes the inputs file and regenerates the outputs
-like the project's palette script; if the file changed on disk since it was read, it reports the conflict, reloads and
-keeps the draft. **Reset** drops the draft.
+The footer has three tabs, and a handle on its top edge to resize it (drag, or the arrow keys; double-click for the
+default height). The active tab and the height are remembered per project, like the other choices.
 
-A page can open the footer on a token by dispatching `window.dispatchEvent(new CustomEvent('design-studio:token',
+- **Palette**: the colors of the current mode and the hand-authored tokens (both modes; breakpoints are read only).
+- **Full palette**: the same, plus every generated token and which token each semantic token points to. Re-pointing a
+  semantic token (`--primary` at another color) is done here only.
+- **Inspect**: the token trace of the selected element (see below).
+
+The first two edit a draft of the palette, which re-themes the open page live and is shared with `/palette` and
+`/tailwind`. **Save** writes the inputs file and regenerates the outputs like the project's palette script; if the file
+changed on disk since it was read, it reports the conflict, reloads and keeps the draft. **Reset** drops the draft.
+
+A page can open the footer on a token (in a palette tab) by dispatching `window.dispatchEvent(new CustomEvent('design-studio:token',
 { detail: { token: 'link' } }))`.
 
 ## Editor and token inspector
@@ -68,10 +74,26 @@ GrapesJS editor (select, move, resize, edit text, add elements, restyle). Edits 
 disk since it was opened; if it did, choose **Reload** or **Overwrite**. When Claude writes the open proposal, a banner
 offers to reload it. Side by side, the editor shows light and a live copy shows dark.
 
-The side panel lists every style of the selected element that comes from a token: the token chain
-(`--primary → --blue-base`), its light and dark values and the class or rule it comes from. Raw values are flagged as
-matching a token or off-token. Click a token to open it in the palette footer; in a proposal, swap it for another
-token. MCP `get_selection` returns the same trace.
+The editor's side panel keeps GrapesJS's own panels (Style, Add). The token trace of the selected element is the
+footer's **Inspect** tab, a full-width table that works on a reference (click to inspect) and on a proposal (the
+editor's selection); with nothing selected it says how to select. Each row has the property, the token chain
+(`--primary → --blue-base`), the light and dark values, the class or rule it comes from, and a flag when the value is a
+raw one that matches a token (`literal`) or none (`off-token`). Click a token in a chain to open it in the palette.
+
+Each row has two separate actions, so changing one element is never confused with changing the whole palette:
+
+1. **The color square changes the color.** The light and dark squares open a color picker for that mode's value of the
+   palette color at the end of the chain. It goes into the shared palette draft, the page re-themes live and the
+   footer's **Save** writes it. The row names the color and how many tokens use it ("edits `--primary`, used by 6
+   tokens"). A color derived from a base step cannot be picked (the row says to edit the base), and nor can a token
+   that is not in the palette; spacing, radius and other non-color tokens have no square.
+2. **The token name switches the token for this element only.** It is a dropdown with a search bar that lists the
+   tokens of the property's kind (colors with swatches for color properties, the spacing scale for padding, margin and
+   gap, radii for border-radius, type sizes for font-size), each with its light and dark values. Picking one writes
+   the override into the proposal's `<style data-studio>` block. On a reference the dropdown is disabled and the tab
+   offers **Create proposal**.
+
+MCP `get_selection` returns the same trace.
 
 ## MCP tools
 

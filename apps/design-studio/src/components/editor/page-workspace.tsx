@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { PageFrame } from '#/components/shell/page-frame'
 import type { PageRef, Variant } from '#/components/shell/page-frame'
 import type { Picked } from '#/inspector/pick'
+import { NOTHING, useInspected } from '#/inspector/inspect-state'
 import { pushSelection } from '#/inspector/selection-client'
 import {
   createPageProposal,
@@ -12,7 +13,6 @@ import {
 import { onStudioMessage } from '#/studio-events'
 import { PageEditor } from './page-editor'
 import type { EditorController } from './page-editor'
-import { TokenInspector } from './token-inspector'
 
 type Status =
   | { kind: 'idle' }
@@ -50,6 +50,7 @@ export function PageWorkspace({
   const [external, setExternal] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [picked, setPicked] = useState<Picked | null>(null)
+  const { publish } = useInspected()
 
   const open = (target: 'reference' | 'proposal') =>
     navigate({
@@ -137,6 +138,20 @@ export function PageWorkspace({
 
   const saveRef = useRef(save)
   saveRef.current = save
+  const createRef = useRef(createProposal)
+  createRef.current = createProposal
+
+  // The footer's Inspect tab shows the picked element, and can switch its tokens in a proposal.
+  useEffect(() => {
+    publish({
+      picked,
+      swap: editable
+        ? (row, token) => controller.current?.swap(row, token)
+        : null,
+      createProposal: editable ? null : () => void createRef.current(),
+    })
+  }, [picked, editable, publish])
+  useEffect(() => () => publish(NOTHING), [publish])
   useEffect(() => {
     if (!editable) return
     const onKey = (e: KeyboardEvent) => {
@@ -288,24 +303,17 @@ export function PageWorkspace({
             controller={controller}
             onDirty={setDirty}
             onSave={() => void saveRef.current()}
+            onPick={setPicked}
           />
         ) : (
-          <div
-            className="grid h-full"
-            style={{ gridTemplateColumns: '1fr 320px' }}
-          >
-            <PageFrame
-              page={page}
-              variant={variant}
-              onPick={(p) => {
-                setPicked(p)
-                pushSelection({ ...page, variant }, p)
-              }}
-            />
-            <aside className="min-h-0 overflow-y-auto border-l border-(--line) bg-(--bg-elev) text-(--ink)">
-              <TokenInspector picked={picked} />
-            </aside>
-          </div>
+          <PageFrame
+            page={page}
+            variant={variant}
+            onPick={(p) => {
+              setPicked(p)
+              pushSelection({ ...page, variant }, p)
+            }}
+          />
         )}
       </div>
     </div>

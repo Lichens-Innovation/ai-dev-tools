@@ -14,24 +14,24 @@ A local, single-user replacement for Claude Design in the design plugin's loop (
 
 One deep module, `src/server/design-project.ts` (`openProject(root)`), holds all the behaviour: pages, palette, watching. The UI server functions (`src/server/functions.ts`) and the MCP tools (`src/server/mcp.ts`) are thin over it. Keep it that way: a rule that matters to both belongs in `DesignProject`, not in a route or a tool.
 
-| File                                          | What it does                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `server/design-project.ts`                    | `openProject`: `pages`, `palette`, `watch`. Errors are `Conflict`, `NotFound`, `Invalid` (`errors.ts`)  |
-| `server/page-html.ts`                         | Checks a page loads only from `design/assets`; rebases asset links for `proposals/screens`              |
-| `server/native-import.mjs`                    | Node's own `import()` for the project's `palette.ts` (Vite cannot transform it)                         |
-| `server/selection.ts`                         | In-memory editor selection: the browser pushes, MCP `get_selection` reads. Not part of DesignProject    |
-| `server/hub.ts`                               | Fan-out of watch events and `open_page` to the `/events` stream                                         |
-| `server/studio.ts`                            | The process-wide singleton (project at `PROJECT_ROOT`, default `/project`, selection, hub)              |
-| `palette/draft.ts`                            | Pure draft logic: a diff against the saved palette (`Draft`), merge, rebase, count, validation          |
-| `palette/palette-state.tsx`                   | `PaletteProvider`/`usePalette`: the shared draft, debounced server preview, save, `design-studio:token` |
-| `palette/theme.ts`                            | Themes an iframe (`data-theme`, `color-scheme`, draft css) or scopes the css for the studio's own pages |
-| `studio/shell-state.tsx`                      | `ShellProvider`: mode, side by side, sidebar, footer, Advanced, remembered in localStorage per project  |
-| `components/shell/`                           | Navbar, sidebar, page frame (one iframe per mode), palette footer                                       |
-| `components/palette/`, `components/tailwind/` | The `/palette` and `/tailwind` pages                                                                    |
-| `server/render.ts`                            | Safe static serving of `design/` for `/render/*`                                                        |
-| `inspector/`                                  | Token trace over the iframe CSSOM (`trace.ts`, pure), click picker, selection push to `/api/selection`  |
-| `editor/`                                     | Page file <-> editor: `page-document.ts` (body + `<style data-studio>`), `serialize.ts`, Style Manager  |
-| `components/editor/`                          | `PageEditor` (GrapesJS, lazy-loaded), `PageWorkspace` (toolbar, banners, save), `TokenInspector`        |
+| File                                          | What it does                                                                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `server/design-project.ts`                    | `openProject`: `pages`, `palette`, `watch`. Errors are `Conflict`, `NotFound`, `Invalid` (`errors.ts`)                 |
+| `server/page-html.ts`                         | Checks a page loads only from `design/assets`; rebases asset links for `proposals/screens`                             |
+| `server/native-import.mjs`                    | Node's own `import()` for the project's `palette.ts` (Vite cannot transform it)                                        |
+| `server/selection.ts`                         | In-memory editor selection: the browser pushes, MCP `get_selection` reads. Not part of DesignProject                   |
+| `server/hub.ts`                               | Fan-out of watch events and `open_page` to the `/events` stream                                                        |
+| `server/studio.ts`                            | The process-wide singleton (project at `PROJECT_ROOT`, default `/project`, selection, hub)                             |
+| `palette/draft.ts`                            | Pure draft logic: a diff against the saved palette (`Draft`), merge, rebase, count, validation                         |
+| `palette/palette-state.tsx`                   | `PaletteProvider`/`usePalette`: the shared draft, debounced server preview, save, `design-studio:token`                |
+| `palette/theme.ts`                            | Themes an iframe (`data-theme`, `color-scheme`, draft css) or scopes the css for the studio's own pages                |
+| `studio/shell-state.tsx`                      | `ShellProvider`: mode, side by side, sidebar, footer tab and height, remembered in localStorage per project            |
+| `components/shell/`                           | Navbar, sidebar, page frame (one iframe per mode), palette footer with its Inspect tab (`inspect-tab`, `token-select`) |
+| `components/palette/`, `components/tailwind/` | The `/palette` and `/tailwind` pages                                                                                   |
+| `server/render.ts`                            | Safe static serving of `design/` for `/render/*`                                                                       |
+| `inspector/`                                  | Token trace over the iframe CSSOM (`trace.ts`, pure), click picker, selection push to `/api/selection`                 |
+| `editor/`                                     | Page file <-> editor: `page-document.ts` (body + `<style data-studio>`), `serialize.ts`, Style Manager                 |
+| `components/editor/`                          | `PageEditor` (GrapesJS, lazy-loaded), `PageWorkspace` (toolbar, banners, save)                                         |
 
 Rules of `DesignProject`:
 
@@ -49,7 +49,7 @@ The browser never re-implements the engine: `palette.preview(draft)` (a `DesignP
 
 A reference is shown in the plain page frame (read only, click to inspect); Create proposal copies it and opens GrapesJS (BSD-3) on the proposal. The project CSS goes to the canvas as `canvas.styles` (never parsed into the editor); the editor owns only the body and the rules of one page-local `<style data-studio>` block. `selectorManager.componentFirst` makes edits `#id` rules in that block. Save writes the body plus that block through `saveProposal` with the `baseHash`; a `Conflict` offers Reload or Overwrite, and an SSE change on the open file shows a reload banner (the workspace ignores its own saved hashes).
 
-`inspector/trace.ts` is pure and unit-tested in jsdom (`test/trace.test.ts`): winning declaration per property (importance, specificity, order, inline last), `var()` chains through `:root` and `[data-theme]` per mode, `literal`/`off-token` flags. Clicking a token dispatches `design-studio:token` (the palette footer listens). A swap in a proposal writes `var(--other)` into the data-studio block. The selection (page, selector, excerpt, trace) is pushed to the selection holder for MCP `get_selection`. jsdom drops `!important` on `var()` values, so tests use raw values there. Custom Style Manager types must be registered before `addSector`.
+`inspector/trace.ts` is pure and unit-tested in jsdom (`test/trace.test.ts`): winning declaration per property (importance, specificity, order, inline last), `var()` chains through `:root` and `[data-theme]` per mode, `literal`/`off-token` flags. Clicking a token dispatches `design-studio:token` (the palette footer listens). The trace is shown by the footer's Inspect tab, not in the editor: the page publishes its selection to `inspector/inspect-state.tsx` (`InspectProvider`, in the root layout), with `swap` (a proposal) or `createProposal` (a reference). `inspector/inspect.ts` is pure and unit-tested: `swapCandidates` (tokens of the property's kind, filtered by a search) and `colorEditFor` (the palette input at the end of a chain, `--bg`/`--text` mapped to their neutral inputs, derived steps refused). Picking an element with the footer closed opens it on Inspect. A swap in a proposal writes `var(--other)` into the data-studio block for that element; the color square edits the palette draft instead. The selection (page, selector, excerpt, trace) is pushed to the selection holder for MCP `get_selection`. jsdom drops `!important` on `var()` values, so tests use raw values there. Custom Style Manager types must be registered before `addSector`.
 
 ## Testing
 
