@@ -64,7 +64,18 @@ studio on the same `studio.port` (a different port means editing that URL). If `
 exists with another URL, show both and ask before changing it. A new MCP server connects at the
 start of a session: tell the user to run `/mcp` → reconnect, or restart, to get its tools
 (`list_pages`, `get_page`, `create_proposal`, `write_page`, `get_selection`, `get_palette`,
-`set_palette`, `open_page`).
+`set_palette`, `open_page`, and for sketches `list_sketch_requests`, `get_sketch_request`,
+`resolve_sketch_request`).
+
+**Make real through a channel.** The design plugin's channel pushes the studio's Make real requests into the
+session. It is a research preview and needs this flag when Claude Code starts:
+
+```bash
+claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools
+```
+
+Tell the user. Without it, Make real still works: the studio shows **Copy command**
+(`/design-sketch <id>`) to paste into the session.
 
 ### 5. Open the studio
 
