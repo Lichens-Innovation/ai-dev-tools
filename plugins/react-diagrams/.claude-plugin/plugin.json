@@ -1,0 +1,10 @@
+{
+  "name": "react-diagrams",
+  "version": "0.1.0",
+  "description": "React diagram and canvas tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react", "diagrams", "react-flow", "xyflow", "canvas"]
+}

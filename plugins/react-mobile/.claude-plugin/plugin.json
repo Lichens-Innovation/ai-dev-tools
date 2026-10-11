@@ -1,0 +1,10 @@
+{
+  "name": "react-mobile",
+  "version": "0.1.0",
+  "description": "React Native and mobile development tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react-native", "mobile", "expo", "gluestack", "typescript"]
+}
