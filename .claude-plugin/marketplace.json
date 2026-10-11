@@ -21,6 +21,21 @@
       "description": "React development tools and skills for Claude Code"
     },
     {
+      "name": "react-mobile",
+      "source": "./plugins/react-mobile",
+      "description": "React Native and mobile development tools and skills for Claude Code"
+    },
+    {
+      "name": "react-diagrams",
+      "source": "./plugins/react-diagrams",
+      "description": "React diagram and canvas tools and skills for Claude Code"
+    },
+    {
+      "name": "react-forms",
+      "source": "./plugins/react-forms",
+      "description": "React form tools and skills for Claude Code"
+    },
+    {
       "name": "dev",
       "source": "./plugins/dev",
       "description": "General developer tools and skills for Claude Code"
