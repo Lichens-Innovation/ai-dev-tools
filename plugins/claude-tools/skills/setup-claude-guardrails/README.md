@@ -27,13 +27,14 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Claude Code secrets:** `.credentials.json` and `~/.claude.json` (OAuth tokens, MCP API keys).
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
 - **Calls that can't leave the sandbox:** an excluded command (`gh`, `git push`, `open`) mixed with a backtick, `$(...)`, heredoc, pipe or other command. Denied up front, with the fix in the message, instead of failing later on the proxy.
-- **File reads after a `cd`** (with `blockReadsOutsideWorkingDirectories`): `cd src; sed -n 1,9p a.ts`. Claude Code can't resolve that path ahead of time and asks the user even in auto mode, so the hook denies it and tells Claude to drop the `cd`.
+- **File reads after a `cd`** (with `blockReadsOutsideWorkingDirectories`): `cd src; sed -n 1,9p a.ts`. Claude Code can't resolve that path ahead of time and asks the user even in auto mode, so the hook denies it and tells Claude to drop the `cd`. Same for `sed -i` / `perl -i` edits: the hook sends Claude to the Edit tool.
 - **Ask, don't block:** edits to any checkout's `.claude/settings*.json`, the hook itself and `~/.claude/settings.json` (it can turn hooks off).
 - **Fail closed:** malformed input or a hook error blocks the call.
 
 ## Allowed on purpose
 
 - **`~/.claude`:** Claude Code's own config, plans and saved tool output. Its secrets stay blocked.
+- **Claude's temp dir** (`/tmp/claude-<uid>`, the sandbox's `$TMPDIR`): added to `additionalDirectories`, so commands given a temp file don't make the user approve them under the read block.
 - **`.env*.example|.sample|.template|.dist`:** named explicitly, not through a wildcard.
 - **Message text:** commit messages and PR titles/bodies with no `$` or backticks (`git commit -m`, `git commit -F - <<'EOF'`, `gh`/`glab` `--title`/`--body`/`--notes`/`--description`). They only get stored, so paths and `.env` in them are words, not file access. File flags (`-F`, `--body-file`, `git commit -t`) are still checked.
 - **Paths that can't exist:** `/api/users` in a grep pattern (top-level dir missing, and `/` not writable).

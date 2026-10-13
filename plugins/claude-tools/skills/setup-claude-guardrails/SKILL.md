@@ -38,7 +38,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
    - the hook and rule exist and are identical to this skill's copies;
-   - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
+   - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, `blockReadsOutsideWorkingDirectories`, and Claude's temp dir in `additionalDirectories`;
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
@@ -66,7 +66,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    {
      "permissions": {
        "blockReadsOutsideWorkingDirectories": true,
-       "additionalDirectories": ["<extra roots, as given, ~ allowed>"],
+       "additionalDirectories": ["/tmp/claude-<uid>", "<extra roots, as given, ~ allowed>"],
        "deny": [
          "Read(.env)", "Read(.env.*)", "Read(*.env)",
          "Read(!.env*.example)", "Read(!.env*.sample)", "Read(!.env*.template)", "Read(!.env*.dist)",
@@ -104,7 +104,8 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
    Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
-   - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
+   - Always add Claude's temp dir, `/tmp/claude-<uid>` with `<uid>` from `id -u` (on macOS also `/private/tmp/claude-<uid>`). It is the sandbox's `$TMPDIR`, where the rule sends temp files; without it, the read block makes the user approve every command that is passed one (`node script.cjs /tmp/claude-1000/task.json`). Project-only means no other roots.
+   - Omit `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
    - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
    - Skip a hook entry if that event already has one with the same `command`.
    - Once installed, the hook asks before edits to settings files and itself, so expect prompts on a re-run.
@@ -126,7 +127,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - **env:** blocks `.env`, `.env.*`, `*.env` (case-insensitive) except `.example|.sample|.template|.dist`, including Bash wildcards, quote-split names, symlinks and Grep `glob` filters (not Glob patterns: they only list names). `process.env` and `import.meta.env` count only if such a file exists. Also blocks `.credentials.json` and `.claude.json` anywhere.
 - **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
 - **sandbox exit:** with the sandbox on and `excludedCommands` set, denies a call that starts with an excluded command (`gh`, `git push`, `open`, ...) but also holds a backtick, `$(...)`, heredoc, pipe or another command: it would stay in the sandbox and fail on credentials or the network. The message gives the fix (split the call, `--body-file`). Redirections aren't detected.
-- **read block:** with `blockReadsOutsideWorkingDirectories` on, denies a call where a file reader (`cat`, `sed`, `grep`, `head`, ...) runs after a `cd`. Claude Code can't resolve that path before running it and asks the user, even in auto mode; the deny sends Claude back to drop the `cd` instead.
+- **read block:** with `blockReadsOutsideWorkingDirectories` on, denies a call where a file reader (`cat`, `sed`, `grep`, `head`, ...) runs after a `cd`. Claude Code can't resolve that path before running it and asks the user, even in auto mode; the deny sends Claude back to drop the `cd` instead. Same for `sed -i` and `perl -i`, whose scripts can't be checked: the deny sends Claude to the Edit tool.
 - **failure hints:** the `PostToolUseFailure` entry runs the same script on a failed Bash call. Only if the error matches a known sandbox signature (`proxy requires authentication`, `Could not read from remote repository`, `Operation not permitted`, the `open` Launch Services errors) it adds context with the cause and the fix, plus a line telling Claude to suggest improving the guardrail if it keeps costing steps or is unclear. Other failures get nothing.
 - Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
