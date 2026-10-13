@@ -497,6 +497,32 @@ const main = () => {
     );
   }
 
+  // --- read block ------------------------------------------------------------------------------
+
+  // With permissions.blockReadsOutsideWorkingDirectories, Claude Code can't resolve a file read after
+  // a `cd` in the same call ("a path that is computed at run time") and asks the user, even in auto
+  // mode. Denying here costs the model one retry instead of costing the user a prompt.
+  const READERS = new Set(
+    "cat head tail sed awk gawk grep egrep fgrep rg less more wc nl cut sort uniq diff cmp jq yq tac strings xxd od".split(" ")
+  );
+  const blocksReads = settingsFiles.some((f) => readJson(f).permissions?.blockReadsOutsideWorkingDirectories === true);
+  const lexedCommand = command === null ? null : lexCommand(scanned);
+  if (blocksReads && lexedCommand) {
+    const programs = lexedCommand.segments.map(({ words }) => words.find((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value))?.value);
+    const cdAt = programs.findIndex((p) => p === "cd" || p === "pushd");
+    const reader = cdAt < 0 ? undefined : programs.slice(cdAt + 1).find((p) => READERS.has(p));
+    if (reader) {
+      respond(
+        "deny",
+        "read-block",
+        `\`${reader}\` runs after a \`cd\` in the same call, so Claude Code can't check its path against ` +
+          `blockReadsOutsideWorkingDirectories and would make the user approve it. Drop the \`cd\`: use paths from the ` +
+          `current directory or absolute paths, \`git -C <dir>\`, or the Read and Grep tools, and split unrelated ` +
+          `commands into parallel calls.`
+      );
+    }
+  }
+
   // --- sandbox exit ----------------------------------------------------------------------------
 
   // `gh`, `git push` and `open` run outside the sandbox only when every command in the call is one of
