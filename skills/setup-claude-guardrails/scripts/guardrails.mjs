@@ -508,7 +508,26 @@ const main = () => {
   const blocksReads = settingsFiles.some((f) => readJson(f).permissions?.blockReadsOutsideWorkingDirectories === true);
   const lexedCommand = command === null ? null : lexCommand(scanned);
   if (blocksReads && lexedCommand) {
-    const programs = lexedCommand.segments.map(({ words }) => words.find((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value))?.value);
+    const simple = lexedCommand.segments.map(({ words }) => {
+      const at = words.findIndex((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value));
+      return at < 0 ? [] : words.slice(at).map((w) => w.value);
+    });
+    // Claude Code can't check what an in-place edit script reads or writes, so each one prompts.
+    const inPlace = simple.find(
+      ([program, ...args]) =>
+        (program === "sed" && args.some((a) => /^-[a-zA-Z]*i|^--in-place/.test(a))) ||
+        (program === "perl" && args.some((a) => /^-[a-zA-Z]*i/.test(a)))
+    );
+    if (inPlace) {
+      respond(
+        "deny",
+        "read-block",
+        `\`${inPlace[0]}\` in-place edits can't be checked against blockReadsOutsideWorkingDirectories, so each one ` +
+          `makes the user approve it. Edit files with the Edit or Write tool instead (one Edit per change). ` +
+          `Read-only \`sed -n\` is fine.`
+      );
+    }
+    const programs = simple.map((words) => words[0]);
     const cdAt = programs.findIndex((p) => p === "cd" || p === "pushd");
     const reader = cdAt < 0 ? undefined : programs.slice(cdAt + 1).find((p) => READERS.has(p));
     if (reader) {
