@@ -27,7 +27,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Claude Code secrets:** `.credentials.json` and `~/.claude.json` (OAuth tokens, MCP API keys).
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
 - **Calls that can't leave the sandbox:** an excluded command (`gh`, `git push`, `open`) mixed with a backtick, `$(...)`, heredoc, pipe or other command. Denied up front, with the fix in the message, instead of failing later on the proxy.
-- **File reads after a `cd`** (with `blockReadsOutsideWorkingDirectories`): `cd src; sed -n 1,9p a.ts`. Claude Code can't resolve that path ahead of time and asks the user even in auto mode, so the hook denies it and tells Claude to drop the `cd`.
+- **File reads after a `cd`** (with `blockReadsOutsideWorkingDirectories`): `cd src; sed -n 1,9p a.ts`. Claude Code can't resolve that path ahead of time and asks the user even in auto mode, so the hook denies it and tells Claude to drop the `cd`. Same for `sed -i` / `perl -i` edits: the hook sends Claude to the Edit tool.
 - **Ask, don't block:** edits to any checkout's `.claude/settings*.json`, the hook itself and `~/.claude/settings.json` (it can turn hooks off).
 - **Fail closed:** malformed input or a hook error blocks the call.
 
