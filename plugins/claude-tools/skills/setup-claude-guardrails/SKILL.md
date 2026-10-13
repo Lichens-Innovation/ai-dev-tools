@@ -38,7 +38,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
 1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
    - the hook and rule exist and are identical to this skill's copies;
-   - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, and `blockReadsOutsideWorkingDirectories`;
+   - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, `blockReadsOutsideWorkingDirectories`, and Claude's temp dir in `additionalDirectories`;
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
@@ -66,7 +66,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    {
      "permissions": {
        "blockReadsOutsideWorkingDirectories": true,
-       "additionalDirectories": ["<extra roots, as given, ~ allowed>"],
+       "additionalDirectories": ["/tmp/claude-<uid>", "<extra roots, as given, ~ allowed>"],
        "deny": [
          "Read(.env)", "Read(.env.*)", "Read(*.env)",
          "Read(!.env*.example)", "Read(!.env*.sample)", "Read(!.env*.template)", "Read(!.env*.dist)",
@@ -104,7 +104,8 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 
    Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
-   - Omit `additionalDirectories` for project-only and `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
+   - Always add Claude's temp dir, `/tmp/claude-<uid>` with `<uid>` from `id -u` (on macOS also `/private/tmp/claude-<uid>`). It is the sandbox's `$TMPDIR`, where the rule sends temp files; without it, the read block makes the user approve every command that is passed one (`node script.cjs /tmp/claude-1000/task.json`). Project-only means no other roots.
+   - Omit `sandbox` if declined. For several checkouts, prefer absolute or `~` roots (relative ones resolve per checkout).
    - Keep the `deny` order: a `!` negation only carves exceptions out of earlier rules in the same file. Append the block contiguously to an existing list.
    - Skip a hook entry if that event already has one with the same `command`.
    - Once installed, the hook asks before edits to settings files and itself, so expect prompts on a re-run.

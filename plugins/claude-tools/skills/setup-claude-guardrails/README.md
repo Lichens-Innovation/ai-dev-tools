@@ -34,6 +34,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 ## Allowed on purpose
 
 - **`~/.claude`:** Claude Code's own config, plans and saved tool output. Its secrets stay blocked.
+- **Claude's temp dir** (`/tmp/claude-<uid>`, the sandbox's `$TMPDIR`): added to `additionalDirectories`, so commands given a temp file don't make the user approve them under the read block.
 - **`.env*.example|.sample|.template|.dist`:** named explicitly, not through a wildcard.
 - **Message text:** commit messages and PR titles/bodies with no `$` or backticks (`git commit -m`, `git commit -F - <<'EOF'`, `gh`/`glab` `--title`/`--body`/`--notes`/`--description`). They only get stored, so paths and `.env` in them are words, not file access. File flags (`-F`, `--body-file`, `git commit -t`) are still checked.
 - **Paths that can't exist:** `/api/users` in a grep pattern (top-level dir missing, and `/` not writable).
