@@ -231,6 +231,23 @@ sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
 sbx deny  Bash '{"command":"open ~/x.html && echo done"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"git commit -m x && git push"}'
 
+echo "read block"
+# With blockReadsOutsideWorkingDirectories, Claude Code asks the user about a file read after a cd in
+# the same call, even in auto mode, so the hook sends the model back to rewrite it instead.
+RB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB"' EXIT
+mkdir -p "$RB/.claude" "$RB/src"
+echo '{ "permissions": { "blockReadsOutsideWorkingDirectories": true } }' > "$RB/.claude/settings.local.json"
+rb() { CLAUDE_PROJECT_DIR="$RB" check "$1" "$2" "$3" "$RB"; }
+rb deny  Bash '{"command":"cd '"$RB"'/src; sed -n 55,82p a.ts; grep -n x b.ts | head"}'
+rb deny  Bash '{"command":"cd src && cat a.ts"}'
+rb deny  Bash '{"command":"cd src && git show HEAD:src/a.ts | sed -n 1,9p"}'
+rb allow Bash '{"command":"cd src && npm test"}'
+rb allow Bash '{"command":"sed -n 55,82p src/a.ts"}'
+rb allow Bash '{"command":"git -C src log --oneline | head"}'
+rb allow Bash '{"command":"git commit -m '"$Q"'cd x; cat y'"$Q"'"}'
+CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"cd src && cat a.ts"}'
+
 echo "failure hints"
 # hint_check <expected: hint|none> <command> <error text> [expected text in the hint]
 hint_check() {
