@@ -39,6 +39,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 1. **Check for an existing install** (read-only, before asking anything). Resolve the main checkout and linked worktrees, and say which one the session is in. In each, check:
    - the hook and rule exist and are identical to this skill's copies;
    - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, `blockReadsOutsideWorkingDirectories`, and Claude's temp dir in `additionalDirectories`;
+   - with the sandbox on: the sandbox entries step 5 would add for this machine (step 3's tool lookup), and `echo ok` runs (step 7);
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
@@ -49,12 +50,16 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - "Enable the Bash sandbox?": Yes, strict (recommended: OS-enforced; network needs per-domain approval, no unsandboxed fallback), or No (hook heuristics only).
    - Sandbox only: "Run git hosting commands outside the sandbox?": Yes (`gh`, `glab`, `git push`/`pull`/`fetch` use your Keychain, SSH agent and network; risky subcommands prompt), or No (they fail in the sandbox; run them with `!`). No recommendation: it trades isolation for convenience.
    - Sandbox only: "Run `open` outside the sandbox?": Yes (recommended on macOS: the sandbox blocks `open`, so skills like `/claude-light` can't open a page; apps and URLs still prompt), or No (run `! open <path>` yourself).
+   - Sandbox and a JS lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock*`) only: "Let sandboxed commands reach the package registry?": Yes (only `registry.npmjs.org`; postinstall downloads such as Electron's from GitHub stay blocked), or No. No recommendation: lint and test runs rarely need it, installs are better run with `!` (step 8).
    - Linked worktrees only: "Install in which checkouts?": all (recommended), or the current one.
+
+   `AskUserQuestion` takes at most 4 questions: put any extra in a second call.
 
 3. **Prerequisites.**
    - `node --version` >= 18, else stop: the hook would fail closed on every call.
    - `claude --version` >= 2.1.257 for `blockReadsOutsideWorkingDirectories`; if older, skip that key and say to upgrade. If it fails with `operation not permitted` (the session's sandbox, before step 5's exclusion applies), ask the user to run `! claude --version`.
    - Linux/WSL2 with the sandbox: tell the user to run `/sandbox` afterwards to check bubblewrap. Native Windows: no sandbox.
+   - Sandbox only: run `command -v node` and `command -v` on the project's package manager (from its lockfile: `pnpm`, `npm`, `yarn`, `bun`). The sandbox can't read the home dir, so a tool installed under it is "command not found" inside, and every `node` call fails (the hook still runs: hooks aren't sandboxed). Record the install root of each one under `$HOME` that isn't already a root: `~/.nvm`, `~/.local/share/fnm`, `~/.volta`, `~/.bun`, and `$PNPM_HOME` (default `~/.local/share/pnpm`) for pnpm. If `command -v` itself fails because the session is already sandboxed, ask the user to run `! command -v node <pm>`.
 
 4. **Copy** the hook to `.claude/hooks/guardrails.mjs` and the rule to `.claude/rules/guardrails.md` in each chosen checkout. If a copy exists and differs, show the diff and ask first.
 
@@ -102,6 +107,15 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    | Sandbox on (always, read-only: the sandbox blocks the `claude` binary, breaking step 3) | | `claude --version`, `claude -v` (exact forms only, so no unsandboxed agent session) |
    | `open` outside the sandbox | `Bash(open -a *)`, `Bash(open -b *)`, `Bash(open *://*)` | `open`, `open *`, `xdg-open`, `xdg-open *` |
 
+   And with the sandbox on:
+
+   | When | Merge |
+   | ---- | ----- |
+   | A tool from step 3 lives under `$HOME` | its install root in `sandbox.filesystem.allowRead` (`~` allowed) |
+   | pnpm under `$HOME` | also `$PNPM_HOME` in `sandbox.filesystem.allowWrite`: pnpm opens a database there even for `pnpm --version` |
+   | pnpm, on Linux/WSL2 | `"env": { "XDG_RUNTIME_DIR": "/tmp/claude-<uid>" }`: pnpm puts its store lock there, and the real `/run/user/<uid>` holds the SSH agent, D-Bus and keyring sockets, so don't add it to `allowWrite`. The `env` block applies to the whole session (hooks, MCP servers) and loads at session start |
+   | Registry: yes | `"allowedDomains": ["registry.npmjs.org"]` in `sandbox.network` |
+
    Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
 
    - Always add Claude's temp dir, `/tmp/claude-<uid>` with `<uid>` from `id -u` (on macOS also `/private/tmp/claude-<uid>`). It is the sandbox's `$TMPDIR`, where the rule sends temp files; without it, the read block makes the user approve every command that is passed one (`node script.cjs /tmp/claude-1000/task.json`). Project-only means no other roots.
@@ -114,11 +128,16 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - If it doesn't exist, create it and add `.worktreeinclude` (unanchored: the hook reads a leading `/` as absolute) to the shared exclude.
    - If it is tracked, it is shared: show the lines and ask first. If declined, skip and say new worktrees won't get a copy.
 
-7. **Verify.** Run `bash scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` from this skill's directory (always `bash`, never `sh`: on macOS `sh` is bash in POSIX mode and the `claude config` checks fail). It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
+7. **Verify.** With the sandbox on, first run `echo ok` and `node --version` (sandbox settings apply to the next command, no restart needed):
+   - `apply-seccomp: ... nested userns is capability-restricted`: bubblewrap can't apply its seccomp filter on this kernel (often Ubuntu's AppArmor userns restriction), so every Bash command fails. Stop and ask: set `sandbox.network.allowAllUnixSockets: true` (skips the filter; sandboxed commands can then connect to any Unix socket, Docker and the SSH agent included), or turn the sandbox off.
+   - `node` not found: the install root from step 3 is missing from `allowRead`. Ask for `! command -v node` and add it.
+
+   Then run `bash scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` from this skill's directory (always `bash`, never `sh`: on macOS `sh` is bash in POSIX mode and the `claude config` checks fail). It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
+   - Exit 2 with `node does not run here`: as above, fix `allowRead` first. Every case would otherwise read as a hook bug.
    - Exit 2 with `could not create a scratch ...` or `temp dir ... is not usable`: stop and report. Never point `TMPDIR` at a real directory: the script writes fake secrets there and deletes it.
    - `rm:` errors on paths outside `$TMPDIR`: stop immediately, tell the user, run nothing else.
 
-8. **Report** the files changed per checkout (none tracked), the roots, sandbox on/off, and the limitations below. A fresh clone or a later `git worktree add` needs a re-run. Hooks and the sandbox load at session start: restart Claude Code. With the sandbox, suggest `/sandbox` → Config to review the effective lists.
+8. **Report** the files changed per checkout (none tracked), the roots, sandbox on/off, and the limitations below. A fresh clone or a later `git worktree add` needs a re-run. Hooks and the sandbox load at session start: restart Claude Code. With the sandbox, suggest `/sandbox` → Config to review the effective lists, and recommend running package installs with `!` (`! pnpm install`): inside, they need the registry and postinstall hosts, and the sandbox's mounts block hard links from the home store, so pnpm builds a second store next to the project.
 
 ## Hook behavior
 
@@ -128,7 +147,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - **self:** asks (not denies) before writes, Bash included, to any checkout's settings files or hook and to `~/.claude/settings.json` (which can set `disableAllHooks`).
 - **sandbox exit:** with the sandbox on and `excludedCommands` set, denies a call that starts with an excluded command (`gh`, `git push`, `open`, ...) but also holds a backtick, `$(...)`, heredoc, pipe or another command: it would stay in the sandbox and fail on credentials or the network. The message gives the fix (split the call, `--body-file`). Redirections aren't detected.
 - **read block:** with `blockReadsOutsideWorkingDirectories` on, denies a call where a file reader (`cat`, `sed`, `grep`, `head`, ...) runs after a `cd`. Claude Code can't resolve that path before running it and asks the user, even in auto mode; the deny sends Claude back to drop the `cd` instead. Same for `sed -i` and `perl -i`, whose scripts can't be checked: the deny sends Claude to the Edit tool.
-- **failure hints:** the `PostToolUseFailure` entry runs the same script on a failed Bash call. Only if the error matches a known sandbox signature (`proxy requires authentication`, `Could not read from remote repository`, `Operation not permitted`, the `open` Launch Services errors) it adds context with the cause and the fix, plus a line telling Claude to suggest improving the guardrail if it keeps costing steps or is unclear. Other failures get nothing.
+- **failure hints:** the `PostToolUseFailure` entry runs the same script on a failed Bash call. Only if the error matches a known sandbox signature (`proxy requires authentication`, `Could not read from remote repository`, `Operation not permitted`, `Read-only file system`, the `open` Launch Services errors, `apply-seccomp`, `command not found` for node and the package managers, pnpm's database and store-lock errors, a failed package install) it adds context with the cause and the fix, plus a line telling Claude to suggest improving the guardrail if it keeps costing steps or is unclear. Other failures get nothing.
 - Malformed input or an internal error exits 2 and blocks the call (fail closed).
 
 ## Limitations: tell the user
@@ -142,4 +161,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - With git hosting excluded, `gh`/`glab` act with your full account and `git push` reaches any remote. Only the listed `ask` rules prompt; `gh pr merge`, `git push --force` and the like run under your normal permission mode.
 - With `open` excluded, any file path opens without a prompt in its default app, outside the sandbox.
 - With the sandbox, Bash can only read the `~/.claude` subfolders Claude Code opens (plugins, skills, agents, rules, commands) and write none of it. Use Read/Edit for files like `~/.claude/settings.json`.
+- `sandbox.filesystem.allowRead` paths (`~/.nvm`, `$PNPM_HOME`) let programs run from there, but the hook still denies naming them in a command (`ls ~/.local/share/pnpm`). Ask the user to run such a command with `!`.
+- With `allowAllUnixSockets`, sandboxed commands can connect to any Unix socket (Docker, SSH agent). With `XDG_RUNTIME_DIR` overridden, tools that need the real runtime dir (Wayland clipboard, notifications) don't find it, in hooks and MCP servers too.
+- With the registry allowed, any sandboxed command can reach `registry.npmjs.org`, not just the package manager.
 - A linked worktree outside the main checkout (`../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there.
