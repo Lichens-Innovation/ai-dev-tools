@@ -329,9 +329,9 @@ const FAILURE_HINTS = [
     program: /^\s*(?:\w+=\S*\s+)*pnpm\b/,
     error: /unable to open database file|pnpm-store-operation-locks/i,
     hint:
-      "pnpm can't write its own files: PNPM_HOME (often ~/.local/share/pnpm) must be in sandbox.filesystem.allowWrite, " +
-      "and its lock needs env.XDG_RUNTIME_DIR set to Claude's temp dir (the env block loads at session start). " +
-      "Tell the user which one is missing.",
+      "pnpm can't write its own files. For pnpm-store-operation-locks, retry once as XDG_RUNTIME_DIR=$TMPDIR pnpm ... " +
+      "(the lock goes under the runtime dir, which the sandbox can't write). For unable to open database file, " +
+      "PNPM_HOME (often ~/.local/share/pnpm) must be in sandbox.filesystem.allowWrite: tell the user.",
   },
   {
     error: /Operation not permitted|Read-only file system/i,

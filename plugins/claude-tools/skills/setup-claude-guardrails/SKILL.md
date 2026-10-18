@@ -113,7 +113,6 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    | ---- | ----- |
    | A tool from step 3 lives under `$HOME` | its install root in `sandbox.filesystem.allowRead` (`~` allowed) |
    | pnpm under `$HOME` | also `$PNPM_HOME` in `sandbox.filesystem.allowWrite`: pnpm opens a database there even for `pnpm --version` |
-   | pnpm, on Linux/WSL2 | `"env": { "XDG_RUNTIME_DIR": "/tmp/claude-<uid>" }`: pnpm puts its store lock there, and the real `/run/user/<uid>` holds the SSH agent, D-Bus and keyring sockets, so don't add it to `allowWrite`. The `env` block applies to the whole session (hooks, MCP servers) and loads at session start |
    | Registry: yes | `"allowedDomains": ["registry.npmjs.org"]` in `sandbox.network` |
 
    Excluded commands still go through permission rules and the hook; `allowUnsandboxedCommands: false` doesn't stop them. A call leaves the sandbox only when every command in it matches (`git push && gh pr create ...` does), never with `cd`, `$(...)`, redirections or heredocs, `xargs` or `eval`. A plain file path for `open` doesn't prompt.
@@ -162,6 +161,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - With `open` excluded, any file path opens without a prompt in its default app, outside the sandbox.
 - With the sandbox, Bash can only read the `~/.claude` subfolders Claude Code opens (plugins, skills, agents, rules, commands) and write none of it. Use Read/Edit for files like `~/.claude/settings.json`.
 - `sandbox.filesystem.allowRead` paths (`~/.nvm`, `$PNPM_HOME`) let programs run from there, but the hook still denies naming them in a command (`ls ~/.local/share/pnpm`). Ask the user to run such a command with `!`.
-- With `allowAllUnixSockets`, sandboxed commands can connect to any Unix socket (Docker, SSH agent). With `XDG_RUNTIME_DIR` overridden, tools that need the real runtime dir (Wayland clipboard, notifications) don't find it, in hooks and MCP servers too.
+- With `allowAllUnixSockets`, sandboxed commands can connect to any Unix socket (Docker, SSH agent).
+- On Linux, pnpm puts its store lock under `XDG_RUNTIME_DIR` (`/run/user/<uid>`), which the sandbox can't write. Don't add it to `allowWrite`: it holds the SSH agent, D-Bus and keyring sockets. Setting it in the `env` block doesn't work either: it is reset before each command. The failure hint makes Claude retry with `XDG_RUNTIME_DIR=$TMPDIR pnpm ...`.
 - With the registry allowed, any sandboxed command can reach `registry.npmjs.org`, not just the package manager.
 - A linked worktree outside the main checkout (`../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there.
