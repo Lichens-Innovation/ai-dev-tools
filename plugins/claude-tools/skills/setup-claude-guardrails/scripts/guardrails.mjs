@@ -334,6 +334,14 @@ const FAILURE_HINTS = [
       "PNPM_HOME (often ~/.local/share/pnpm) must be in sandbox.filesystem.allowWrite: tell the user.",
   },
   {
+    // Claude Code itself denies sandboxed writes to these paths (denyWithinAllow), whatever allowWrite says.
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
+    hint:
+      "Claude Code keeps sandboxed commands from writing .claude/hooks, .claude/skills and settings files. Use the Write " +
+      "tool (it asks the user) or ask the user to run the command with !. Don't suggest making these paths writable: a " +
+      "sandboxed command could then rewrite the guardrails.",
+  },
+  {
     error: /Operation not permitted|Read-only file system/i,
     hint:
       "A sandbox restriction blocked this command. Don't retry it as is: use $TMPDIR for temp files, stay inside the " +

@@ -288,6 +288,7 @@ hint_check hint 'pnpm --version' '(eval):1: command not found: pnpm' 'allowRead'
 hint_check hint 'bash scripts/test.sh' 'line 3: node: command not found' 'allowRead'
 hint_check hint 'pnpm --version' '[ERROR] unable to open database file' 'allowWrite'
 hint_check hint 'pnpm lint' "$PNPM_LOCK" 'XDG_RUNTIME_DIR=$TMPDIR pnpm'
+hint_check hint 'cp a.mjs .claude/hooks/guardrails.mjs' "cp: cannot create regular file '.claude/hooks/guardrails.mjs': Read-only file system" 'Use the Write tool'
 hint_check none 'npm test' 'Error: 3 tests failed'
 hint_check none 'pnpm install' 'ERR_PNPM_OUTDATED_LOCKFILE'
 hint_check none 'npm test' "$PROXY"
