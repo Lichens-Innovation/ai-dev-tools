@@ -13,6 +13,9 @@ die() { echo "test-guardrails: $*" >&2; exit 2; }
 HOOK="${1:-$(dirname "$0")/guardrails.mjs}"
 [ -f "$HOOK" ] || die "hook not found: $HOOK"
 SCRIPT="$(cd "$(dirname "$HOOK")" && pwd -P)/$(basename "$HOOK")"
+# Without node every check reads as "allow", which looks like a broken hook. Inside the sandbox
+# this usually means node lives under the home dir (nvm, fnm, volta) and isn't in allowRead.
+node --version >/dev/null 2>&1 || die "node does not run here (in the sandbox: add its install dir to sandbox.filesystem.allowRead)"
 
 # The scratch dirs get populated with fake secrets and then rm -rf'd, so they must be fresh
 # mktemp dirs under the temp root. An unchecked empty mktemp result once made `cd "" && pwd`
@@ -277,12 +280,49 @@ hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.gith
 hint_check hint 'open /tmp/x.html' 'LSOpenURLsWithRole() failed with error -10822' 'run with !'
 hint_check hint 'touch /etc/x' 'touch: /etc/x: Operation not permitted' 'sandbox restriction'
 hint_check hint 'git push' "$PROXY" 'setup-claude-guardrails'
+PNPM_LOCK='Failed to open the store operation lock at "pnpm-store-operation-locks": Read-only file system (os error 30)'
+hint_check hint 'pnpm install' "$PNPM_LOCK" 'run the install with !'
+hint_check hint 'pnpm install' 'electron postinstall: TypeError: fetch failed' 'run the install with !'
+hint_check hint 'echo ok' 'apply-seccomp: write /proc/self/setgroups (nested userns is capability-restricted; caller must provide CAP_SYS_ADMIN): Permission denied' 'allowAllUnixSockets'
+hint_check hint 'pnpm --version' '(eval):1: command not found: pnpm' 'allowRead'
+hint_check hint 'bash scripts/test.sh' 'line 3: node: command not found' 'allowRead'
+hint_check hint 'pnpm --version' '[ERROR] unable to open database file' 'allowWrite'
+hint_check hint 'pnpm lint' "$PNPM_LOCK" 'XDG_RUNTIME_DIR=$TMPDIR pnpm'
+hint_check hint 'cp a.mjs .claude/hooks/guardrails.mjs' "cp: cannot create regular file '.claude/hooks/guardrails.mjs': Read-only file system" 'Use the Write tool'
 hint_check none 'npm test' 'Error: 3 tests failed'
+hint_check none 'pnpm install' 'ERR_PNPM_OUTDATED_LOCKFILE'
 hint_check none 'npm test' "$PROXY"
 hint_check none 'git push' 'rejected: non-fast-forward'
 hint_check none 'git commit -m "fix: could not read from remote repository"' 'nothing to commit'
 echo '{"hook_event_name":"PostToolUseFailure","tool_name":"Read","tool_input":{"file_path":"x"}}' | node "$SCRIPT" >/dev/null 2>&1 \
   && echo "  ok    non-Bash failure exits 0" || { echo "  FAIL  non-Bash failure did not exit 0"; failures=$((failures + 1)); }
+
+echo "sandbox stubs"
+# On Linux the sandbox leaves 0-byte mount points at the protected paths it blocks (.bashrc, .vscode,
+# .claude/agents, ...). SKILL.md step 7 excludes them, re-including directories with a trailing
+# slash so a real .vscode/ or .claude/agents/ still shows in git status.
+STUB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB" "$STUB"' EXIT
+# stub_check <expected git status --porcelain output, one path per line>
+stub_check() {
+  local want="$1" got
+  got="$(git -C "$STUB" status --porcelain --untracked-files=all | sed 's/^?? //' | grep -v "^$MARKER\$" | sort)"
+  if [ "$got" = "$want" ]; then
+    printf '  ok    untracked: %s\n' "$(printf '%s' "${want:-(none)}" | tr '\n' ' ')"
+  else
+    printf '  FAIL  expected untracked [%s], got [%s]\n' "$want" "$got"
+    failures=$((failures + 1))
+  fi
+}
+git -C "$STUB" init -q
+mkdir -p "$STUB/.claude"
+: > "$STUB/.bashrc"; : > "$STUB/.vscode"; : > "$STUB/.claude/agents"
+printf '%s\n' '/.bashrc' '/.vscode' '!/.vscode/' '/.claude/agents' '!/.claude/agents/' >> "$STUB/.git/info/exclude"
+stub_check ""
+rm -f "$STUB/.vscode" "$STUB/.claude/agents"
+mkdir -p "$STUB/.vscode" "$STUB/.claude/agents"
+: > "$STUB/.vscode/settings.json"; : > "$STUB/.claude/agents/a.md"
+stub_check "$(printf '%s\n' .claude/agents/a.md .vscode/settings.json)"
 
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?
