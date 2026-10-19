@@ -31,7 +31,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - `.claude/hooks/guardrails.mjs`, from this skill's `scripts/guardrails.mjs`
 - `.claude/rules/guardrails.md`, from `assets/guardrails.md`: tells Claude how to work with the hook (loads every session)
 - `.claude/settings.local.json`: permissions, optional sandbox, hook registration
-- shared `.git/info/exclude`: the hook and rule paths
+- shared `.git/info/exclude`: the hook and rule paths, and on Linux with the sandbox its mount stubs (step 7)
 - `<main>/.worktreeinclude`: the hook, the rule and `settings.local.json`
 
 ## Workflow
@@ -40,6 +40,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - the hook and rule exist and are identical to this skill's copies;
    - settings have the hook entry (`PreToolUse` and `PostToolUseFailure`) with the same `command`, all 18 `deny` entries from step 5, `blockReadsOutsideWorkingDirectories`, and Claude's temp dir in `additionalDirectories`;
    - with the sandbox on: the sandbox entries step 5 would add for this machine (step 3's tool lookup), and `echo ok` runs (step 7);
+   - on Linux with the sandbox: every mount stub step 7 lists is in the shared exclude;
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
@@ -131,6 +132,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 7. **Verify.** With the sandbox on, first run `echo ok` and `node --version` (sandbox settings apply to the next command, no restart needed):
    - `apply-seccomp: ... nested userns is capability-restricted`: bubblewrap can't apply its seccomp filter on this kernel (often Ubuntu's AppArmor userns restriction), so every Bash command fails. Stop and ask: set `sandbox.network.allowAllUnixSockets: true` (skips the filter; sandboxed commands can then connect to any Unix socket, Docker and the SSH agent included), or turn the sandbox off.
    - `node` not found: the install root from step 3 is missing from `allowRead`. Ask for `! command -v node` and add it.
+   - Linux only, once `echo ok` runs: exclude the sandbox's mount stubs. To block a protected path that doesn't exist yet (`.bashrc`, `.gitconfig`, `.mcp.json`, `.vscode`, `.claude/agents`, a denied `.env`, ...), bubblewrap creates an empty file there and mounts `/dev/null` over it. The file stays behind, so `git status` lists it in every checkout. Inside the sandbox each one is a character device, which a checkout never holds otherwise. List them with `find . -maxdepth 2 -xtype c -not -path './.git/*'`. Use `-xtype`, not `-type`: `-type` trusts the directory listing, which still says regular file. The `.git` filter skips `.git/config.lock`, which `git status` never shows. Append each to the shared exclude (step 4), anchored, as `/<path>`, and add `!/<path>/` right after it for a name that can be a directory (`.vscode`, `.idea`, anything under `.claude/`), so a real directory of that name still shows. Skip lines already listed. Write with Edit, not Bash: the hook denies a command that names `.env`. Don't delete the stubs: the next sandboxed command recreates them.
 
    Then run `bash scripts/test-guardrails.sh <main>/.claude/hooks/guardrails.mjs` from this skill's directory (always `bash`, never `sh`: on macOS `sh` is bash in POSIX mode and the `claude config` checks fail). It checks ~100 allow/deny/ask cases in a throwaway project under `$TMPDIR`. Report failures verbatim.
    - Exit 2 with `node does not run here`: as above, fix `allowRead` first. Every case would otherwise read as a hook bug.
@@ -164,6 +166,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - `sandbox.filesystem.allowRead` paths (`~/.nvm`, `$PNPM_HOME`) let programs run from there, but the hook still denies naming them in a command (`ls ~/.local/share/pnpm`). Ask the user to run such a command with `!`.
 - With the sandbox, Bash can't write `.claude/hooks`, `.claude/skills` or settings files (Claude Code's own protection, not this skill's). Edits go through Write/Edit, which ask. Keep it that way: if a sandboxed command could write them, it could replace the hook without a prompt.
 - With `allowAllUnixSockets`, sandboxed commands can connect to any Unix socket (Docker, SSH agent).
+- On Linux, the excluded mount stubs hide a real file you create later at the same path (say a genuine untracked `.mcp.json`) from `git status`. Delete its line from `.git/info/exclude`. Directories aren't affected.
 - On Linux, pnpm puts its store lock under `XDG_RUNTIME_DIR` (`/run/user/<uid>`), which the sandbox can't write. Don't add it to `allowWrite`: it holds the SSH agent, D-Bus and keyring sockets. Setting it in the `env` block doesn't work either: it is reset before each command. The failure hint makes Claude retry with `XDG_RUNTIME_DIR=$TMPDIR pnpm ...`.
 - With `pnpm_config_verify_deps_before_run` off, pnpm no longer warns that `node_modules` is stale: a script fails on a missing module instead, and Claude asks for `! pnpm install`. The `env` block applies to the whole session, so pnpm run by hooks skips the check too (not your own terminal).
 - With the registry allowed, any sandboxed command can reach `registry.npmjs.org`, not just the package manager.

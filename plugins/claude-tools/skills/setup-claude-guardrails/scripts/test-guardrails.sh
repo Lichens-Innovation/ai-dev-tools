@@ -297,6 +297,33 @@ hint_check none 'git commit -m "fix: could not read from remote repository"' 'no
 echo '{"hook_event_name":"PostToolUseFailure","tool_name":"Read","tool_input":{"file_path":"x"}}' | node "$SCRIPT" >/dev/null 2>&1 \
   && echo "  ok    non-Bash failure exits 0" || { echo "  FAIL  non-Bash failure did not exit 0"; failures=$((failures + 1)); }
 
+echo "sandbox stubs"
+# On Linux the sandbox leaves 0-byte mount points at the protected paths it blocks (.bashrc, .vscode,
+# .claude/agents, ...). SKILL.md step 7 excludes them, re-including directories with a trailing
+# slash so a real .vscode/ or .claude/agents/ still shows in git status.
+STUB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB" "$STUB"' EXIT
+# stub_check <expected git status --porcelain output, one path per line>
+stub_check() {
+  local want="$1" got
+  got="$(git -C "$STUB" status --porcelain --untracked-files=all | sed 's/^?? //' | grep -v "^$MARKER\$" | sort)"
+  if [ "$got" = "$want" ]; then
+    printf '  ok    untracked: %s\n' "$(printf '%s' "${want:-(none)}" | tr '\n' ' ')"
+  else
+    printf '  FAIL  expected untracked [%s], got [%s]\n' "$want" "$got"
+    failures=$((failures + 1))
+  fi
+}
+git -C "$STUB" init -q
+mkdir -p "$STUB/.claude"
+: > "$STUB/.bashrc"; : > "$STUB/.vscode"; : > "$STUB/.claude/agents"
+printf '%s\n' '/.bashrc' '/.vscode' '!/.vscode/' '/.claude/agents' '!/.claude/agents/' >> "$STUB/.git/info/exclude"
+stub_check ""
+rm -f "$STUB/.vscode" "$STUB/.claude/agents"
+mkdir -p "$STUB/.vscode" "$STUB/.claude/agents"
+: > "$STUB/.vscode/settings.json"; : > "$STUB/.claude/agents/a.md"
+stub_check "$(printf '%s\n' .claude/agents/a.md .vscode/settings.json)"
+
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?
 if [ $rc -eq 2 ]; then echo "  ok    malformed input exits 2"; else echo "  FAIL  malformed input exited $rc"; failures=$((failures + 1)); fi
