@@ -304,6 +304,44 @@ const FAILURE_HINTS = [
     hint: "The sandbox blocks open and osascript. Don't retry: give the user the exact command to run with !.",
   },
   {
+    // Installs need the package store, a lock under XDG_RUNTIME_DIR, the registry and postinstall downloads
+    // (Electron from GitHub): too much to open up, and the sandbox's mounts make pnpm copy a second store.
+    program: /^\s*(?:\w+=\S*\s+)*(?:pnpm|npm|yarn|bun)\s+(?:install|i|add|ci|update|up)\b/,
+    error: /Read-only file system|Operation not permitted|STORE_DIR|fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|allowed_domains/i,
+    hint:
+      "Package installs don't fit the sandbox (store, lock, registry and postinstall downloads). Don't retry or " +
+      "widen the sandbox: ask the user to run the install with !.",
+  },
+  {
+    error: /apply-seccomp|nested userns/i,
+    hint:
+      "Bubblewrap can't apply its seccomp filter on this kernel, so every sandboxed command fails. Stop and tell the " +
+      "user: setting sandbox.network.allowAllUnixSockets to true skips that filter, at the cost of letting sandboxed " +
+      "commands connect to any Unix socket (Docker, SSH agent). It's their call.",
+  },
+  {
+    error: /command not found: (?:node|pnpm|npm|npx|yarn|bun|corepack)\b|\b(?:node|pnpm|npm|npx|yarn|bun|corepack): command not found/i,
+    hint:
+      "The tool is installed under the home dir (nvm, fnm, volta, PNPM_HOME), which the sandbox can't read. Ask the user " +
+      "for `command -v <tool>` (run with !) and to add its install dir to sandbox.filesystem.allowRead.",
+  },
+  {
+    program: /^\s*(?:\w+=\S*\s+)*pnpm\b/,
+    error: /unable to open database file|pnpm-store-operation-locks/i,
+    hint:
+      "pnpm can't write its own files. For pnpm-store-operation-locks, retry once as XDG_RUNTIME_DIR=$TMPDIR pnpm ... " +
+      "(the lock goes under the runtime dir, which the sandbox can't write). For unable to open database file, " +
+      "PNPM_HOME (often ~/.local/share/pnpm) must be in sandbox.filesystem.allowWrite: tell the user.",
+  },
+  {
+    // Claude Code itself denies sandboxed writes to these paths (denyWithinAllow), whatever allowWrite says.
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
+    hint:
+      "Claude Code keeps sandboxed commands from writing .claude/hooks, .claude/skills and settings files. Use the Write " +
+      "tool (it asks the user) or ask the user to run the command with !. Don't suggest making these paths writable: a " +
+      "sandboxed command could then rewrite the guardrails.",
+  },
+  {
     error: /Operation not permitted|Read-only file system/i,
     hint:
       "A sandbox restriction blocked this command. Don't retry it as is: use $TMPDIR for temp files, stay inside the " +
