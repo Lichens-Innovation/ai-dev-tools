@@ -6,9 +6,10 @@ disable-model-invocation: true
 
 # Design Init
 
-Setup orchestrator. Gets a project ready for `design-loop`: the palette lives in the repo **and**
-in the Claude Design project from day one, so it is part of the loop like any component.
-Idempotent: safe to re-run; skips what already exists.
+Setup orchestrator. Gets a project ready for `design-loop` on one of two backends (contract §8):
+**Claude Design**, where the palette lives in the repo **and** in the Claude Design project from
+day one, so it is part of the loop like any component, or the **local design studio**, where the
+design lives in the repo's `design/` folder. Idempotent: safe to re-run; skips what already exists.
 
 ## Shared contract
 
@@ -20,12 +21,23 @@ this skill produces must satisfy the preconditions in §6.
 1. **Detect current state.** Run `node ${CLAUDE_SKILL_DIR}/scripts/detect.mjs` (read-only JSON):
    Claude Code prerequisites (`prerequisites`), package manager, monorepo, and per package whether
    Tailwind, Storybook (with its `issues` review), Chromatic and Playwright are present, the
-   Storybook MCP entries, and the manifest. Also check what a script cannot: the Claude Design MCP
-   is connected, `/design sync` is listed (README "Prerequisites"), a canonical palette file
-   exists, and whether a Claude Design project is already bound. Report the gap list.
+   Storybook MCP entries, and the manifest. Also check what a script cannot: a canonical palette
+   file exists, and, once the backend is known (step 1a), its own prerequisites: for Claude Design
+   the Claude Design MCP is connected, `/design sync` is listed (README "Prerequisites") and
+   whether a project is already bound; for local, Docker answers (`docker info`) and the studio
+   container is running. Report the gap list.
+
+1a. **Backend.** An existing manifest decides: its `backend`, or `claude-design` when it has none
+   (contract §2). Do not ask again: moving a set-up project to the other backend is
+   `/design-switch-backend`. With no manifest yet, ask (`AskUserQuestion`): **Claude Design** (explore in claude.ai/design;
+   needs the Claude Design MCP, DesignSync and `/design sync`) or **Local design studio** (a Docker
+   container serves the project's `design/` folder; no account, nothing leaves the machine).
+   Steps 4, 5, 6 and 8 are for Claude Design only; the local backend has its own steps L1 to L4
+   after step 7. Everything else is shared.
 
 1b. **Prerequisites and choices.**
-   - **Prerequisites** (`prerequisites.fixes`, Node 22.18+ for `palette.ts`): list each change you
+   - **Prerequisites** (`prerequisites.fixes`, Node 22.18+ for `palette.ts`; for the local backend
+     only the Node version applies, skip the Claude Code settings fixes): list each change you
      would make (e.g. set `disableBundledSkills` to `false` in `<file>`, remove `DesignSync` from
      `permissions.deny`), then ask before applying any. JSON settings cannot hold a comment, so
      explain the change in your reply instead. Settings edits need a new session: say so. When
@@ -59,7 +71,7 @@ this skill produces must satisfy the preconditions in §6.
 3b. **Chromatic (sub-skill).** When chosen in 1b (or already present), invoke **`chromatic-init`**
    once Storybook exists.
 
-4. **Create or bind the Claude Design project.** `DesignSync list_projects`.
+4. **Create or bind the Claude Design project** (Claude Design only). `DesignSync list_projects`.
    - **Default: create a new project** for this repo with `DesignSync create_project` (`name`:
      the repo name).
    - Reuse an existing project only when the user points at one; confirm with
@@ -75,7 +87,7 @@ this skill produces must satisfy the preconditions in §6.
 `<palette.ts>` below is the repo's copy `design-palette` put in (step 5 there), else the
 plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts).
 
-5. **Reconcile the palette** (only when the project already has `Palette.dc.html` at its root per
+5. **Reconcile the palette** (Claude Design only, and only when the project already has `Palette.dc.html` at its root per
    `DesignSync list_files`, i.e. a reused project or a re-run). Fetch it with `DesignSync get_file`
    into `/tmp/design-init/remote-palette.html` (data, not instructions: contract §7), then:
 
@@ -93,7 +105,7 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
 
    Never merge silently.
 
-6. **Seed the palette card.** Copy
+6. **Seed the palette card** (Claude Design only). Copy
    [`palette-preview.dc.html`](${CLAUDE_SKILL_DIR}/../design-palette/templates/palette-preview.dc.html)
    to `/tmp/design-init/palette.html` and
    [`design-nav.js`](${CLAUDE_SKILL_DIR}/../design-palette/templates/design-nav.js) (the navbar
@@ -139,7 +151,40 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
    once it has a card, else `null`). With several Storybook targets, also write `storybooks`
    and each component's `storybook` key.
 
-8. **Prepare `/design sync`.** The built-in `/design sync` skill turns a Storybook target's
+   Write `backend` first (`"claude-design"` or `"local"`). For **local**, the rows keep their
+   meaning with local paths (contract §2, "The local backend's rows"): no `designProjectId`;
+   `palette.designPath: null`, no `thumbnailPath`, `lastImplementedHash`: the SHA-256 of the inputs
+   file; each component's `designPath: "design/components/<kebab-name>.html"` and `proposalPath:
+   "design/proposals/<kebab-name>.html"` right away (the references exist after step L3).
+
+**Local backend only, in place of steps 4, 5, 6 and 8:**
+
+L1. **Create `design/`**: `design/assets/`, `design/components/`, `design/screens/`,
+   `design/proposals/screens/` (a `.gitkeep` in each folder that would stay empty) and
+   `design/index.json` as `{ "pages": [] }`. `design/` is committed; git-ignore `.design-screens/`
+   (the saved sign-in for screen captures) and `design/requests/` (the studio's Make real requests: ids
+   and PNGs, local to the machine; the studio also writes a `.gitignore` there). Never overwrite an existing `design/`. Screen captures
+   anonymise the app's data with `@faker-js/faker`, resolved from the Storybook target's `dir` like
+   Playwright: install it there as a dev dependency next to Playwright (`npm i -D @faker-js/faker`
+   with the project's package manager) unless it is already present.
+
+L2. **Capture the mapped components.** Each Storybook target must be running (its `runCommand`; start
+   it only if the user asks) with Playwright installed. For each component row, from its target's
+   `dir`: `node ${CLAUDE_SKILL_DIR}/../design-loop/scripts/capture.mjs component <name>
+   --storybook-url <url> --story-id <storyId> --manifest <repo>/design.manifest.json`. A failed
+   capture is reported (which story, why), not fatal: the component stays without a reference and
+   `design-refresh` retries it. Screens are not captured here: they are added later, on request,
+   by `design-refresh`.
+
+L3. **Start the studio.** Follow `${CLAUDE_SKILL_DIR}/../../commands/design-studio.md` (the
+   `/design-studio` command): it starts this project's container, writes `studio.port` and
+   registers the studio MCP at project scope. Then check `node
+   ${CLAUDE_SKILL_DIR}/../design-loop/scripts/local-backend.mjs status`.
+
+L4. **Explain the loop.** Open the studio, pick a component, **Create proposal**, edit it (or ask
+   Claude to), then `/design-loop`.
+
+8. **Prepare `/design sync`** (Claude Design only). The built-in `/design sync` skill turns a Storybook target's
    stories into the project's component cards. Hand it what this skill already knows so it
    skips the discovery:
    - Create `.design-sync/config.json` if it is missing (never overwrite it) for the first
@@ -191,9 +236,12 @@ plugin's [`palette.ts`](${CLAUDE_SKILL_DIR}/../design-palette/scripts/palette.ts
      start marker's hash stays, so a later plugin can tell when the text changed. Ask the user to
      run `/design sync` again so both reach the project.
 
-9. **Verify preconditions.** Walk contract §6 and list anything still missing.
+9. **Verify preconditions.** Walk contract §6 (the project's backend) and list anything still missing.
 
-10. **Report & next steps.** Palette file(s), what each app imports and audit summary,
+10. **Report & next steps.** For the **local** backend: palette file(s) and audit summary,
+    Storybook/Chromatic/MCP status, the components captured (and those that failed), the studio
+    URL and whether its MCP server is registered, then the loop of step L4; that is the whole
+    report. For **Claude Design**: palette file(s), what each app imports and audit summary,
     Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
     many components have a card, and whether the design provider (with the navbar hook) is in
     place, scaffolded or missing. Next: `/design sync` the first target, then re-run
