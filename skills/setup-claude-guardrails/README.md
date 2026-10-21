@@ -6,7 +6,7 @@ Installs personal (untracked) guardrails into a project's `.claude/`: permission
 
 Keep Claude away from sensitive data, on the user's computer and in the repository:
 
-1. Don't read or edit anything outside the defined directories (the project, its worktrees and `additionalDirectories`).
+1. Don't read or edit anything outside the defined directories (the project, its worktrees and `additionalDirectories`). With the sandbox on, `sandbox.filesystem.allowRead` paths may also be read, and `allowWrite` ones written by sandboxed Bash, where the OS enforces it. So never put secrets (`~/.aws`, `~/.ssh`, `~/.config/gh`) in either list.
 2. Don't read or edit env files and secrets inside them.
 
 Everything else should stay easy. A guardrail that makes Claude take extra steps without protecting either goal is friction to remove, not safety. Judge every change against these two goals.
@@ -22,7 +22,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 
 ## Blocked
 
-- **Outside scope:** file tools and Bash paths (absolute, `~`, `$HOME`, `..`, bare `cd`) outside the project, worktrees, `additionalDirectories`, temp dirs and `~/.claude`. With the sandbox, the OS also enforces it for every Bash command.
+- **Outside scope:** file tools and Bash paths (absolute, `~`, `$HOME`, `..`, bare `cd`) outside the project, worktrees, `additionalDirectories`, temp dirs and `~/.claude`. With the sandbox, the OS also enforces it for every Bash command, and the hook also allows reads in `sandbox.filesystem.allowRead` and Bash writes in `allowWrite` (minus `denyRead`/`denyWrite`; Write/Edit there stay denied).
 - **Env files:** `.env`, `.env.*`, `*.env` in any case, through wildcards, quote tricks, symlinks, `git show HEAD:.env` and Grep `glob` filters.
 - **Claude Code secrets:** `.credentials.json` and `~/.claude.json` (OAuth tokens, MCP API keys).
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
@@ -62,6 +62,7 @@ Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mist
 - **Skipping the hook's Bash path checks when the sandbox is on:** the sandbox still lets Bash read `/etc`, `/usr` and `/var/folders`, which holds other apps' temp files.
 - **Scanning less of env-file wildcards** (`grep ".env*"`): the shell expands them after the hook runs.
 - **Dropping the "ask" on commands that mention settings files:** it protects the guardrails themselves.
+- **Letting Write/Edit into `allowWrite` paths:** the OS only enforces `allowWrite` on Bash, and the skill puts tool dirs (`$PNPM_HOME`) there for the tools, not for Claude to edit.
 
 ## Known limits
 
