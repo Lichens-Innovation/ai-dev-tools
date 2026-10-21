@@ -234,11 +234,69 @@ sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
 sbx deny  Bash '{"command":"open ~/x.html && echo done"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"git commit -m x && git push"}'
 
+echo "sandbox grants"
+# With the sandbox on, sandbox.filesystem.allowRead opens a path to reads (Read, Grep, Glob, Bash
+# commands that only read it), allowWrite to Bash writes too (the OS enforces it there, not for the
+# Write and Edit tools), and a denyRead inside a grant still wins.
+# Like the extra roots, the granted dirs under $HOME are never created.
+GRANT="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+GRANT_OFF="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF"' EXIT
+RO="$HOME/.guardrails-test-ro"
+ABS="$HOME/.guardrails-test-abs"
+RW="$HOME/.guardrails-test-rw"
+mkdir -p "$GRANT/.claude" "$GRANT_OFF/.claude"
+FS='"filesystem": { "allowRead": ["~/.guardrails-test-ro", "'"$ABS"'"], "allowWrite": ["~/.guardrails-test-rw"], "denyRead": ["~/.guardrails-test-ro/secret"] }'
+echo '{ "sandbox": { "enabled": true, '"$FS"' } }' > "$GRANT/.claude/settings.local.json"
+echo '{ "sandbox": { "enabled": false, '"$FS"' } }' > "$GRANT_OFF/.claude/settings.local.json"
+gr() { CLAUDE_PROJECT_DIR="$GRANT" check "$1" "$2" "$3" "$GRANT"; }
+gr allow Bash  '{"command":"du -sh ~/.guardrails-test-ro"}'
+gr allow Bash  '{"command":"ls '"$RO"'/sub"}'
+gr allow Bash  '{"command":"ls $HOME/.guardrails-test-ro | head -3"}'
+gr allow Bash  '{"command":"ls '"$ABS"'"}'
+gr allow Bash  '{"command":"find ~/.guardrails-test-ro -name x.json"}'
+gr allow Bash  '{"command":"cp ~/.guardrails-test-ro/a.txt src/a.txt"}'
+gr allow Read  '{"file_path":"'"$RO"'/a.txt"}'
+gr allow Grep  '{"pattern":"x","path":"'"$RO"'"}'
+gr allow Glob  '{"pattern":"'"$RO"'/**/*.js"}'
+gr deny  Bash  '{"command":"rm ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"echo x > ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"cat a.txt >> '"$ABS"'/x"}'
+gr deny  Bash  '{"command":"cp a.txt ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"find ~/.guardrails-test-ro -delete"}'
+gr deny  Bash  '{"command":"ls ~/.guardrails-test-ro && rm -rf ~/.guardrails-test-ro"}'
+gr deny  Bash  '{"command":"cd ~/.guardrails-test-ro && ls"}'
+gr deny  Write '{"file_path":"'"$RO"'/x"}'
+gr deny  Edit  '{"file_path":"'"$ABS"'/x"}'
+gr allow Bash  '{"command":"touch ~/.guardrails-test-rw/x"}'
+gr allow Bash  '{"command":"echo x > ~/.guardrails-test-rw/x"}'
+gr allow Bash  '{"command":"rm ~/.guardrails-test-rw/x"}'
+gr allow Read  '{"file_path":"'"$RW"'/x"}'
+gr deny  Write '{"file_path":"'"$RW"'/x"}'
+gr deny  Edit  '{"file_path":"'"$RW"'/x"}'
+gr deny  Bash  '{"command":"cat ~/.guardrails-test-ro/secret/key"}'
+gr deny  Read  '{"file_path":"'"$RO"'/secret/key"}'
+gr deny  Bash  '{"command":"ls ~/.guardrails-test-ro-sibling"}'
+CLAUDE_PROJECT_DIR="$GRANT_OFF" check deny Bash '{"command":"ls ~/.guardrails-test-ro"}' "$GRANT_OFF"
+CLAUDE_PROJECT_DIR="$GRANT_OFF" check deny Read '{"file_path":"'"$RO"'/a.txt"}' "$GRANT_OFF"
+# grant_message <tool> <tool_input JSON> <expected text...>: the deny message names the settings that would allow it.
+grant_message() {
+  local tool="$1" tool_input="$2" out want; shift 2
+  out="$(printf '{"tool_name":"%s","tool_input":%s,"cwd":"%s"}' "$tool" "$tool_input" "$GRANT" | CLAUDE_PROJECT_DIR="$GRANT" node "$SCRIPT" 2>/dev/null)"
+  for want in "$@"; do
+    if [[ "$out" == *"$want"* ]]; then printf '  ok    message %-30s %s %s\n' "\"$want\"" "$tool" "$tool_input"
+    else printf '  FAIL  no "%s" in the message for %s %s: %s\n' "$want" "$tool" "$tool_input" "$out"; failures=$((failures + 1)); fi
+  done
+}
+grant_message Bash '{"command":"ls ~/.guardrails-test-elsewhere"}' sandbox.filesystem.allowRead permissions.additionalDirectories narrower broader
+grant_message Bash '{"command":"rm ~/.guardrails-test-ro/x"}' 'reads only' sandbox.filesystem.allowWrite
+grant_message Write '{"file_path":"'"$RW"'/x"}' 'sandboxed Bash commands only'
+
 echo "read block"
 # With blockReadsOutsideWorkingDirectories, Claude Code asks the user about a file read after a cd in
 # the same call, even in auto mode, so the hook sends the model back to rewrite it instead.
 RB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB"' EXIT
 mkdir -p "$RB/.claude" "$RB/src"
 echo '{ "permissions": { "blockReadsOutsideWorkingDirectories": true } }' > "$RB/.claude/settings.local.json"
 rb() { CLAUDE_PROJECT_DIR="$RB" check "$1" "$2" "$3" "$RB"; }
@@ -302,7 +360,7 @@ echo "sandbox stubs"
 # .claude/agents, ...). SKILL.md step 7 excludes them, re-including directories with a trailing
 # slash so a real .vscode/ or .claude/agents/ still shows in git status.
 STUB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB" "$STUB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB"' EXIT
 # stub_check <expected git status --porcelain output, one path per line>
 stub_check() {
   local want="$1" got
