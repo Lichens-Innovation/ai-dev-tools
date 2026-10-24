@@ -18,7 +18,8 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 | `SKILL.md` | Install workflow (read only when the skill runs) |
 | `scripts/guardrails.mjs` | The hook, copied to `.claude/hooks/guardrails.mjs` |
 | `assets/guardrails.md` | Rule copied to `.claude/rules/guardrails.md`; loads every session, so keep it short |
-| `scripts/test-guardrails.sh` | Regression tests (~100 cases); run after every hook change, and against the previous hook to confirm new cases fail on it |
+| `scripts/suggest-allow-rules.mjs` | Reads the project's package.json scripts, justfile/Makefile targets, turbo tasks and `CLAUDE.md` commands and prints candidate `permissions.allow` rules for the read-only and verification ones; never writes |
+| `scripts/test-guardrails.sh` | Regression tests (~100 cases, plus the allow-rule suggestions); run after every hook or suggester change, and against the previous hook to confirm new cases fail on it |
 
 ## Blocked
 
@@ -42,6 +43,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Node and package managers under `/home`** (sandbox only; nvm, fnm, volta, bun, `$PNPM_HOME`, Linuxbrew): their install roots in `sandbox.filesystem.allowRead`, `$PNPM_HOME` in `allowWrite`. pnpm's store lock goes under `XDG_RUNTIME_DIR` on Linux: the failure hint retries with it pointed at `$TMPDIR` (the `env` block can't set it: it is reset before each command). `pnpm_config_verify_deps_before_run=false` in the `env` block stops pnpm's pre-script install, which can only fail inside. Without them every `node`/`pnpm` call fails inside, which protects nothing. Installs still belong outside (`! pnpm install`).
 - **The npm registry** (optional, sandbox only): `registry.npmjs.org` in `sandbox.network.allowedDomains`, no other host.
 - **The sandbox's mount stubs** (Linux only): bubblewrap leaves an empty file at each protected path it blocks that didn't exist (`.bashrc`, `.mcp.json`, `.vscode`, `.claude/agents`, ...), and `git status` lists them. They're excluded in `.git/info/exclude`, with a trailing-slash re-include so a real directory of the same name still shows. Deleting them is pointless: the next sandboxed command recreates them.
+- **Verification commands without a prompt** (optional): each parallel or spawned session asks separately, so the skill proposes `permissions.allow` rules for lint, typecheck, test and format-check commands and writes only the ones the user picks. Anything whose name or body installs, pushes, publishes, deploys, fixes/writes, deletes or watches is never proposed. The hook and sandbox still check these calls.
 - **Git hosting and `open` outside the sandbox** (optional): `gh`, `glab`, `git push|pull|fetch`, `open` use the Keychain, SSH agent and network. Risky subcommands (`gh api`, `gh auth`, `open -a`, ...) ask. A call leaves the sandbox only if every command in it is excluded: `git push && gh pr create --body '…'` works; a heredoc, pipe, `cd` or `$(...)` keeps it inside.
 
 ## Teaching Claude from mistakes

@@ -1,6 +1,6 @@
 ---
 name: setup-claude-guardrails
-description: "Installs guardrails in this project's .claude/ (and its git worktrees) that keep Claude Code from reading, writing or running commands on paths outside a scoped directory (the project, or a chosen parent like ~/Documents/gits), and block env files (.env, .env.local, ...) except .env*.example. Combines permission deny rules, blockReadsOutsideWorkingDirectories, an optional Bash sandbox and a PreToolUse hook. Use when the user wants to sandbox Claude to the repo, protect secrets from Claude, add safety hooks, or invokes /setup-claude-guardrails."
+description: "Installs guardrails in this project's .claude/ (and its git worktrees) that keep Claude Code from reading, writing or running commands on paths outside a scoped directory (the project, or a chosen parent like ~/Documents/gits), and block env files (.env, .env.local, ...) except .env*.example. Combines permission deny rules, blockReadsOutsideWorkingDirectories, an optional Bash sandbox and a PreToolUse hook, and offers permissions.allow rules for the project's lint, typecheck and test commands so parallel sessions prompt less. Use when the user wants to sandbox Claude to the repo, protect secrets from Claude, add safety hooks, or invokes /setup-claude-guardrails."
 disable-model-invocation: true
 ---
 
@@ -44,7 +44,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - `git check-ignore -q` passes for the hook, the rule and `settings.local.json`;
    - once, in the main checkout: `.worktreeinclude` lists all three.
 
-   **All in place:** report the setup (roots from `additionalDirectories`, sandbox on/off, git hosting and `open` exclusions, hook up to date, which checkouts). Ask one question: keep it as is (recommended; stop, no tests) or reconfigure (step 2, current values as defaults). **Partial:** list the gaps and fill only those, current values as defaults. **None:** continue.
+   **All in place:** report the setup (roots from `additionalDirectories`, sandbox on/off, git hosting and `open` exclusions, hook up to date, which checkouts). Ask one question: keep it as is (recommended; stop, no tests), suggest allow rules only (step 2's allow-rules part, then merge the picks as in step 5; no other step), or reconfigure (step 2, current values as defaults). **Partial:** list the gaps and fill only those, current values as defaults. **None:** continue.
 
 2. **Ask** in one `AskUserQuestion` call:
    - "Which directories may Claude access?": project only (recommended), or project + others (e.g. `~/Documents/gits`). If none are named, ask for the paths before writing.
@@ -55,6 +55,11 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - Linked worktrees only: "Install in which checkouts?": all (recommended), or the current one.
 
    `AskUserQuestion` takes at most 4 questions: put any extra in a second call.
+
+   **Allow rules** (separate `AskUserQuestion` call, after the questions above). Each parallel or spawned session asks for permission on its own, so N sessions mean N prompts for the same `pnpm lint`. Run `node scripts/suggest-allow-rules.mjs <main checkout>` from this skill's directory. It only reads: package.json scripts (in the lockfile's package manager's forms), justfile recipes, Makefile targets, turbo.json tasks and commands named in `CLAUDE.md`, and prints JSON `candidates` (`command`, `kind`, `source`, `rules`) and `skipped` (`command`, `source`, `reason`). It proposes only lint, typecheck, test, format-check and verify commands whose name and body (followed through the scripts, recipes or targets they call) don't install, push, publish, deploy, fix/write files, delete, or run in watch mode, and leaves out rules already in `permissions.allow`.
+   - No candidates: say so and skip.
+   - Otherwise list every candidate (command, source, rules) and the skipped ones with their reason, then ask "Which commands may run without a prompt?" with `multiSelect: true`: one option per command (label the command, description the source and rules), up to 4 options per question and 4 questions. More than 16: one option per `kind`, its commands in the description. No recommendation and nothing preselected.
+   - Write only what the user picked. None picked, or the question dismissed: write no allow rules. Never add a rule the script didn't propose (an install, `git push`, publish, deploy or destructive command), even if the user names one under "Other": say why and leave it out.
 
 3. **Prerequisites.**
    - `node --version` >= 18, else stop: the hook would fail closed on every call.
@@ -108,6 +113,10 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    | Sandbox on (always, read-only: the sandbox blocks the `claude` binary, breaking step 3) | | `claude --version`, `claude -v` (exact forms only, so no unsandboxed agent session) |
    | `open` outside the sandbox | `Bash(open -a *)`, `Bash(open -b *)`, `Bash(open *://*)` | `open`, `open *`, `xdg-open`, `xdg-open *` |
 
+   | When | `permissions.allow` |
+   | ---- | ------------------- |
+   | Allow rules picked (step 2) | every rule of each picked candidate (`Bash(pnpm lint)`, `Bash(pnpm lint *)`, ...), unchanged |
+
    And with the sandbox on:
 
    | When | Merge |
@@ -139,7 +148,7 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
    - Exit 2 with `could not create a scratch ...` or `temp dir ... is not usable`: stop and report. Never point `TMPDIR` at a real directory: the script writes fake secrets there and deletes it.
    - `rm:` errors on paths outside `$TMPDIR`: stop immediately, tell the user, run nothing else.
 
-8. **Report** the files changed per checkout (none tracked), the roots, sandbox on/off, and the limitations below. A fresh clone or a later `git worktree add` needs a re-run. Hooks and the sandbox load at session start: restart Claude Code. With the sandbox, suggest `/sandbox` → Config to review the effective lists, and recommend running package installs with `!` (`! pnpm install`): inside, they need the registry and postinstall hosts, and the sandbox's mounts block hard links from the home store, so pnpm builds a second store next to the project.
+8. **Report** the files changed per checkout (none tracked), the roots, sandbox on/off, the allow rules added, and the limitations below. A fresh clone or a later `git worktree add` needs a re-run. Hooks and the sandbox load at session start: restart Claude Code. With the sandbox, suggest `/sandbox` → Config to review the effective lists, and recommend running package installs with `!` (`! pnpm install`): inside, they need the registry and postinstall hosts, and the sandbox's mounts block hard links from the home store, so pnpm builds a second store next to the project.
 
 ## Hook behavior
 
@@ -172,3 +181,4 @@ Everything is installed per checkout; each has its own untracked `.claude/`. `.g
 - With `pnpm_config_verify_deps_before_run` off, pnpm no longer warns that `node_modules` is stale: a script fails on a missing module instead, and Claude asks for `! pnpm install`. The `env` block applies to the whole session, so pnpm run by hooks skips the check too (not your own terminal).
 - With the registry allowed, any sandboxed command can reach `registry.npmjs.org`, not just the package manager.
 - A linked worktree outside the main checkout (`../feature`) is its own project: the main checkout isn't in its scope. `git` itself still works there.
+- An allow rule trusts a name, not what runs: `Bash(pnpm lint)` keeps running without a prompt after someone changes the `lint` script, and `Bash(pnpm lint *)` takes any arguments. The hook and the sandbox still check every call. Re-run the skill after such a change, or remove the rule from `permissions.allow`.
