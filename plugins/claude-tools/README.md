@@ -15,6 +15,9 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   inside a scoped directory (the project, or a parent like `~/Documents/gits`) and block access
   to `.env` files (except `.env*.example`). It also installs `.claude/rules/guardrails.md`, a rule
   telling Claude which tools to avoid and how to phrase commands so the hook doesn't reject them.
+  It also proposes `permissions.allow` rules for the project's lint, typecheck and test commands
+  (package.json, justfile, Makefile, turbo, `CLAUDE.md`), so parallel sessions stop prompting for
+  them; you pick which ones are written.
 - **setup-claude-just-usage** — reads the repository's justfiles and, for each level that has one
   (root, `apps/frontend`, `packages/ui`, ...), writes `.claude/rules/use-just-commands.md` listing the
   recipes and telling Claude to always use them, plus a per-level hook config. One shared `PreToolUse`
@@ -42,7 +45,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 ## Use it
 
 - `/claude-light` — apply the light-mode local settings to the current project.
-- `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project.
+- `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project, and pick allow rules for its verification commands.
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
 - `/setup-claude-auto-lint-format` — lint and format every file Claude edits, reporting only problems.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
