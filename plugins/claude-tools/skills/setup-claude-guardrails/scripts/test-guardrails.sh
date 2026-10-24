@@ -382,6 +382,141 @@ mkdir -p "$STUB/.vscode" "$STUB/.claude/agents"
 : > "$STUB/.vscode/settings.json"; : > "$STUB/.claude/agents/a.md"
 stub_check "$(printf '%s\n' .claude/agents/a.md .vscode/settings.json)"
 
+echo "allow rules"
+# suggest-allow-rules.mjs proposes permissions.allow entries for a project's lint, typecheck and test
+# commands (SKILL.md step 2), and never installs, pushes, publishes, deploys, fixes or deletes.
+SUGGEST="$(dirname "$0")/suggest-allow-rules.mjs"
+[ -f "$SUGGEST" ] || die "suggest-allow-rules.mjs not found next to this script"
+AR="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB" "$AR"' EXIT
+mkdir -p "$AR/.claude"
+: > "$AR/pnpm-lock.yaml"
+cat > "$AR/package.json" <<'JSON'
+{ "scripts": {
+  "lint": "eslint .", "lint:fix": "eslint . --fix", "typecheck": "tsc --noEmit", "test": "vitest run",
+  "test:watch": "vitest", "test:ci": "vitest --watch=false", "test:update": "vitest -u",
+  "format": "prettier --write .", "format:check": "prettier --check .", "build": "tsc",
+  "deploy": "vercel deploy", "release": "changeset publish", "verify": "pnpm lint && pnpm typecheck",
+  "check": "pnpm lint && pnpm release", "test:e2e": "pnpm install && playwright test", "postinstall": "husky"
+} }
+JSON
+cat > "$AR/justfile" <<'JUST'
+set shell := ["bash", "-c"]
+
+lint:
+    pnpm lint
+
+test *args:
+    pnpm test {{args}}
+
+push:
+    git push
+
+ci-check: lint test
+
+check-all: lint push
+
+[private]
+test-hidden:
+    pnpm test
+
+_test-helper:
+    rm -rf dist
+JUST
+printf '.PHONY: test lint clean\ntest:\n\tgo test ./...\nlint:\n\tgolangci-lint run\nlint-fix:\n\tgolangci-lint run --fix\nclean:\n\trm -rf dist\nverify: test clean\n' > "$AR/Makefile"
+echo '{ "tasks": { "build": {}, "lint": {}, "web#typecheck": {}, "deploy": {}, "dev": {}, "test": {} } }' > "$AR/turbo.json"
+cat > "$AR/CLAUDE.md" <<'MD'
+Run `pnpm lint` and `bash scripts/test-all.sh` before a PR. Never `pnpm publish`, `git push` or
+`pnpm install`. In a package: `pnpm --filter <pkg> test`. Tests: `cargo test --workspace`.
+Lint: `ruff check .`, then `ruff format .` and `cargo fmt --check`.
+
+```bash
+$ uv run pytest -q
+rm -rf node_modules
+pnpm test | tee out.txt
+```
+MD
+echo '{ "permissions": { "allow": ["Bash(make lint)", "Bash(make lint *)"] } }' > "$AR/.claude/settings.local.json"
+SETTINGS_BEFORE="$(cat "$AR/.claude/settings.local.json")"
+SUGGESTED="$(node "$SUGGEST" "$AR")" || { echo "  FAIL  suggest-allow-rules.mjs exited non-zero"; failures=$((failures + 1)); SUGGESTED='{}'; }
+# suggest <expected: proposed|skipped|absent> <command>
+suggest() {
+  local expected="$1" cmd="$2" actual
+  if jq -e --arg c "$cmd" '.candidates[] | select(.command == $c)' <<<"$SUGGESTED" >/dev/null; then actual="proposed"
+  elif jq -e --arg c "$cmd" '.skipped[] | select(.command == $c)' <<<"$SUGGESTED" >/dev/null; then actual="skipped"
+  else actual="absent"; fi
+  if [ "$actual" = "$expected" ]; then printf '  ok    %-8s %s\n' "$expected" "$cmd"
+  else printf '  FAIL  expected %s, got %s: %s\n' "$expected" "$actual" "$cmd"; failures=$((failures + 1)); fi
+}
+suggest proposed 'pnpm lint'
+suggest proposed 'pnpm typecheck'
+suggest proposed 'pnpm test'
+suggest proposed 'pnpm test:ci'
+suggest proposed 'pnpm format:check'
+suggest proposed 'pnpm verify'
+suggest skipped  'pnpm lint:fix'
+suggest skipped  'pnpm test:watch'
+suggest skipped  'pnpm test:update'
+suggest skipped  'pnpm check'
+suggest skipped  'pnpm test:e2e'
+suggest absent   'pnpm format'
+suggest absent   'pnpm build'
+suggest absent   'pnpm deploy'
+suggest absent   'pnpm release'
+suggest absent   'pnpm postinstall'
+suggest proposed 'just lint'
+suggest proposed 'just test'
+suggest proposed 'just ci-check'
+suggest skipped  'just check-all'
+suggest absent   'just push'
+suggest absent   'just test-hidden'
+suggest absent   'just _test-helper'
+suggest proposed 'make test'
+suggest skipped  'make lint-fix'
+suggest skipped  'make verify'
+suggest absent   'make clean'
+suggest absent   'make lint'
+suggest proposed 'turbo run lint'
+suggest proposed 'turbo run typecheck'
+suggest proposed 'turbo run test'
+suggest absent   'turbo run build'
+suggest absent   'turbo run deploy'
+suggest absent   'turbo run dev'
+suggest proposed 'bash scripts/test-all.sh'
+suggest proposed 'cargo test --workspace'
+suggest proposed 'uv run pytest -q'
+suggest proposed 'ruff check .'
+suggest skipped  'ruff format .'
+suggest proposed 'cargo fmt --check'
+suggest absent   'pnpm publish'
+suggest absent   'git push'
+suggest absent   'pnpm install'
+suggest absent   'pnpm --filter <pkg> test'
+suggest absent   'pnpm test | tee out.txt'
+# rule_check <description> <jq filter that must output true>
+rule_check() {
+  if [ "$(jq -r "$2" <<<"$SUGGESTED")" = "true" ]; then printf '  ok    %s\n' "$1"
+  else printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); fi
+}
+rule_check 'pnpm lint gets exact and wildcard rules' \
+  '[.candidates[] | select(.command == "pnpm lint") | .rules[]] == ["Bash(pnpm lint)", "Bash(pnpm lint *)", "Bash(pnpm run lint)", "Bash(pnpm run lint *)"]'
+rule_check 'every rule is a Bash(...) rule for its command' \
+  '[.candidates[] | . as $c | .rules[] | test("^Bash\\(.+\\)$")] | all'
+rule_check 'no rule installs, pushes, publishes, deploys, fixes or deletes' \
+  '[.candidates[].rules[] | test("install|push|publish|deploy|release|--fix|--write|rm -|clean"; "i")] | any | not'
+rule_check 'rules already in permissions.allow are left out' \
+  '[.candidates[].rules[]] | index("Bash(make lint)") == null'
+rule_check 'every candidate has a kind and a source' \
+  '[.candidates[] | (.kind | type == "string") and (.source | type == "string")] | all'
+if [ "$(cat "$AR/.claude/settings.local.json")" = "$SETTINGS_BEFORE" ]; then echo "  ok    settings left unchanged"
+else echo "  FAIL  suggest-allow-rules.mjs changed settings.local.json"; failures=$((failures + 1)); fi
+# The hook must not deny what the rules allow, or the rules would only trade a prompt for a deny.
+while IFS= read -r cmd; do
+  CLAUDE_PROJECT_DIR="$AR" check allow Bash "$(jq -cn --arg c "$cmd" '{command:$c}')" "$AR"
+done < <(jq -r '.candidates[].command' <<<"$SUGGESTED")
+SUGGESTED="$(node "$SUGGEST" "$OTHER")"
+rule_check 'a project without command sources gets no candidates' '.candidates == []'
+
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?
 if [ $rc -eq 2 ]; then echo "  ok    malformed input exits 2"; else echo "  FAIL  malformed input exited $rc"; failures=$((failures + 1)); fi
