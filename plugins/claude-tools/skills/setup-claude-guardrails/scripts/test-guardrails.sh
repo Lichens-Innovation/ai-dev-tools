@@ -215,7 +215,8 @@ mkdir -p "$SBX/.claude"
 cat > "$SBX/.claude/settings.local.json" <<'JSON'
 { "sandbox": { "enabled": true, "allowUnsandboxedCommands": false,
   "excludedCommands": ["gh *", "glab *", "git push", "git push *", "git pull", "git pull *", "git fetch", "git fetch *", "open", "open *",
-    "node_modules/electron/dist/electron --remote-debugging-port=9333 *"] } }
+    "node_modules/electron/dist/electron --remote-debugging-port=9333 *",
+    "node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --remote-debugging-port=9333 *"] } }
 JSON
 sbx() { CLAUDE_PROJECT_DIR="$SBX" check "$1" "$2" "$3" "$SBX"; }
 sbx allow Bash '{"command":"git push -u origin HEAD"}'
@@ -231,6 +232,8 @@ sbx deny  Bash '{"command":"gh pr create --title x --body-file - <<EOF\nbody\nEO
 sbx deny  Bash '{"command":"gh pr list | head"}'
 sbx allow Bash '{"command":"node_modules/electron/dist/electron --remote-debugging-port=9333 app/main.js"}'
 sbx deny  Bash '{"command":"node_modules/electron/dist/electron --remote-debugging-port=9333 app/main.js | tee out.txt"}'
+sbx allow Bash '{"command":"node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --remote-debugging-port=9333 app/main.js"}'
+sbx deny  Bash '{"command":"node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --remote-debugging-port=9333 app/main.js | tee out.txt"}'
 sbx deny  Bash '{"command":"git commit -m x && git push"}'
 sbx deny  Bash '{"command":"cd src && git push"}'
 sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
@@ -352,6 +355,7 @@ hint_check hint 'pnpm lint' "$PNPM_LOCK" 'XDG_RUNTIME_DIR=$TMPDIR pnpm'
 hint_check hint 'cp a.mjs .claude/hooks/guardrails.mjs' "cp: cannot create regular file '.claude/hooks/guardrails.mjs': Read-only file system" 'Use the Write tool'
 hint_check hint 'node_modules/electron/dist/electron .' '[8:1029/104606.373618:FATAL:setuid_sandbox_host.cc(163)] The SUID sandbox helper binary was found, but is not configured correctly.' 'excludedCommands'
 hint_check hint 'node_modules/electron/dist/electron .' 'FATAL:setuid_sandbox_host.cc' 'Never retry with --no-sandbox'
+hint_check hint 'node_modules/.bin/electron .' '[ERROR:sandbox_mac.cc] Sandbox initialization failed: Operation not permitted' 'Never retry with --no-sandbox'
 hint_check none 'npm test' 'Error: 3 tests failed'
 hint_check none 'pnpm install' 'ERR_PNPM_OUTDATED_LOCKFILE'
 hint_check none 'npm test' "$PROXY"

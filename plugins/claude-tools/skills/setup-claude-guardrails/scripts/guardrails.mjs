@@ -355,8 +355,9 @@ const FAILURE_HINTS = [
   },
   {
     // Electron/Chromium's own sandbox can't start inside bubblewrap: the namespace sandbox is refused by the
-    // sandbox's seccomp filter and the setuid helper isn't root-owned.
-    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox/i,
+    // sandbox's seccomp filter and the setuid helper isn't root-owned. On macOS its Seatbelt profile can't nest
+    // inside the Bash sandbox's (signatures not yet verified on a Mac).
+    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox|sandbox_apply|sandbox_init|Sandbox initialization failed/i,
     hint:
       "Electron's own Chromium sandbox can't start inside the Bash sandbox. Never retry with --no-sandbox. Tell the " +
       "user: run the app with !, or opt in to the GUI app testing grant of setup-claude-guardrails, which puts the exact " +
