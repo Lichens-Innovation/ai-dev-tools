@@ -45,7 +45,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 ## Use it
 
 - `/claude-light` — apply the light-mode local settings to the current project.
-- `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project, and pick allow rules for its verification commands.
+- `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project, pick allow rules for its verification commands, and optionally let an exact Electron launch command run outside the sandbox for GUI app testing.
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
 - `/setup-claude-auto-lint-format` — lint and format every file Claude edits, reporting only problems.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
