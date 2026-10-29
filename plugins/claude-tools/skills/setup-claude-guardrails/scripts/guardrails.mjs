@@ -354,6 +354,15 @@ const FAILURE_HINTS = [
       "commands connect to any Unix socket (Docker, SSH agent). It's their call.",
   },
   {
+    // Electron/Chromium's own sandbox can't start inside bubblewrap: the namespace sandbox is refused by the
+    // sandbox's seccomp filter and the setuid helper isn't root-owned.
+    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox/i,
+    hint:
+      "Electron's own Chromium sandbox can't start inside the Bash sandbox. Never retry with --no-sandbox. Tell the " +
+      "user: run the app with !, or opt in to the GUI app testing grant of setup-claude-guardrails, which puts the exact " +
+      "launch command in sandbox.excludedCommands (that command then runs with no sandbox at all).",
+  },
+  {
     error: /command not found: (?:node|pnpm|npm|npx|yarn|bun|corepack)\b|\b(?:node|pnpm|npm|npx|yarn|bun|corepack): command not found/i,
     hint:
       "The tool is installed under the home dir (nvm, fnm, volta, PNPM_HOME), which the sandbox can't read. Ask the user " +
