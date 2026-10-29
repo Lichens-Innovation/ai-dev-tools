@@ -355,13 +355,24 @@ const FAILURE_HINTS = [
   },
   {
     // Electron/Chromium's own sandbox can't start inside bubblewrap: the namespace sandbox is refused by the
-    // sandbox's seccomp filter and the setuid helper isn't root-owned. On macOS its Seatbelt profile can't nest
-    // inside the Bash sandbox's (signatures not yet verified on a Mac).
-    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox|sandbox_apply|sandbox_init|Sandbox initialization failed/i,
+    // sandbox's seccomp filter and the setuid helper isn't root-owned. On macOS the Seatbelt profile refuses its
+    // Mach bootstrap check-in (measured: `mach_port_rendezvous_mac.cc: bootstrap_check_in ...: Permission denied (1100)`).
+    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox|MachPortRendezvous|bootstrap_check_in/i,
     hint:
-      "Electron's own Chromium sandbox can't start inside the Bash sandbox. Never retry with --no-sandbox. Tell the " +
-      "user: run the app with !, or opt in to the GUI app testing grant of setup-claude-guardrails, which puts the exact " +
-      "launch command in sandbox.excludedCommands (that command then runs with no sandbox at all).",
+      "Electron can't start inside the Bash sandbox (Linux: Chromium's own sandbox; macOS: the Mach port check-in is " +
+      "refused). Never retry with --no-sandbox. Tell the user: run the app with !, or opt in to the GUI app testing " +
+      "grant of setup-claude-guardrails, which puts the exact launch command in sandbox.excludedCommands (that " +
+      "command then runs with no sandbox at all).",
+  },
+  {
+    // After an excluded GUI launch, a sandboxed probe (node, curl) of the app's debugging port is refused until
+    // local port binding is allowed (measured on macOS: refused instantly).
+    error: /(?:ECONNREFUSED|Connection refused|Failed to connect|couldn't connect)[^\n]*(?:127\.0\.0\.1|localhost|::1)/i,
+    hint:
+      "A connection to a local port was refused. If the target is the dev server, check it is running. If it is a GUI " +
+      "app launched outside the sandbox (excludedCommands), the sandboxed probe can't reach localhost until " +
+      "sandbox.network.allowLocalBinding is true, which lets any sandboxed command reach local ports. Tell the user; " +
+      "it's their call.",
   },
   {
     error: /command not found: (?:node|pnpm|npm|npx|yarn|bun|corepack)\b|\b(?:node|pnpm|npm|npx|yarn|bun|corepack): command not found/i,
