@@ -61,6 +61,7 @@ Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mist
 
 - **Re-injecting the whole rule on every denial or failure:** noise. The hint carries only the relevant fix.
 
+- **Adding `~/.claude/projects` (or its `tool-results` dirs) to `sandbox.filesystem.allowRead` so Bash can read saved tool outputs:** that directory holds the transcripts of every project, which can contain pasted secrets (goal 1). The paths are per session and project, so a narrow grant can't be written up front either. The file tools read them fine: a failure hint (`Grep` to find lines, `Read` with `offset`/`limit` to page) and the rule's symptom text save the wasted Bash attempt instead.
 - **Commit, push and PR in one call:** `git commit` would run outside the sandbox, and so would the repo's git hooks (husky, lint-staged). Two calls is the floor.
 - **Skipping the hook's Bash path checks when the sandbox is on:** the sandbox still lets Bash read `/etc`, `/usr` and `/var/folders`, which holds other apps' temp files.
 - **Scanning less of env-file wildcards** (`grep ".env*"`): the shell expands them after the hook runs.

@@ -25,6 +25,7 @@ Modeled on the `agents.md` rule + `agent_bash_validation.sh` hook of `lichens-or
 - **One hook, many configs.** Sub-level `settings.json` hooks only apply when Claude is started in that directory. A single root registration, which picks the configs from the directory a command runs in (`cwd`, moved by `cd <dir> &&`) up to the root, works from anywhere in the repo.
 - **Blocked list is derived, then confirmed.** The skill reads recipe bodies to find the wrapped tools and shows the list before writing. Blocking a program (`docker`) vs program + subcommand (`pnpm test`) is chosen per tool, so `pnpm install` keeps working when only `pnpm test` has a recipe.
 - **Runners are automatic.** `uv run X`, `uvx X`, `npx X`, `pnpm exec X` match as `X`.
+- **Quiet by default.** The starter `build`, `lint`, `check`, `typecheck`, `test` and `format` recipes run through a private `_quiet` recipe: output goes to a log under `$TMPDIR`, success prints one line and the last 3 lines (usually the runner's own summary), failure prints the last 80 lines and the log path. Less context per session; the log is there when the tail isn't enough, and `FULL_OUTPUT=1` streams everything (not `JUST_VERBOSE`, which is just's own). Existing recipes are only wrapped after the user says yes.
 - **Fails open.** An internal error lets the call through: this is a convenience hook, not a safety one (unlike the guardrails hook, which fails closed).
 
 ## Known limits
