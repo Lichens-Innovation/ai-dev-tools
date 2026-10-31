@@ -32,6 +32,8 @@ How the hook decides: for each command in a Bash call (split on `;`, `&&`, `|`, 
 
 3. **Read each level.** In that directory run `just --list --unsorted` (shows imports and `mod` recipes with doc comments) and `just --dump --dump-format json` for the bodies, parameters and `[private]` flags. Skip private recipes and the `default` recipe that only lists. For every recipe note: name, parameters, doc comment, and the program(s) its body runs. Note shared programs across recipes (`uv`, `docker`, `pnpm`).
 
+   **Quiet output.** Verbose recipes (`build`, `lint`, `check`, `typecheck`, `test`, `format`) flood Claude's context. The asset's versions go through a private `_quiet` recipe: output goes to a log, success prints one line plus the last 3 lines, failure prints the last 80 lines and the log path, and `FULL_OUTPUT=1 just <recipe>` streams everything. New recipes copied from the asset get it (copy `_quiet` once per justfile, with the first recipe that needs it). For the user's own existing recipes that run such commands, propose the same wrapping in step 5 as a separate yes/no, per level: change `test:` + body into `test: (_quiet "test" "<the body command>")` for single-command bodies only; leave multi-line bodies, `dev`/watch/interactive recipes and anything that already redirects output alone. Never wrap without the user's yes. If `just` < 1.46 lacks `[no-exit-message]`, drop that attribute line.
+
    **Offer missing pnpm recipes.** For a level that uses pnpm (`pnpm-lock.yaml` or `pnpm-workspace.yaml` at or above it, or `"packageManager": "pnpm@..."`), compare its recipes with `assets/pnpm-recipes.just`: `install`, `dev`, `build`, `lint`, `check`, `typecheck`, `test`, `format` and `audit`. Propose a recipe only if it is missing (by name, or by another recipe already running the same `pnpm` command) and its script exists in that level's `package.json` (`audit` and `install` need none). Keep the user's existing recipes and names untouched. Show the proposed recipes in step 5; once accepted, append them to the level's justfile (copied from the asset, doc comments included) before step 4 reads it, and re-run `just --list --unsorted`. `just audit -i` runs `pnpm audit --fix=update --interactive`, plain `just audit` the same without `--interactive`. Needs `just` >= 1.46 (option arguments); if older, write `audit *args` with `pnpm audit --fix=update {{args}}` and tell the user to call `just audit --interactive`.
 
 4. **Derive the blocked commands** per level, from the recipe bodies. These are the proposal; show it in step 5.
@@ -44,6 +46,7 @@ How the hook decides: for each command in a Bash call (split on `;`, `&&`, `|`, 
 
 5. **Ask** in one `AskUserQuestion` call, showing per level the recipes and the blocked commands (compact, one line each):
    - "Install these levels and blocked commands?" (with any pnpm recipes to add to a justfile, listed per level): yes (recommended), or adjust (user edits the list; apply and show the result again).
+   - If a level has existing verbose recipes (see "Quiet output"): "Make these recipes report only a summary on success and the tail plus log path on failure?" yes (recommended) or no.
    - If `.claude/settings.json` is untracked or gitignored: "Where to register the hook?": `settings.json` (recommended if tracked) or `settings.local.json`.
 
 6. **Write the files.**

@@ -12,7 +12,7 @@ A PreToolUse hook, deny rules and usually a sandbox are active. After a denied c
 - `git push`/`gh`/`glab` failing with `proxy requires authentication` or `Could not read from remote repository` means the call stayed in the sandbox: rebuild it as above and retry once.
 - Package installs (`pnpm|npm|yarn|bun install|add|ci`) don't fit the sandbox: ask the user to run them with `!` instead of retrying or widening it.
 - The sandbox can't write `.git/config`: tracking fails with `could not lock config file .git/config: Operation not permitted`, and `git checkout -B` can leave a half-done checkout (check `git status`). Use `git switch [-c] <branch>` without `-t`/`--track`; `git push -u` is fine.
-- Bash can't read most of `~/.claude`, including large tool outputs under `~/.claude/projects`: use `Read` with `offset`/`limit`.
+- Bash can't read most of `~/.claude` (`cat|tail|grep: Operation not permitted`), including large saved tool outputs under `~/.claude/projects`: go straight to `Grep` to find lines and `Read` with `offset`/`limit` to page through them, without trying Bash first.
 - Stay in the project and its `additionalDirectories`, plus reads (no `cd`) in the sandbox's `allowRead`; ask for anything else. Never read or edit `.env*` (except `.example|.sample|.template|.dist`), `~/.claude.json` or `.credentials.json`, and don't dodge the check.
 - An `ask` on settings or hook files is intentional: explain and wait.
 - A guardrail that keeps costing you steps, or is unclear: finish the task, then tell the user and suggest improving it (`/setup-claude-guardrails` ships the rule and hook). Don't work around it.
