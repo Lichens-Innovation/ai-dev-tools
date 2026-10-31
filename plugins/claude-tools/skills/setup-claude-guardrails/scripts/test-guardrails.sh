@@ -358,6 +358,9 @@ hint_check hint 'node_modules/electron/dist/electron .' 'FATAL:setuid_sandbox_ho
 hint_check hint 'apps/desktop/node_modules/.bin/electron .' 'FATAL:base/apple/mach_port_rendezvous_mac.cc(158)] bootstrap_check_in com.github.Electron.MachPortRendezvousServer.1234: Permission denied (1100)' 'Never retry with --no-sandbox'
 hint_check hint 'node scripts/probe.mjs' 'TypeError: fetch failed
     cause: Error: connect ECONNREFUSED 127.0.0.1:9431' 'allowLocalBinding'
+hint_check hint 'tail -n 50 ~/.claude/projects/-Users-me-app/abc/tool-results/b1.txt' 'tail: /Users/me/.claude/projects/-Users-me-app/abc/tool-results/b1.txt: Operation not permitted' 'Grep tool'
+hint_check hint 'grep -n FAIL /home/me/.claude/projects/-home-me-app/abc/tool-results/b1.txt' 'grep: /home/me/.claude/projects/-home-me-app/abc/tool-results/b1.txt: No such file or directory' 'offset/limit'
+hint_check none 'grep -n FAIL .claude/projects/x.txt' 'exit code 1'
 hint_check none 'node scripts/probe.mjs' 'connect ECONNREFUSED 10.0.0.5:5432'
 hint_check none 'npm test' 'Error: 3 tests failed'
 hint_check none 'pnpm install' 'ERR_PNPM_OUTDATED_LOCKFILE'

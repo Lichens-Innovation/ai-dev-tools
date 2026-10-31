@@ -397,6 +397,16 @@ const FAILURE_HINTS = [
       "sandboxed command could then rewrite the guardrails.",
   },
   {
+    // Claude Code saves large tool outputs (test logs, ...) under ~/.claude/projects/<project>/<session>/tool-results.
+    // The file tools can read them, but the sandbox keeps Bash out of ~/.claude/projects (transcripts of every project).
+    program: /\.claude\/projects\b/,
+    error: /Operation not permitted|Permission denied|No such file or directory/i,
+    hint:
+      "Bash can't read ~/.claude/projects (saved tool outputs, plus the transcripts of every project): the sandbox blocks " +
+      "it on purpose. Don't retry with another Bash command. Use the Grep tool to find lines in the file and the Read " +
+      "tool with offset/limit to page through it.",
+  },
+  {
     error: /Operation not permitted|Read-only file system/i,
     hint:
       "A sandbox restriction blocked this command. Don't retry it as is: use $TMPDIR for temp files, stay inside the " +
