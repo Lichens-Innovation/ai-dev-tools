@@ -38,7 +38,7 @@ export function useInspected(): InspectContext {
 }
 
 /**
- * The bridge between the page (a reference's click picker, a proposal's editor) and the palette footer, which lives
+ * The bridge between the page (the click picker of a reference or a proposal) and the palette footer, which lives
  * in the root layout and so cannot reach the page's state.
  */
 export function InspectProvider({ children }: { children: ReactNode }) {

@@ -3,7 +3,11 @@ export interface EditorSelection {
   page?: {
     kind: 'component' | 'screen'
     name: string
-    variant: 'reference' | 'proposal'
+    variant: 'reference' | 'proposal' | 'wireframe'
+    /** The proposal version shown (`a` is the proposal). */
+    version?: string
+    /** The wireframe shown. */
+    wireframe?: string
   }
   /** Whatever the editor reports for the selected element (selector, outerHTML…). Opaque to the server. */
   element?: unknown

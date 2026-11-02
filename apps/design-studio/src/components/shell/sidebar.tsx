@@ -38,9 +38,17 @@ function Group({
             key={page.name}
             to="/pages/$kind/$name"
             params={{ kind: page.kind, name: page.name }}
-            // A page opens as its proposal when it has one, else as its reference.
-            search={{ variant: page.hasProposal ? 'proposal' : 'reference' }}
-            title={page.hasProposal ? 'Proposal' : 'Reference'}
+            // A page opens as its proposal when it has one, else as its reference, else on its wireframes.
+            search={{}}
+            title={
+              page.hasProposal
+                ? page.alternates.length
+                  ? `Proposal, ${page.alternates.length + 1} versions`
+                  : 'Proposal'
+                : page.hasReference
+                  ? 'Reference'
+                  : 'Wireframes only'
+            }
             aria-current={current === here ? 'page' : undefined}
             onClick={onPick}
             className={row}
@@ -53,7 +61,7 @@ function Group({
   )
 }
 
-/** A blank page: a new empty proposal (component or screen) named by the user, with only a sketch on it. */
+/** A blank page: a new page (component or screen) named by the user, opened on an empty wireframe to draw it. */
 function NewPage({ onPick }: { onPick: () => void }) {
   const router = useRouter()
   const navigate = useNavigate()
@@ -89,7 +97,7 @@ function NewPage({ onPick }: { onPick: () => void }) {
             await navigate({
               to: '/pages/$kind/$name',
               params: { kind, name: name.trim() },
-              search: { variant: 'proposal' },
+              search: { variant: 'wireframe', wireframe: result.wireframe },
             })
           })
           .catch((err: unknown) =>

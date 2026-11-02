@@ -13,11 +13,6 @@ export const listPages = createServerFn({ method: 'GET' }).handler(async () =>
   getStudio().project.pages.list(),
 )
 
-/** The captured components, for the editor's Add tab. */
-export const listComponentReferences = createServerFn({
-  method: 'GET',
-}).handler(() => getStudio().project.pages.components())
-
 const paletteDraft = z.object({
   inputs: z.record(z.string(), z.object({ lm: z.string(), dm: z.string() })),
   tokens: z.record(z.string(), z.string()),
@@ -80,69 +75,130 @@ export const savePalette = createServerFn({ method: 'POST' })
     attempt(() => getStudio().project.palette.save(data.draft, data.baseHash)),
   )
 
+const refOf = (data: { kind: 'component' | 'screen'; name: string }) => ({
+  kind: data.kind,
+  name: data.name,
+})
+const version = z.string().regex(/^[a-z]$/)
+
 /** The file behind a page, with the hash a later save is checked against. */
 export const getPageSource = createServerFn({ method: 'GET' })
-  .validator(pageRef.extend({ variant: z.enum(['reference', 'proposal']) }))
+  .validator(
+    pageRef.extend({
+      variant: z.enum(['reference', 'proposal']),
+      version: version.optional(),
+    }),
+  )
   .handler(({ data }) =>
-    getStudio().project.pages.read(
-      { kind: data.kind, name: data.name },
-      data.variant,
-    ),
+    getStudio().project.pages.read(refOf(data), data.variant, data.version),
   )
 
 export const createPageProposal = createServerFn({ method: 'POST' })
   .validator(pageRef)
   .handler(({ data }) =>
-    attempt(() => getStudio().project.pages.createProposal(data)),
+    attempt(() => getStudio().project.pages.createProposal(refOf(data))),
   )
 
+/** A token swap from the Inspect tab: the whole page, written against the hash it was read at. */
 export const savePageProposal = createServerFn({ method: 'POST' })
-  .validator(pageRef.extend({ html: z.string(), baseHash: z.string() }))
+  .validator(
+    pageRef.extend({
+      html: z.string(),
+      baseHash: z.string(),
+      version: version.optional(),
+    }),
+  )
   .handler(({ data }) =>
     attempt(() =>
       getStudio().project.pages.saveProposal(
-        { kind: data.kind, name: data.name },
+        refOf(data),
         data.html,
         data.baseHash,
+        data.version,
       ),
     ),
   )
 
-/** A blank page: an empty proposal (component or screen) to sketch a new design on. */
+/** The alternate becomes the proposal (design-loop's target). */
+export const promoteVersion = createServerFn({ method: 'POST' })
+  .validator(pageRef.extend({ version }))
+  .handler(({ data }) =>
+    attempt(() => getStudio().project.pages.promote(refOf(data), data.version)),
+  )
+
+export const discardVersion = createServerFn({ method: 'POST' })
+  .validator(pageRef.extend({ version }))
+  .handler(({ data }) =>
+    attempt(async () => {
+      await getStudio().project.pages.discard(refOf(data), data.version)
+      return {}
+    }),
+  )
+
+/** A blank page: an empty wireframe `main` (component or screen) to draw a new design on. */
 export const createBlankPage = createServerFn({ method: 'POST' })
   .validator(pageRef)
   .handler(({ data }) =>
-    attempt(() => getStudio().project.pages.createBlank(data)),
+    attempt(() => getStudio().project.pages.createBlank(refOf(data))),
   )
 
-/** The sketch drawn over a proposal (Excalidraw's JSON) and the hash a later save is checked against. */
-export const getSketch = createServerFn({ method: 'GET' })
-  .validator(pageRef)
-  .handler(({ data }) => getStudio().project.sketch.read(data))
-
-export const saveSketch = createServerFn({ method: 'POST' })
-  .validator(pageRef.extend({ json: z.string(), baseHash: z.string() }))
+export const getWireframe = createServerFn({ method: 'GET' })
+  .validator(pageRef.extend({ wireframe: z.string() }))
   .handler(({ data }) =>
     attempt(() =>
-      getStudio().project.sketch.save(
-        { kind: data.kind, name: data.name },
+      getStudio().project.wireframes.read(refOf(data), data.wireframe),
+    ),
+  )
+
+/** Saves a wireframe; `baseHash` null creates it. */
+export const saveWireframe = createServerFn({ method: 'POST' })
+  .validator(
+    pageRef.extend({
+      wireframe: z.string(),
+      json: z.string(),
+      baseHash: z.string().nullable(),
+    }),
+  )
+  .handler(({ data }) =>
+    attempt(() =>
+      getStudio().project.wireframes.save(
+        refOf(data),
+        data.wireframe,
         data.json,
         data.baseHash,
       ),
     ),
   )
 
+export const removeWireframe = createServerFn({ method: 'POST' })
+  .validator(pageRef.extend({ wireframe: z.string() }))
+  .handler(({ data }) =>
+    attempt(async () => {
+      await getStudio().project.wireframes.remove(refOf(data), data.wireframe)
+      return {}
+    }),
+  )
+
 export const listSketchRequests = createServerFn({ method: 'GET' })
   .validator(pageRef)
-  .handler(({ data }) => getStudio().project.requests.list({ page: data }))
+  .handler(({ data }) =>
+    getStudio().project.requests.list({ page: refOf(data) }),
+  )
 
-/** Make real: records the request (ids and a PNG) for the selected shapes. */
+/** Make real: records the request (ids and a PNG) for the selected shapes, or the whole wireframe. */
 export const makeReal = createServerFn({ method: 'POST' })
-  .validator(pageRef.extend({ shapeIds: z.array(z.string()), png: z.string() }))
+  .validator(
+    pageRef.extend({
+      wireframe: z.string(),
+      shapeIds: z.array(z.string()),
+      png: z.string(),
+    }),
+  )
   .handler(({ data }) =>
     attempt(async () => ({
       request: await getStudio().project.requests.create({
-        page: { kind: data.kind, name: data.name },
+        page: refOf(data),
+        wireframe: data.wireframe,
         shapeIds: data.shapeIds,
         png: data.png,
       }),

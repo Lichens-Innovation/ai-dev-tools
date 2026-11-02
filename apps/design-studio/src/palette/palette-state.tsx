@@ -166,7 +166,7 @@ function Loaded({
     [],
   )
 
-  // The editor's token inspector hands a token over.
+  // The token inspector hands a token over.
   useEffect(() => {
     const onToken = (event: Event) => {
       const raw = (event as CustomEvent<{ token?: unknown } | null>).detail

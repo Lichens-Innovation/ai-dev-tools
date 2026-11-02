@@ -3,7 +3,12 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { z } from 'zod'
 import { DesignError } from './errors'
 import type { Studio } from './studio'
+import { compactWireframe, parseScene } from './wireframe'
 
+const version = z
+  .string()
+  .regex(/^[a-z]$/)
+  .describe('Proposal version: a (the proposal) or an alternate letter b..z')
 const pageKind = z.enum(['component', 'screen'])
 const pageShape = {
   kind: pageKind.describe('component or screen'),
@@ -53,7 +58,7 @@ export function createMcpServer({
     'list_pages',
     {
       description:
-        'List the design pages (components and screens) with their proposal state and content hashes.',
+        'List the design pages (components and screens): reference and proposal state, content hashes, alternate versions (b, c…), wireframes, and the width the page is laid out at.',
     },
     () => run(() => project.pages.list()),
   )
@@ -62,14 +67,58 @@ export function createMcpServer({
     'get_page',
     {
       description:
-        'Read a page. Returns { html, hash }; pass the hash back as baseHash when writing.',
+        'Read a page. Returns { html, hash }; pass the hash back as baseHash when writing. A proposal has versions: "a" is the proposal itself (what design-loop implements), "b".."z" are alternates.',
       inputSchema: {
         ...pageShape,
         variant: z.enum(['reference', 'proposal']).default('proposal'),
+        version: version.optional(),
       },
     },
-    ({ kind, name, variant }) =>
-      run(() => project.pages.read({ kind, name }, variant)),
+    ({ kind, name, variant, version: v }) =>
+      run(() => project.pages.read({ kind, name }, variant, v)),
+  )
+
+  server.registerTool(
+    'create_alternate',
+    {
+      description:
+        'Write a new alternate version of a page proposal (the full HTML), next to it with the next free letter (b, c…). When the page has no proposal yet, this writes the proposal itself (version a). Returns { version, hash }. The page may load only files under design/assets; start from get_page so the head and asset links stay right.',
+      inputSchema: {
+        ...pageShape,
+        html: z.string().describe('The complete HTML document'),
+      },
+    },
+    ({ kind, name, html }) =>
+      run(() => project.pages.createAlternate({ kind, name }, html)),
+  )
+
+  server.registerTool(
+    'list_wireframes',
+    {
+      description: "List a page's wireframes (Excalidraw drawings) by name.",
+      inputSchema: pageShape,
+    },
+    ({ kind, name }) => run(() => project.wireframes.list({ kind, name })),
+  )
+
+  server.registerTool(
+    'get_wireframe',
+    {
+      description:
+        'Read a wireframe compactly: the page version it was generated from (base), its shapes (type, position, size, text, color; a generated shape has the selector of its page element as source, where that element was as origin and what the user changed: moved, resized, retexted; parent is the container shape it was generated in) and removed: the selectors of generated elements the user deleted. Shapes without a source were drawn by the user. Positions are page pixels.',
+      inputSchema: {
+        ...pageShape,
+        wireframe: z.string().describe('The wireframe name, kebab-case'),
+      },
+    },
+    ({ kind, name, wireframe }) =>
+      run(async () =>
+        compactWireframe(
+          parseScene(
+            (await project.wireframes.read({ kind, name }, wireframe)).json,
+          ),
+        ),
+      ),
   )
 
   server.registerTool(
@@ -86,7 +135,7 @@ export function createMcpServer({
     'write_page',
     {
       description:
-        'Write the full HTML of a page proposal. References are read only and refused. baseHash is the hash from get_page or the last write; a stale one fails with Conflict. The page may load only files under design/assets.',
+        'Write the full HTML of an existing page proposal version (default a, the proposal). References are read only and refused. baseHash is the hash from get_page or the last write; a stale one fails with Conflict. The page may load only files under design/assets. For a new version use create_alternate.',
       inputSchema: {
         ...pageShape,
         html: z.string().describe('The complete HTML document'),
@@ -95,16 +144,17 @@ export function createMcpServer({
           .enum(['proposal', 'reference'])
           .default('proposal')
           .describe('Only "proposal" is writable'),
+        version: version.optional(),
       },
     },
-    ({ kind, name, html, baseHash, variant }) =>
+    ({ kind, name, html, baseHash, variant, version: v }) =>
       run(() => {
         if (variant !== 'proposal')
           throw new DesignError(
             'Invalid',
             'References are read only: write the proposal',
           )
-        return project.pages.saveProposal({ kind, name }, html, baseHash)
+        return project.pages.saveProposal({ kind, name }, html, baseHash, v)
       }),
   )
 
@@ -112,7 +162,7 @@ export function createMcpServer({
     'get_selection',
     {
       description:
-        'What is selected in the browser editor right now (empty when nothing is).',
+        'What the user is looking at in the browser right now: the page, its view (reference, proposal version or wireframe) and the element they picked with its token trace (empty when nothing is open).',
     },
     () => run(() => selection.get()),
   )
@@ -149,7 +199,7 @@ export function createMcpServer({
     'list_sketch_requests',
     {
       description:
-        'List the "Make real" requests the user made from the sketch layer (newest first): id, page, status (pending, sent, done, failed) and the number of shapes. Pending and sent ones are waiting for you.',
+        'List the "Make real" requests the user made from a wireframe (newest first): id, page, wireframe, status (pending, sent, done, failed), the number of selected shapes (0: the whole wireframe) and the version written. Pending and sent ones are waiting for you.',
       inputSchema: {
         status: z.enum(['pending', 'sent', 'done', 'failed']).optional(),
       },
@@ -159,8 +209,10 @@ export function createMcpServer({
         (await project.requests.list({ status })).map((r) => ({
           id: r.id,
           page: r.page,
+          wireframe: r.wireframe ?? null,
           status: r.status,
           shapes: r.shapeIds.length,
+          ...(r.version ? { version: r.version } : {}),
           createdAt: r.createdAt,
         })),
       ),
@@ -170,7 +222,7 @@ export function createMcpServer({
     'get_sketch_request',
     {
       description:
-        "Read a \"Make real\" request: its page, the selected sketch shapes as a compact list (type, position, size, text, color, arrows' start and end, anchors: the selectors of the page elements they cover or point to) and a PNG of the selection over the page. The sketch's text is the user's design notes. Positions are page pixels.",
+        'Read a "Make real" request: the request, its wireframe as get_wireframe returns it (only the selected shapes when partial is true; removed is listed for a whole-wireframe request only) and a PNG of the selection. The wireframe\'s text is the user\'s design notes. Positions are page pixels; translate them into layout, never coordinates.',
       inputSchema: { id: z.string() },
     },
     async ({ id }): Promise<ToolResult> => {
@@ -191,32 +243,70 @@ export function createMcpServer({
     'resolve_sketch_request',
     {
       description:
-        'Close a "Make real" request. done (with a short summary of what you wrote) removes its shapes from the sketch and reloads the page in the studio; failed needs the reason.',
+        'Close a "Make real" request. done needs a short summary of what you wrote and the version you wrote it as (from create_alternate); the studio offers to open it. failed needs the reason. The wireframe is kept either way.',
       inputSchema: {
         id: z.string(),
         status: z.enum(['done', 'failed']),
         summary: z
           .string()
           .describe('Done: what you wrote. Failed: why it could not be done.'),
+        version: version
+          .optional()
+          .describe(
+            'Done: the proposal version written (b, c…; a if it was the first proposal)',
+          ),
       },
     },
-    ({ id, status, summary }) =>
-      run(() => project.requests.resolve(id, { status, note: summary })),
+    ({ id, status, summary, version: v }) =>
+      run(() =>
+        project.requests.resolve(id, { status, note: summary, version: v }),
+      ),
   )
 
   server.registerTool(
     'open_page',
     {
-      description: 'Tell the open browser to show a page.',
+      description:
+        'Tell the open browser to show a page: its reference, a proposal version, or a wireframe.',
       inputSchema: {
         ...pageShape,
-        variant: z.enum(['reference', 'proposal']).default('proposal'),
+        variant: z
+          .enum(['reference', 'proposal', 'wireframe'])
+          .default('proposal'),
+        version: version.optional().describe('For a proposal; default a'),
+        wireframe: z.string().optional().describe('For a wireframe: its name'),
       },
     },
-    ({ kind, name, variant }) =>
+    ({ kind, name, variant, version: v, wireframe }) =>
       run(async () => {
-        await project.pages.read({ kind, name }, variant)
-        hub.publish({ type: 'open', kind, name, variant })
+        const ref = { kind, name }
+        if (variant === 'wireframe') {
+          if (!wireframe)
+            throw new DesignError('Invalid', 'Name the wireframe to open')
+          await project.wireframes.read(ref, wireframe)
+          hub.publish({
+            type: 'open',
+            kind,
+            name,
+            target: { view: 'wireframe', wireframe },
+          })
+        } else if (variant === 'reference') {
+          await project.pages.read(ref, 'reference')
+          hub.publish({
+            type: 'open',
+            kind,
+            name,
+            target: { view: 'reference' },
+          })
+        } else {
+          await project.pages.read(ref, 'proposal', v)
+          hub.publish({
+            type: 'open',
+            kind,
+            name,
+            target: { view: 'proposal', version: v ?? 'a' },
+          })
+        }
         return 'ok'
       }),
   )

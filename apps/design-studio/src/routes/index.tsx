@@ -16,35 +16,50 @@ function Home() {
         <p>No pages yet: the project has nothing under design/.</p>
       ) : (
         <ul className="divide-y">
-          {pages.map((page) => (
-            <li
-              key={`${page.kind}/${page.name}`}
-              className="flex items-center gap-3 py-2"
-            >
-              <span className="w-20 text-sm opacity-60">{page.kind}</span>
-              <span className="flex-1 font-medium">{page.name}</span>
-              <Link
-                to="/pages/$kind/$name"
-                params={{ kind: page.kind, name: page.name }}
-                search={{ variant: 'reference' }}
-                className="underline"
+          {pages.map((page) => {
+            const params = { kind: page.kind, name: page.name }
+            return (
+              <li
+                key={`${page.kind}/${page.name}`}
+                className="flex items-center gap-3 py-2"
               >
-                reference
-              </Link>
-              {page.hasProposal ? (
+                <span className="w-20 text-sm opacity-60">{page.kind}</span>
+                <span className="flex-1 font-medium">{page.name}</span>
+                {page.hasReference && (
+                  <Link
+                    to="/pages/$kind/$name"
+                    params={params}
+                    search={{ variant: 'reference' }}
+                    className="underline"
+                  >
+                    reference
+                  </Link>
+                )}
+                {page.hasProposal ? (
+                  <Link
+                    to="/pages/$kind/$name"
+                    params={params}
+                    search={{ variant: 'proposal' }}
+                    className="underline"
+                  >
+                    proposal
+                    {page.alternates.length > 0 &&
+                      ` (+${page.alternates.length})`}
+                  </Link>
+                ) : (
+                  <span className="opacity-40">no proposal</span>
+                )}
                 <Link
                   to="/pages/$kind/$name"
-                  params={{ kind: page.kind, name: page.name }}
-                  search={{ variant: 'proposal' }}
+                  params={params}
+                  search={{ variant: 'wireframe' }}
                   className="underline"
                 >
-                  proposal
+                  wireframes ({page.wireframes.length})
                 </Link>
-              ) : (
-                <span className="opacity-40">no proposal</span>
-              )}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </main>

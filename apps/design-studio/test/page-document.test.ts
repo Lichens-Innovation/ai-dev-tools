@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
-import grapesjs from 'grapesjs'
 import { describe, expect, it } from 'vitest'
-import { applyEdits, formatCss, parsePage } from '../src/editor/page-document'
-import { serializeEditor } from '../src/editor/serialize'
+import { applyEdits, formatCss, parsePage } from '../src/proposal/page-document'
 
 const PAGE = `<!doctype html>
 <html lang="en" data-theme="light">
@@ -78,43 +76,5 @@ describe('formatCss', () => {
     ).toBe(
       '.a {\n  background: url(data:image/png;base64,AA==);\n  color: red;\n}\n@media (max-width:600px) {\n  .a {\n    color: blue;\n  }\n}',
     )
-  })
-})
-
-describe('an edit through the editor, saved and reopened', () => {
-  const open = (html: string) => {
-    const parts = parsePage(html)
-    const editor = grapesjs.init({
-      headless: true,
-      protectedCss: '',
-      storageManager: false,
-    })
-    editor.setComponents(parts.body)
-    editor.setStyle(parts.studioCss)
-    return editor
-  }
-  const save = (editor: ReturnType<typeof open>, html: string) =>
-    serializeEditor(editor, html)
-
-  it('shows the same result after reopening', () => {
-    const editor = open(PAGE)
-    const button = editor.getWrapper()!.components().at(0)
-    button.addStyle({
-      'background-color': 'var(--primary)',
-      'border-radius': 'var(--radius-md)',
-    })
-    button.components().reset()
-    button.append('Send')
-    const saved = save(editor, PAGE)
-    expect(saved).toContain('Send')
-    expect(parsePage(saved).studioCss).toMatch(
-      /background-color: var\(--primary\)/,
-    )
-
-    // Reopening keeps the rules and the text; the editor only settles the attribute order (id first) once.
-    const reopened = save(open(saved), saved)
-    expect(parsePage(reopened).studioCss).toBe(parsePage(saved).studioCss)
-    expect(parsePage(reopened).body).toContain('>Send</button>')
-    expect(save(open(reopened), reopened)).toBe(reopened)
   })
 })

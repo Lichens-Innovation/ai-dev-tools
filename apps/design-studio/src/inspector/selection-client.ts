@@ -3,7 +3,9 @@ import type { Picked } from './pick'
 export interface OpenPage {
   kind: 'component' | 'screen'
   name: string
-  variant: 'reference' | 'proposal'
+  variant: 'reference' | 'proposal' | 'wireframe'
+  version?: string
+  wireframe?: string
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined

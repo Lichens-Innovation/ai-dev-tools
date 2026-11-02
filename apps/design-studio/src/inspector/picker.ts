@@ -22,13 +22,27 @@ export function attachPicker(doc: Document, onPick: (p: Picked) => void) {
       if (target?.nodeType !== 1) return
       event.preventDefault()
       event.stopPropagation()
-      doc
-        .querySelectorAll(`[${MARK}]`)
-        .forEach((el) => el.removeAttribute(MARK))
-      const picked = pick(target)
-      target.setAttribute(MARK, '')
-      onPick(picked)
+      mark(doc, target)
+      onPick(pick(target))
     },
     true,
   )
+}
+
+function mark(doc: Document, target: Element) {
+  doc.querySelectorAll(`[${MARK}]`).forEach((el) => el.removeAttribute(MARK))
+  target.setAttribute(MARK, '')
+}
+
+/** Picks the element at `selector` again (the page reloaded after a swap). Null when it is gone. */
+export function repick(doc: Document, selector: string): Picked | null {
+  let target: Element | null = null
+  try {
+    target = doc.querySelector(selector)
+  } catch {
+    return null
+  }
+  if (!target) return null
+  mark(doc, target)
+  return pick(target)
 }

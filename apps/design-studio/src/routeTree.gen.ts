@@ -9,31 +9,21 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TailwindRouteImport } from './routes/tailwind'
-import { Route as PaletteRouteImport } from './routes/palette'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as EventsRouteImport } from './routes/events'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as RenderSplatRouteImport } from './routes/render.$'
-import { Route as ExcalidrawAssetsSplatRouteImport } from './routes/excalidraw-assets.$'
-import { Route as ApiSelectionRouteImport } from './routes/api.selection'
+import { Route as EventsRouteImport } from './routes/events'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PaletteRouteImport } from './routes/palette'
+import { Route as TailwindRouteImport } from './routes/tailwind'
 import { Route as ApiRequestsRouteImport } from './routes/api.requests'
+import { Route as ApiSelectionRouteImport } from './routes/api.selection'
+import { Route as ExcalidrawAssetsSplatRouteImport } from './routes/excalidraw-assets.$'
+import { Route as RenderSplatRouteImport } from './routes/render.$'
 import { Route as PagesKindNameRouteImport } from './routes/pages.$kind.$name'
 import { Route as ApiRequestsIdSentRouteImport } from './routes/api.requests.$id.sent'
 
-const TailwindRoute = TailwindRouteImport.update({
-  id: '/tailwind',
-  path: '/tailwind',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaletteRoute = PaletteRouteImport.update({
-  id: '/palette',
-  path: '/palette',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsRoute = EventsRouteImport.update({
@@ -41,19 +31,24 @@ const EventsRoute = EventsRouteImport.update({
   path: '/events',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RenderSplatRoute = RenderSplatRouteImport.update({
-  id: '/render/$',
-  path: '/render/$',
+const PaletteRoute = PaletteRouteImport.update({
+  id: '/palette',
+  path: '/palette',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ExcalidrawAssetsSplatRoute = ExcalidrawAssetsSplatRouteImport.update({
-  id: '/excalidraw-assets/$',
-  path: '/excalidraw-assets/$',
+const TailwindRoute = TailwindRouteImport.update({
+  id: '/tailwind',
+  path: '/tailwind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRequestsRoute = ApiRequestsRouteImport.update({
+  id: '/api/requests',
+  path: '/api/requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSelectionRoute = ApiSelectionRouteImport.update({
@@ -61,9 +56,14 @@ const ApiSelectionRoute = ApiSelectionRouteImport.update({
   path: '/api/selection',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiRequestsRoute = ApiRequestsRouteImport.update({
-  id: '/api/requests',
-  path: '/api/requests',
+const ExcalidrawAssetsSplatRoute = ExcalidrawAssetsSplatRouteImport.update({
+  id: '/excalidraw-assets/$',
+  path: '/excalidraw-assets/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RenderSplatRoute = RenderSplatRouteImport.update({
+  id: '/render/$',
+  path: '/render/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PagesKindNameRoute = PagesKindNameRouteImport.update({
@@ -174,25 +174,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/tailwind': {
-      id: '/tailwind'
-      path: '/tailwind'
-      fullPath: '/tailwind'
-      preLoaderRoute: typeof TailwindRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/palette': {
-      id: '/palette'
-      path: '/palette'
-      fullPath: '/palette'
-      preLoaderRoute: typeof PaletteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events': {
@@ -202,25 +188,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/render/$': {
-      id: '/render/$'
-      path: '/render/$'
-      fullPath: '/render/$'
-      preLoaderRoute: typeof RenderSplatRouteImport
+    '/palette': {
+      id: '/palette'
+      path: '/palette'
+      fullPath: '/palette'
+      preLoaderRoute: typeof PaletteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/excalidraw-assets/$': {
-      id: '/excalidraw-assets/$'
-      path: '/excalidraw-assets/$'
-      fullPath: '/excalidraw-assets/$'
-      preLoaderRoute: typeof ExcalidrawAssetsSplatRouteImport
+    '/tailwind': {
+      id: '/tailwind'
+      path: '/tailwind'
+      fullPath: '/tailwind'
+      preLoaderRoute: typeof TailwindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/requests': {
+      id: '/api/requests'
+      path: '/api/requests'
+      fullPath: '/api/requests'
+      preLoaderRoute: typeof ApiRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/selection': {
@@ -230,11 +223,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSelectionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/requests': {
-      id: '/api/requests'
-      path: '/api/requests'
-      fullPath: '/api/requests'
-      preLoaderRoute: typeof ApiRequestsRouteImport
+    '/excalidraw-assets/$': {
+      id: '/excalidraw-assets/$'
+      path: '/excalidraw-assets/$'
+      fullPath: '/excalidraw-assets/$'
+      preLoaderRoute: typeof ExcalidrawAssetsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/render/$': {
+      id: '/render/$'
+      path: '/render/$'
+      fullPath: '/render/$'
+      preLoaderRoute: typeof RenderSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pages/$kind/$name': {

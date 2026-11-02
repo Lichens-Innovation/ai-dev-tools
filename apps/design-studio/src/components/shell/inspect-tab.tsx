@@ -245,8 +245,8 @@ export function InspectTab({ pal }: { pal: PaletteContext }) {
   if (!live)
     return (
       <p className="py-3 text-[13px] text-(--ink-3)">
-        Nothing selected. Click an element in a reference, or select one in the
-        editor of a proposal, to see the tokens it uses.
+        Nothing selected. Click an element in a reference or a proposal to see
+        the tokens it uses.
       </p>
     )
   const { createProposal, swap } = inspected

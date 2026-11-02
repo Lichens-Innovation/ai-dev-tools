@@ -36,8 +36,11 @@ design/
   assets/project.css            captured CSS, images, fonts: assets/<hash>.<ext>
   components/<kebab>.html       reference snapshots (read only)
   screens/<kebab>.html
-  proposals/<kebab>.html        editable copies, what the design loop implements
+  proposals/<kebab>.html        the proposal (version a), what the design loop implements
+  proposals/<kebab>.<v>.html    alternate versions b..z, until one is used
   proposals/screens/<kebab>.html
+  wireframes/<components|screens>/<kebab>/<name>.excalidraw
+  requests/                     Make real requests (git-ignored)
   index.json                    the catalog
 ```
 
@@ -48,8 +51,8 @@ load nothing but files under `design/assets`.
 
 Every page has a navbar (sidebar toggle, palette and Tailwind links, the section shortcuts of the open page, a
 light/dark switch, side by side), a sidebar listing the pages of `design/index.json` (each opens its proposal if
-there is one, else its reference) and a palette footer. The light/dark, side-by-side, sidebar and footer choices are
-remembered per project in the browser.
+there is one, else its reference, else its wireframes) and a palette footer. The light/dark, side-by-side, sidebar
+and footer choices are remembered per project in the browser.
 
 The footer has three tabs, and a handle on its top edge to resize it (drag, or the arrow keys; double-click for the
 default height). The active tab and the height are remembered per project, like the other choices.
@@ -66,47 +69,24 @@ changed on disk since it was read, it reports the conflict, reloads and keeps th
 A page can open the footer on a token (in a palette tab) by dispatching `window.dispatchEvent(new CustomEvent('design-studio:token',
 { detail: { token: 'link' } }))`.
 
-## Editor and token inspector
+## A page: reference, proposal versions, wireframes
 
-A reference opens read only: click an element to inspect it. **Create proposal** copies it and opens the copy in the
-GrapesJS editor (select, move, resize, edit text, add elements, restyle). Edits are saved into the page body and its
-`<style data-studio>` block, the overrides the design loop reads. **Save** (Ctrl+S) checks the file did not change on
-disk since it was opened; if it did, choose **Reload** or **Overwrite**. When Claude writes the open proposal, a banner
-offers to reload it. Side by side, the editor shows light and a live copy shows dark.
+The bar above a page switches between its three views:
 
-### Moving, copying and adding
+- **Reference**: the page as the code renders it today (read only).
+- **Proposal**: the realistic HTML view of the design. You don't edit it by hand: ask Claude for changes ("make the
+  header sticky"), and the open page reloads when Claude writes it. What you change yourself are theme values: the
+  palette in the footer, and token swaps in the Inspect tab. When a page has alternate versions, chips **A**, **B**,
+  **C**… switch between them. On an alternate, **Use this version** makes it the proposal (the old proposal takes its
+  letter) and **Discard** deletes it. Only the proposal (A) is what `/design-loop` implements.
+- **Wireframes**: Excalidraw drawings of the page, where you try things yourself (see below).
 
-Editing a proposal works like moving things in Figma. The result is always a layout the design loop can implement
-(order in the DOM, `margin: auto`, the container's alignment, written as `data-studio` rules), never `position:
-absolute`, `top` or `left`.
+## Token inspector
 
-- **Drag the selected element** itself (not only the toolbar's move icon). It follows the cursor freely, and a marker
-  shows the drop: a line between two elements, a dashed box when it goes into another box, a line at the far end or
-  the middle of its row when it will be pushed there. On release: between two elements it is moved there in the order;
-  into another box it is moved into it at that spot; at the far end of its row (or column) it gets `margin-left: auto`
-  (`margin-top` in a column), at the centre both margins; as the only child of its box, the box's alignment
-  (`justify-content`, or `align-items` in a column) changes. A plain box is made a flex box when the push needs it.
-  Moving an element forgets an earlier push. Esc cancels a drag.
-- **Add tab**: **Components** lists the project's captured component references, each with a small preview. Dragging
-  one in inserts its real markup (the project's classes, so it looks right at once) with `data-component="<name>"`
-  (the name in `design/index.json`) on its root. Copies of an element carrying `data-component` keep it. The plain HTML
-  blocks stay under **Elements**.
-- **Copy, paste, duplicate**: Ctrl+C / Ctrl+V (a paste goes after the selected element), Ctrl+D duplicates in place.
-  The clipboard (markup and the rules of the element's ids) is kept in the browser per project, so an element copied
-  in one proposal can be pasted into another.
-- **Keyboard**: Alt+arrows move the selection before or after its siblings; Delete removes; Ctrl+Z / Ctrl+Shift+Z undo
-  and redo. Each gesture above is one undo step.
-- **Line-up buttons** on the selection's toolbar set its container's alignment: start, centre, end, space between
-  ("push this to the right").
-- **Layers tab**: the element tree, named by `data-component` where present. Click selects; drag a row above, below or
-  into another, with the same rules as the canvas.
-- The **?** next to the tabs lists these shortcuts.
-
-The editor's side panel has the Style, Add and Layers tabs. The token trace of the selected element is the
-footer's **Inspect** tab, a full-width table that works on a reference (click to inspect) and on a proposal (the
-editor's selection); with nothing selected it says how to select. Each row has the property, the token chain
-(`--primary → --blue-base`), the light and dark values, the class or rule it comes from, and a flag when the value is a
-raw one that matches a token (`literal`) or none (`off-token`). Click a token in a chain to open it in the palette.
+Click an element in a reference or a proposal: the footer's **Inspect** tab shows its token trace, a full-width table.
+Each row has the property, the token chain (`--primary → --blue-base`), the light and dark values, the class or rule it
+comes from, and a flag when the value is a raw one that matches a token (`literal`) or none (`off-token`). Click a
+token in a chain to open it in the palette.
 
 Each row has two separate actions, so changing one element is never confused with changing the whole palette:
 
@@ -118,51 +98,54 @@ Each row has two separate actions, so changing one element is never confused wit
 2. **The token name switches the token for this element only.** It is a dropdown with a search bar that lists the
    tokens of the property's kind (colors with swatches for color properties, the spacing scale for padding, margin and
    gap, radii for border-radius, type sizes for font-size), each with its light and dark values. Picking one writes
-   the override into the proposal's `<style data-studio>` block. On a reference the dropdown is disabled and the tab
-   offers **Create proposal**.
+   the override into the proposal version's `<style data-studio>` block (the element gets a `ds-…` id if it has no
+   unique one). **Undo swap** (Ctrl+Z) takes the last swap back, unless the file changed since. On a reference the
+   dropdown is disabled and the tab offers **Create proposal**.
 
 MCP `get_selection` returns the same trace.
 
-## Sketch layer and Make real
+## Wireframes and Make real
 
-A transparent Excalidraw layer (loaded in the browser only) sits over the proposal in the editor. The toolbar's
-**Select** works on the page (GrapesJS); **Sketch**, **Rectangle**, **Pen**, **Text**, **Arrow** and **Eraser** hand the
-mouse and keyboard to the sketch, and **Hide sketch** toggles the layer. Excalidraw's own UI is hidden. Zoom and scroll
-follow the page and cannot be changed from the sketch; side by side shows the sketch over the light editor only.
+A page can have several wireframes. **New wireframe** draws one from a version of the page (the proposal, an
+alternate or the reference), laid out at the page's width: boxes, text, fields, buttons, images as cross-hatched
+boxes, each shape remembering the page element it stands for. It can also start blank. **New blank page** (sidebar)
+creates a page with no reference and an empty wireframe `main`.
 
-- **Anchors.** Shapes, arrow ends and text record the page element they cover or point to (a selector preferring ids,
-  plus an offset) in the element's `customData`, and follow it when the layout moves.
-- **Saved** as `<proposal>.excalidraw` next to the proposal (Excalidraw JSON, opens on excalidraw.com): autosave with an
-  atomic write and a changed-on-disk check (Reload or Overwrite).
-- **New blank page** (sidebar): an empty proposal, a component or a screen named by you, with only a sketch.
-- **Make real.** Select shapes and press it: the studio writes `design/requests/<id>.json` and a PNG of the selection over
-  the page (git-ignored). A badge on the shapes shows `Pending → Sent to Claude → Done | Failed`. **Copy command** puts
-  `/design-sketch <id>` on the clipboard, the fallback when the Claude Code channel is not on. The design plugin's channel
-  (`channel/design-channel.mjs`) follows `/events` and pushes new requests into the session; start Claude Code with
-  `claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools`.
+Then it is Excalidraw: move, resize, retext, delete, draw new things, write notes to Claude. It autosaves (Ctrl+S saves
+now); if the file changes on disk, a banner offers to reload it. Wireframes are plain Excalidraw files and open on
+excalidraw.com.
+
+**Make real** sends the selected shapes (or the whole wireframe when nothing is selected) to Claude: the studio writes
+`design/requests/<id>.json` and a PNG. Claude reads what moved, changed or was deleted against the page it was drawn
+from, writes the result as a **new alternate version** of the proposal, and the request list offers **Open version X**.
+**Copy command** puts `/design-sketch <id>` on the clipboard, the fallback when the Claude Code channel is not on. The
+design plugin's channel (`channel/design-channel.mjs`) follows `/events` and pushes new requests into the session;
+start Claude Code with `claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools`.
 
 ## MCP tools
 
-`list_pages`, `get_page`, `create_proposal`, `write_page` (proposals only; needs the `baseHash` of the last read),
-`get_selection`, `get_palette`, `set_palette`, `open_page`, and for Make real `list_sketch_requests`,
-`get_sketch_request` (compact shapes and the PNG) and `resolve_sketch_request` (`done` removes the shapes and reloads the
-page, `failed` keeps them).
+- Pages: `list_pages`, `get_page` (a reference or a proposal version), `create_proposal`, `write_page` (a proposal
+  version; needs the `baseHash` of the last read), `create_alternate` (the next free letter), `open_page`.
+- Wireframes: `list_wireframes`, `get_wireframe` (compact shapes, their source elements and changes, removed elements).
+- Make real: `list_sketch_requests`, `get_sketch_request` (the compact wireframe and the PNG), `resolve_sketch_request`
+  (`done` with the version written, or `failed`).
+- `get_selection`, `get_palette`, `set_palette`.
 
 ## Routes
 
-| Route                    | What it does                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `/`                      | List of pages                                                                    |
-| `/pages/$kind/$name`     | A reference (read only, inspectable) or a proposal in the editor                 |
-| `/palette`               | The palette card: colors, contrast audit, semantic mapping, tokens, components   |
-| `/tailwind`              | The Tailwind classes card: every utility under the project's namespace           |
-| `/render/*`              | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright |
-| `/events`                | Server-sent events: file changes and `open_page` requests                        |
-| `/mcp`                   | MCP, Streamable HTTP                                                             |
-| `/api/selection`         | `PUT` the editor selection (browser), `GET` it                                   |
-| `/api/requests`          | `GET` the requests (`?status=pending`), for the channel                          |
-| `/api/requests/$id/sent` | `POST`: the channel delivered it (`pending` becomes `sent`)                      |
-| `/excalidraw-assets/*`   | Excalidraw's fonts, served locally                                               |
+| Route                    | What it does                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `/`                      | List of pages                                                                                |
+| `/pages/$kind/$name`     | A page: `?variant=reference`, `?variant=proposal&version=b`, `?variant=wireframe&wireframe=` |
+| `/palette`               | The palette card: colors, contrast audit, semantic mapping, tokens, components               |
+| `/tailwind`              | The Tailwind classes card: every utility under the project's namespace                       |
+| `/render/*`              | The raw files of `design/`, e.g. `/render/proposals/button.html`, for Playwright             |
+| `/events`                | Server-sent events: file changes, requests and `open_page` requests                          |
+| `/mcp`                   | MCP, Streamable HTTP                                                                         |
+| `/api/selection`         | `PUT` the browser selection, `GET` it                                                        |
+| `/api/requests`          | `GET` the requests (`?status=pending`), for the channel                                      |
+| `/api/requests/$id/sent` | `POST`: the channel delivered it (`pending` becomes `sent`)                                  |
+| `/excalidraw-assets/*`   | Excalidraw's fonts, served locally                                                           |
 
 ## Develop
 

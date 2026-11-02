@@ -1,7 +1,7 @@
 import { excerptOf, listTokens, selectorFor, traceTokens } from './trace'
 import type { TokenInfo, TraceRow } from './trace'
 
-/** An element picked in a page (the editor's canvas or a rendered snapshot), with what the inspector shows of it. */
+/** An element picked in a rendered page, with what the inspector shows of it. */
 export interface Picked {
   element: Element
   selector: string

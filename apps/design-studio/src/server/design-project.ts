@@ -19,13 +19,13 @@ import { conflict, invalid, notFound } from './errors'
 import { nativeImport } from './native-import.mjs'
 import { assertLoadsOnlyAssets, rebaseForScreenProposal } from './page-html'
 import {
-  EMPTY_SKETCH,
-  compactShapes,
+  compactWireframe,
+  emptyScene,
   liveIds,
   parseScene,
-  removeShapes,
-} from './sketch'
-import type { CompactShape } from './sketch'
+  sceneJson,
+} from './wireframe'
+import type { CompactWireframe } from './wireframe'
 
 export type PageKind = 'component' | 'screen'
 export interface PageRef {
@@ -34,46 +34,58 @@ export interface PageRef {
 }
 export type PageVariant = 'reference' | 'proposal'
 
+/**
+ * A proposal's version: `a` is the proposal itself (`<name>.html`, what design-loop implements), `b`..`z` are
+ * alternates (`<name>.<v>.html`, next to it) made from wireframes, until one is promoted.
+ */
+export const VERSION = /^[a-z]$/
+export const PROPOSAL = 'a'
+
 export interface PageSummary extends PageRef {
-  /** False for a blank page: a proposal made from nothing, with no captured reference. */
+  /** False for a blank page: one made from nothing, with no captured reference. */
   hasReference: boolean
   hasProposal: boolean
   referenceHash: string | null
   proposalHash: string | null
+  /** The alternate versions (`b`, `c`…), in order. */
+  alternates: string[]
+  /** The page's wireframes, by name. */
+  wireframes: string[]
+  /** The width the page is laid out at: a screen's manifest viewport, else a default. */
+  width: number
 }
 
 export type RequestStatus = 'pending' | 'sent' | 'done' | 'failed'
 
 /**
- * A "Make real" request: ids and file references only, never free text taken from the page. The sketch's text is read
- * by Claude through MCP (`get_sketch_request`), as the user's design notes.
+ * A "Make real" request: ids and file references only, never free text taken from the page. The wireframe's text is
+ * read by Claude through MCP (`get_sketch_request`), as the user's design notes.
  */
 export interface SketchRequest {
   id: string
   page: PageRef
+  /** The wireframe it was made from. Absent on requests from the old sketch layer. */
+  wireframe?: string
+  /** The selected shapes; empty: the whole wireframe. */
   shapeIds: string[]
-  /** The PNG of the selection over the page, in design/requests/. */
+  /** The PNG of the selection, in design/requests/. */
   png: string
   status: RequestStatus
   createdAt: string
   updatedAt: string
   /** What Claude said when it resolved the request: a summary (done) or a reason (failed). */
   resolution?: string
+  /** The proposal version Claude wrote for it (`b`…, or `a` when the page had no proposal). */
+  version?: string
 }
 
 export interface SketchRequestDetail {
   request: SketchRequest
-  /** The selected shapes as they are in the sketch now (empty once they were removed). */
-  shapes: CompactShape[]
+  /** The wireframe (or the selected shapes of it) as it is now; null when it is gone. */
+  wireframe: CompactWireframe | null
 }
 
-export interface ComponentReference {
-  /** The component's name in the manifest/catalog (`Button`): what `data-component` says. */
-  name: string
-  /** The reference page it was captured as. */
-  page: string
-  html: string
-}
+const DEFAULT_WIDTH = { component: 720, screen: 1280 } as const
 
 export type PaletteInputs = Record<string, { lm: string; dm: string }>
 export interface PaletteDraft {
@@ -127,51 +139,78 @@ export interface PaletteState extends PaletteDraft {
   hash: string
 }
 
+/** File events; `hash` is null when the file was deleted. */
 export type DesignEvent =
   | {
       kind: 'page'
       name: string
       pageKind: PageKind
       variant: PageVariant
-      hash: string
+      /** The proposal version (`a`…); null for a reference. */
+      version: string | null
+      hash: string | null
     }
   | { kind: 'palette'; hash: string }
-  | { kind: 'sketch'; name: string; pageKind: PageKind; hash: string }
+  | {
+      kind: 'wireframe'
+      name: string
+      pageKind: PageKind
+      wireframe: string
+      hash: string | null
+    }
   | { kind: 'request'; request: SketchRequest }
 
 export interface DesignProject {
   root: string
   pages: {
+    /** Every page with a reference, a proposal or a wireframe. */
     list: () => Promise<PageSummary[]>
     read: (
       ref: PageRef,
       variant: PageVariant,
+      version?: string,
     ) => Promise<{ html: string; hash: string }>
-    /** The captured component references, named as in the manifest, for the editor's Add tab. */
-    components: () => Promise<ComponentReference[]>
     createProposal: (ref: PageRef) => Promise<{ hash: string }>
-    /** A new, empty proposal with no reference: the page to sketch a new component or screen on. */
-    createBlank: (ref: PageRef) => Promise<{ hash: string }>
+    /** A new page with no reference: an empty wireframe `main` to draw it on. */
+    createBlank: (ref: PageRef) => Promise<{ wireframe: string; hash: string }>
     saveProposal: (
       ref: PageRef,
       html: string,
       baseHash: string,
+      version?: string,
     ) => Promise<{ hash: string }>
+    /** A new alternate (the next free letter); the proposal itself when the page has none yet. */
+    createAlternate: (
+      ref: PageRef,
+      html: string,
+    ) => Promise<{ version: string; hash: string }>
+    /** The alternate becomes the proposal, and the proposal takes its letter. */
+    promote: (ref: PageRef, version: string) => Promise<{ hash: string }>
+    /** Deletes an alternate (never the proposal). */
+    discard: (ref: PageRef, version: string) => Promise<void>
   }
-  /** The sketch drawn over a proposal, saved next to it as `<proposal>.excalidraw`. */
-  sketch: {
-    /** The file's content and hash; a proposal without a sketch reads as an empty one. */
-    read: (ref: PageRef) => Promise<{ json: string; hash: string }>
+  /** Wireframes: Excalidraw files in `design/wireframes/<components|screens>/<page>/<name>.excalidraw`. */
+  wireframes: {
+    list: (ref: PageRef) => Promise<string[]>
+    read: (
+      ref: PageRef,
+      name: string,
+    ) => Promise<{ json: string; hash: string }>
+    /** `baseHash` null creates it (`Conflict` if it exists). */
     save: (
       ref: PageRef,
+      name: string,
       json: string,
-      baseHash: string,
+      baseHash: string | null,
     ) => Promise<{ hash: string }>
+    remove: (ref: PageRef, name: string) => Promise<void>
   }
   /** "Make real" requests, kept in design/requests/ (git-ignored). */
   requests: {
     create: (input: {
       page: PageRef
+      wireframe: string
+      /** Empty: the whole wireframe. */
       shapeIds: string[]
       /** The PNG, base64. */
       png: string
@@ -184,10 +223,10 @@ export interface DesignProject {
     png: (id: string) => Promise<Buffer>
     /** The channel delivered it (pending -> sent). Later states are left alone. */
     markSent: (id: string) => Promise<SketchRequest>
-    /** Done removes the request's shapes from the sketch. */
+    /** The wireframe stays; `version` records the proposal version written for it. */
     resolve: (
       id: string,
-      outcome: { status: 'done' | 'failed'; note: string },
+      outcome: { status: 'done' | 'failed'; note: string; version?: string },
     ) => Promise<SketchRequest>
   }
   palette: {
@@ -261,6 +300,11 @@ interface Manifest {
     script?: string | null
     namespace?: string | null
   }
+  screens?: {
+    mockupPath?: unknown
+    proposalPath?: unknown
+    viewport?: unknown
+  }[]
 }
 
 export const hashOf = (content: string | Buffer) =>
@@ -306,49 +350,125 @@ export function openProject(rootDir: string): DesignProject {
     }
   }
 
+  function assertVersion(version: string): void {
+    if (typeof version !== 'string' || !VERSION.test(version))
+      throw invalid(
+        `Version "${String(version)}" must be one letter (a is the proposal)`,
+      )
+  }
+
+  const proposalDir = (kind: PageKind) =>
+    kind === 'component' ? 'proposals' : 'proposals/screens'
+
   /** Path of a page, relative to design/ (posix). The only place names turn into paths. */
-  const relPath = (ref: PageRef, variant: PageVariant): string => {
+  const relPath = (
+    ref: PageRef,
+    variant: PageVariant,
+    version = PROPOSAL,
+  ): string => {
     if (variant === 'reference')
       return `${ref.kind === 'component' ? 'components' : 'screens'}/${ref.name}.html`
-    return `${ref.kind === 'component' ? 'proposals' : 'proposals/screens'}/${ref.name}.html`
+    const suffix = version === PROPOSAL ? '' : `.${version}`
+    return `${proposalDir(ref.kind)}/${ref.name}${suffix}.html`
   }
-  const absPath = (ref: PageRef, variant: PageVariant) =>
-    path.join(designDir, ...relPath(ref, variant).split('/'))
+  const absPath = (ref: PageRef, variant: PageVariant, version = PROPOSAL) =>
+    path.join(designDir, ...relPath(ref, variant, version).split('/'))
 
-  async function readPage(ref: PageRef, variant: PageVariant) {
+  async function readPage(
+    ref: PageRef,
+    variant: PageVariant,
+    version = PROPOSAL,
+  ) {
     assertRef(ref)
-    const html = await readIfExists(absPath(ref, variant))
+    if (variant !== 'reference' && variant !== 'proposal')
+      throw invalid(`Unknown variant "${String(variant)}"`)
+    if (variant === 'proposal') assertVersion(version)
+    const html = await readIfExists(absPath(ref, variant, version))
     if (html === null)
-      throw notFound(`No ${variant} for ${ref.kind} "${ref.name}"`)
+      throw notFound(
+        variant === 'proposal' && version !== PROPOSAL
+          ? `No version ${version} of ${ref.kind} "${ref.name}"`
+          : `No ${variant} for ${ref.kind} "${ref.name}"`,
+      )
     return { html, hash: hashOf(html) }
   }
 
-  async function namesIn(dir: string): Promise<string[]> {
+  async function filesIn(dir: string): Promise<string[]> {
     try {
       const entries = await readdir(path.join(designDir, dir), {
         withFileTypes: true,
       })
-      return entries
-        .filter((e) => e.isFile() && e.name.endsWith('.html'))
-        .map((e) => e.name.slice(0, -'.html'.length))
-        .filter((n) => KEBAB.test(n))
+      return entries.filter((e) => e.isFile()).map((e) => e.name)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
       throw error
     }
   }
 
+  const namesIn = async (dir: string) =>
+    (await filesIn(dir))
+      .filter((n) => n.endsWith('.html'))
+      .map((n) => n.slice(0, -'.html'.length))
+      .filter((n) => KEBAB.test(n))
+
+  /** The alternates of every page in a proposals folder: name -> versions, sorted. */
+  async function alternatesIn(dir: string): Promise<Map<string, string[]>> {
+    const found = new Map<string, string[]>()
+    for (const file of (await filesIn(dir)).sort()) {
+      const m = /^([a-z0-9]+(?:-[a-z0-9]+)*)\.([b-z])\.html$/.exec(file)
+      if (m) found.set(m[1], [...(found.get(m[1]) ?? []), m[2]])
+    }
+    return found
+  }
+
+  /** The screens' widths from the manifest viewports (`"1440x900"`), by page name. */
+  async function screenWidths(): Promise<Map<string, number>> {
+    const widths = new Map<string, number>()
+    try {
+      const manifest = JSON.parse(
+        (await readIfExists(path.join(root, 'design.manifest.json'))) ?? '{}',
+      ) as Manifest
+      for (const row of manifest.screens ?? []) {
+        const width = /^(\d{3,4})x\d+$/.exec(String(row.viewport ?? ''))?.[1]
+        if (!width) continue
+        for (const p of [row.mockupPath, row.proposalPath])
+          if (typeof p === 'string')
+            widths.set(path.posix.basename(p, '.html'), Number(width))
+      }
+    } catch {
+      // A bad manifest only costs the widths.
+    }
+    return widths
+  }
+
+  async function writeVersion(ref: PageRef, version: string, html: string) {
+    if (typeof html !== 'string') throw invalid('html must be a string')
+    assertLoadsOnlyAssets(html, proposalDir(ref.kind))
+    await writeAtomic(absPath(ref, 'proposal', version), html)
+    return { hash: hashOf(html) }
+  }
+
   const pages: DesignProject['pages'] = {
     async list() {
       const kinds: PageKind[] = ['component', 'screen']
+      const widths = await screenWidths()
       const lists = await Promise.all(
         kinds.map(async (kind) => {
-          const [references, proposals] = await Promise.all([
+          const [references, proposals, alternates, drawn] = await Promise.all([
             namesIn(kind === 'component' ? 'components' : 'screens'),
-            namesIn(kind === 'component' ? 'proposals' : 'proposals/screens'),
+            namesIn(proposalDir(kind)),
+            alternatesIn(proposalDir(kind)),
+            wireframePages(kind),
           ])
-          // A proposal with no reference is a blank page.
-          const names = [...new Set([...references, ...proposals])].sort()
+          // A page with no reference is a blank page: drawn from nothing.
+          const names = [
+            ...new Set([
+              ...references,
+              ...proposals,
+              ...alternates.keys(),
+              ...drawn,
+            ]),
+          ].sort()
           return Promise.all(
             names.map(async (name): Promise<PageSummary> => {
               const ref = { kind, name }
@@ -363,6 +483,11 @@ export function openProject(rootDir: string): DesignProject {
                 hasProposal: proposal !== null,
                 referenceHash: reference?.hash ?? null,
                 proposalHash: proposal?.hash ?? null,
+                alternates: alternates.get(name) ?? [],
+                wireframes: await wireframes.list(ref),
+                width:
+                  (kind === 'screen' ? widths.get(name) : undefined) ??
+                  DEFAULT_WIDTH[kind],
               }
             }),
           )
@@ -372,32 +497,6 @@ export function openProject(rootDir: string): DesignProject {
     },
 
     read: readPage,
-
-    async components() {
-      // The catalog names a component as the manifest does; a page missing from it gets its kebab name in Pascal case.
-      const names = new Map<string, string>()
-      try {
-        const index = JSON.parse(
-          (await readIfExists(path.join(designDir, 'index.json'))) ?? '{}',
-        ) as { pages?: { name?: unknown; reference?: unknown }[] }
-        for (const row of index.pages ?? [])
-          if (typeof row.name === 'string' && typeof row.reference === 'string')
-            names.set(row.reference, row.name)
-      } catch {
-        // An unreadable catalog only costs the names.
-      }
-      const pascal = (kebab: string) =>
-        kebab.replace(/(?:^|-)([a-z0-9])/g, (_, c: string) => c.toUpperCase())
-      const found = (await namesIn('components')).sort()
-      return Promise.all(
-        found.map(async (page) => ({
-          name: names.get(`components/${page}.html`) ?? pascal(page),
-          page,
-          html: (await readPage({ kind: 'component', name: page }, 'reference'))
-            .html,
-        })),
-      )
-    },
 
     async createProposal(ref) {
       const reference = await readPage(ref, 'reference')
@@ -415,69 +514,162 @@ export function openProject(rootDir: string): DesignProject {
 
     async createBlank(ref) {
       assertRef(ref)
-      for (const variant of ['reference', 'proposal'] as const)
-        if (existsSync(absPath(ref, variant)))
-          throw conflict(
-            `${ref.kind} "${ref.name}" already exists (${variant}): open it instead`,
-          )
-      const up = ref.kind === 'screen' ? '../../' : '../'
-      const html = `<!doctype html>
-<html lang="en" data-theme="light">
-  <head>
-    <meta charset="utf-8" />
-    <title>${ref.name}</title>
-    <link rel="stylesheet" href="${up}assets/project.css" />
-  </head>
-  <body>
-  </body>
-</html>
-`
-      await writeAtomic(absPath(ref, 'proposal'), html)
-      return { hash: hashOf(html) }
+      const taken =
+        existsSync(absPath(ref, 'reference')) ||
+        existsSync(absPath(ref, 'proposal')) ||
+        (await wireframes.list(ref)).length > 0
+      if (taken)
+        throw conflict(
+          `${ref.kind} "${ref.name}" already exists: open it instead`,
+        )
+      const width = DEFAULT_WIDTH[ref.kind]
+      const { hash } = await wireframes.save(
+        ref,
+        'main',
+        sceneJson(emptyScene({ width })),
+        null,
+      )
+      return { wireframe: 'main', hash }
     },
 
-    async saveProposal(ref, html, baseHash) {
-      const current = await readPage(ref, 'proposal')
-      if (typeof html !== 'string') throw invalid('html must be a string')
-      const pageDir = path.posix.dirname(relPath(ref, 'proposal'))
-      assertLoadsOnlyAssets(html, pageDir)
+    async saveProposal(ref, html, baseHash, version = PROPOSAL) {
+      const current = await readPage(ref, 'proposal', version)
       if (current.hash !== baseHash) {
         throw conflict(
           `${ref.kind} "${ref.name}" changed since it was read (hash ${current.hash.slice(0, 8)}…)`,
         )
       }
-      await writeAtomic(absPath(ref, 'proposal'), html)
-      return { hash: hashOf(html) }
+      return writeVersion(ref, version, html)
+    },
+
+    async createAlternate(ref, html) {
+      assertRef(ref)
+      if (!existsSync(absPath(ref, 'proposal')))
+        return {
+          version: PROPOSAL,
+          ...(await writeVersion(ref, PROPOSAL, html)),
+        }
+      const version = 'bcdefghijklmnopqrstuvwxyz'
+        .split('')
+        .find((v) => !existsSync(absPath(ref, 'proposal', v)))
+      if (!version)
+        throw conflict(
+          `${ref.kind} "${ref.name}" has 25 alternates: discard some first`,
+        )
+      return { version, ...(await writeVersion(ref, version, html)) }
+    },
+
+    async promote(ref, version) {
+      assertVersion(version)
+      if (version === PROPOSAL) throw invalid('Version a is the proposal')
+      const alternate = await readPage(ref, 'proposal', version)
+      const proposal = await readPage(ref, 'proposal')
+      await writeAtomic(absPath(ref, 'proposal'), alternate.html)
+      await writeAtomic(absPath(ref, 'proposal', version), proposal.html)
+      return { hash: alternate.hash }
+    },
+
+    async discard(ref, version) {
+      assertVersion(version)
+      if (version === PROPOSAL)
+        throw invalid('The proposal itself cannot be discarded here')
+      await readPage(ref, 'proposal', version)
+      await unlink(absPath(ref, 'proposal', version))
     },
   }
 
-  // --- sketch ------------------------------------------------------------
+  // --- wireframes --------------------------------------------------------
 
-  /** The sketch sits next to its proposal, same name, `.excalidraw`. */
-  const sketchFile = (ref: PageRef) =>
-    absPath(ref, 'proposal').replace(/\.html$/, '.excalidraw')
+  const wireframeDir = (ref: PageRef) =>
+    path.join(
+      designDir,
+      'wireframes',
+      ref.kind === 'component' ? 'components' : 'screens',
+      ref.name,
+    )
 
-  async function readSketch(ref: PageRef) {
+  function wireframeFile(ref: PageRef, name: string) {
     assertRef(ref)
-    const json = (await readIfExists(sketchFile(ref))) ?? EMPTY_SKETCH
+    if (typeof name !== 'string' || !KEBAB.test(name))
+      throw invalid(
+        `Wireframe name "${String(name)}" must be kebab-case (letters, digits, dashes)`,
+      )
+    return path.join(wireframeDir(ref), `${name}.excalidraw`)
+  }
+
+  /** The pages of a kind that have a wireframe folder. */
+  async function wireframePages(kind: PageKind): Promise<string[]> {
+    try {
+      const dir = path.join(
+        designDir,
+        'wireframes',
+        kind === 'component' ? 'components' : 'screens',
+      )
+      const entries = await readdir(dir, { withFileTypes: true })
+      const pagesWithFiles = await Promise.all(
+        entries
+          .filter((e) => e.isDirectory() && KEBAB.test(e.name))
+          .map(async (e) =>
+            (await wireframes.list({ kind, name: e.name })).length
+              ? e.name
+              : null,
+          ),
+      )
+      return pagesWithFiles.filter((n): n is string => n !== null)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+      throw error
+    }
+  }
+
+  async function readWireframe(ref: PageRef, name: string) {
+    const json = await readIfExists(wireframeFile(ref, name))
+    if (json === null)
+      throw notFound(`No wireframe "${name}" for ${ref.kind} "${ref.name}"`)
     return { json, hash: hashOf(json) }
   }
 
-  const sketch: DesignProject['sketch'] = {
-    read: readSketch,
+  const wireframes: DesignProject['wireframes'] = {
+    async list(ref) {
+      assertRef(ref)
+      try {
+        const entries = await readdir(wireframeDir(ref), {
+          withFileTypes: true,
+        })
+        return entries
+          .filter((e) => e.isFile() && e.name.endsWith('.excalidraw'))
+          .map((e) => e.name.slice(0, -'.excalidraw'.length))
+          .filter((n) => KEBAB.test(n))
+          .sort()
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
+        throw error
+      }
+    },
 
-    async save(ref, json, baseHash) {
-      // A sketch belongs to a proposal: there is none to draw on without one.
-      await readPage(ref, 'proposal')
+    read: readWireframe,
+
+    async save(ref, name, json, baseHash) {
+      const file = wireframeFile(ref, name)
       parseScene(json)
-      const current = await readSketch(ref)
-      if (current.hash !== baseHash) {
+      const current = await readIfExists(file)
+      if (baseHash === null) {
+        if (current !== null)
+          throw conflict(`Wireframe "${name}" already exists`)
+      } else if (current === null) {
+        throw notFound(`No wireframe "${name}" for ${ref.kind} "${ref.name}"`)
+      } else if (hashOf(current) !== baseHash) {
         throw conflict(
-          `The sketch of ${ref.kind} "${ref.name}" changed since it was read (hash ${current.hash.slice(0, 8)}…)`,
+          `Wireframe "${name}" changed since it was read (hash ${hashOf(current).slice(0, 8)}…)`,
         )
       }
-      await writeAtomic(sketchFile(ref), json)
+      await writeAtomic(file, json)
       return { hash: hashOf(json) }
+    },
+
+    async remove(ref, name) {
+      await readWireframe(ref, name)
+      await unlink(wireframeFile(ref, name))
     },
   }
 
@@ -524,22 +716,21 @@ export function openProject(rootDir: string): DesignProject {
   }
 
   const requests: DesignProject['requests'] = {
-    create: ({ page, shapeIds, png }) =>
+    create: ({ page, wireframe, shapeIds, png }) =>
       serial(async () => {
-        await readPage(page, 'proposal')
+        const scene = parseScene((await readWireframe(page, wireframe)).json)
         if (
           !Array.isArray(shapeIds) ||
-          shapeIds.length === 0 ||
-          shapeIds.length > 500 ||
+          shapeIds.length > 5000 ||
           !shapeIds.every((id) => typeof id === 'string' && SHAPE_ID.test(id))
         )
-          throw invalid('shapeIds must list 1 to 500 shape ids')
-        const scene = parseScene((await readSketch(page)).json)
+          throw invalid('shapeIds must list at most 5000 shape ids')
         const known = liveIds(scene)
+        if (known.size === 0) throw invalid('The wireframe is empty')
         const missing = shapeIds.filter((id) => !known.has(id))
         if (missing.length)
           throw invalid(
-            `Shapes not in the saved sketch (save it first): ${missing.slice(0, 5).join(', ')}`,
+            `Shapes not in the saved wireframe (save it first): ${missing.slice(0, 5).join(', ')}`,
           )
         if (typeof png !== 'string') throw invalid('png must be base64')
         const bytes = Buffer.from(png, 'base64')
@@ -551,6 +742,7 @@ export function openProject(rootDir: string): DesignProject {
         const request: SketchRequest = {
           id,
           page: { kind: page.kind, name: page.name },
+          wireframe,
           shapeIds: [...new Set(shapeIds)],
           png: `${id}.png`,
           status: 'pending',
@@ -596,8 +788,17 @@ export function openProject(rootDir: string): DesignProject {
 
     async get(id) {
       const request = await readRequest(id)
-      const scene = parseScene((await readSketch(request.page)).json)
-      return { request, shapes: compactShapes(scene, request.shapeIds) }
+      if (!request.wireframe) return { request, wireframe: null }
+      const current = await readWireframe(
+        request.page,
+        request.wireframe,
+      ).catch(() => null)
+      return {
+        request,
+        wireframe: current
+          ? compactWireframe(parseScene(current.json), request.shapeIds)
+          : null,
+      }
     },
 
     async png(id) {
@@ -632,19 +833,17 @@ export function openProject(rootDir: string): DesignProject {
               ? 'A done request needs a short summary'
               : 'A failed request needs a reason',
           )
-        if (outcome.status === 'done') {
-          // The shapes became real elements: take them off the sketch.
-          const current = await readSketch(request.page)
-          const scene = parseScene(current.json)
-          const json =
-            JSON.stringify(removeShapes(scene, request.shapeIds), null, 2) +
-            '\n'
-          await writeAtomic(sketchFile(request.page), json)
+        const version = outcome.version
+        if (version !== undefined) {
+          assertVersion(version)
+          // The version must exist: it is what the studio opens from the request.
+          await readPage(request.page, 'proposal', version)
         }
         const next: SketchRequest = {
           ...request,
           status: outcome.status,
           resolution: note.slice(0, 1000),
+          ...(version !== undefined ? { version } : {}),
           updatedAt: new Date().toISOString(),
         }
         await writeRequest(next)
@@ -938,18 +1137,19 @@ export function openProject(rootDir: string): DesignProject {
     }
   }
 
-  function sketchOf(
+  function wireframeOf(
     file: string,
-  ): Omit<Extract<DesignEvent, { kind: 'sketch' }>, 'hash'> | null {
+  ): Omit<Extract<DesignEvent, { kind: 'wireframe' }>, 'hash'> | null {
     const rel = path.relative(designDir, file).split(path.sep).join('/')
     const m = rel.match(
-      /^(proposals|proposals\/screens)\/([a-z0-9-]+)\.excalidraw$/,
+      /^wireframes\/(components|screens)\/([a-z0-9-]+)\/([a-z0-9-]+)\.excalidraw$/,
     )
     if (!m) return null
     return {
-      kind: 'sketch',
+      kind: 'wireframe',
       name: m[2],
-      pageKind: m[1] === 'proposals' ? 'component' : 'screen',
+      pageKind: m[1] === 'components' ? 'component' : 'screen',
+      wireframe: m[3],
     }
   }
 
@@ -958,36 +1158,46 @@ export function openProject(rootDir: string): DesignProject {
   ): Omit<Extract<DesignEvent, { kind: 'page' }>, 'hash'> | null {
     const rel = path.relative(designDir, file).split(path.sep).join('/')
     const m = rel.match(
-      /^(components|screens|proposals|proposals\/screens)\/([a-z0-9-]+)\.html$/,
+      /^(components|screens|proposals|proposals\/screens)\/([a-z0-9-]+?)(?:\.([b-z]))?\.html$/,
     )
     if (!m) return null
     const variant: PageVariant = m[1].startsWith('proposals')
       ? 'proposal'
       : 'reference'
+    if (variant === 'reference' && m[3]) return null
     const pageKind: PageKind =
       m[1] === 'components' || m[1] === 'proposals' ? 'component' : 'screen'
-    return { kind: 'page', name: m[2], pageKind, variant }
+    return {
+      kind: 'page',
+      name: m[2],
+      pageKind,
+      variant,
+      version: variant === 'proposal' ? (m[3] ?? PROPOSAL) : null,
+    }
   }
 
   async function onChange(file: string, inputsFile: string | null) {
-    let content: string
+    let content: string | null
     try {
       content = await readFile(file, 'utf8')
     } catch {
-      return
+      content = null
     }
-    const hash = hashOf(content)
+    const hash = content === null ? null : hashOf(content)
     if (lastHash.get(file) === hash) return
-    lastHash.set(file, hash)
+    if (hash === null) lastHash.delete(file)
+    else lastHash.set(file, hash)
     const page = pageOf(file)
-    const sk = sketchOf(file)
+    const wf = wireframeOf(file)
     const event: DesignEvent | null =
       file === inputsFile
-        ? { kind: 'palette', hash }
+        ? hash === null
+          ? null
+          : { kind: 'palette', hash }
         : page
           ? { ...page, hash }
-          : sk
-            ? { ...sk, hash }
+          : wf
+            ? { ...wf, hash }
             : null
     if (event) emit(event)
   }
@@ -1002,7 +1212,7 @@ export function openProject(rootDir: string): DesignProject {
     })
     const handler = (file: string) =>
       void onChange(path.resolve(file), inputsFile)
-    w.on('add', handler).on('change', handler)
+    w.on('add', handler).on('change', handler).on('unlink', handler)
     watcher = w
     await new Promise<void>((resolve) => w.once('ready', () => resolve()))
   }
@@ -1012,7 +1222,7 @@ export function openProject(rootDir: string): DesignProject {
   return {
     root,
     pages,
-    sketch,
+    wireframes,
     requests,
     palette,
     watching: () => starting ?? Promise.resolve(),

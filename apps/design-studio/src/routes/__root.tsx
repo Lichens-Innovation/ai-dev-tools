@@ -71,14 +71,23 @@ function Studio({
   useEffect(() => {
     const close = connectStudioStream()
     const off = onStudioMessage((message) => {
-      // A page was added, removed or got a proposal: the sidebar and the views read the new list.
-      if (message.type === 'change' && message.event.kind === 'page')
+      // A page, a version or a wireframe was added or removed: the sidebar and the views read the new list.
+      if (
+        message.type === 'change' &&
+        (message.event.kind === 'page' || message.event.kind === 'wireframe')
+      )
         void router.invalidate()
       if (message.type !== 'open') return
+      const { target } = message
       void navigate({
         to: '/pages/$kind/$name',
         params: { kind: message.kind, name: message.name },
-        search: { variant: message.variant },
+        search:
+          target.view === 'wireframe'
+            ? { variant: 'wireframe', wireframe: target.wireframe }
+            : target.view === 'proposal'
+              ? { variant: 'proposal', version: target.version }
+              : { variant: 'reference' },
       })
     })
     return () => {

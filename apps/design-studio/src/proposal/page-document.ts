@@ -1,5 +1,5 @@
 /**
- * A page file as the editor sees it. The body is the DOM the editor edits; the page-local `<style data-studio>` block
+ * A page file split into its parts. The body is the page's DOM; the page-local `<style data-studio>` block
  * holds the rules of the edits (restyling, token swaps), so the design loop reads them as overrides on top of the
  * reference. The rest of the head is left exactly as it is. String work only: no parser, so the file is not reformatted.
  */
@@ -100,7 +100,7 @@ export function formatCss(css: string): string {
 const studioBlock = (css: string) =>
   `<style data-studio>\n${formatCss(css)}\n</style>`
 
-/** The file with the editor's body and rules in it. An empty rule set removes the block. */
+/** The file with the given body and rules in it. An empty rule set removes the block. */
 export function applyEdits(
   html: string,
   edits: { body: string; css: string },

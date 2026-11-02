@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Picked } from '#/inspector/pick'
-import { attachPicker } from '#/inspector/picker'
+import { attachPicker, repick } from '#/inspector/picker'
 import { isEmpty } from '#/palette/draft'
 import type { Mode } from '#/palette/draft'
 import { usePalette } from '#/palette/palette-state'
@@ -15,7 +15,12 @@ export interface PageRef {
   name: string
 }
 
-export const renderPath = ({ kind, name }: PageRef, variant: Variant) => {
+/** The URL of a page file: a reference, or a proposal version (`a`, the default, is the proposal itself). */
+export const renderPath = (
+  { kind, name }: PageRef,
+  variant: Variant,
+  version = 'a',
+) => {
   const dir =
     variant === 'reference'
       ? kind === 'component'
@@ -24,7 +29,8 @@ export const renderPath = ({ kind, name }: PageRef, variant: Variant) => {
       : kind === 'component'
         ? 'proposals'
         : 'proposals/screens'
-  return `/render/${dir}/${name}.html`
+  const suffix = variant === 'proposal' && version !== 'a' ? `.${version}` : ''
+  return `/render/${dir}/${name}${suffix}.html`
 }
 
 /**
@@ -34,13 +40,20 @@ export const renderPath = ({ kind, name }: PageRef, variant: Variant) => {
 export function PageFrame({
   page,
   variant,
+  version = 'a',
   onPick,
+  reselect,
 }: {
   page: PageRef
   variant: Variant
+  version?: string
   /** When given, a click in the page picks that element (the token inspector's input). */
   onPick?: (picked: Picked) => void
+  /** After a reload, pick this element again (the one the user had picked). */
+  reselect?: string | null
 }) {
+  const reselectRef = useRef(reselect)
+  reselectRef.current = reselect
   const shell = useShell()
   const palette = usePalette()
   const frames = useRef(new Map<Mode, HTMLIFrameElement>())
@@ -76,18 +89,20 @@ export function PageFrame({
         if (
           event.pageKind === page.kind &&
           event.name === page.name &&
-          event.variant === variant
+          event.variant === variant &&
+          event.hash !== null &&
+          (variant === 'reference' || event.version === version)
         )
           frames.current.forEach((f) => f.contentWindow?.location.reload())
       }),
-    [page.kind, page.name, variant],
+    [page.kind, page.name, variant, version],
   )
 
   useNavSections(() => {
     const frame = frames.current.get(modes[0])
     const win = frame?.contentWindow as (Window & typeof globalThis) | null
     return win?.document.body ? { document: win.document, window: win } : null
-  }, [page.kind, page.name, variant, loaded, shell.sideBySide])
+  }, [page.kind, page.name, variant, version, loaded, shell.sideBySide])
 
   return (
     <div
@@ -106,13 +121,19 @@ export function PageFrame({
               if (node) frames.current.set(mode, node)
               else frames.current.delete(mode)
             }}
-            title={`${page.name} ${variant} (${mode})`}
-            src={renderPath(page, variant)}
+            title={`${page.name} ${variant}${variant === 'proposal' && version !== 'a' ? ` ${version.toUpperCase()}` : ''} (${mode})`}
+            src={renderPath(page, variant, version)}
             onLoad={(e) => {
               apply(mode)
               setLoaded((n) => n + 1)
               const doc = e.currentTarget.contentDocument
-              if (onPick && doc) attachPicker(doc, onPick)
+              if (!onPick || !doc) return
+              attachPicker(doc, onPick)
+              const selector = reselectRef.current
+              if (selector && mode === modes[0]) {
+                const again = repick(doc, selector)
+                if (again) onPick(again)
+              }
             }}
             className="w-full flex-1 border-0 bg-white"
           />
