@@ -1,6 +1,6 @@
 {
   "name": "claude-tools",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "description": "General-purpose tools and skills for Claude Code",
   "author": {
     "name": "Samuel Daigle",
