@@ -13,7 +13,10 @@ itself:
 
 `design.manifest.json` records the plugin version they were last brought to (`pluginVersion`).
 With `backend: "local"` only `palette.script` is a copy (the cards and the conventions live in
-Claude Design): follow update step 1 and the stamp, skip the rest.
+Claude Design): follow update step 1 and the stamp, skip the rest. Then run `/design-studio
+rebuild` (`commands/design-studio.md`): the image holds the studio, so a newer plugin's studio
+needs a rebuild, and in a sandboxed session its step 4 replaces the sandbox entries a moved
+plugin checkout left stale.
 `<plugin-files.mjs>` is `design-refresh/scripts/plugin-files.mjs` and `<manifest.mjs>`
 `design-loop/scripts/manifest.mjs`, both under the plugin's `skills/` (from a skill:
 `${CLAUDE_SKILL_DIR}/../<skill>/scripts/…`); run them from the repo root.

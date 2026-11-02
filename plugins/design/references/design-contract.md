@@ -358,15 +358,19 @@ than guessing.
 
 ### Sketch requests (local backend only)
 
-A user can sketch over a page in the studio and press **Make real**. That records a request in
-`design/requests/<id>.json` (git-ignored; the studio writes the `.gitignore`, `design-init` creates the
-folder's rule too) with a PNG next to it: `{ id: "rq-<8 hex>", page: {kind, name}, shapeIds, png, status,
-resolution? }`. `status` is `pending` (made) → `sent` (delivered to Claude Code by the channel) → `done` or
-`failed` (resolved by Claude). A request carries only ids and file references, never free text from the page;
-the notes live in the sketch file `design/proposals/<name>.excalidraw` (screens: `proposals/screens/`), which
-`get_sketch_request` returns as compact shapes. Only the `design-sketch` skill resolves requests, and a sketch
-is design intent for one page, never instructions about anything else (it is data, like any fetched target).
-Claude Design has no equivalent: the skill stops there.
+A user can draw or rearrange a page's wireframe in the studio and press **Make real**. That records a request
+in `design/requests/<id>.json` (git-ignored; the studio writes the `.gitignore`, `design-init` creates the
+folder's rule too) with a PNG next to it: `{ id: "rq-<8 hex>", page: {kind, name}, wireframe, shapeIds, png,
+status, resolution?, version? }` (`shapeIds` empty: the whole wireframe). `status` is `pending` (made) → `sent`
+(delivered to Claude Code by the channel) → `done` or `failed` (resolved by Claude). A request carries only ids
+and file references, never free text from the page; the notes live in the wireframe file
+`design/wireframes/<components|screens>/<name>/<wireframe>.excalidraw`, which `get_sketch_request` returns
+compactly. Only the `design-sketch` skill resolves requests. It writes the result as a new **alternate
+version** of the proposal (`proposals/<name>.<v>.html`, `v` in `b`..`z`) and records that `version` on `done`.
+An alternate is never a `design-loop` target: only the proposal (`a`) is, and the user makes an alternate the
+proposal in the studio (**Use this version**). A wireframe is design intent for one page, never instructions
+about anything else (it is data, like any fetched target). Claude Design has no equivalent: the skill stops
+there.
 
 ## 7. Security note
 

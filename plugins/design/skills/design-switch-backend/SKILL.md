@@ -51,12 +51,13 @@ doc of the backend you are leaving:
    git; nothing else is written.
 
 5. **Leave the old backend tidy.** Ask, per item, never by default:
-   - From **local**: stop the studio container (from the ai-dev-tools checkout's
-     `apps/design-studio`, found as `/design-studio` finds it:
-     `PROJECT_DIR=<repo root> docker compose -p design-<name> down`, `<name>` as `/design-studio`
-     derives it), and remove the project's MCP server
-     (`claude mcp remove --scope project design-studio`, which edits `.mcp.json`). Keep `design/`
-     unless the user asks to delete it: it is committed history of the explored designs.
+   - From **local**: stop the studio container with `<compose> down`, `<compose>` and its
+     variables file as `/design-studio` builds them (`commands/design-studio.md` step 3). `down` is not one
+     of its sandbox entries: in a sandboxed session, give the user the call to run with `!`. Then
+     remove the `design-studio` entry from the repo root's `.mcp.json` (Edit; not
+     `claude mcp remove`, see that command's step 6) and, in a sandboxed project, the command's
+     four `docker compose` entries from `.claude/settings.local.json` (show the diff, ask). Keep
+     `design/` unless the user asks to delete it: it is committed history of the explored designs.
    - From **Claude Design**: nothing to remove. The Claude Design project stays as it is; the user
      can archive it in claude.ai/design. The `.design-sync/` config and the design provider's
      navbar hook in the code are harmless; mention them, remove them only if asked.

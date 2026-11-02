@@ -19,7 +19,9 @@ The studio's URL is `http://localhost:<manifest studio.port, default 3009>`;
 `path` (the proposal file), `exists`, `hash` (of that file) and `lastImplementedHash`; the palette's
 `path` is its inputs file. The candidates are every `approved` item plus every `wip` item with
 `exists: true`. Stale means `hash` differs from `lastImplementedHash` (also when it is `null`).
-There is nothing to ask a server: the proposals are files, written by the studio.
+There is nothing to ask a server: the proposals are files, written by the studio. Only the proposal
+(version `a`, `<name>.html`) is a target; the alternates `<name>.<v>.html` next to it are ignored
+until the user makes one the proposal (**Use this version**).
 
 ## Fetch target
 

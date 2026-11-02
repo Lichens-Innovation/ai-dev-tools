@@ -24,8 +24,10 @@ this skill produces must satisfy the preconditions in §6.
    Storybook MCP entries, and the manifest. Also check what a script cannot: a canonical palette
    file exists, and, once the backend is known (step 1a), its own prerequisites: for Claude Design
    the Claude Design MCP is connected, `/design sync` is listed (README "Prerequisites") and
-   whether a project is already bound; for local, Docker answers (`docker info`) and the studio
-   container is running. Report the gap list.
+   whether a project is already bound; for local, Docker is installed and the studio
+   container is running (`/design-studio` steps 3 to 5; in a sandboxed session Docker only answers
+   once that command's step 4 has added its sandbox entries, so a socket error here is not a
+   missing Docker). Report the gap list.
 
 1a. **Backend.** An existing manifest decides: its `backend`, or `claude-design` when it has none
    (contract §2). Do not ask again: moving a set-up project to the other backend is

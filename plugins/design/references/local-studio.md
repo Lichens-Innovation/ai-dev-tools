@@ -9,11 +9,12 @@ that backend. The operations the skills call are in [`backends/local.md`](./back
 | ----------------------------------- | ----------------------------------- | ------------------------------------------------- |
 | `design/components/<name>.html`     | `capture.mjs`, from a story         | Reference: how the component looks in code today  |
 | `design/screens/<name>.html`        | `capture.mjs`, from the running app | Reference: the screen as the app renders it       |
-| `design/proposals/<name>.html`      | the studio (editor, Claude via MCP) | Target: the reference plus the change             |
+| `design/proposals/<name>.html`      | Claude via the studio MCP, token swaps | Target (version a): the reference plus the change |
+| `design/proposals/<name>.<v>.html` (screens: `proposals/screens/`) | Claude (Make real) | Alternate versions `b`..`z`: not targets |
 | `design/proposals/screens/<name>.html` | the studio                       | Target: the screen plus the change                |
 | `design/assets/project.css`, `design/assets/<hash>.<ext>` | `capture.mjs` | The captured stylesheets, images and fonts |
 | `design/index.json`                 | `capture.mjs`                       | The catalog: one row per captured page            |
-| `design/proposals/<name>.excalidraw` (screens: `proposals/screens/`) | the studio (sketch layer) | The sketch drawn over a proposal (Excalidraw JSON) |
+| `design/wireframes/<components\|screens>/<name>/<wireframe>.excalidraw` | the studio (Wireframes view) | A page's wireframes (Excalidraw JSON) |
 | `design/requests/<id>.json`, `<id>.png` | the studio (Make real)          | A request for Claude: git-ignored, ids and a PNG  |
 
 `<name>` is kebab-case (`primary-button`). `design/` is committed. The palette has no file: its card
@@ -37,44 +38,53 @@ from), which is how `capture.mjs` refuses to overwrite an edited one and how sta
 
 ## A proposal
 
-Made in the studio: **Create proposal** copies a reference and opens it in the editor (select,
-move, resize, edit text, restyle, swap a token for another), or Claude writes it through the studio
-MCP (`create_proposal`, `write_page`; `get_selection` returns the element the user has selected
-with its token trace). The change lives in two places, and only these:
+The studio shows a proposal as a realistic, read-only HTML view. **Create proposal** copies a
+reference; then Claude writes it through the studio MCP (`create_proposal`, `write_page`,
+`create_alternate`; `get_selection` returns the view and the element the user picked, with its token
+trace) when the user asks for a change. The user's own edits are theme values: the palette, and a
+**token swap** on the picked element. The change lives in two places, and only these:
 
 - **The `<style data-studio>` block** of the head: the rules of the edits, as `#id` selectors
-  (an edit of one element), `var(--token)` for a token swap.
-- **The body**: elements moved, added, removed or retexted.
+  (an edit of one element; a swap gives an element without a unique id a `ds-<hex>` one),
+  `var(--token)` for a token swap.
+- **The body**: elements moved, added, removed or retexted, always as layout (order, flex, grid,
+  the project's classes), never coordinates.
 
-Moving works like Figma (drag the selected element, copy, paste, duplicate, Alt+arrows, line-up buttons, a Layers
-tab), but a drag never writes coordinates: a drop is an order in the body, a move into another box, `margin-left:
-auto` (or `margin-top: auto` in a column, both sides to centre) on the element, or the container's alignment
-(`display: flex` with `justify-content` or `align-items`) as a `data-studio` rule. Implement them as layout.
+**Versions.** `a` is the proposal (`<name>.html`), the only one `design-loop` implements. Make real
+writes alternates `b`..`z` (`<name>.<v>.html`) next to it. In the studio, **Use this version** on
+an alternate swaps it with `a` (the old proposal takes its letter), and **Discard** deletes it.
+`get_page`, `write_page` and `open_page` take a `version`.
 
-**`data-component="<name>"`.** The Add tab lists the captured component references and inserts their real markup
-(the project's classes) with this attribute on the root, `<name>` being the component's name in the manifest
-(`design/index.json`). An element carrying it is an **instance of that manifest component**: `design-loop` implements
-it by using the component (its props or variant for what the element shows), never new markup copied from the
-proposal. Copies of the element keep the attribute. Several roots are wrapped in a `display: contents` box that
-carries it. Rules on that element (`#id`) are overrides of the instance, read like any other `data-studio` rule.
+**`data-component="<name>"`.** On the root of an element that is a use of a captured component,
+`<name>` being the component's name in the manifest (`design/index.json`). Claude adds it when it
+builds a page from the project's components. An element carrying it is an **instance of that
+manifest component**: `design-loop` implements it by using the component (its props or variant for
+what the element shows), never new markup copied from the proposal. Several roots are wrapped in a
+`display: contents` box that carries it. Rules on that element (`#id`) are overrides of the
+instance, read like any other `data-studio` rule.
 
 `design-loop` implements exactly that difference: the data-studio rules, then the body diff against
 the reference. Everything else in the proposal is the reference.
 
-## Sketch and Make real
+## Wireframes and Make real
 
-A transparent Excalidraw layer sits over the editor. The toolbar's **Select** works on the page; **Rectangle**,
-**Pen**, **Text**, **Arrow** and **Eraser** (and **Sketch**, to move shapes) give the mouse and keyboard to the
-sketch. A toggle hides the layer. Zoom and scroll are locked to the page, and side by side shows the sketch over
-the light editor only. Shapes, arrow ends and text remember the page element they cover (a selector preferring
-ids, plus an offset) and follow it when the layout moves. The sketch autosaves to `<proposal>.excalidraw` (atomic
-write, `Conflict` when it changed on disk). A **blank page** (sidebar, **New blank page**) is an empty proposal
-named by the user with no reference, to sketch a new component or screen from nothing.
+Trying things by hand happens in a page's **Wireframes** view, in Excalidraw. A page has several
+wireframes (`design/wireframes/<components|screens>/<name>/<wireframe>.excalidraw`, plain Excalidraw
+JSON plus a `studio` key). **New wireframe** generates one from a version of the page (the proposal,
+an alternate or the reference) laid out at its width: boxes, text, fields, buttons, images as
+cross-hatched boxes, icons as small ellipses. Each generated shape remembers the page element it
+stands for (a selector preferring ids) and where it was. A wireframe can also start blank, and
+**New blank page** (sidebar) creates a page with no reference and an empty wireframe `main`. The
+user moves, resizes, retexts and deletes shapes, draws new ones and writes notes; it autosaves
+(atomic write, `Conflict` when it changed on disk).
 
-Select shapes and press **Make real**: the studio records a request (see the contract, §2) with a PNG of the
-selection over the page, and shows its status as a badge on the shapes. Claude reads it with the MCP tools
-`list_sketch_requests`, `get_sketch_request` (compact shapes and the PNG) and `resolve_sketch_request`
-(`done` removes the shapes and reloads the page, `failed` keeps them). The **`design-sketch`** skill does that.
+**Make real** (the selection, or the whole wireframe with nothing selected) records a request (see
+the contract, §2) with a PNG. Claude reads it with the MCP tools `list_sketch_requests`,
+`get_sketch_request` (the compact wireframe, as `get_wireframe` gives it: each shape's source
+element, its origin, what changed, its parent, and `removed`, the deleted elements; and the PNG),
+writes the result with `create_alternate`, and closes it with `resolve_sketch_request` (`done` with
+the `version` written, or `failed`). The studio's request list then offers **Open version X**. The
+**`design-sketch`** skill does that.
 
 **The channel.** The design plugin ships a Claude Code channel (`channel/design-channel.mjs`, declared in the
 plugin's `.mcp.json` as the `design` server). It reads `design.manifest.json` from the cwd, stays idle unless
@@ -91,6 +101,9 @@ Without that flag nothing is pushed: the request stays `pending`, and **Copy com
 answers through the studio MCP.
 
 ## Reading a proposal (design-loop step 3)
+
+Only version `a` (`<name>.html`). An alternate (`<name>.<v>.html`) is not a target until the user
+presses **Use this version**.
 
 - List each `data-studio` rule: its `#id` selector, which element of the reference it is (find the
   id in the body; its classes and place name the variant or state), and its values. A value written
