@@ -341,6 +341,9 @@ PROXY='Received disconnect from UNKNOWN port 65535:1: This proxy requires authen
 hint_check hint 'git push -u origin HEAD' "$PROXY" '--body-file'
 hint_check hint 'git push -u origin HEAD && gh pr create --fill' 'fatal: Could not read from remote repository.' 'ask the user to run it with !'
 hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.github.com' 'sandbox'
+hint_check hint 'git -C /tmp/wt push -u origin feat/x' 'fatal: Could not read from remote repository.' 'worktrees share branches'
+hint_check hint 'git -C /tmp/wt push -u origin feat/x' "deny network-outbound github-x:22 (not in this command's allowed_domains)" 'git push -u origin <branch>'
+hint_check hint 'git -c http.proxy= fetch origin' "$PROXY" "doesn't match the excluded git push"
 hint_check hint 'open /tmp/x.html' 'LSOpenURLsWithRole() failed with error -10822' 'run with !'
 hint_check hint 'touch /etc/x' 'touch: /etc/x: Operation not permitted' 'sandbox restriction'
 hint_check hint 'git push' "$PROXY" 'setup-claude-guardrails'

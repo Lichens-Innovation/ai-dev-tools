@@ -324,6 +324,16 @@ const globBase = (pattern) => {
 
 const FAILURE_HINTS = [
   {
+    // Excluded commands match the start of the call, so git's global options keep it in the sandbox.
+    program: /^\s*(?:\w+=\S*\s+)*git\s+(?:(?:-C|-c|--git-dir|--work-tree)(?:\s+|=)\S+\s+)+(?:push|pull|fetch)\b/,
+    error: /proxy requires authentication|Could not read from remote repository|Could not resolve host|allowed_domains/i,
+    hint:
+      "git -C <dir> push (or -c, --git-dir, --work-tree before the subcommand) doesn't match the excluded git push, so " +
+      "it ran inside the sandbox. Drop the option and run git push from the project's directory, without cd. A " +
+      "worktree's branch can be pushed from the main checkout by name, since worktrees share branches: " +
+      "git push -u origin <branch>.",
+  },
+  {
     program: /^\s*(?:\w+=\S*\s+)*(?:git\s+(?:push|pull|fetch)|gh|glab)\b/,
     error: /proxy requires authentication|Could not read from remote repository|Could not resolve host/i,
     hint:
