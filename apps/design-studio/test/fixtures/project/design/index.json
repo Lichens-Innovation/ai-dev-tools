@@ -1,0 +1,6 @@
+{
+  "pages": [
+    { "kind": "component", "name": "Button", "reference": "components/button.html", "proposal": "proposals/button.html", "storyId": "ui-button--default", "states": ["Default"] },
+    { "kind": "screen", "name": "Home", "reference": "screens/home.html", "proposal": "proposals/screens/home.html", "route": "/", "states": ["Default"] }
+  ]
+}

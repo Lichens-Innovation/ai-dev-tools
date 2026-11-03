@@ -1,0 +1,44 @@
+{
+  "001-design-studio-core-project-store-mcp-endpoint-docker-live-page-view.md": {
+    "status": "done",
+    "blockedBy": []
+  },
+  "002-design-studio-shell-palette-page-and-palette-footer-with-save.md": {
+    "status": "done",
+    "blockedBy": [
+      "001-design-studio-core-project-store-mcp-endpoint-docker-live-page-view.md"
+    ]
+  },
+  "003-design-studio-grapesjs-editor-and-token-inspector.md": {
+    "status": "done",
+    "blockedBy": [
+      "001-design-studio-core-project-store-mcp-endpoint-docker-live-page-view.md"
+    ]
+  },
+  "004-design-plugin-backend-local-using-the-design-studio.md": {
+    "status": "done",
+    "blockedBy": [
+      "001-design-studio-core-project-store-mcp-endpoint-docker-live-page-view.md"
+    ]
+  },
+  "005-design-plugin-anonymise-dev-data-in-local-backend-screen-captures.md": {
+    "status": "done",
+    "blockedBy": []
+  },
+  "006-design-studio-footer-tabs-with-an-inspect-tab-for-the-selected-element-s-tokens.md": {
+    "status": "done",
+    "blockedBy": []
+  },
+  "007-design-studio-figma-like-moving-copying-and-adding-of-components-in-a-proposal.md": {
+    "status": "done",
+    "blockedBy": [
+      "006-design-studio-footer-tabs-with-an-inspect-tab-for-the-selected-element-s-tokens.md"
+    ]
+  },
+  "008-design-studio-sketch-layer-and-make-real-through-a-claude-code-channel.md": {
+    "status": "done",
+    "blockedBy": [
+      "007-design-studio-figma-like-moving-copying-and-adding-of-components-in-a-proposal.md"
+    ]
+  }
+}

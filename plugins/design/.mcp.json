@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "design": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/channel/design-channel.mjs"]
+    }
+  }
+}

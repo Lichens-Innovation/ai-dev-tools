@@ -1,0 +1,64 @@
+/* design-palette inputs (canonical). -lm light mode, -dm dark mode.
+   Edit these values, then regenerate with the package's `palette` script (e.g. npm run palette), which runs
+   scripts/palette.ts <this file> --theme generated/theme.css [--scheme …] [--mobile …] [--json …] [--namespace …] */
+:root {
+  /* Brand: primary + secondary required, tertiary–quinary optional */
+  --primary-lm: #401f3e;
+  --primary-dm: #8a5585;
+  --secondary-lm: #3f2e56;
+  --secondary-dm: #705e9b;
+
+  /* Base: font-inverted and border are optional */
+  --font-lm: #1f1a24;
+  --font-dm: #eee8f0;
+  --font-inverted-lm: #fbfaf8;
+  --font-inverted-dm: #17131a;
+  --background-lm: #fbfaf8;
+  --background-dm: #17131a;
+  --border-lm: #dcdad9;
+  --border-dm: #37323a;
+
+  /* Status */
+  --info-lm: #2f6fde;
+  --info-dm: #5b93f0;
+  --danger-lm: #d33a3a;
+  --danger-dm: #ef6461;
+  --success-lm: #237a4b;
+  --success-dm: #4cb47a;
+  --warning-lm: #d99a17;
+  --warning-dm: #e8b53c;
+}
+
+/* Hand-authored tokens: spacing, type, radius, breakpoints… Same in both modes, copied as is into the theme (and
+   the Sass names with --sass). Tailwind v4 names, so the vocabulary is the same with or without Tailwind.
+   Tailwind projects: delete this block, Tailwind's own theme holds the scale. */
+:root {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 2rem;
+
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+
+  /* Literal values only: the Sass file turns them into media queries (@include mq(sm)) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+}
+
+/* Token overrides (optional): re-point a semantic token of the theme to another token, the same in both modes.
+   Only the tokens that reference another one (--link, --text-muted, --primary-text, --text-on-primary…);
+   the value is var(--<token>). Delete a line to go back to the generated reference. */
+:root {
+  /* --link: var(--info-text); */
+}
