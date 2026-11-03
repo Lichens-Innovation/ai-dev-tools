@@ -347,6 +347,19 @@ const FAILURE_HINTS = [
       "widen the sandbox: ask the user to run the install with !.",
   },
   {
+    // A package.json "packageManager" pin that differs from the installed version makes the package manager
+    // download the pinned one, even for `pnpm --version`. The sandbox blocks the registry unless allowed.
+    program: /^\s*(?:\w+=\S*\s+)*(?:pnpm|npm|npx|yarn|bun|corepack)\b/,
+    error: /GET https?:\/\/registry\.npmjs\.org\/\S*:? fetch failed|network-outbound\s+registry\.npmjs\.org/i,
+    hint:
+      "The package manager tried to download the version pinned in package.json (packageManager or " +
+      "devEngines.packageManager) and the sandbox blocks registry.npmjs.org. Don't retry (pnpm's " +
+      "manage-package-manager-versions=false doesn't avoid it). Tell the user the two fixes: add " +
+      "sandbox.network.allowedDomains: [\"registry.npmjs.org\"] to settings (any sandboxed command can then reach the " +
+      "registry), or install the pinned version themselves (e.g. corepack enable, or npm i -g pnpm@<pinned>). " +
+      "It's their call.",
+  },
+  {
     error: /apply-seccomp|nested userns/i,
     hint:
       "Bubblewrap can't apply its seccomp filter on this kernel, so every sandboxed command fails. Stop and tell the " +
