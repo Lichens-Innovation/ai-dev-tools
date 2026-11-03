@@ -10,11 +10,13 @@
  *
  * Usage:
  *   node screenshot.mjs <url-or-html-file> <out.png> [--selector "#storybook-root"] [--viewport 1440x900]
- *     [--color-scheme light|dark] [--storage-state <auth.json>]
+ *     [--color-scheme light|dark] [--theme light|dark] [--storage-state <auth.json>]
  *   node screenshot.mjs --save-auth <url> <auth.json>
  *
  * --viewport sets the page size (default 1280x720): screens render at their manifest viewport.
  * --color-scheme emulates the OS mode, for apps that follow prefers-color-scheme.
+ * --theme also sets data-theme and color-scheme on <html>, as the design studio does: a local studio
+ *   page (/render/...) has one panel, so it is shot once per mode.
  * --storage-state loads a saved login (cookies + localStorage), for apps behind a sign-in.
  * --save-auth opens a visible browser on <url>: sign in, then click the "Save login" button it adds
  *   (bottom right). The login is saved to <auth.json> then, once; nothing touches the page before. The file holds session tokens: keep it git-ignored, never upload it.
@@ -106,6 +108,11 @@ if (colorScheme !== null && colorScheme !== 'light' && colorScheme !== 'dark') {
   console.error('--color-scheme takes light or dark');
   process.exit(1);
 }
+const theme = flag('--theme');
+if (theme !== null && theme !== 'light' && theme !== 'dark') {
+  console.error('--theme takes light or dark');
+  process.exit(1);
+}
 const storageState = flag('--storage-state');
 if (storageState !== null && !existsSync(storageState)) {
   console.error(`Storage state not found: ${storageState}. Record it with --save-auth.`);
@@ -114,7 +121,7 @@ if (storageState !== null && !existsSync(storageState)) {
 
 if (!source || !outPath) {
   console.error(
-    'Usage: node screenshot.mjs <url-or-html-file> <out.png> [--selector "#sel"] [--viewport WxH] [--color-scheme light|dark] [--storage-state <file>]'
+    'Usage: node screenshot.mjs <url-or-html-file> <out.png> [--selector "#sel"] [--viewport WxH] [--color-scheme light|dark] [--theme light|dark] [--storage-state <file>]'
   );
   process.exit(1);
 }
@@ -131,11 +138,18 @@ try {
   const context = await browser.newContext({
     deviceScaleFactor: 2,
     ...(vp && { viewport: { width: Number(vp[1]), height: Number(vp[2]) } }),
-    ...(colorScheme && { colorScheme }),
+    ...((colorScheme ?? theme) && { colorScheme: colorScheme ?? theme }),
     ...(storageState && { storageState })
   });
   const page = await context.newPage();
   await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  if (theme) {
+    // Evaluated by Playwright, so it works on /render pages, whose policy blocks the page's own scripts.
+    await page.evaluate(mode => {
+      document.documentElement.dataset.theme = mode;
+      document.documentElement.style.colorScheme = mode;
+    }, theme);
+  }
   // Prefer an explicit selector, else the Storybook story root, else the body.
   const target =
     (selector && (await page.$(selector))) ||
