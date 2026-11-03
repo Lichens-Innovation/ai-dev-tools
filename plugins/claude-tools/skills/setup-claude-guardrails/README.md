@@ -71,3 +71,5 @@ Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mist
 ## Known limits
 
 Without the sandbox, the Bash checks are a heuristic on command text: `$(...)`, variables, `eval`, scripts and recursive greps get past them. Hooks don't apply to MCP tools. Directories added with `/add-dir` for one session only are invisible to the hook. See `SKILL.md` → Limitations.
+
+An excluded command runs outside the sandbox, and the hook sees only its command text, not the files it reads. Keep each entry exact: `docker compose -f <file> *` would also allow `run -v /:/host`. Even an exact entry can be steered by such a file. The design plugin's `/design-studio` passes `--env-file <vars file>`, and a `PROJECT_DIR` in that file decides what the container mounts. That command reads the file back and shows it before the call, and each call still prompts. An env-file-style name (`*.env`) for such a file is refused by the env block: give it another name (`.compose-vars`).
