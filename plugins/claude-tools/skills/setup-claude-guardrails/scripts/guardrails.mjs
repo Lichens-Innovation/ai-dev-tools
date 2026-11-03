@@ -6,7 +6,8 @@
 //
 // Runs three checks on every matched tool call:
 //   scope — deny paths outside the project + permissions.additionalDirectories (+ temp dirs and
-//           Claude Code's own ~/.claude)
+//           Claude Code's own ~/.claude); with the sandbox on, also allow reads in
+//           sandbox.filesystem.allowRead, and Bash writes in allowWrite, minus denyRead/denyWrite
 //   env   — deny .env files, except .env*.example / .sample / .template / .dist, and Claude Code's
 //           ~/.claude/.credentials.json and ~/.claude.json
 //   self  — ask before anything writes this hook, a checkout's .claude/settings*.json (project or
@@ -84,6 +85,30 @@ const systemPrograms = (command) =>
     })
   );
 
+// Programs that only read their arguments, for paths in sandbox.filesystem.allowRead. The sandbox
+// still blocks writes there; this only decides whether the hook lets the call reach it.
+const READ_ONLY_PROGRAMS = new Set(
+  ("ls du df stat file tree cat head tail wc less more nl grep egrep fgrep rg diff cmp readlink realpath basename " +
+    "dirname md5sum sha1sum sha256sum shasum jq strings xxd od find sed node").split(" ")
+);
+// The words of a simple command (from lexCommand) that it only reads: a read-only program's arguments
+// (not `find -delete|-exec`, not `sed -i`) or the sources of a `cp`, never a redirection target.
+const readWords = (words) => {
+  const at = words.findIndex((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value));
+  if (at < 0) return [];
+  const program = words[at].value;
+  const args = words.slice(at + 1).filter((w) => !w.redirect);
+  const values = args.map((w) => w.value);
+  if (program === "cp") {
+    if (values.some((v) => /^(?:-[a-zA-Z]*t|--target-directory)/.test(v))) return [];
+    return args.filter((w) => !w.value.startsWith("-")).slice(0, -1);
+  }
+  if (!READ_ONLY_PROGRAMS.has(program)) return [];
+  if (program === "find" && values.some((v) => /^-(?:delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/.test(v))) return [];
+  if (program === "sed" && values.some((v) => /^-[a-zA-Z]*i|^--in-place/.test(v))) return [];
+  return args;
+};
+
 // --- Message text ------------------------------------------------------------------------------
 // A commit message or PR body is only stored, so a `/plugin` or `.env` in it is not a path. It is
 // blanked out before the checks when it can't expand (no `$` or backtick) and is either the value
@@ -97,8 +122,8 @@ const MESSAGE_FLAGS = {
 };
 const GIT_MESSAGE_COMMANDS = new Set(["commit", "tag", "merge", "stash", "notes"]);
 
-// Words of a command with their spans, grouped into simple commands, plus heredoc bodies.
-// Returns null for anything it doesn't follow.
+// Words of a command with their spans, grouped into simple commands, plus heredoc bodies. A word
+// after `>` (a redirection target) has `redirect: true`. Returns null for anything it doesn't follow.
 const lexCommand = (command) => {
   const len = command.length;
   const segments = [];
@@ -106,7 +131,14 @@ const lexCommand = (command) => {
   let pending = [];
   let segment = { words: [], piped: false };
   let word = null;
-  const startWord = (i) => (word ??= { start: i, value: "", literal: true });
+  let redirect = false;
+  const startWord = (i) => {
+    if (!word) {
+      word = { start: i, value: "", literal: true, redirect };
+      redirect = false;
+    }
+    return word;
+  };
   const endWord = (i) => {
     if (word) segment.words.push({ ...word, end: i });
     word = null;
@@ -115,6 +147,7 @@ const lexCommand = (command) => {
     segment.piped = piped;
     segments.push(segment);
     segment = { words: [], piped: false };
+    redirect = false;
   };
 
   let i = 0;
@@ -183,6 +216,7 @@ const lexCommand = (command) => {
       i += m[0].length;
     } else if (c === ">" || c === "<") {
       endWord(i);
+      redirect = c === ">" || command[i + 1] === ">";
       i++;
       while (i < len && /[>&|]/.test(command[i])) i++;
     } else if (c === "|") {
@@ -290,6 +324,16 @@ const globBase = (pattern) => {
 
 const FAILURE_HINTS = [
   {
+    // Excluded commands match the start of the call, so git's global options keep it in the sandbox.
+    program: /^\s*(?:\w+=\S*\s+)*git\s+(?:(?:-C|-c|--git-dir|--work-tree)(?:\s+|=)\S+\s+)+(?:push|pull|fetch)\b/,
+    error: /proxy requires authentication|Could not read from remote repository|Could not resolve host|allowed_domains/i,
+    hint:
+      "git -C <dir> push (or -c, --git-dir, --work-tree before the subcommand) doesn't match the excluded git push, so " +
+      "it ran inside the sandbox. Drop the option and run git push from the project's directory, without cd. A " +
+      "worktree's branch can be pushed from the main checkout by name, since worktrees share branches: " +
+      "git push -u origin <branch>.",
+  },
+  {
     program: /^\s*(?:\w+=\S*\s+)*(?:git\s+(?:push|pull|fetch)|gh|glab)\b/,
     error: /proxy requires authentication|Could not read from remote repository|Could not resolve host/i,
     hint:
@@ -313,11 +357,45 @@ const FAILURE_HINTS = [
       "widen the sandbox: ask the user to run the install with !.",
   },
   {
+    // A package.json "packageManager" pin that differs from the installed version makes the package manager
+    // download the pinned one, even for `pnpm --version`. The sandbox blocks the registry unless allowed.
+    program: /^\s*(?:\w+=\S*\s+)*(?:pnpm|npm|npx|yarn|bun|corepack)\b/,
+    error: /GET https?:\/\/registry\.npmjs\.org\/\S*:? fetch failed|network-outbound\s+registry\.npmjs\.org/i,
+    hint:
+      "The package manager tried to download the version pinned in package.json (packageManager or " +
+      "devEngines.packageManager) and the sandbox blocks registry.npmjs.org. Don't retry (pnpm's " +
+      "manage-package-manager-versions=false doesn't avoid it). Tell the user the two fixes: add " +
+      "sandbox.network.allowedDomains: [\"registry.npmjs.org\"] to settings (any sandboxed command can then reach the " +
+      "registry), or install the pinned version themselves (e.g. corepack enable, or npm i -g pnpm@<pinned>). " +
+      "It's their call.",
+  },
+  {
     error: /apply-seccomp|nested userns/i,
     hint:
       "Bubblewrap can't apply its seccomp filter on this kernel, so every sandboxed command fails. Stop and tell the " +
       "user: setting sandbox.network.allowAllUnixSockets to true skips that filter, at the cost of letting sandboxed " +
       "commands connect to any Unix socket (Docker, SSH agent). It's their call.",
+  },
+  {
+    // Electron/Chromium's own sandbox can't start inside bubblewrap: the namespace sandbox is refused by the
+    // sandbox's seccomp filter and the setuid helper isn't root-owned. On macOS the Seatbelt profile refuses its
+    // Mach bootstrap check-in (measured: `mach_port_rendezvous_mac.cc: bootstrap_check_in ...: Permission denied (1100)`).
+    error: /setuid_sandbox_host|SUID sandbox helper|No usable sandbox|chrome-sandbox|MachPortRendezvous|bootstrap_check_in/i,
+    hint:
+      "Electron can't start inside the Bash sandbox (Linux: Chromium's own sandbox; macOS: the Mach port check-in is " +
+      "refused). Never retry with --no-sandbox. Tell the user: run the app with !, or opt in to the GUI app testing " +
+      "grant of setup-claude-guardrails, which puts the exact launch command in sandbox.excludedCommands (that " +
+      "command then runs with no sandbox at all).",
+  },
+  {
+    // After an excluded GUI launch, a sandboxed probe (node, curl) of the app's debugging port is refused until
+    // local port binding is allowed (measured on macOS: refused instantly).
+    error: /(?:ECONNREFUSED|Connection refused|Failed to connect|couldn't connect)[^\n]*(?:127\.0\.0\.1|localhost|::1)/i,
+    hint:
+      "A connection to a local port was refused. If the target is the dev server, check it is running. If it is a GUI " +
+      "app launched outside the sandbox (excludedCommands), the sandboxed probe can't reach localhost until " +
+      "sandbox.network.allowLocalBinding is true, which lets any sandboxed command reach local ports. Tell the user; " +
+      "it's their call.",
   },
   {
     error: /command not found: (?:node|pnpm|npm|npx|yarn|bun|corepack)\b|\b(?:node|pnpm|npm|npx|yarn|bun|corepack): command not found/i,
@@ -340,6 +418,16 @@ const FAILURE_HINTS = [
       "Claude Code keeps sandboxed commands from writing .claude/hooks, .claude/skills and settings files. Use the Write " +
       "tool (it asks the user) or ask the user to run the command with !. Don't suggest making these paths writable: a " +
       "sandboxed command could then rewrite the guardrails.",
+  },
+  {
+    // Claude Code saves large tool outputs (test logs, ...) under ~/.claude/projects/<project>/<session>/tool-results.
+    // The file tools can read them, but the sandbox keeps Bash out of ~/.claude/projects (transcripts of every project).
+    program: /\.claude\/projects\b/,
+    error: /Operation not permitted|Permission denied|No such file or directory/i,
+    hint:
+      "Bash can't read ~/.claude/projects (saved tool outputs, plus the transcripts of every project): the sandbox blocks " +
+      "it on purpose. Don't retry with another Bash command. Use the Grep tool to find lines in the file and the Read " +
+      "tool with offset/limit to page through it.",
   },
   {
     error: /Operation not permitted|Read-only file system/i,
@@ -382,6 +470,8 @@ const main = () => {
   // What the checks read: the command without its commit or PR message text.
   const scanned = command === null ? null : blankMessages(command);
   const tokens = scanned === null ? [] : bashTokens(scanned);
+  const lexedCommand = scanned === null ? null : lexCommand(scanned);
+  const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 
   // --- scope -----------------------------------------------------------------------------------
 
@@ -405,7 +495,48 @@ const main = () => {
     claudeDir,
   ];
 
-  const inScope = (p) => roots.some((root) => p === root || p.startsWith(root + path.sep));
+  const within = (p, root) => p === root || p.startsWith(root + path.sep);
+  const inScope = (p) => roots.some((root) => within(p, root));
+
+  // The sandbox's own grants: sandbox.filesystem.allowRead adds read-only roots, allowWrite ones Bash may
+  // also write. Only with the sandbox on (local settings over project over user): without it nothing
+  // enforces them, and a Bash write the hook mistook for a read would go through.
+  const sandboxes = settingsFiles.map((f) => readJson(f).sandbox ?? {});
+  const sandboxOn = [1, 0, 2].map((k) => sandboxes[k].enabled).find((v) => typeof v === "boolean") === true;
+  // Like the sandbox: `/` and `//` are absolute, `~` is home, anything else is relative to the project
+  // (project settings) or the config dir (user settings).
+  const sandboxEntries = (key) =>
+    !sandboxOn
+      ? []
+      : sandboxes.flatMap((s, k) =>
+          (s.filesystem?.[key] ?? [])
+            .filter((e) => typeof e === "string" && e)
+            .map((e) => ({ entry: e, resolved: resolvePath(e.replace(/^\/\//, "/"), k < 2 ? projectDir : claudeDir) }))
+        );
+  const grants = (key) => sandboxEntries(key).filter(({ entry }) => !GLOB_CHARS.test(entry)).map((e) => e.resolved);
+  // A denyRead (denyWrite) entry wins over the grants it sits inside, and over all of them when it is
+  // a pattern: a name without a slash (`.env`, `*.pem`) matches any path segment.
+  const denials = (key) =>
+    sandboxEntries(key).map(({ entry, resolved }) => {
+      if (!entry.includes("/")) {
+        const re = globToRegex(entry);
+        return { root: null, test: (p) => p.split(path.sep).some((s) => re.test(s)) };
+      }
+      if (!GLOB_CHARS.test(entry)) return { root: resolved, test: (p) => within(p, resolved) };
+      const re = globToRegex(resolved);
+      return { root: null, test: (p) => p.split(path.sep).some((_, k, parts) => re.test(parts.slice(0, k + 1).join(path.sep))) };
+    });
+  const writeRoots = grants("allowWrite");
+  const readRoots = [...grants("allowRead"), ...writeRoots];
+  const deniedReads = denials("denyRead");
+  const deniedWrites = denials("denyWrite");
+  // The deepest grant holding p decides, unless a deny entry inside that grant matches p.
+  const granted = (p, grantRoots, denied) => {
+    const root = grantRoots.filter((r) => within(p, r)).sort((a, b) => b.length - a.length)[0];
+    return root !== undefined && !denied.some((d) => d.test(p) && (d.root === null || within(d.root, root)));
+  };
+  const readable = (p) => granted(p, readRoots, deniedReads);
+  const writable = (p) => readable(p) && granted(p, writeRoots, deniedWrites);
   const SAFE_DEVICES = new Set(["/dev/null", "/dev/stdout", "/dev/stderr", "/dev/stdin", "/dev/tty"]);
   // `/api/users` in a grep pattern names nothing on disk: a path whose top-level directory doesn't
   // exist can't be read, and can't be created unless the filesystem root is writable.
@@ -422,14 +553,28 @@ const main = () => {
     const top = p.slice(root.length).split(path.sep)[0];
     return !rootWritable && top !== "" && !fs.existsSync(root + top);
   };
-  const outside = (candidates) => candidates.map((p) => resolvePath(p)).find((p) => !SAFE_DEVICES.has(p) && !inScope(p));
-  const denyScope = (what) =>
+  // The first candidate (resolved) that is neither in scope nor granted(resolved, candidate).
+  const outside = (candidates, granted) =>
+    candidates.map((c) => [c, resolvePath(c)]).find(([c, p]) => !SAFE_DEVICES.has(p) && !inScope(p) && !granted(p, c))?.[1];
+  const denyScope = (what, p) =>
     respond(
       "deny",
       "scope",
-      `${what} is outside the allowed scope (${roots.join(", ")}). Stay inside the project, or ask the user ` +
-        `to add the directory to permissions.additionalDirectories in ${settingsFiles[1]} (this project) or ` +
-        `${settingsFiles[2]} (all projects). Directories added with /add-dir for this session only are not visible to this hook.`
+      p !== undefined && WRITE_TOOLS.has(tool) && writable(p)
+        ? `${what} is in sandbox.filesystem.allowWrite, which this hook grants to sandboxed Bash commands only, where ` +
+            `the OS enforces it. The Write and Edit tools stay inside the project and permissions.additionalDirectories.`
+        : p !== undefined && readable(p)
+        ? `${what} is in sandbox.filesystem.allowRead, which this hook grants to reads only: the Read, Grep and Glob ` +
+            `tools, and Bash commands that only read it (ls, du, cat, stat, head, grep, find without -delete/-exec, ` +
+            `node <script>, cp from it), not as a redirection target or after a cd. Writing there with a sandboxed ` +
+            `Bash command needs sandbox.filesystem.allowWrite: ask the user.`
+        :`${what} is outside the allowed scope (${roots.join(", ")}` +
+            `${readRoots.length ? `; sandbox allowRead/allowWrite: ${readRoots.join(", ")}` : ""}). Stay inside the ` +
+            `project, or ask the user to add the directory, in ${settingsFiles[1]} (this project) or ` +
+            `${settingsFiles[2]} (all projects), to either sandbox.filesystem.allowRead (the narrower grant: read-only, ` +
+            `honoured by this hook only with the sandbox on; allowWrite to also write) or ` +
+            `permissions.additionalDirectories (the broader one: a working directory for every tool, reads and writes). ` +
+            `Directories added with /add-dir for this session only are not visible to this hook.`
     );
 
   let offender;
@@ -443,20 +588,34 @@ const main = () => {
     if (/(?:^|[;&|(\n])\s*(?:cd|pushd)\s*(?=$|[;&|)\n])/.test(scanned)) denyScope(`\`cd\` with no argument (${os.homedir()})`);
 
     const programs = systemPrograms(scanned);
+    const homeVar = (t) => t.replace(/^\$\{?HOME\}?/, "~");
     const pathLike = tokens.filter(
       (t) =>
         !programs.has(t) &&
         (/^(\/|~|\$\{?HOME\}?)/.test(t) || t === ".." || t.startsWith("../") || t.includes("/../") || t.endsWith("/.."))
     );
-    offender = outside(pathLike.map((t) => t.replace(/^\$\{?HOME\}?/, "~")).filter((t) => !phantom(resolvePath(t))));
+    // Words the call only reads; one also used any other way doesn't count. Nothing when the lexer gives up.
+    const reads = new Set();
+    const others = new Set();
+    for (const { words } of lexedCommand?.segments ?? []) {
+      const read = new Set(readWords(words));
+      for (const w of words) {
+        for (const v of [w.value, w.value.slice(w.value.indexOf("=") + 1)]) (read.has(w) ? reads : others).add(homeVar(v));
+      }
+    }
+    offender = outside(
+      pathLike.map(homeVar).filter((t) => !phantom(resolvePath(t))),
+      (p, t) => writable(p) || (readable(p) && reads.has(t) && !others.has(t))
+    );
   } else {
     const candidates = [...filePaths];
     if (tool === "Glob" && typeof args.pattern === "string") {
       candidates.push(path.resolve(resolvePath(args.path || cwd), expandHome(globBase(args.pattern)) || "."));
     }
-    offender = outside(candidates);
+    // allowWrite is for sandboxed Bash, where the OS enforces it: the file tools only get the read grant.
+    offender = outside(candidates, (p) => !WRITE_TOOLS.has(tool) && readable(p));
   }
-  if (offender) denyScope(offender);
+  if (offender) denyScope(offender, offender);
 
   // --- env -------------------------------------------------------------------------------------
 
@@ -519,7 +678,6 @@ const main = () => {
   const isProtected = (p) =>
     p === path.join(claudeDir, "settings.json") ||
     /[\\/]\.claude[\\/](?:settings(?:\.local)?\.json|hooks[\\/]guardrails\.mjs)$/.test(p);
-  const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
   const protectedHit =
     command !== null
       ? tokens.filter((t) => /settings|guardrails/.test(t)).map((t) => resolvePath(t)).find(isProtected)
@@ -544,7 +702,6 @@ const main = () => {
     "cat head tail sed awk gawk grep egrep fgrep rg less more wc nl cut sort uniq diff cmp jq yq tac strings xxd od".split(" ")
   );
   const blocksReads = settingsFiles.some((f) => readJson(f).permissions?.blockReadsOutsideWorkingDirectories === true);
-  const lexedCommand = command === null ? null : lexCommand(scanned);
   if (blocksReads && lexedCommand) {
     const simple = lexedCommand.segments.map(({ words }) => {
       const at = words.findIndex((w) => !/^\w+=/.test(w.value) && !WRAPPERS.has(w.value));
@@ -585,7 +742,6 @@ const main = () => {
   // `gh`, `git push` and `open` run outside the sandbox only when every command in the call is one of
   // sandbox.excludedCommands, joined by `&&`. Anything else keeps the whole call inside, where they
   // fail on credentials or the network. Say so before the call runs instead of after it fails.
-  const sandboxes = settingsFiles.map((f) => readJson(f).sandbox ?? {});
   const excluded = sandboxes
     .flatMap((s) => (s.excludedCommands ?? []).filter((e) => typeof e === "string"))
     .map((e) => e.replace(/\s*\*$/, "").split(/\s+/).filter(Boolean))

@@ -214,7 +214,9 @@ trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX"' EXIT
 mkdir -p "$SBX/.claude"
 cat > "$SBX/.claude/settings.local.json" <<'JSON'
 { "sandbox": { "enabled": true, "allowUnsandboxedCommands": false,
-  "excludedCommands": ["gh *", "glab *", "git push", "git push *", "git pull", "git pull *", "git fetch", "git fetch *", "open", "open *"] } }
+  "excludedCommands": ["gh *", "glab *", "git push", "git push *", "git pull", "git pull *", "git fetch", "git fetch *", "open", "open *",
+    "node_modules/electron/dist/electron --remote-debugging-port=9333 *",
+    "apps/desktop/node_modules/.bin/electron --remote-debugging-port=9333 *"] } }
 JSON
 sbx() { CLAUDE_PROJECT_DIR="$SBX" check "$1" "$2" "$3" "$SBX"; }
 sbx allow Bash '{"command":"git push -u origin HEAD"}'
@@ -228,17 +230,79 @@ sbx deny  Bash "{\"command\":\"git push -u origin HEAD && gh pr create --title x
 sbx deny  Bash '{"command":"gh pr create --title x --body \"$(cat body.md)\""}'
 sbx deny  Bash '{"command":"gh pr create --title x --body-file - <<EOF\nbody\nEOF"}'
 sbx deny  Bash '{"command":"gh pr list | head"}'
+sbx allow Bash '{"command":"node_modules/electron/dist/electron --remote-debugging-port=9333 app/main.js"}'
+sbx deny  Bash '{"command":"node_modules/electron/dist/electron --remote-debugging-port=9333 app/main.js | tee out.txt"}'
+sbx allow Bash '{"command":"apps/desktop/node_modules/.bin/electron --remote-debugging-port=9333 app/main.js"}'
+sbx deny  Bash '{"command":"apps/desktop/node_modules/.bin/electron --remote-debugging-port=9333 app/main.js | tee out.txt"}'
 sbx deny  Bash '{"command":"git commit -m x && git push"}'
 sbx deny  Bash '{"command":"cd src && git push"}'
 sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
 sbx deny  Bash '{"command":"open ~/x.html && echo done"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"git commit -m x && git push"}'
 
+echo "sandbox grants"
+# With the sandbox on, sandbox.filesystem.allowRead opens a path to reads (Read, Grep, Glob, Bash
+# commands that only read it), allowWrite to Bash writes too (the OS enforces it there, not for the
+# Write and Edit tools), and a denyRead inside a grant still wins.
+# Like the extra roots, the granted dirs under $HOME are never created.
+GRANT="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+GRANT_OFF="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF"' EXIT
+RO="$HOME/.guardrails-test-ro"
+ABS="$HOME/.guardrails-test-abs"
+RW="$HOME/.guardrails-test-rw"
+mkdir -p "$GRANT/.claude" "$GRANT_OFF/.claude"
+FS='"filesystem": { "allowRead": ["~/.guardrails-test-ro", "'"$ABS"'"], "allowWrite": ["~/.guardrails-test-rw"], "denyRead": ["~/.guardrails-test-ro/secret"] }'
+echo '{ "sandbox": { "enabled": true, '"$FS"' } }' > "$GRANT/.claude/settings.local.json"
+echo '{ "sandbox": { "enabled": false, '"$FS"' } }' > "$GRANT_OFF/.claude/settings.local.json"
+gr() { CLAUDE_PROJECT_DIR="$GRANT" check "$1" "$2" "$3" "$GRANT"; }
+gr allow Bash  '{"command":"du -sh ~/.guardrails-test-ro"}'
+gr allow Bash  '{"command":"ls '"$RO"'/sub"}'
+gr allow Bash  '{"command":"ls $HOME/.guardrails-test-ro | head -3"}'
+gr allow Bash  '{"command":"ls '"$ABS"'"}'
+gr allow Bash  '{"command":"find ~/.guardrails-test-ro -name x.json"}'
+gr allow Bash  '{"command":"cp ~/.guardrails-test-ro/a.txt src/a.txt"}'
+gr allow Read  '{"file_path":"'"$RO"'/a.txt"}'
+gr allow Grep  '{"pattern":"x","path":"'"$RO"'"}'
+gr allow Glob  '{"pattern":"'"$RO"'/**/*.js"}'
+gr deny  Bash  '{"command":"rm ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"echo x > ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"cat a.txt >> '"$ABS"'/x"}'
+gr deny  Bash  '{"command":"cp a.txt ~/.guardrails-test-ro/x"}'
+gr deny  Bash  '{"command":"find ~/.guardrails-test-ro -delete"}'
+gr deny  Bash  '{"command":"ls ~/.guardrails-test-ro && rm -rf ~/.guardrails-test-ro"}'
+gr deny  Bash  '{"command":"cd ~/.guardrails-test-ro && ls"}'
+gr deny  Write '{"file_path":"'"$RO"'/x"}'
+gr deny  Edit  '{"file_path":"'"$ABS"'/x"}'
+gr allow Bash  '{"command":"touch ~/.guardrails-test-rw/x"}'
+gr allow Bash  '{"command":"echo x > ~/.guardrails-test-rw/x"}'
+gr allow Bash  '{"command":"rm ~/.guardrails-test-rw/x"}'
+gr allow Read  '{"file_path":"'"$RW"'/x"}'
+gr deny  Write '{"file_path":"'"$RW"'/x"}'
+gr deny  Edit  '{"file_path":"'"$RW"'/x"}'
+gr deny  Bash  '{"command":"cat ~/.guardrails-test-ro/secret/key"}'
+gr deny  Read  '{"file_path":"'"$RO"'/secret/key"}'
+gr deny  Bash  '{"command":"ls ~/.guardrails-test-ro-sibling"}'
+CLAUDE_PROJECT_DIR="$GRANT_OFF" check deny Bash '{"command":"ls ~/.guardrails-test-ro"}' "$GRANT_OFF"
+CLAUDE_PROJECT_DIR="$GRANT_OFF" check deny Read '{"file_path":"'"$RO"'/a.txt"}' "$GRANT_OFF"
+# grant_message <tool> <tool_input JSON> <expected text...>: the deny message names the settings that would allow it.
+grant_message() {
+  local tool="$1" tool_input="$2" out want; shift 2
+  out="$(printf '{"tool_name":"%s","tool_input":%s,"cwd":"%s"}' "$tool" "$tool_input" "$GRANT" | CLAUDE_PROJECT_DIR="$GRANT" node "$SCRIPT" 2>/dev/null)"
+  for want in "$@"; do
+    if [[ "$out" == *"$want"* ]]; then printf '  ok    message %-30s %s %s\n' "\"$want\"" "$tool" "$tool_input"
+    else printf '  FAIL  no "%s" in the message for %s %s: %s\n' "$want" "$tool" "$tool_input" "$out"; failures=$((failures + 1)); fi
+  done
+}
+grant_message Bash '{"command":"ls ~/.guardrails-test-elsewhere"}' sandbox.filesystem.allowRead permissions.additionalDirectories narrower broader
+grant_message Bash '{"command":"rm ~/.guardrails-test-ro/x"}' 'reads only' sandbox.filesystem.allowWrite
+grant_message Write '{"file_path":"'"$RW"'/x"}' 'sandboxed Bash commands only'
+
 echo "read block"
 # With blockReadsOutsideWorkingDirectories, Claude Code asks the user about a file read after a cd in
 # the same call, even in auto mode, so the hook sends the model back to rewrite it instead.
 RB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB"' EXIT
 mkdir -p "$RB/.claude" "$RB/src"
 echo '{ "permissions": { "blockReadsOutsideWorkingDirectories": true } }' > "$RB/.claude/settings.local.json"
 rb() { CLAUDE_PROJECT_DIR="$RB" check "$1" "$2" "$3" "$RB"; }
@@ -277,18 +341,33 @@ PROXY='Received disconnect from UNKNOWN port 65535:1: This proxy requires authen
 hint_check hint 'git push -u origin HEAD' "$PROXY" '--body-file'
 hint_check hint 'git push -u origin HEAD && gh pr create --fill' 'fatal: Could not read from remote repository.' 'ask the user to run it with !'
 hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.github.com' 'sandbox'
+hint_check hint 'git -C /tmp/wt push -u origin feat/x' 'fatal: Could not read from remote repository.' 'worktrees share branches'
+hint_check hint 'git -C /tmp/wt push -u origin feat/x' "deny network-outbound github-x:22 (not in this command's allowed_domains)" 'git push -u origin <branch>'
+hint_check hint 'git -c http.proxy= fetch origin' "$PROXY" "doesn't match the excluded git push"
 hint_check hint 'open /tmp/x.html' 'LSOpenURLsWithRole() failed with error -10822' 'run with !'
 hint_check hint 'touch /etc/x' 'touch: /etc/x: Operation not permitted' 'sandbox restriction'
 hint_check hint 'git push' "$PROXY" 'setup-claude-guardrails'
 PNPM_LOCK='Failed to open the store operation lock at "pnpm-store-operation-locks": Read-only file system (os error 30)'
 hint_check hint 'pnpm install' "$PNPM_LOCK" 'run the install with !'
 hint_check hint 'pnpm install' 'electron postinstall: TypeError: fetch failed' 'run the install with !'
+hint_check hint 'pnpm --version' '[ERROR] GET https://registry.npmjs.org/pnpm: fetch failed' 'packageManager'
+hint_check hint 'pnpm --version' 'deny network-outbound registry.npmjs.org:443' 'allowedDomains'
+hint_check none 'curl https://registry.npmjs.org/pnpm' 'deny network-outbound registry.npmjs.org:443'
 hint_check hint 'echo ok' 'apply-seccomp: write /proc/self/setgroups (nested userns is capability-restricted; caller must provide CAP_SYS_ADMIN): Permission denied' 'allowAllUnixSockets'
 hint_check hint 'pnpm --version' '(eval):1: command not found: pnpm' 'allowRead'
 hint_check hint 'bash scripts/test.sh' 'line 3: node: command not found' 'allowRead'
 hint_check hint 'pnpm --version' '[ERROR] unable to open database file' 'allowWrite'
 hint_check hint 'pnpm lint' "$PNPM_LOCK" 'XDG_RUNTIME_DIR=$TMPDIR pnpm'
 hint_check hint 'cp a.mjs .claude/hooks/guardrails.mjs' "cp: cannot create regular file '.claude/hooks/guardrails.mjs': Read-only file system" 'Use the Write tool'
+hint_check hint 'node_modules/electron/dist/electron .' '[8:1029/104606.373618:FATAL:setuid_sandbox_host.cc(163)] The SUID sandbox helper binary was found, but is not configured correctly.' 'excludedCommands'
+hint_check hint 'node_modules/electron/dist/electron .' 'FATAL:setuid_sandbox_host.cc' 'Never retry with --no-sandbox'
+hint_check hint 'apps/desktop/node_modules/.bin/electron .' 'FATAL:base/apple/mach_port_rendezvous_mac.cc(158)] bootstrap_check_in com.github.Electron.MachPortRendezvousServer.1234: Permission denied (1100)' 'Never retry with --no-sandbox'
+hint_check hint 'node scripts/probe.mjs' 'TypeError: fetch failed
+    cause: Error: connect ECONNREFUSED 127.0.0.1:9431' 'allowLocalBinding'
+hint_check hint 'tail -n 50 ~/.claude/projects/-Users-me-app/abc/tool-results/b1.txt' 'tail: /Users/me/.claude/projects/-Users-me-app/abc/tool-results/b1.txt: Operation not permitted' 'Grep tool'
+hint_check hint 'grep -n FAIL /home/me/.claude/projects/-home-me-app/abc/tool-results/b1.txt' 'grep: /home/me/.claude/projects/-home-me-app/abc/tool-results/b1.txt: No such file or directory' 'offset/limit'
+hint_check none 'grep -n FAIL .claude/projects/x.txt' 'exit code 1'
+hint_check none 'node scripts/probe.mjs' 'connect ECONNREFUSED 10.0.0.5:5432'
 hint_check none 'npm test' 'Error: 3 tests failed'
 hint_check none 'pnpm install' 'ERR_PNPM_OUTDATED_LOCKFILE'
 hint_check none 'npm test' "$PROXY"
@@ -302,7 +381,7 @@ echo "sandbox stubs"
 # .claude/agents, ...). SKILL.md step 7 excludes them, re-including directories with a trailing
 # slash so a real .vscode/ or .claude/agents/ still shows in git status.
 STUB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$RB" "$STUB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB"' EXIT
 # stub_check <expected git status --porcelain output, one path per line>
 stub_check() {
   local want="$1" got
@@ -323,6 +402,141 @@ rm -f "$STUB/.vscode" "$STUB/.claude/agents"
 mkdir -p "$STUB/.vscode" "$STUB/.claude/agents"
 : > "$STUB/.vscode/settings.json"; : > "$STUB/.claude/agents/a.md"
 stub_check "$(printf '%s\n' .claude/agents/a.md .vscode/settings.json)"
+
+echo "allow rules"
+# suggest-allow-rules.mjs proposes permissions.allow entries for a project's lint, typecheck and test
+# commands (SKILL.md step 2), and never installs, pushes, publishes, deploys, fixes or deletes.
+SUGGEST="$(dirname "$0")/suggest-allow-rules.mjs"
+[ -f "$SUGGEST" ] || die "suggest-allow-rules.mjs not found next to this script"
+AR="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB" "$AR"' EXIT
+mkdir -p "$AR/.claude"
+: > "$AR/pnpm-lock.yaml"
+cat > "$AR/package.json" <<'JSON'
+{ "scripts": {
+  "lint": "eslint .", "lint:fix": "eslint . --fix", "typecheck": "tsc --noEmit", "test": "vitest run",
+  "test:watch": "vitest", "test:ci": "vitest --watch=false", "test:update": "vitest -u",
+  "format": "prettier --write .", "format:check": "prettier --check .", "build": "tsc",
+  "deploy": "vercel deploy", "release": "changeset publish", "verify": "pnpm lint && pnpm typecheck",
+  "check": "pnpm lint && pnpm release", "test:e2e": "pnpm install && playwright test", "postinstall": "husky"
+} }
+JSON
+cat > "$AR/justfile" <<'JUST'
+set shell := ["bash", "-c"]
+
+lint:
+    pnpm lint
+
+test *args:
+    pnpm test {{args}}
+
+push:
+    git push
+
+ci-check: lint test
+
+check-all: lint push
+
+[private]
+test-hidden:
+    pnpm test
+
+_test-helper:
+    rm -rf dist
+JUST
+printf '.PHONY: test lint clean\ntest:\n\tgo test ./...\nlint:\n\tgolangci-lint run\nlint-fix:\n\tgolangci-lint run --fix\nclean:\n\trm -rf dist\nverify: test clean\n' > "$AR/Makefile"
+echo '{ "tasks": { "build": {}, "lint": {}, "web#typecheck": {}, "deploy": {}, "dev": {}, "test": {} } }' > "$AR/turbo.json"
+cat > "$AR/CLAUDE.md" <<'MD'
+Run `pnpm lint` and `bash scripts/test-all.sh` before a PR. Never `pnpm publish`, `git push` or
+`pnpm install`. In a package: `pnpm --filter <pkg> test`. Tests: `cargo test --workspace`.
+Lint: `ruff check .`, then `ruff format .` and `cargo fmt --check`.
+
+```bash
+$ uv run pytest -q
+rm -rf node_modules
+pnpm test | tee out.txt
+```
+MD
+echo '{ "permissions": { "allow": ["Bash(make lint)", "Bash(make lint *)"] } }' > "$AR/.claude/settings.local.json"
+SETTINGS_BEFORE="$(cat "$AR/.claude/settings.local.json")"
+SUGGESTED="$(node "$SUGGEST" "$AR")" || { echo "  FAIL  suggest-allow-rules.mjs exited non-zero"; failures=$((failures + 1)); SUGGESTED='{}'; }
+# suggest <expected: proposed|skipped|absent> <command>
+suggest() {
+  local expected="$1" cmd="$2" actual
+  if jq -e --arg c "$cmd" '.candidates[] | select(.command == $c)' <<<"$SUGGESTED" >/dev/null; then actual="proposed"
+  elif jq -e --arg c "$cmd" '.skipped[] | select(.command == $c)' <<<"$SUGGESTED" >/dev/null; then actual="skipped"
+  else actual="absent"; fi
+  if [ "$actual" = "$expected" ]; then printf '  ok    %-8s %s\n' "$expected" "$cmd"
+  else printf '  FAIL  expected %s, got %s: %s\n' "$expected" "$actual" "$cmd"; failures=$((failures + 1)); fi
+}
+suggest proposed 'pnpm lint'
+suggest proposed 'pnpm typecheck'
+suggest proposed 'pnpm test'
+suggest proposed 'pnpm test:ci'
+suggest proposed 'pnpm format:check'
+suggest proposed 'pnpm verify'
+suggest skipped  'pnpm lint:fix'
+suggest skipped  'pnpm test:watch'
+suggest skipped  'pnpm test:update'
+suggest skipped  'pnpm check'
+suggest skipped  'pnpm test:e2e'
+suggest absent   'pnpm format'
+suggest absent   'pnpm build'
+suggest absent   'pnpm deploy'
+suggest absent   'pnpm release'
+suggest absent   'pnpm postinstall'
+suggest proposed 'just lint'
+suggest proposed 'just test'
+suggest proposed 'just ci-check'
+suggest skipped  'just check-all'
+suggest absent   'just push'
+suggest absent   'just test-hidden'
+suggest absent   'just _test-helper'
+suggest proposed 'make test'
+suggest skipped  'make lint-fix'
+suggest skipped  'make verify'
+suggest absent   'make clean'
+suggest absent   'make lint'
+suggest proposed 'turbo run lint'
+suggest proposed 'turbo run typecheck'
+suggest proposed 'turbo run test'
+suggest absent   'turbo run build'
+suggest absent   'turbo run deploy'
+suggest absent   'turbo run dev'
+suggest proposed 'bash scripts/test-all.sh'
+suggest proposed 'cargo test --workspace'
+suggest proposed 'uv run pytest -q'
+suggest proposed 'ruff check .'
+suggest skipped  'ruff format .'
+suggest proposed 'cargo fmt --check'
+suggest absent   'pnpm publish'
+suggest absent   'git push'
+suggest absent   'pnpm install'
+suggest absent   'pnpm --filter <pkg> test'
+suggest absent   'pnpm test | tee out.txt'
+# rule_check <description> <jq filter that must output true>
+rule_check() {
+  if [ "$(jq -r "$2" <<<"$SUGGESTED")" = "true" ]; then printf '  ok    %s\n' "$1"
+  else printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); fi
+}
+rule_check 'pnpm lint gets exact and wildcard rules' \
+  '[.candidates[] | select(.command == "pnpm lint") | .rules[]] == ["Bash(pnpm lint)", "Bash(pnpm lint *)", "Bash(pnpm run lint)", "Bash(pnpm run lint *)"]'
+rule_check 'every rule is a Bash(...) rule for its command' \
+  '[.candidates[] | . as $c | .rules[] | test("^Bash\\(.+\\)$")] | all'
+rule_check 'no rule installs, pushes, publishes, deploys, fixes or deletes' \
+  '[.candidates[].rules[] | test("install|push|publish|deploy|release|--fix|--write|rm -|clean"; "i")] | any | not'
+rule_check 'rules already in permissions.allow are left out' \
+  '[.candidates[].rules[]] | index("Bash(make lint)") == null'
+rule_check 'every candidate has a kind and a source' \
+  '[.candidates[] | (.kind | type == "string") and (.source | type == "string")] | all'
+if [ "$(cat "$AR/.claude/settings.local.json")" = "$SETTINGS_BEFORE" ]; then echo "  ok    settings left unchanged"
+else echo "  FAIL  suggest-allow-rules.mjs changed settings.local.json"; failures=$((failures + 1)); fi
+# The hook must not deny what the rules allow, or the rules would only trade a prompt for a deny.
+while IFS= read -r cmd; do
+  CLAUDE_PROJECT_DIR="$AR" check allow Bash "$(jq -cn --arg c "$cmd" '{command:$c}')" "$AR"
+done < <(jq -r '.candidates[].command' <<<"$SUGGESTED")
+SUGGESTED="$(node "$SUGGEST" "$OTHER")"
+rule_check 'a project without command sources gets no candidates' '.candidates == []'
 
 echo "fail closed"
 out="$(echo 'not json' | node "$SCRIPT" 2>/dev/null)"; rc=$?

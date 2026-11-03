@@ -6,7 +6,7 @@ Installs personal (untracked) guardrails into a project's `.claude/`: permission
 
 Keep Claude away from sensitive data, on the user's computer and in the repository:
 
-1. Don't read or edit anything outside the defined directories (the project, its worktrees and `additionalDirectories`).
+1. Don't read or edit anything outside the defined directories (the project, its worktrees and `additionalDirectories`). With the sandbox on, `sandbox.filesystem.allowRead` paths may also be read, and `allowWrite` ones written by sandboxed Bash, where the OS enforces it. So never put secrets (`~/.aws`, `~/.ssh`, `~/.config/gh`) in either list.
 2. Don't read or edit env files and secrets inside them.
 
 Everything else should stay easy. A guardrail that makes Claude take extra steps without protecting either goal is friction to remove, not safety. Judge every change against these two goals.
@@ -18,11 +18,12 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 | `SKILL.md` | Install workflow (read only when the skill runs) |
 | `scripts/guardrails.mjs` | The hook, copied to `.claude/hooks/guardrails.mjs` |
 | `assets/guardrails.md` | Rule copied to `.claude/rules/guardrails.md`; loads every session, so keep it short |
-| `scripts/test-guardrails.sh` | Regression tests (~100 cases); run after every hook change, and against the previous hook to confirm new cases fail on it |
+| `scripts/suggest-allow-rules.mjs` | Reads the project's package.json scripts, justfile/Makefile targets, turbo tasks and `CLAUDE.md` commands and prints candidate `permissions.allow` rules for the read-only and verification ones; never writes |
+| `scripts/test-guardrails.sh` | Regression tests (~100 cases, plus the allow-rule suggestions); run after every hook or suggester change, and against the previous hook to confirm new cases fail on it |
 
 ## Blocked
 
-- **Outside scope:** file tools and Bash paths (absolute, `~`, `$HOME`, `..`, bare `cd`) outside the project, worktrees, `additionalDirectories`, temp dirs and `~/.claude`. With the sandbox, the OS also enforces it for every Bash command.
+- **Outside scope:** file tools and Bash paths (absolute, `~`, `$HOME`, `..`, bare `cd`) outside the project, worktrees, `additionalDirectories`, temp dirs and `~/.claude`. With the sandbox, the OS also enforces it for every Bash command, and the hook also allows reads in `sandbox.filesystem.allowRead` and Bash writes in `allowWrite` (minus `denyRead`/`denyWrite`; Write/Edit there stay denied).
 - **Env files:** `.env`, `.env.*`, `*.env` in any case, through wildcards, quote tricks, symlinks, `git show HEAD:.env` and Grep `glob` filters.
 - **Claude Code secrets:** `.credentials.json` and `~/.claude.json` (OAuth tokens, MCP API keys).
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
@@ -42,6 +43,8 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Node and package managers under `/home`** (sandbox only; nvm, fnm, volta, bun, `$PNPM_HOME`, Linuxbrew): their install roots in `sandbox.filesystem.allowRead`, `$PNPM_HOME` in `allowWrite`. pnpm's store lock goes under `XDG_RUNTIME_DIR` on Linux: the failure hint retries with it pointed at `$TMPDIR` (the `env` block can't set it: it is reset before each command). `pnpm_config_verify_deps_before_run=false` in the `env` block stops pnpm's pre-script install, which can only fail inside. Without them every `node`/`pnpm` call fails inside, which protects nothing. Installs still belong outside (`! pnpm install`).
 - **The npm registry** (optional, sandbox only): `registry.npmjs.org` in `sandbox.network.allowedDomains`, no other host.
 - **The sandbox's mount stubs** (Linux only): bubblewrap leaves an empty file at each protected path it blocks that didn't exist (`.bashrc`, `.mcp.json`, `.vscode`, `.claude/agents`, ...), and `git status` lists them. They're excluded in `.git/info/exclude`, with a trailing-slash re-include so a real directory of the same name still shows. Deleting them is pointless: the next sandboxed command recreates them.
+- **Verification commands without a prompt** (optional): each parallel or spawned session asks separately, so the skill proposes `permissions.allow` rules for lint, typecheck, test and format-check commands and writes only the ones the user picks. Anything whose name or body installs, pushes, publishes, deploys, fixes/writes, deletes or watches is never proposed. The hook and sandbox still check these calls.
+- **GUI app testing** (optional, sandbox and an `electron` dependency only, never on by default): Electron can't start inside the Bash sandbox (Chromium's own sandbox under bubblewrap on Linux; a refused Mach port check-in under Seatbelt on macOS), and `--no-sandbox` is not accepted. The launch command is the workspace's own `node_modules/.bin/electron`, not the root one. On Linux a single display socket can't be granted either (seccomp can't filter Unix sockets by path), and `allowAllUnixSockets` is never added for this. The only grant is the exact launch command in `sandbox.excludedCommands`, which then runs **with no sandbox at all**. To drive the window, a second, separate opt-in adds `sandbox.network.allowLocalBinding` (any sandboxed command can then reach every local port). The launch must be that command alone, in the background; the probe is a second call. The failure hint tells Claude not to retry with `--no-sandbox`.
 - **Git hosting and `open` outside the sandbox** (optional): `gh`, `glab`, `git push|pull|fetch`, `open` use the Keychain, SSH agent and network. Risky subcommands (`gh api`, `gh auth`, `open -a`, ...) ask. A call leaves the sandbox only if every command in it is excluded: `git push && gh pr create --body '…'` works; a heredoc, pipe, `cd` or `$(...)` keeps it inside.
 
 ## Teaching Claude from mistakes
@@ -58,11 +61,15 @@ Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mist
 
 - **Re-injecting the whole rule on every denial or failure:** noise. The hint carries only the relevant fix.
 
+- **Adding `~/.claude/projects` (or its `tool-results` dirs) to `sandbox.filesystem.allowRead` so Bash can read saved tool outputs:** that directory holds the transcripts of every project, which can contain pasted secrets (goal 1). The paths are per session and project, so a narrow grant can't be written up front either. The file tools read them fine: a failure hint (`Grep` to find lines, `Read` with `offset`/`limit` to page) and the rule's symptom text save the wasted Bash attempt instead.
 - **Commit, push and PR in one call:** `git commit` would run outside the sandbox, and so would the repo's git hooks (husky, lint-staged). Two calls is the floor.
 - **Skipping the hook's Bash path checks when the sandbox is on:** the sandbox still lets Bash read `/etc`, `/usr` and `/var/folders`, which holds other apps' temp files.
 - **Scanning less of env-file wildcards** (`grep ".env*"`): the shell expands them after the hook runs.
 - **Dropping the "ask" on commands that mention settings files:** it protects the guardrails themselves.
+- **Letting Write/Edit into `allowWrite` paths:** the OS only enforces `allowWrite` on Bash, and the skill puts tool dirs (`$PNPM_HOME`) there for the tools, not for Claude to edit.
 
 ## Known limits
 
 Without the sandbox, the Bash checks are a heuristic on command text: `$(...)`, variables, `eval`, scripts and recursive greps get past them. Hooks don't apply to MCP tools. Directories added with `/add-dir` for one session only are invisible to the hook. See `SKILL.md` → Limitations.
+
+An excluded command runs outside the sandbox, and the hook sees only its command text, not the files it reads. Keep each entry exact: `docker compose -f <file> *` would also allow `run -v /:/host`. Even an exact entry can be steered by such a file. The design plugin's `/design-studio` passes `--env-file <vars file>`, and a `PROJECT_DIR` in that file decides what the container mounts. That command reads the file back and shows it before the call, and each call still prompts. An env-file-style name (`*.env`) for such a file is refused by the env block: give it another name (`.compose-vars`).

@@ -39,7 +39,7 @@
     "remark-gfm": "4.0.1",
     "tailwind-merge": "3.0.2",
     "tailwindcss": "4.1.18",
-    "zod": "4.3.6"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@repo/claude-fs": "workspace:*",
@@ -61,6 +61,6 @@
     "sass": "1.89.0",
     "typescript": "6.0.2",
     "vite": "8.0.16",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
