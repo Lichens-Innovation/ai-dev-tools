@@ -19,6 +19,9 @@ field() { node -p "JSON.stringify(require('./out.json')$1)" | tr -d '"'; }
 # check: version states and the repo's palette.ts.
 printf '{\n  "designProjectId": "p",\n  "reconcileRule": "canonical-wins",\n  "palette": { "script": "palette.ts" }\n}\n' > design.manifest.json
 cp "$palette" palette.ts
+mkdir -p .claude/rules
+pf check; check "missing theme rule exits 1" "$?" "1"; check "missing theme rule" "$(field .themeRule.state)" "missing"
+node "$script" theme-rule > .claude/rules/theme.md; check "theme-rule exits 0" "$?" "0"
 pf check; check "unstamped exits 1" "$?" "1"; check "unstamped" "$(field .version)" "unstamped"
 check "same palette.ts" "$(field .paletteScript.state)" "same"
 pf stamp; check "stamp exits 0" "$?" "0"
@@ -56,6 +59,24 @@ pf check; check "marked block is current" "$(field .conventions.state)" "same"
 has "mark keeps the fitted text" 'RegloUI provider' .design-sync/conventions.md
 has "mark keeps the project note" 'Project note' .design-sync/conventions.md
 rm -r .design-sync
+
+# theme rule: tracked by the hash in its marker, not by the fitted text.
+has "rule has a hashed marker" '<!-- design-plugin:theme-rule [0-9a-f]\{12\} -->' .claude/rules/theme.md
+has "rule keeps its frontmatter first" '^paths:' .claude/rules/theme.md
+check "rule starts with frontmatter" "$(head -1 .claude/rules/theme.md)" "---"
+pf check; check "fresh rule is current" "$(field .themeRule.state)" "same"
+sed -i.bak 's|{{INPUTS}}|src/theme.inputs.css|; s|<!-- tailwind -->||; s|<!-- /tailwind -->||' .claude/rules/theme.md
+printf '\n- Project note.\n' >> .claude/rules/theme.md
+pf check; check "fitted rule is current" "$(field .themeRule.state)" "same"
+sed -i.bak 's|theme-rule [0-9a-f]* -->|theme-rule 000000000000 -->|' .claude/rules/theme.md
+pf check; check "older rule exits 1" "$?" "1"; check "older rule differs" "$(field .themeRule.state)" "differs"
+pf mark-rule; check "mark-rule exits 0" "$?" "0"
+pf check; check "marked rule is current" "$(field .themeRule.state)" "same"
+has "mark-rule keeps the fitted text" 'src/theme.inputs.css' .claude/rules/theme.md
+has "mark-rule keeps the project note" 'Project note' .claude/rules/theme.md
+printf '# Theme\n' > .claude/rules/theme.md
+pf check; check "unmarked rule" "$(field .themeRule.state)" "unmarked"
+node "$script" theme-rule > .claude/rules/theme.md
 
 # compare: a seeded card is the same code; an older navbar and card code differ.
 mkdir remote

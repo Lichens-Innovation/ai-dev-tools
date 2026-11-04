@@ -12,7 +12,7 @@ operations of contract §8, done as the backend's doc says
 [`local.md`](${CLAUDE_SKILL_DIR}/../../references/backends/local.md)); read the one that applies.
 For the local studio that is `local-backend.mjs check` and re-capturing with `capture.mjs`: no
 `/design-sync`, no uploads, and the steps below that only concern Claude Design (the navbar tag,
-the plugin files other than `palette.ts`, `ds-bundle/`) do not apply.
+the plugin files other than `palette.ts` and the theme rule, `ds-bundle/`) do not apply.
 
 For Claude Design: the synced components (through
 `/design-sync`, run by the user), the screen mockups (through
@@ -59,8 +59,8 @@ from is running; start it only if the user asks.
 
    - **Screens.** For each `screens[]` row, recompute `sourceHash` (screens.md): a different
      value means its mockup is stale.
-   - **Plugin files** (`palette.ts`, the conventions in the readme header, the navbar, the
-     palette and Tailwind cards): run
+   - **Plugin files** (`palette.ts`, the theme rule `.claude/rules/theme.md`, the conventions in
+     the readme header, the navbar, the palette and Tailwind cards): run
      `node ${CLAUDE_SKILL_DIR}/scripts/plugin-files.mjs check`
      ([`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#check)). Exit 1 means
      step 3 applies; exit 3, an older plugin here than the project's: say so and skip step 3.
@@ -96,7 +96,7 @@ from is running; start it only if the user asks.
 
 3. **Plugin files** (when the check asked for an update). Follow
    [`plugin-files.md`](${CLAUDE_SKILL_DIR}/references/plugin-files.md#update): `palette.ts`, the
-   conventions, then the navbar, palette card and Tailwind card in Claude Design (asking before
+   theme rule, the conventions, then the navbar, palette card and Tailwind card in Claude Design (asking before
    replacing each), then stamp the manifest. Only the conventions need a sync, to publish them:
    update them before handing the sync to the user (step 2), so one sync carries both.
 
