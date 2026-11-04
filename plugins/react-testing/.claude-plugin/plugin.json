@@ -1,0 +1,10 @@
+{
+  "name": "react-testing",
+  "version": "0.1.0",
+  "description": "React testing tools and skills for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react", "testing", "react-testing-library", "vitest", "jest"]
+}
