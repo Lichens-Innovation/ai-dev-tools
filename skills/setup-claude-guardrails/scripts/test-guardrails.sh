@@ -323,6 +323,12 @@ rb allow Bash '{"command":"perl -I lib script.pl"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"sed -i s/a/b/ src/a.ts"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"cd src && cat a.ts"}'
 
+echo "lone / message"
+check deny Bash '{"command":"grep -o \"<text>x</text>\" f.svg | sed \"s/<text>//;s/<\\/text>//\""}'
+lone_out="$(printf '{"tool_name":"Bash","tool_input":{"command":"grep -o \\"<text>x</text>\\" f.svg | sed \\"s/<text>//;s/<\\\\/text>//\\""},"cwd":"%s"}' "$PROJECT" | node "$SCRIPT" 2>/dev/null)"
+if [[ "$lone_out" == *'Write'* && "$lone_out" != *'additionalDirectories'* ]]; then echo "  ok    lone / message points to Write"
+else echo "  FAIL  lone / message: $lone_out"; failures=$((failures + 1)); fi
+
 echo "failure hints"
 # hint_check <expected: hint|none> <command> <error text> [expected text in the hint]
 hint_check() {
@@ -340,6 +346,8 @@ hint_check() {
 PROXY='Received disconnect from UNKNOWN port 65535:1: This proxy requires authentication, and this client did not offer an authentication method'
 hint_check hint 'git push -u origin HEAD' "$PROXY" '--body-file'
 hint_check hint 'git push -u origin HEAD && gh pr create --fill' 'fatal: Could not read from remote repository.' 'ask the user to run it with !'
+hint_check hint 'git switch main' "error: unable to unlink old 'plugins/design-studio/.mcp.json': Operation not permitted" 'ask the user to run the command'
+hint_check hint 'git pull' "error: unable to create file plugins/design-studio/.mcp.json: Operation not permitted" 'git status'
 hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.github.com' 'sandbox'
 hint_check hint 'git -C /tmp/wt push -u origin feat/x' 'fatal: Could not read from remote repository.' 'worktrees share branches'
 hint_check hint 'git -C /tmp/wt push -u origin feat/x' "deny network-outbound github-x:22 (not in this command's allowed_domains)" 'git push -u origin <branch>'

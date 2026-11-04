@@ -412,6 +412,15 @@ const FAILURE_HINTS = [
       "PNPM_HOME (often ~/.local/share/pnpm) must be in sandbox.filesystem.allowWrite: tell the user.",
   },
   {
+    // A branch that adds or removes .mcp.json can't be checked out: the sandbox denies unlinking or creating it.
+    program: /^\s*(?:\w+=\S*\s+)*git\s+(?:(?:-C|-c)\s+\S+\s+)*(?:switch|checkout|pull|merge|rebase|restore|stash|reset)\b/,
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system|unable to (?:unlink|create)|cannot (?:unlink|create)|could not (?:unlink|create)))[\s\S]*\.mcp\.json/i,
+    hint:
+      "The sandbox can't unlink or create .mcp.json (or another file it denies writing), and this branch change adds or " +
+      "removes it, so the checkout may be half done. Check git status, don't retry, and ask the user to run the command " +
+      "with ! (e.g. ! rm <path>/.mcp.json && git pull).",
+  },
+  {
     // Claude Code itself denies sandboxed writes to these paths (denyWithinAllow), whatever allowWrite says.
     error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
     hint:
@@ -568,6 +577,10 @@ const main = () => {
             `tools, and Bash commands that only read it (ls, du, cat, stat, head, grep, find without -delete/-exec, ` +
             `node <script>, cp from it), not as a redirection target or after a cd. Writing there with a sandboxed ` +
             `Bash command needs sandbox.filesystem.allowWrite: ask the user.`
+        : p !== undefined && p === path.parse(p).root
+        ? `${what} is the filesystem root, outside the allowed scope. A lone / in a heredoc, regex, sed script or closing ` +
+            `tag (</text>) is read as that path. Don't widen allowRead: write the script or text to a file with the Write ` +
+            `tool (in the project or /tmp/claude-<uid>/) and run the file.`
         :`${what} is outside the allowed scope (${roots.join(", ")}` +
             `${readRoots.length ? `; sandbox allowRead/allowWrite: ${readRoots.join(", ")}` : ""}). Stay inside the ` +
             `project, or ask the user to add the directory, in ${settingsFiles[1]} (this project) or ` +
