@@ -51,7 +51,8 @@ trace) when the user asks for a change. The user's own edits are theme values: t
   the project's classes), never coordinates.
 
 **Versions.** `a` is the proposal (`<name>.html`), the only one `implement-design` implements. Make real
-writes alternates `b`..`z` (`<name>.<v>.html`) next to it. In the studio, **Use this version** on
+(`sketch-in-studio`) and `design-in-studio` write alternates `b`..`z` (`<name>.<v>.html`) next to it,
+through the plugin's `designer` agent. In the studio, **Use this version** on
 an alternate swaps it with `a` (the old proposal takes its letter), and **Discard** deletes it.
 `get_page`, `write_page` and `open_page` take a `version`.
 

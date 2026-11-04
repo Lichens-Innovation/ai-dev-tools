@@ -1,75 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 540" width="1000" height="540" font-family="system-ui, -apple-system, Segoe UI, sans-serif" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 580" width="1000" height="580" font-family="system-ui, -apple-system, Segoe UI, sans-serif" role="img" aria-labelledby="t d">
   <title id="t">The design loop</title>
-  <desc id="d">Sync the code to Claude Design, explore proposals there, approve one, implement it in code with implement-design, publish to Chromatic, then re-sync Claude Design with refresh-design.</desc>
+  <desc id="d">Capture the code's components and screens into the local design studio, explore versions there with design-in-studio, a wireframe and Make real, or edits by hand, pick one with Use this version, implement it in code with implement-design, publish to Chromatic, then re-capture with refresh-design.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#475569"/>
     </marker>
   </defs>
 
-  <rect width="1000" height="540" rx="12" fill="#ffffff"/>
+  <rect width="1000" height="580" rx="12" fill="#ffffff"/>
   <text x="30" y="40" font-size="22" font-weight="700" fill="#0f172a">The design loop</text>
 
-  <!-- 1 Sync up -->
-  <rect x="30" y="70" width="260" height="120" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-  <text x="48" y="100" font-size="16" font-weight="700" fill="#0f172a">1 · Sync up</text>
+  <!-- 1 Capture -->
+  <rect x="30" y="70" width="280" height="150" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="48" y="100" font-size="16" font-weight="700" fill="#0f172a">1 · Capture</text>
   <text x="48" y="126" font-size="13" fill="#1e293b">/refresh-design (Claude Code)</text>
-  <text x="48" y="146" font-size="13" fill="#1e293b">Components and screen mockups</text>
-  <text x="48" y="166" font-size="13" fill="#1e293b">land in Claude Design</text>
+  <text x="48" y="146" font-size="13" fill="#1e293b">References captured from</text>
+  <text x="48" y="166" font-size="13" fill="#1e293b">Storybook and the running app</text>
+  <text x="48" y="186" font-size="13" fill="#1e293b">into design/</text>
 
   <!-- 2 Explore -->
-  <rect x="370" y="70" width="260" height="120" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-  <text x="388" y="100" font-size="16" font-weight="700" fill="#0f172a">2 · Explore</text>
-  <text x="388" y="126" font-size="13" fill="#1e293b">In Claude Design</text>
-  <text x="388" y="146" font-size="13" fill="#1e293b">Iterate palette, component and</text>
-  <text x="388" y="166" font-size="13" fill="#1e293b">screen proposals, fast</text>
+  <rect x="360" y="70" width="280" height="150" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="378" y="100" font-size="16" font-weight="700" fill="#0f172a">2 · Explore, in the studio</text>
+  <text x="378" y="126" font-size="13" fill="#1e293b">/design-in-studio: designer agent</text>
+  <text x="378" y="146" font-size="13" fill="#1e293b">Wireframe, then Make real</text>
+  <text x="378" y="166" font-size="13" fill="#1e293b">Edits by hand: palette, tokens</text>
+  <text x="378" y="186" font-size="13" fill="#1e293b">Each writes a version: b, c…</text>
 
-  <!-- 3 Approve -->
-  <rect x="710" y="70" width="260" height="120" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
-  <text x="728" y="100" font-size="16" font-weight="700" fill="#0f172a">3 · Approve</text>
-  <text x="728" y="126" font-size="13" fill="#1e293b">You, the first time only</text>
-  <text x="728" y="146" font-size="13" fill="#1e293b">/implement-design asks and records</text>
-  <text x="728" y="166" font-size="13" fill="#1e293b">status: approved in the manifest</text>
+  <!-- 3 Pick -->
+  <rect x="690" y="70" width="280" height="150" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="708" y="100" font-size="16" font-weight="700" fill="#0f172a">3 · Pick</text>
+  <text x="708" y="126" font-size="13" fill="#1e293b">You, in the studio</text>
+  <text x="708" y="146" font-size="13" fill="#1e293b">Use this version makes it</text>
+  <text x="708" y="166" font-size="13" fill="#1e293b">the proposal (a)</text>
+  <text x="708" y="186" font-size="13" fill="#1e293b">/implement-design asks once</text>
 
   <!-- 4 Implement -->
-  <rect x="560" y="270" width="410" height="230" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-  <text x="578" y="300" font-size="16" font-weight="700" fill="#0f172a">4 · Implement — /implement-design</text>
-  <text x="578" y="332" font-size="13" fill="#1e293b">a. Read the approved proposal</text>
-  <text x="578" y="360" font-size="13" fill="#1e293b">b. Reconcile the canonical CSS tokens</text>
-  <text x="578" y="388" font-size="13" fill="#1e293b">c. Edit the component code</text>
-  <text x="578" y="416" font-size="13" fill="#1e293b">d. Screenshot and compare (Playwright)</text>
-  <text x="578" y="444" font-size="13" fill="#1e293b">e. Validate (Storybook MCP: a11y + tests)</text>
-  <path d="M900 412 H920 V384 H904" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="578" y="476" font-size="12" font-style="italic" fill="#334155">c and d repeat until the pixels match the proposal</text>
+  <rect x="560" y="290" width="410" height="230" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="578" y="320" font-size="16" font-weight="700" fill="#0f172a">4 · Implement — /implement-design</text>
+  <text x="578" y="352" font-size="13" fill="#1e293b">a. Read the proposal and its reference</text>
+  <text x="578" y="380" font-size="13" fill="#1e293b">b. Reconcile the canonical CSS tokens</text>
+  <text x="578" y="408" font-size="13" fill="#1e293b">c. Edit the component code</text>
+  <text x="578" y="436" font-size="13" fill="#1e293b">d. Screenshot and compare (Playwright)</text>
+  <text x="578" y="464" font-size="13" fill="#1e293b">e. Validate (Storybook MCP: a11y + tests)</text>
+  <path d="M900 432 H920 V404 H904" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="578" y="496" font-size="12" font-style="italic" fill="#334155">c and d repeat until the pixels match the proposal</text>
 
   <!-- Publish -->
-  <rect x="300" y="330" width="200" height="110" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-  <text x="318" y="360" font-size="16" font-weight="700" fill="#0f172a">Publish</text>
-  <text x="318" y="386" font-size="13" fill="#1e293b">Chromatic</text>
-  <text x="318" y="406" font-size="13" fill="#1e293b">Visual diff and team</text>
-  <text x="318" y="426" font-size="13" fill="#1e293b">approval</text>
+  <rect x="300" y="350" width="200" height="110" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <text x="318" y="380" font-size="16" font-weight="700" fill="#0f172a">Publish</text>
+  <text x="318" y="406" font-size="13" fill="#1e293b">Chromatic (optional)</text>
+  <text x="318" y="426" font-size="13" fill="#1e293b">Visual diff and team</text>
+  <text x="318" y="446" font-size="13" fill="#1e293b">approval</text>
 
   <!-- Arrows -->
-  <path d="M290 130 H368" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M630 130 H708" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M840 190 V268" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M560 385 H502" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M300 385 H160 V192" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M310 145 H358" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M640 145 H688" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M830 220 V288" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M560 405 H502" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M300 405 H170 V222" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- Re-sync label -->
-  <text x="30" y="420" font-size="13" font-weight="700" fill="#0f172a">5 · Re-sync with /refresh-design</text>
-  <text x="30" y="440" font-size="13" fill="#1e293b">so Claude Design shows the new code,</text>
-  <text x="30" y="460" font-size="13" fill="#1e293b">then back to step 2</text>
+  <!-- Re-capture label -->
+  <text x="30" y="440" font-size="13" font-weight="700" fill="#0f172a">5 · Re-capture with /refresh-design</text>
+  <text x="30" y="460" font-size="13" fill="#1e293b">so the studio shows the new code,</text>
+  <text x="30" y="480" font-size="13" fill="#1e293b">then back to step 2</text>
 
   <!-- Legend -->
   <g font-size="12" fill="#334155">
-    <rect x="30" y="500" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
-    <text x="52" y="512">Claude Design</text>
-    <rect x="160" y="500" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
-    <text x="182" y="512">Claude Code</text>
-    <rect x="285" y="500" width="14" height="14" rx="3" fill="#fef3c7" stroke="#d97706"/>
-    <text x="307" y="512">You</text>
-    <rect x="360" y="500" width="14" height="14" rx="3" fill="#dcfce7" stroke="#16a34a"/>
-    <text x="382" y="512">Chromatic</text>
+    <rect x="30" y="525" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="52" y="537">Design studio</text>
+    <rect x="160" y="525" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="182" y="537">Claude Code</text>
+    <rect x="285" y="525" width="14" height="14" rx="3" fill="#fef3c7" stroke="#d97706"/>
+    <text x="307" y="537">You</text>
+    <rect x="360" y="525" width="14" height="14" rx="3" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="382" y="537">Chromatic</text>
   </g>
+  <text x="30" y="565" font-size="12" font-style="italic" fill="#334155">With Claude Design, the secondary backend: step 1 syncs the components there, and step 2 happens in claude.ai/design.</text>
 </svg>

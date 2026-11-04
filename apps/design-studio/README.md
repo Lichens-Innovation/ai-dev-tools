@@ -75,7 +75,8 @@ The bar above a page switches between its three views:
 
 - **Reference**: the page as the code renders it today (read only).
 - **Proposal**: the realistic HTML view of the design. You don't edit it by hand: ask Claude for changes ("make the
-  header sticky"), and the open page reloads when Claude writes it. What you change yourself are theme values: the
+  header sticky"), or run `/design-in-studio <page> <brief>` for new versions from the plugin's designer agent, and
+  the open page reloads when Claude writes it. What you change yourself are theme values: the
   palette in the footer, and token swaps in the Inspect tab. When a page has alternate versions, chips **A**, **B**,
   **C**… switch between them. On an alternate, **Use this version** makes it the proposal (the old proposal takes its
   letter) and **Discard** deletes it. Only the proposal (A) is what `/implement-design` implements.
