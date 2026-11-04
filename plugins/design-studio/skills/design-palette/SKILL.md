@@ -127,9 +127,15 @@ Read before starting:
    Then fit it to the project, keeping the first lines (frontmatter, then the
    `design-plugin:theme-rule <hash>` marker) as they are:
    - Fill `{{INPUTS}}` (the canonical file), `{{GENERATED}}` (the generated folder or files, with
-     the `generated/` glob the formatter ignores) and `{{PALETTE_COMMAND}}` (the package's
-     `palette` script, e.g. `pnpm --filter <pkg> palette`), `{{NAMESPACE}}` and `{{SASS_FILE}}`
-     where they appear.
+     the `generated/` glob the formatter ignores) and `{{PALETTE_COMMAND}}`, `{{NAMESPACE}}` and
+     `{{SASS_FILE}}` where they appear.
+   - `{{PALETTE_COMMAND}}` follows the project's command convention. Before defaulting to the
+     package's `palette` script (e.g. `pnpm --filter <pkg> palette`), look for a `justfile`, a
+     `Makefile` or root scripts, and for a rule or hook in `.claude/rules/` and `.claude/hooks/`
+     that tells agents to use them (e.g. "use just recipes"). When one exists and has no recipe
+     for the palette, offer to add one that runs the package's script (`just palette`), ask
+     before editing it, then put that recipe in the rule. When the user declines, use the
+     package script and say in the report that the project's convention doesn't cover it.
    - Keep exactly one of the `<!-- tailwind -->`, `<!-- css -->` blocks (Tailwind namespace chosen
      or not) and the `<!-- sass -->` block only with `--sass`; delete the others and every
      marker comment line of the blocks you keep.

@@ -55,7 +55,8 @@ by hand, the Claude Design files there). A file the user keeps is left as is; sa
 
    - `missing` (a project set up before the rule existed): create it as `design-palette` step 6b
      does, from the manifest's `palette` entry (inputs, outputs, `script`, `namespace`) and the
-     package's `palette` script. Ask first.
+     project's command convention (the `justfile` check of that step, else the package's
+     `palette` script). Ask first.
    - `differs`: show what the plugin's text says that the project's doesn't, and the merged rule:
      the plugin's points, still fitted, keeping the project's notes and any addition that doesn't
      contradict them.
