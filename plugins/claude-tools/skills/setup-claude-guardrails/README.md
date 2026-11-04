@@ -55,6 +55,8 @@ The rule is always in context and still gets missed, so repeated mistakes are fi
 2. **Explain after a failure:** the `PostToolUseFailure` hook matches known sandbox error text and adds the cause and fix as context. It also tells Claude it may suggest improving the guardrail if it keeps costing steps or is unclear: that is the feedback loop for this skill.
 3. **Rule:** `assets/guardrails.md` carries the symptom (the error text), not only the do's and don'ts.
 
+Examples: a lone `/` (regex, heredoc, closing tag) is denied with "write it to a file with Write" instead of the allowRead advice, and a `git switch|pull` that fails on `.mcp.json` gets a hint to check `git status` and have the user run it with `!`. The lone `/` is not exempted from the scope check: it is the real root, and only paths that can't exist (`/api/users`) are.
+
 Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mistake repeats.
 
 ## Decided against (keep in mind for future reviews)
