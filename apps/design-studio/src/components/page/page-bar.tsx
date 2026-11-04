@@ -113,7 +113,7 @@ export function PageBar({
                   }
                   title={
                     v === 'a'
-                      ? 'The proposal: what design-loop implements'
+                      ? 'The proposal: what implement-design implements'
                       : `Alternate ${v.toUpperCase()}`
                   }
                   className={chip}
@@ -147,7 +147,7 @@ export function PageBar({
           <button
             type="button"
             className={primaryButton}
-            title="This version becomes the proposal (A), the one design-loop implements"
+            title="This version becomes the proposal (A), the one implement-design implements"
             onClick={() => void promote(alternate)}
           >
             Use this version

@@ -1,6 +1,6 @@
 # design-studio
 
-A local, single-user replacement for Claude Design in the design plugin's loop (`plugins/design`). It serves one target project's `design/` pages in the browser and exposes them to Claude Code over MCP. See `README.md` for running it.
+A local, single-user replacement for Claude Design in the design-studio plugin's loop (`plugins/design-studio`). It serves one target project's `design/` pages in the browser and exposes them to Claude Code over MCP. See `README.md` for running it.
 
 ## Stack
 
@@ -39,7 +39,7 @@ Rules of `DesignProject`:
 
 - Pages are addressed by `{kind, name}` with `name` kebab-case, never by path. Nothing escapes `design/`.
 - References are read only: there is no write for them. Proposals are written by `saveProposal` against a `baseHash` (stale = `Conflict`) or by `createAlternate`.
-- A proposal has versions: `a` is the proposal (`<name>.html`, the design-loop target), `b`..`z` are alternates (`<name>.<v>.html`). `promote` swaps an alternate with `a`; `discard` deletes an alternate, never `a`.
+- A proposal has versions: `a` is the proposal (`<name>.html`, the implement-design target), `b`..`z` are alternates (`<name>.<v>.html`). `promote` swaps an alternate with `a`; `discard` deletes an alternate, never `a`.
 - Writes are atomic (tmp + rename). The watcher ignores `*.tmp`.
 - `palette.save` imports the project's own `palette.ts` (manifest `palette.script`) and calls its exported functions, in the order its CLI does. If `palette.ts` changes its CLI flow, mirror it.
 - The filesystem and `palette.ts` are used directly, with no ports. Tests copy `test/fixtures/project` to a temp dir.
@@ -64,11 +64,11 @@ A new wireframe is generated in the browser: `wireframe/build.ts` lays the page 
 
 `wireframe-workspace.tsx` is client only (Excalidraw is dynamically imported, fonts come from `/excalidraw-assets/`). It autosaves (700 ms debounce on a signature of element versions) with the `baseHash`, ignores the events of its own saves, and shows a banner on an external change or deletion. Excalidraw's `serializeAsJSON` drops the `studio` key: the workspace adds it back. Make real flushes the save, then sends the selected shapes (or none: the whole wireframe) and a PNG. Claude answers with `create_alternate`, so the result is a new version, never an overwrite of `a`.
 
-Request events go out on `/events`. The channel (`plugins/design/channel/design-channel.mjs`) consumes `/events`, `/api/requests` and `POST /api/requests/:id/sent`: keep them stable. Requests carry ids and file references only, never text from the page.
+Request events go out on `/events`. The channel (`plugins/design-studio/channel/design-channel.mjs`) consumes `/events`, `/api/requests` and `POST /api/requests/:id/sent`: keep them stable. Requests carry ids and file references only, never text from the page.
 
 ## Testing
 
-`pnpm --filter design-studio test`. The fixture project ships a copy of the plugin's `palette.ts`; a test fails if it drifts from `plugins/design/skills/design-palette/scripts/palette.ts`, so copy it again when the plugin's changes. `vitest.config.ts` loads `native-import.mjs` as an external module: do not remove that, the palette import breaks inside Vitest's sandbox.
+`pnpm --filter design-studio test`. The fixture project ships a copy of the plugin's `palette.ts`; a test fails if it drifts from `plugins/design-studio/skills/design-palette/scripts/palette.ts`, so copy it again when the plugin's changes. `vitest.config.ts` loads `native-import.mjs` as an external module: do not remove that, the palette import breaks inside Vitest's sandbox.
 
 ## Docker
 

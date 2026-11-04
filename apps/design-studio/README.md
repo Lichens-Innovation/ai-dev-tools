@@ -1,6 +1,6 @@
 # Design studio
 
-A local, single-user replacement for Claude Design in the [design plugin](../../plugins/design)'s loop. It serves
+A local, single-user replacement for Claude Design in the [design-studio plugin](../../plugins/design-studio)'s loop. It serves
 one project's design pages in the browser, and exposes the same pages to Claude Code over MCP, so a proposal written
 by Claude shows up live in the page you have open.
 
@@ -78,7 +78,7 @@ The bar above a page switches between its three views:
   header sticky"), and the open page reloads when Claude writes it. What you change yourself are theme values: the
   palette in the footer, and token swaps in the Inspect tab. When a page has alternate versions, chips **A**, **B**,
   **C**… switch between them. On an alternate, **Use this version** makes it the proposal (the old proposal takes its
-  letter) and **Discard** deletes it. Only the proposal (A) is what `/design-loop` implements.
+  letter) and **Discard** deletes it. Only the proposal (A) is what `/implement-design` implements.
 - **Wireframes**: Excalidraw drawings of the page, where you try things yourself (see below).
 
 ## Token inspector
@@ -118,9 +118,9 @@ excalidraw.com.
 **Make real** sends the selected shapes (or the whole wireframe when nothing is selected) to Claude: the studio writes
 `design/requests/<id>.json` and a PNG. Claude reads what moved, changed or was deleted against the page it was drawn
 from, writes the result as a **new alternate version** of the proposal, and the request list offers **Open version X**.
-**Copy command** puts `/design-sketch <id>` on the clipboard, the fallback when the Claude Code channel is not on. The
-design plugin's channel (`channel/design-channel.mjs`) follows `/events` and pushes new requests into the session;
-start Claude Code with `claude --dangerously-load-development-channels plugin:design@lichens-ai-dev-tools`.
+**Copy command** puts `/sketch-in-studio <id>` on the clipboard, the fallback when the Claude Code channel is not on. The
+design-studio plugin's channel (`channel/design-channel.mjs`) follows `/events` and pushes new requests into the session;
+start Claude Code with `claude --dangerously-load-development-channels plugin:design-studio@lichens-ai-dev-tools`.
 
 ## MCP tools
 
