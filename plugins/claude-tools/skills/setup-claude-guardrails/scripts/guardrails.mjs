@@ -435,8 +435,8 @@ const FAILURE_HINTS = [
     error: /Operation not permitted|Permission denied|No such file or directory/i,
     hint:
       "Bash can't read ~/.claude/projects (saved tool outputs, plus the transcripts of every project): the sandbox blocks " +
-      "it on purpose. Don't retry with another Bash command. Use the Grep tool to find lines in the file and the Read " +
-      "tool with offset/limit to page through it.",
+      "it on purpose. Don't retry with another Bash command. Use the Grep tool (if you have it) to find lines in the " +
+      "file and the Read tool with offset/limit to page through it.",
   },
   {
     error: /Operation not permitted|Read-only file system/i,
@@ -744,7 +744,7 @@ const main = () => {
         "read-block",
         `\`${reader}\` runs after a \`cd\` in the same call, so Claude Code can't check its path against ` +
           `blockReadsOutsideWorkingDirectories and would make the user approve it. Drop the \`cd\`: use paths from the ` +
-          `current directory or absolute paths, \`git -C <dir>\`, or the Read and Grep tools, and split unrelated ` +
+          `current directory or absolute paths, \`git -C <dir>\`, or the Read tool (and Grep, if you have it), and split unrelated ` +
           `commands into parallel calls.`
       );
     }
