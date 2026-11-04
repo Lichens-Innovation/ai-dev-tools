@@ -449,7 +449,7 @@ html[data-design-nav] .ds-cell>h4{color:var(--text-muted,#6b7280)}
       onclick: () => { P.adv = !P.adv; save({ advanced: P.adv }); adv.setAttribute('aria-pressed', String(P.adv)); if (P.adv && !P.open) { togglePalette(); toggle.setAttribute('aria-expanded', 'true'); } updateFoot(); } });
     adv.setAttribute('aria-pressed', String(P.adv));
     const note = el('p', { className: 'dn-foot-note' });
-    note.innerHTML = 'Editing the <b class="dn-foot-mode"></b> mode value of each input (the navbar switch picks the mode); token values apply to both modes. Changes stay in this browser until Palette.dc.html is updated: copy the request, paste it in Claude Design\'s chat, then run <code>design-loop</code> in the repo.';
+    note.innerHTML = 'Editing the <b class="dn-foot-mode"></b> mode value of each input (the navbar switch picks the mode); token values apply to both modes. Changes stay in this browser until Palette.dc.html is updated: copy the request, paste it in Claude Design\'s chat, then run <code>implement-design</code> in the repo.';
     foot = el('section', { className: 'dn-foot', ariaLabel: 'Palette' }, [
       el('div', { className: 'dn-foot-head' }, [toggle, el('div', { className: 'dn-foot-status' }), adv, resetAll, copy]),
       el('div', { className: 'dn-foot-body' }, [el('div', { className: 'dn-foot-rows' }), el('div', { className: 'dn-foot-gen' }), note, el('textarea', { className: 'dn-req', readOnly: true, rows: 3, ariaLabel: 'Request for Claude Design' })])

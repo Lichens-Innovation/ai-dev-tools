@@ -119,9 +119,9 @@ packages/theme/
   package's `palette` script: `"palette": "node scripts/palette.ts src/theme.inputs.css --theme
 src/generated/theme.css --scheme src/generated/scheme.css --mobile src/generated/tailwind.css
 --json src/generated/palette.json --namespace noa"`. Node 22.18+, no dependencies. Keep it out of the
-  formatter and linter too, so it stays byte-identical to the plugin's: `design-loop` and
-  `design-refresh` compare it with the plugin's and offer the newer one
-  ([plugin-files.md](../../design-refresh/references/plugin-files.md)).
+  formatter and linter too, so it stays byte-identical to the plugin's: `implement-design` and
+  `refresh-design` compare it with the plugin's and offer the newer one
+  ([plugin-files.md](../../refresh-design/references/plugin-files.md)).
 - Apps import the package's export names, never a `generated/` path, so the layout can change
   without touching them.
 - Add `generated/` to the formatter's and linter's ignore files: a reformatted output turns every

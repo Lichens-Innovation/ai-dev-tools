@@ -643,7 +643,7 @@ class Component extends DCLogic {
     const closeAll = () => this.setState({ pop:null });
     const css = s.tab === 'web' ? this.webCss() : s.tab === 'mobile' ? buildTailwindCss(p, this.props.namespace) : JSON.stringify(toInputs(p), null, 2);
     return {
-      css, exportHint: s.tab === 'web' ? 'The theme (plain values, flipped by prefers-color-scheme) plus the browser scheme block, so color-scheme on <html> can force a mode.' : s.tab === 'mobile' ? 'The theme plus Tailwind v4 utilities, for a mobile-only project. React Native follows prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. design-loop reads it when the palette is approved.',
+      css, exportHint: s.tab === 'web' ? 'The theme (plain values, flipped by prefers-color-scheme) plus the browser scheme block, so color-scheme on <html> can force a mode.' : s.tab === 'mobile' ? 'The theme plus Tailwind v4 utilities, for a mobile-only project. React Native follows prefers-color-scheme.' : 'Paste into the card\'s inputs prop to keep these colors. implement-design reads it when the palette is approved.',
       inputsTabBg: s.tab === 'inputs' ? 'var(--bg-elevated)' : 'transparent', setInputsTab: () => this.setState({ tab:'inputs', copied:false }),
       webTabBg: s.tab === 'web' ? 'var(--bg-elevated)' : 'transparent', mobileTabBg: s.tab === 'mobile' ? 'var(--bg-elevated)' : 'transparent',
       setWeb: () => this.setState({ tab:'web', copied:false }), setMobile: () => this.setState({ tab:'mobile', copied:false }),

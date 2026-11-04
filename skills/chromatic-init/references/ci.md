@@ -1,7 +1,7 @@
 # Chromatic in CI
 
 Read only when the user chose CI publishing in step 6. Without it, the design loop still
-publishes manually (`design-loop` step 9) — CI publishing only adds a build per push.
+publishes manually (`implement-design` step 9) — CI publishing only adds a build per push.
 
 ## Before editing the pipeline
 

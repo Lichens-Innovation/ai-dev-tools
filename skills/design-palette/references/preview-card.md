@@ -15,7 +15,7 @@ so every card in the project shares:
   card, the project's start page. To its right, in the navbar and the sidebar, a Tailwind icon
   opens the [Tailwind classes card](#tailwind-classes-card) when the project has one.
 - **Hamburger button and sidebar**: the palette link, then **Pages** (the screen mockups, from
-  `screens/index.json`, written by `design-refresh`), then every other card grouped as in the
+  `screens/index.json`, written by `refresh-design`), then every other card grouped as in the
   Design System view, from the `_ds_manifest.json` Claude Design compiles at the project root.
   A click opens that page in place. The sidebar starts open on wide screens and remembers its
   state; on narrow screens it covers the page and closes after a pick. Proposals are not listed.
@@ -58,7 +58,7 @@ The **Export → Web** tab ends with the token values in use.
 ## Tailwind classes card
 
 [`templates/tailwind-classes.html`](../templates/tailwind-classes.html), uploaded to the project
-root as `Tailwind.html` by `design-init` when the palette has a Tailwind namespace, lists every
+root as `Tailwind.html` by `init-design-studio` when the palette has a Tailwind namespace, lists every
 class the palette generates: the text, background and border names (`text-noa-muted`,
 `bg-noa-primary-subtle`, `border-noa-danger-strong`, …) grouped by color, then every token by its
 full name on a chosen utility (`ring-noa-focus-ring`). Each class shows its swatch, the token it
@@ -76,7 +76,7 @@ the hand-authored token values from its `tokens` prop (`{ "spacing-md": "1rem", 
 token overrides from its `overrides` prop (`{ "link": "info-text" }`), all written by
 `palette.ts --to-card`. Its Semantic section marks an overridden token with "(override)". Swatch, field and footer edits are a draft; to keep them, paste
 the footer's **Copy request** in Claude Design's chat (or paste the card's **Export → Inputs JSON**
-into `inputs`). The card's `inputs`, `tokens` and `overrides` are what `design-loop` applies when the palette
+into `inputs`). The card's `inputs`, `tokens` and `overrides` are what `implement-design` applies when the palette
 is approved: `--from-card` rewrites the values in the inputs file in place and ignores a token
 name the file lacks (add new tokens to the file, then re-seed the card); it adds, rewrites or
 removes override lines in the overrides block and fails, writing nothing, on an invalid one.
@@ -85,7 +85,7 @@ A component may not use the input its name suggests (a "primary" button can be f
 
 ## Push the card
 
-`design-init` does this automatically (seed + reconcile). Manually:
+`init-design-studio` does this automatically (seed + reconcile). Manually:
 
 1. Write the inputs, token values and title: `node palette.ts <canonical> --to-card <card> --title "<name>" --namespace <palette.namespace>`
    (the card's Tailwind export uses it).
@@ -96,12 +96,12 @@ A component may not use the input its name suggests (a "primary" button can be f
    tool's `create_support_js`. The card does not render without it; never overwrite an
    existing one.
 4. Record the card in the manifest's `palette` entry (contract §2). Approving the palette card
-   triggers `design-loop` to copy the approved inputs back into the canonical file and re-run
+   triggers `implement-design` to copy the approved inputs back into the canonical file and re-run
    `palette.ts`.
 
-A newer plugin brings a newer card: `design-refresh` (and `design-loop` before implementing) puts
+A newer plugin brings a newer card: `refresh-design` (and `implement-design` before implementing) puts
 the plugin's card code in place and keeps the card's data (`data-props`), with the navbar beside
-it ([plugin-files.md](../../design-refresh/references/plugin-files.md)).
+it ([plugin-files.md](../../refresh-design/references/plugin-files.md)).
 
 The first line, `<!-- @dsCard group="Colors" -->`, files the card under **Colors** in the Design
 System view. Keep it when editing the card.
@@ -113,7 +113,7 @@ System view. Keep it when editing the card.
   blocks such a frame from loading `http://localhost` without a prompt (Firefox logs
   `prompt action: auto_deny`), and a private Chromatic permalink redirects to a login page that
   refuses to be framed. To see palette changes on real components, run `/design sync` after
-  `design-loop` applies the palette: the synced cards render the shipped components.
+  `implement-design` applies the palette: the synced cards render the shipped components.
 - Deleting or moving a card file can leave a stale "file not found" entry in the Design System
   view (Claude Design keeps it in its generated `_ds_manifest.json`). Upload the card at its
   final path the first time.

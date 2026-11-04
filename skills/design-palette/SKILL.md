@@ -1,12 +1,12 @@
 ---
 name: design-palette
-description: "Creates or migrates the canonical CSS theme palette: light/dark inputs, generated scales, semantic tokens shared by web and React Native, hand-authored spacing/type/breakpoint tokens, Tailwind v4 utilities or Sass names, and a contrast audit. Used by design-init, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
+description: "Creates or migrates the canonical CSS theme palette: light/dark inputs, generated scales, semantic tokens shared by web and React Native, hand-authored spacing/type/breakpoint tokens, Tailwind v4 utilities or Sass names, and a contrast audit. Used by init-design-studio, or directly when the user wants to create a theme palette, set up design tokens, normalize existing CSS variables, or check palette contrast."
 ---
 
 # Design Palette
 
 Produces the **canonical theme palette**, the single source of truth for design tokens
-(contract §5). Usually invoked by `design-init`; can run standalone.
+(contract §5). Usually invoked by `init-design-studio`; can run standalone.
 
 Read before starting:
 
@@ -83,7 +83,7 @@ Read before starting:
    Raise the project's `engines.node` to `>=22.18` when it allows older versions. Outside a
    `"type": "module"` package, Node prints a harmless module-type warning; add `"type": "module"`
    when no other script there needs CommonJS. The manifest records it as `palette.script` and the
-   namespace as `palette.namespace` (`design-init` writes them). On a later run, compare the copy
+   namespace as `palette.namespace` (`init-design-studio` writes them). On a later run, compare the copy
    with the plugin's first and, when they differ, show the diff and ask before replacing it
    (contract §5). Adding the script is no install: never run the package manager's install.
 
@@ -121,12 +121,12 @@ Read before starting:
    `WARN` lines are advisory; explain them in one line each. Also say which brand slots are unset:
    they have no tokens, so a class like `bg-noa-tertiary` does not exist until the input is added.
 
-8. **Palette card.** When run by `design-init`, stop here: it seeds the Claude Design card and
+8. **Palette card.** When run by `init-design-studio`, stop here: it seeds the Claude Design card and
    reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md).
 
 9. **Report.** Canonical file path, the `palette` script, generated file(s), what each app
    imports, input count and audit summary. The inputs are canonical; Claude Design is downstream
-   and `design-loop` reconciles its changes back into them.
+   and `implement-design` reconciles its changes back into them.
 
 ## Rules
 

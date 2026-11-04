@@ -2,7 +2,7 @@
 // design-palette generator: reads the canonical --name-lm / --name-dm inputs, writes the theme, its browser scheme file,
 // the namespaced Tailwind utilities, Sass names and a resolved JSON, syncs inputs with the Claude Design palette card, and prints a
 // contrast audit. Zero dependencies. Node 22.18+ runs it as is (erasable TypeScript only: no build step).
-// Copied into projects by the design plugin: edit the plugin's copy, never a project's.
+// Copied into projects by the design-studio plugin: edit the plugin's copy, never a project's.
 
 type Mode = 'light' | 'dark';
 type Pair = { light: string; dark: string };

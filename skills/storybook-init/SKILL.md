@@ -1,13 +1,13 @@
 ---
 name: storybook-init
-description: "Installs and configures Storybook in a React or React Native project. Used by design-init, or directly when the user wants to add Storybook or configure the Storybook MCP."
+description: "Installs and configures Storybook in a React or React Native project. Used by init-design-studio, or directly when the user wants to add Storybook or configure the Storybook MCP."
 ---
 
 # Storybook Init
 
 Installs the **render + knowledge** stack for the design loop: Storybook, the Storybook MCP
 server (knowledge + tests), and Playwright (screenshots). Chromatic is `chromatic-init`. Usually
-invoked by `design-init`. Needs Node.js 20+ and npm 10+ / pnpm 9+ / Yarn 4+.
+invoked by `init-design-studio`. Needs Node.js 20+ and npm 10+ / pnpm 9+ / Yarn 4+.
 
 Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md): this skill
 satisfies the render/knowledge preconditions in §6 and produces the **Storybook targets** of §2.
@@ -72,7 +72,7 @@ row. A normal repo has exactly one (root, `:6006`, key `default`).
 
 5. **Confirm Playwright screenshots.** Ensure Playwright is installed (`npm i -D playwright &&
    npx playwright install chromium`) and can capture a single story from the running Storybook via
-   `<url>/iframe.html?id=<storyId>&viewMode=story`. `design-loop`'s `scripts/screenshot.mjs` takes
+   `<url>/iframe.html?id=<storyId>&viewMode=story`. `implement-design`'s `scripts/screenshot.mjs` takes
    the URL as an argument, so one install serves every target.
 
 6. **Baseline stories (MCP-guided).** If mapped components lack stories, scaffold minimal ones so
@@ -84,7 +84,7 @@ row. A normal repo has exactly one (root, `:6006`, key `default`).
    - Record the target for the manifest (contract §2): `dir`, `url`, `mcpServer`, `runCommand`.
      A single root target on `:6006` matches the defaults and needs no `storybooks` entry.
    - Report the run command + URL, MCP entry, Playwright status, and any component still missing a
-     story (it blocks `design-loop` for that component).
+     story (it blocks `implement-design` for that component).
    - Next: run `chromatic-init` to add the publish/approval gate.
 
 ## Notes

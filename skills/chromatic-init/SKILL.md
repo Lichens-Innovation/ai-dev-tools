@@ -1,15 +1,15 @@
 ---
 name: chromatic-init
-description: "Adds Chromatic visual testing to a Storybook project. Used by design-init, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow."
+description: "Adds Chromatic visual testing to a Storybook project. Used by init-design-studio, or directly when the user wants to set up Chromatic, visual regression testing, or a Storybook review workflow."
 ---
 
 # Chromatic Init
 
 Wires **Chromatic**, the visual regression / approval gate at the end of the design loop. Runs
-after `storybook-init`; usually invoked by `design-init`.
+after `storybook-init`; usually invoked by `init-design-studio`.
 
 Read [`design-contract.md`](${CLAUDE_SKILL_DIR}/../../references/design-contract.md): Chromatic is
-the PUBLISH stage, which `design-loop` calls once a component's render has converged and tests pass.
+the PUBLISH stage, which `implement-design` calls once a component's render has converged and tests pass.
 
 Set up **once per Storybook target** (contract §2): one Chromatic project, token and publish
 script each, so baselines and review queues stay independent. A single-Storybook repo uses
@@ -55,7 +55,7 @@ Prerequisites: Storybook 6.5+ installed and building; Node 18+; `git`; a Chromat
    repo's wrapper, not at the root (no Storybook there). Prefer the env var over typing the token
    on the command line (shell history).
 
-6. **Ask about CI publishing.** Publishing is already covered without CI: `design-loop` publishes
+6. **Ask about CI publishing.** Publishing is already covered without CI: `implement-design` publishes
    each target manually once a component converges. CI publishing adds a build — and its
    snapshots — on every triggering push, which can exhaust a free or small Chromatic plan. Ask
    the user whether to publish from CI, stating that trade-off.
@@ -74,4 +74,4 @@ Prerequisites: Storybook 6.5+ installed and building; Node 18+; `git`; a Chromat
 
 - A wrapper that reads the token from `.env` should tolerate `export `, spaces around `=`, quotes
   and CRLF — a strict `^NAME=` match reports "not set" on a correctly filled file.
-- The first run only establishes a baseline; diffs appear on later runs (the `design-loop` publish step).
+- The first run only establishes a baseline; diffs appear on later runs (the `implement-design` publish step).
