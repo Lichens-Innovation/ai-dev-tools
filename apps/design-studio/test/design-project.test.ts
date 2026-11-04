@@ -166,7 +166,7 @@ describe('palette', () => {
   it('ships the plugin palette.ts byte for byte in the fixture', async () => {
     const plugin = path.resolve(
       FIXTURE,
-      '../../../../../plugins/design/skills/design-palette/scripts/palette.ts',
+      '../../../../../plugins/design-studio/skills/design-palette/scripts/palette.ts',
     )
     expect(
       await readFile(path.join(FIXTURE, 'theme/scripts/palette.ts'), 'utf8'),

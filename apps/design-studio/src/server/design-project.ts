@@ -35,7 +35,7 @@ export interface PageRef {
 export type PageVariant = 'reference' | 'proposal'
 
 /**
- * A proposal's version: `a` is the proposal itself (`<name>.html`, what design-loop implements), `b`..`z` are
+ * A proposal's version: `a` is the proposal itself (`<name>.html`, what implement-design implements), `b`..`z` are
  * alternates (`<name>.<v>.html`, next to it) made from wireframes, until one is promoted.
  */
 export const VERSION = /^[a-z]$/

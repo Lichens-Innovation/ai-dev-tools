@@ -119,7 +119,7 @@ export const savePageProposal = createServerFn({ method: 'POST' })
     ),
   )
 
-/** The alternate becomes the proposal (design-loop's target). */
+/** The alternate becomes the proposal (implement-design's target). */
 export const promoteVersion = createServerFn({ method: 'POST' })
   .validator(pageRef.extend({ version }))
   .handler(({ data }) =>

@@ -602,7 +602,7 @@ function WireframeCanvas({
   }
 
   const copy = (request: SketchRequest) => {
-    const command = `/design-sketch ${request.id}`
+    const command = `/sketch-in-studio ${request.id}`
     void navigator.clipboard
       .writeText(command)
       .then(() => setNote(`Copied ${command}`))

@@ -67,7 +67,7 @@ export function createMcpServer({
     'get_page',
     {
       description:
-        'Read a page. Returns { html, hash }; pass the hash back as baseHash when writing. A proposal has versions: "a" is the proposal itself (what design-loop implements), "b".."z" are alternates.',
+        'Read a page. Returns { html, hash }; pass the hash back as baseHash when writing. A proposal has versions: "a" is the proposal itself (what implement-design implements), "b".."z" are alternates.',
       inputSchema: {
         ...pageShape,
         variant: z.enum(['reference', 'proposal']).default('proposal'),

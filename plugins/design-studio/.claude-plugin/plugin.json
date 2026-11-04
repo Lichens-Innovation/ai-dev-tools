@@ -1,0 +1,10 @@
+{
+  "name": "design-studio",
+  "version": "2.0.0",
+  "description": "Design <-> Storybook/Chromatic iteration loop on a local design studio (or, secondarily, Claude Design): iterate look-and-feel there, then implement and visually validate the result in a React or React Native codebase.",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["design", "design-system", "design-studio", "storybook", "chromatic", "claude-design", "playwright"]
+}
