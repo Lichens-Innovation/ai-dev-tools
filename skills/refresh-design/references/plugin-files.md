@@ -10,10 +10,11 @@ itself:
 | `Tailwind.html`   | Claude Design  | `design-palette/templates/tailwind-classes.html` (Tailwind namespace only) |
 | `Palette.dc.html` | Claude Design  | `design-palette/templates/palette-preview.dc.html`, with the project's data |
 | Conventions block | repo, readme header | `references/conventions.md`, fitted to the project (`/design sync` publishes it) |
+| Theme rule        | repo           | `design-palette/templates/theme-rule.md`, fitted to the project (`.claude/rules/theme.md`) |
 
 `design.manifest.json` records the plugin version they were last brought to (`pluginVersion`).
-With `backend: "local"` only `palette.script` is a copy (the cards and the conventions live in
-Claude Design): follow update step 1 and the stamp, skip the rest. Then run `/open-design-studio
+With `backend: "local"` only `palette.script` and the theme rule are copies (the cards and the
+conventions live in Claude Design): follow update steps 1 and 1b and the stamp, skip the rest. Then run `/open-design-studio
 rebuild` (`commands/open-design-studio.md`): the image holds the studio, so a newer plugin's studio
 needs a rebuild, and in a sandboxed session its step 4 replaces the sandbox entries a moved
 plugin checkout left stale.
@@ -29,8 +30,8 @@ node <plugin-files.mjs> check
 
 - Exit 0 (`current`, `palette.ts` and the conventions the same): nothing to do, and no Claude
   Design reads.
-- Exit 1 (`behind`, `unstamped`, or `paletteScript.state` or `conventions.state` not `same`):
-  update, below. `conventions` is `null` when `.design-sync/config.json` has no `readmeHeader`.
+- Exit 1 (`behind`, `unstamped`, or `paletteScript.state`, `conventions.state` or
+  `themeRule.state` not `same`): update, below. `conventions` is `null` when `.design-sync/config.json` has no `readmeHeader`.
 - Exit 3 (`ahead`): this machine has an older plugin than the one that last updated the project.
   Never downgrade: tell the user to update the plugin (`/plugin`, then the `design-studio` plugin) and stop
   until they do or say to go on anyway.
@@ -46,6 +47,25 @@ by hand, the Claude Design files there). A file the user keeps is left as is; sa
    `git status`: the generated files should not change. When they do, show the diff before going
    on; it is the new plugin's output, not an edit. A change the user made in the repo copy belongs
    in the plugin: offer to move it there.
+
+1b. <a id="theme-rule"></a>**Theme rule** (`themeRule.state` not `same`; do it right after step 1, it
+   needs no Claude Design). `.claude/rules/theme.md` is the plugin's template fitted to the
+   project, with the plugin text's hash in its `design-plugin:theme-rule` marker. Print the
+   plugin's version with `node <plugin-files.mjs> theme-rule`, then:
+
+   - `missing` (a project set up before the rule existed): create it as `design-palette` step 6b
+     does, from the manifest's `palette` entry (inputs, outputs, `script`, `namespace`) and the
+     project's command convention (the `justfile` check of that step, else the package's
+     `palette` script). Ask first.
+   - `differs`: show what the plugin's text says that the project's doesn't, and the merged rule:
+     the plugin's points, still fitted, keeping the project's notes and any addition that doesn't
+     contradict them.
+   - `unmarked`: the file isn't from the plugin or predates the marker. Show the plugin's rule
+     next to it and propose a merge under the marker; never duplicate points or drop the
+     project's own.
+
+   On yes, write it; kept as is, leave the text. Either way run `node <plugin-files.mjs>
+   mark-rule` so the same text isn't offered again.
 
 2. <a id="conventions"></a>**Conventions** (`conventions.state` not `same`). The readme header
    holds the plugin's conventions between `<!-- design-plugin:conventions <hash> -->` and
