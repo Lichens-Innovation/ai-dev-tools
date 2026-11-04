@@ -2,7 +2,7 @@
 
 A PreToolUse hook, deny rules and usually a sandbox are active. After a denied call, change approach instead of retrying; if that's impossible, tell the user what is missing.
 
-- Missing tool (e.g. `Glob`): use `find`/`ls` via Bash or `Grep`. `Write` fails on an existing file you haven't read: `rm -f` it first.
+- Missing tool (e.g. `Glob`, `Grep`: some builds don't ship them): use `find`/`ls`/`grep` via Bash. `Write` fails on an existing file you haven't read: `rm -f` it first.
 - The hook scans the whole command; a `/` or `~/` in a string counts as a path. Message text without `$` or backticks is skipped (`git commit -m '…'`, `-F - <<'EOF'`, `gh`/`glab` `--title|--body|--notes|--description`). Put other path-heavy text (scripts, JSON) in a file made with `Write`.
 - Never `cd`, even inside the project: a read after a `cd` can't be checked against the read block, so the user must approve it even in auto mode. Use relative or absolute paths, `git -C <dir>`, the tool's own flag (`-C`, `--root`, `--prefix`, `--cwd`) or `pnpm --filter <pkg>` / `npm -w <pkg>`.
 - Edit files with Edit/Write, never `sed -i`, `perl -i` or `awk` rewrites, even for small edits: Claude Code can't check their scripts against the read block, so each one prompts.
@@ -13,7 +13,7 @@ A PreToolUse hook, deny rules and usually a sandbox are active. After a denied c
 - Package installs (`pnpm|npm|yarn|bun install|add|ci`) don't fit the sandbox: ask the user to run them with `!` instead of retrying or widening it.
 - The sandbox can't write `.git/config`: tracking fails with `could not lock config file .git/config: Operation not permitted`, and `git checkout -B` can leave a half-done checkout (check `git status`). Use `git switch [-c] <branch>` without `-t`/`--track`; `git push -u` is fine.
 - A `git switch|checkout|pull` failing on `.mcp.json` (or another file the sandbox won't let it write): check `git status`, then ask the user to run it with `!`. Don't retry.
-- Bash can't read most of `~/.claude` (`cat|tail|grep: Operation not permitted`), including large saved tool outputs under `~/.claude/projects`: go straight to `Grep` to find lines and `Read` with `offset`/`limit` to page through them, without trying Bash first.
+- Bash can't read most of `~/.claude` (`cat|tail|grep: Operation not permitted`), including large saved tool outputs under `~/.claude/projects`: go straight to `Grep` (if you have it) to find lines and `Read` with `offset`/`limit` to page through them, without trying Bash first.
 - Stay in the project and its `additionalDirectories`, plus reads (no `cd`) in the sandbox's `allowRead`; ask for anything else. Never read or edit `.env*` (except `.example|.sample|.template|.dist`), `~/.claude.json` or `.credentials.json`, and don't dodge the check.
 - An `ask` on settings or hook files is intentional: explain and wait.
 - A guardrail that keeps costing you steps, or is unclear: finish the task, then tell the user and suggest improving it (`/setup-claude-guardrails` ships the rule and hook). Don't work around it.
