@@ -34,7 +34,7 @@ this skill produces must satisfy the preconditions in §6.
    `/switch-design-backend`. With no manifest yet, ask (`AskUserQuestion`): **Claude Design** (explore in claude.ai/design;
    needs the Claude Design MCP, DesignSync and `/design sync`) or **Local design studio** (a Docker
    container serves the project's `design/` folder; no account, nothing leaves the machine).
-   Steps 4, 5, 6 and 8 are for Claude Design only; the local backend has its own steps L1 to L4
+   Steps 4, 5, 6 and 8 are for Claude Design only; the local backend has its own steps L1 to L5
    after step 7. Everything else is shared.
 
 1b. **Prerequisites and choices.**
@@ -183,8 +183,28 @@ L3. **Start the studio.** Follow `${CLAUDE_SKILL_DIR}/../../commands/open-design
    registers the studio MCP at project scope. Then check `node
    ${CLAUDE_SKILL_DIR}/../implement-design/scripts/local-backend.mjs status`.
 
-L4. **Explain the loop.** Open the studio, pick a component, **Create proposal**, edit it (or ask
-   Claude to), then `/implement-design`.
+L4. **Companion skills (optional).** The plugin's `designer` agent (used by `/design-in-studio` and
+   `/sketch-in-studio`) preloads five interface skills from
+   [jakubkrehel/skills](https://github.com/jakubkrehel/skills) (MIT) when they are installed:
+   `better-layout`, `better-typography`, `better-ui`, `better-accessibility` and `better-writing`.
+   Check `.claude/skills/` and `~/.claude/skills/` for them; when some are missing, ask
+   (`AskUserQuestion`) whether to install them, and give the user the command to run with `!`
+   (it downloads from GitHub; never run it yourself):
+
+   ```
+   npx skills add jakubkrehel/skills -a claude-code -s better-layout -s better-typography -s better-ui -s better-accessibility -s better-writing -y
+   ```
+
+   It installs them in the project's `.claude/skills/` (add `-g` for every project). Never
+   `better-colors`: its palette rules conflict with the canonical palette, and the plugin's
+   [`color-usage.md`](${CLAUDE_SKILL_DIR}/../../references/color-usage.md) already carries its
+   usage and contrast rules. When the user has it (or the whole `interfaces` plugin) installed, say
+   to turn it off for this project. Without the five skills the agent still works, from its own
+   checks and `color-usage.md`, with less guidance on layout, type and copy.
+
+L5. **Explain the loop.** Open the studio, pick a component, **Create proposal**, then explore:
+   `/design-in-studio` (the designer writes versions from a brief), a wireframe and **Make real**,
+   or edits by hand. Press **Use this version** on the one to keep, then `/implement-design`.
 
 8. **Prepare `/design sync`** (Claude Design only). The built-in `/design sync` skill turns a Storybook target's
    stories into the project's component cards. Hand it what this skill already knows so it
@@ -242,7 +262,8 @@ L4. **Explain the loop.** Open the studio, pick a component, **Create proposal**
 
 10. **Report & next steps.** For the **local** backend: palette file(s) and audit summary,
     Storybook/Chromatic/MCP status, the components captured (and those that failed), the studio
-    URL and whether its MCP server is registered, then the loop of step L4; that is the whole
+    URL and whether its MCP server is registered, which companion skills are installed (and which
+    were declined), then the loop of step L5; that is the whole
     report. For **Claude Design**: palette file(s), what each app imports and audit summary,
     Storybook/Chromatic/MCP status, Design project + palette card path, manifest path, and how
     many components have a card, and whether the design provider (with the navbar hook) is in
