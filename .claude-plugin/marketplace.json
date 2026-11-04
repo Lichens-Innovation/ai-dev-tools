@@ -36,6 +36,16 @@
       "description": "React form tools and skills for Claude Code"
     },
     {
+      "name": "react-dnd",
+      "source": "./plugins/react-dnd",
+      "description": "React drag and drop tools and skills for Claude Code"
+    },
+    {
+      "name": "react-testing",
+      "source": "./plugins/react-testing",
+      "description": "React testing tools and skills for Claude Code"
+    },
+    {
       "name": "dev",
       "source": "./plugins/dev",
       "description": "General developer tools and skills for Claude Code"

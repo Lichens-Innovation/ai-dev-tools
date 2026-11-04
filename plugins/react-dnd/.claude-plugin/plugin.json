@@ -1,0 +1,10 @@
+{
+  "name": "react-dnd",
+  "version": "0.1.0",
+  "description": "Drag and drop tools and skills for React with Atlassian's pragmatic-drag-and-drop",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react", "drag-and-drop", "dnd", "pragmatic-drag-and-drop", "atlaskit"]
+}
