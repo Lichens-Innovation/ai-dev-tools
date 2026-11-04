@@ -116,6 +116,35 @@ Read before starting:
    `--diff-card <card>` only prints the differences. `--title <name>` sets the
    card's project name; `--thumbnail <file>` writes the Claude Design project thumbnail.
 
+6b. **Write the theme rule.** Agents editing the app must know the theme is generated. Create
+   `.claude/rules/theme.md` at the repo root from the plugin's template, never overwriting an
+   existing one without showing the diff:
+
+   ```bash
+   node ${CLAUDE_SKILL_DIR}/../refresh-design/scripts/plugin-files.mjs theme-rule > .claude/rules/theme.md
+   ```
+
+   Then fit it to the project, keeping the first lines (frontmatter, then the
+   `design-plugin:theme-rule <hash>` marker) as they are:
+   - Fill `{{INPUTS}}` (the canonical file), `{{GENERATED}}` (the generated folder or files, with
+     the `generated/` glob the formatter ignores) and `{{PALETTE_COMMAND}}`, `{{NAMESPACE}}` and
+     `{{SASS_FILE}}` where they appear.
+   - `{{PALETTE_COMMAND}}` follows the project's command convention. Before defaulting to the
+     package's `palette` script (e.g. `pnpm --filter <pkg> palette`), look for a `justfile`, a
+     `Makefile` or root scripts, and for a rule or hook in `.claude/rules/` and `.claude/hooks/`
+     that tells agents to use them (e.g. "use just recipes"). When one exists and has no recipe
+     for the palette, offer to add one that runs the package's script (`just palette`), ask
+     before editing it, then put that recipe in the rule. When the user declines, use the
+     package script and say in the report that the project's convention doesn't cover it.
+   - Keep exactly one of the `<!-- tailwind -->`, `<!-- css -->` blocks (Tailwind namespace chosen
+     or not) and the `<!-- sass -->` block only with `--sass`; delete the others and every
+     marker comment line of the blocks you keep.
+   - Narrow `paths:` to the UI folders when the repo has non-UI code with CSS or TSX.
+   - Add project specifics under "Project notes" (how mode is toggled, third-party kits that force
+     their own names). They are kept when the plugin updates the rule.
+
+   `refresh-design` keeps it in step with the plugin afterwards.
+
 7. **Report the audit** (report only, never block). For each `FAIL`, propose the smallest input
    change that fixes it (usually nudging that color's lightness) and ask before applying.
    `WARN` lines are advisory; explain them in one line each. Also say which brand slots are unset:
@@ -124,7 +153,7 @@ Read before starting:
 8. **Palette card.** When run by `init-design-studio`, stop here: it seeds the Claude Design card and
    reconciles. Standalone, follow [`references/preview-card.md`](references/preview-card.md).
 
-9. **Report.** Canonical file path, the `palette` script, generated file(s), what each app
+9. **Report.** Canonical file path, the `palette` script, generated file(s), the theme rule, what each app
    imports, input count and audit summary. The inputs are canonical; Claude Design is downstream
    and `implement-design` reconciles its changes back into them.
 

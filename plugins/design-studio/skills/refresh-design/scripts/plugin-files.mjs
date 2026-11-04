@@ -15,6 +15,12 @@
  *   node plugin-files.mjs stamp              write the plugin version into the manifest
  *   node plugin-files.mjs conventions        print the plugin's conventions block, markers included
  *   node plugin-files.mjs mark               record the plugin's conventions as applied in the readme header
+ *   node plugin-files.mjs theme-rule         print the plugin's theme rule template, with its hash in the marker
+ *   node plugin-files.mjs mark-rule          record the plugin's theme rule as applied in .claude/rules/theme.md
+ *
+ * The theme rule (.claude/rules/theme.md, or --rule <path>) is the template design-palette/templates/theme-rule.md
+ * fitted to the project. check compares the hash in its marker with the template's: same | differs | unmarked
+ * | missing. A missing rule asks for an update too, so a project set up before the rule existed is offered it.
  *
  * check prints { plugin, project, version: current|behind|ahead|unstamped, paletteScript, conventions,
  * update }
@@ -43,6 +49,7 @@ import { fileURLToPath } from 'node:url';
 const PLUGIN = fileURLToPath(new URL('../../../', import.meta.url));
 const TEMPLATES = join(PLUGIN, 'skills/design-palette/templates');
 const CONVENTIONS = join(PLUGIN, 'references/conventions.md');
+const THEME_RULE = join(TEMPLATES, 'theme-rule.md');
 const FILES = { 'design-nav.js': 'design-nav.js', 'Tailwind.html': 'tailwind-classes.html', 'Palette.dc.html': 'palette-preview.dc.html' };
 
 const args = process.argv.slice(2);
@@ -52,6 +59,7 @@ const flag = (name) => {
 };
 const manifestPath = flag('--manifest') ?? 'design.manifest.json';
 const syncConfigPath = flag('--sync-config') ?? '.design-sync/config.json';
+const rulePath = flag('--rule') ?? '.claude/rules/theme.md';
 const [command, ...rest] = args;
 
 const fail = (message) => {
@@ -105,6 +113,15 @@ const pluginBlock = () => {
   if (!m) return fail(`${CONVENTIONS} has no conventions block`);
   return { text: m[2], hash: sha(m[2]).slice(0, 12) };
 };
+// The theme rule (.claude/rules/theme.md): the template fitted to the project. Its marker carries the
+// hash of the template text (marker line left out) it was last brought to, so the hash is compared,
+// not the fitted text.
+const RULE_MARKER_RE = /<!-- design-plugin:theme-rule(?: ([0-9a-f]+))? -->\n?/;
+const pluginRule = () => {
+  const text = read(THEME_RULE);
+  if (!RULE_MARKER_RE.test(text)) return fail(`${THEME_RULE} has no theme-rule marker`);
+  return { text, hash: sha(text.replace(RULE_MARKER_RE, '')).slice(0, 12) };
+};
 // The readme header /design sync publishes, from its config; null when the project has none.
 const readmeHeader = () => {
   if (!existsSync(syncConfigPath)) return null;
@@ -130,8 +147,13 @@ if (command === 'check') {
     const m = read(header).match(BLOCK_RE);
     return !m ? 'unmarked' : m[1] === pluginBlock().hash ? 'same' : 'differs';
   })() };
-  const update = version === 'behind' || version === 'unstamped' || [paletteScript, conventions].some((c) => c !== null && c.state !== 'same');
-  print({ plugin, project, version, paletteScript, conventions, update: version !== 'ahead' && update });
+  const themeRule = { path: rulePath, state: (() => {
+    if (!existsSync(rulePath)) return 'missing';
+    const m = read(rulePath).match(RULE_MARKER_RE);
+    return !m || !m[1] ? 'unmarked' : m[1] === pluginRule().hash ? 'same' : 'differs';
+  })() };
+  const update = version === 'behind' || version === 'unstamped' || [paletteScript, conventions, themeRule].some((c) => c !== null && c.state !== 'same');
+  print({ plugin, project, version, paletteScript, conventions, themeRule, update: version !== 'ahead' && update });
   process.exit(version === 'ahead' ? 3 : update ? 1 : 0);
 } else if (command === 'compare') {
   const dir = rest[0];
@@ -194,6 +216,15 @@ if (command === 'check') {
   if (!BLOCK_RE.test(text)) fail(`${header} has no design-plugin:conventions markers: put the block between them first`);
   writeFileSync(header, text.replace(BLOCK_RE, (_, __, block) => `<!-- design-plugin:conventions ${hash} -->\n${block}<!-- /design-plugin:conventions -->`));
   console.log(`conventions: ${hash}`);
+} else if (command === 'theme-rule') {
+  const { text, hash } = pluginRule();
+  process.stdout.write(text.replace(RULE_MARKER_RE, `<!-- design-plugin:theme-rule ${hash} -->\n`));
+} else if (command === 'mark-rule') {
+  if (!existsSync(rulePath)) fail(`no ${rulePath}`);
+  const text = read(rulePath), { hash } = pluginRule();
+  if (!RULE_MARKER_RE.test(text)) fail(`${rulePath} has no design-plugin:theme-rule marker: add it first`);
+  writeFileSync(rulePath, text.replace(RULE_MARKER_RE, `<!-- design-plugin:theme-rule ${hash} -->\n`));
+  console.log(`theme rule: ${hash}`);
 } else {
-  fail('usage: plugin-files.mjs check | compare <dir> | card <remote-card> <out> | stamp | conventions | mark  [--manifest <path>] [--sync-config <path>]');
+  fail('usage: plugin-files.mjs check | compare <dir> | card <remote-card> <out> | stamp | conventions | mark | theme-rule | mark-rule  [--manifest <path>] [--sync-config <path>] [--rule <path>]');
 }
