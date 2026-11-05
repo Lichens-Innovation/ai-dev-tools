@@ -1,6 +1,6 @@
 # Screenshots inside a sandbox
 
-Read this when `scripts/capture.sh` exits `3`, or the dev server or Storybook will not start, in a project that runs commands in an OS sandbox (Claude Code's Bash sandbox, Docker, CI). Fix what is listed, tell the user what is missing, and fall back to 🚫. Do not widen the sandbox yourself.
+Read this when `scripts/capture.sh` exits `3`, or the dev server or Storybook will not start, in a project that runs commands in an OS sandbox (Claude Code's Bash sandbox, Docker, CI). Fix what is listed, tell the user what is missing, and drop the "Screen capture(s)" section. Do not widen the sandbox yourself.
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -16,4 +16,4 @@ Package installs (`playwright install`, `npm i`) never fit the sandbox. Ask the 
 
 ## Manual fallback
 
-When nothing works, give the user the URL to open (Storybook: `http://localhost:<port>/iframe.html?id=<story-id>&viewMode=story`) and ask them to drag screenshots into the PR on GitHub. Leave "Screen capture(s)" as `- 🚫`.
+When nothing works, give the user the URL to open (Storybook: `http://localhost:<port>/iframe.html?id=<story-id>&viewMode=story`) and ask them to drag screenshots into the PR on GitHub. Drop the "Screen capture(s)" section.

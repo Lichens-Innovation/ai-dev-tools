@@ -11,9 +11,10 @@
 
 ## Related Issue(s)
 
-<!-- Fill from interactive prompt: comma-separated Jira IDs → list as - [Description](https://…/browse/KEY-123) or - [KEY-123](url) -->
-- 🚫
+<!-- Jira IDs → list as - [Description](https://…/browse/KEY-123) or - [KEY-123](url). No tickets: delete this whole section, heading included. -->
+- {related_issue}
 
 ## Screen capture(s)
 
-- 🚫
+<!-- No screenshots: delete this whole section, heading included. -->
+- {screenshot_caption_and_image}
