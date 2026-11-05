@@ -15,15 +15,17 @@
   }
   @page {
     size: A4;
-    margin: 18mm 16mm 20mm;
+    margin: 18mm 0 20mm; /* side padding lives on .page so the cover can run edge to edge */
     @bottom-center { content: counter(page); font: 9pt "Helvetica Neue", Arial, sans-serif; color: #8a95a3; }
   }
+  @page :first { margin-top: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html { font: 10.5pt/1.5 "Helvetica Neue", "Segoe UI", Arial, sans-serif; color: var(--ink); }
   body { margin: 0; }
 
+  .page { padding: 0 16mm; }
   .cover {
-    margin: -18mm -16mm 10mm;
+    margin: 0 0 10mm;
     padding: 22mm 16mm 12mm;
     background: linear-gradient(135deg, var(--accent-dark), var(--accent));
     color: #fff;
@@ -67,6 +69,7 @@
   <div class="meta"><span class="pill">{{VERSION}}</span><span>{{DATE}}</span></div>
 </div>
 
+<div class="page">
 <p class="intro">{{INTRO}}</p>
 
 <!-- REPEAT: one <section class="product"> per product/area. A single-area release has exactly one, with its h2 set to the product name. -->
@@ -100,6 +103,7 @@
 </section>
 
 <p class="closing">{{CLOSING}}</p>
+</div>
 
 </body>
 </html>
