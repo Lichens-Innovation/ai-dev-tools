@@ -18,6 +18,7 @@
 
 <!-- REPEAT: one <section class="product"> per product/area. A single-area release has exactly one, with its h2 set to the product name. -->
 <section class="product">
+  <!-- OMIT this whole <header> when the release has a single section (the cover and intro already name the product). -->
   <header>
     <h2>{{SECTION_TITLE}}</h2>
     <p class="tagline">{{SECTION_TAGLINE}}</p>
@@ -31,7 +32,7 @@
     <p>{{FEATURE_TEXT}}</p>
   </div>
 
-  <!-- OMIT this whole block when the section has no screenshot. 1 to 3 figures. -->
+  <!-- OMIT this whole block when the section has no screenshot. 1 to 3 figures, each on its own row. -->
   <h3>{{LABEL_PREVIEW}}</h3>
   <div class="shots">
     <!-- REPEAT: one figure per screenshot; src is a file name next to this HTML -->

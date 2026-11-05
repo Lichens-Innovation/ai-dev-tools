@@ -15,7 +15,7 @@ PR titles may not follow conventional commits. Then decide from the body, and wh
 
 ## Sections
 
-One section per product or area when the user-facing PRs split cleanly across two or more of them (by title scope such as `feat(mobile):`, `feat(web):`, or by the folders they touch). Otherwise a single section titled with the product name. Never create a section with nothing in it. Each section gets a one-sentence tagline naming its headline change.
+One section per product or area when the user-facing PRs split cleanly across two or more of them (by title scope such as `feat(mobile):`, `feat(web):`, or by the folders they touch). Otherwise a single section, and then its `<header>` (product name and tagline) is omitted: the cover and the intro already say both. With two or more sections, each gets a title and a one-sentence tagline naming its headline change. Never create a section with nothing in it.
 
 ## Features
 
@@ -55,4 +55,5 @@ Date format: `3 novembre 2026` (fr), `November 3, 2026` (en).
 
 - Source: the "Screen capture(s)" section of each PR body in the release. Keep only entries that point at a screenshot of the product.
 - At most 3 per section and 6 in the report. Prefer one per headline feature, from `feat` PRs. Skip near-duplicates.
+- Layout: one screenshot per row at full page width, so it stays readable. A PDF has no click-to-enlarge; readers zoom in the viewer, which is why the full-resolution PNG is embedded as is.
 - Caption: the PR's caption, translated, shortened to a few words and written for the user ("Work timer", not "TaskTimer component, running state").
