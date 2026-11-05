@@ -20,7 +20,7 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
 
 3. **Load each PR** (parallel): `gh pr view <n> --json number,title,body,url,labels`. Use only this and the screenshots; never read code.
 
-4. **Ask once, in one message, for what the request lacks:** the product name as customers know it (often not the repo name; suggest `gh repo view --json name --jq .name` as default) and the version (empty = date only). Date is today.
+4. **Ask once, in one message, for what the request lacks:** the product name as customers know it (often not the repo name; suggest `gh repo view --json name --jq .name` as default) and the version (empty = date only). Date is today. **Suggest the version** instead of asking blind, semantic-release style: last release = `git describe --tags --abbrev=0 origin/main` (tags like `v1.4.2`; none: no suggestion). Bump from the step 1 commit subjects, highest wins: `!` after the type or a `BREAKING CHANGE` footer = major; any `feat` = minor; any `fix` or `perf` = patch; only `docs`, `chore`, `refactor`, `test`, `style`, `ci`, `build` = no release, say so. Offer e.g. "Suggested version: 1.5.0 (1 feat, 3 fix since v1.4.2). Use it? [Y/n/other]". It is a suggestion from the commits, not the real semantic-release output: if the project has a `release:dry` script, mention the user can run it to confirm. Never run it yourself (it needs tokens and the network).
 
 5. **Write the content** following `references/writing.md`, then show a plan (title line with product, version, language; each section with feature titles, fix count and planned screenshots; count of internal PRs omitted) and ask "Generate the PDF? [Y/n]" (default **Y**).
 
