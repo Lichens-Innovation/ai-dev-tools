@@ -1,0 +1,53 @@
+/* Change --accent to rebrand. Everything else derives from it. */
+:root {
+  --accent: #0f766e;
+  --accent-dark: #0b4f4a;
+  --accent-soft: #e6f4f2;
+  --ink: #1c2530;
+  --muted: #5b6776;
+  --line: #dde3ea;
+}
+@page {
+  size: A4;
+  margin: 18mm 0 20mm; /* side padding lives on .page so the cover can run edge to edge */
+  @bottom-center { content: counter(page); font: 9pt "Helvetica Neue", Arial, sans-serif; color: #8a95a3; }
+}
+@page :first { margin-top: 0; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html { font: 10.5pt/1.5 "Helvetica Neue", "Segoe UI", Arial, sans-serif; color: var(--ink); }
+body { margin: 0; }
+
+.page { padding: 0 16mm; }
+.cover {
+  margin: 0 0 10mm;
+  padding: 22mm 16mm 12mm;
+  background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+  color: #fff;
+}
+.cover .eyebrow { font-size: 9pt; letter-spacing: .16em; text-transform: uppercase; opacity: .8; }
+.cover h1 { margin: 3mm 0 2mm; font-size: 30pt; line-height: 1.1; font-weight: 700; }
+.cover .meta { display: flex; gap: 4mm; align-items: center; font-size: 10pt; }
+.pill { background: rgba(255,255,255,.18); border-radius: 99px; padding: 1mm 4mm; font-weight: 600; }
+
+.intro { font-size: 11.5pt; color: var(--ink); margin: 0 0 8mm; }
+
+section.product { margin-bottom: 10mm; }
+section.product > header { border-left: 4px solid var(--accent); padding-left: 4mm; margin-bottom: 5mm; break-after: avoid; }
+section.product h2 { margin: 0; font-size: 17pt; letter-spacing: .02em; text-transform: uppercase; color: var(--accent-dark); }
+section.product .tagline { margin: 1mm 0 0; color: var(--muted); }
+
+h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin: 6mm 0 3mm; break-after: avoid; }
+
+.feature { padding: 3mm 4mm; margin-bottom: 3mm; background: var(--accent-soft); border-radius: 2mm; break-inside: avoid; }
+.feature h4 { margin: 0 0 1mm; font-size: 11pt; }
+.feature p { margin: 0; color: #2f3b49; }
+
+.shots { display: flex; gap: 4mm; align-items: flex-start; break-inside: avoid; }
+.shots figure { flex: 1 1 0; margin: 0; text-align: center; min-width: 0; }
+.shots img { max-width: 100%; max-height: 75mm; border: 1px solid var(--line); border-radius: 2mm; box-shadow: 0 1mm 3mm rgba(20,30,45,.12); }
+.shots figcaption { margin-top: 2mm; font-size: 9pt; color: var(--muted); }
+
+ul.fixes { margin: 0; padding: 0; list-style: none; }
+ul.fixes li { position: relative; padding: 1.5mm 0 1.5mm 6mm; border-bottom: 1px solid var(--line); break-inside: avoid; }
+ul.fixes li:last-child { border-bottom: 0; }
+ul.fixes li::before { content: ""; position: absolute; left: 0; top: 3.4mm; width: 2.2mm; height: 2.2mm; border-radius: 50%; background: var(--accent); }

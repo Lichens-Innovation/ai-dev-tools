@@ -29,5 +29,6 @@ Screenshots come from the "Screen capture(s)" section written by `generate-pr-de
 - `SKILL.md` — the workflow.
 - `references/writing.md` — how PRs become features and fixes, tone, labels.
 - `references/sandbox.md` — fixing PDF rendering inside a sandbox.
-- `assets/template.html` — the report layout; change `--accent` to rebrand.
+- `assets/template.html` — the report structure, filled in per run.
+- `assets/report.css` — the report styling; change `--accent` to rebrand.
 - `scripts/render-pdf.sh` — HTML to PDF.
