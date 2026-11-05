@@ -2,7 +2,8 @@
 # Render an HTML file to an A4 PDF: headless Chrome/Chromium first (honours @page margins
 # and page numbers), then the project's Playwright.
 # Usage: bash render-pdf.sh <report.html> <out.pdf>
-# Env:   CHROME_BIN  explicit Chrome/Chromium binary (else looked up on PATH)
+# Env:   CHROME_BIN      explicit Chrome/Chromium binary (else looked up on PATH)
+#        PLAYWRIGHT_BIN  explicit Playwright binary (else the repo root, then apps/*, packages/*)
 # Exit:  0 ok | 2 no renderer available | 3 renderer found but PDF not produced
 set -u
 
@@ -44,15 +45,26 @@ if [ -n "$chrome" ]; then
   run_chrome --no-sandbox && ok && exit 0
 fi
 
-if [ -x node_modules/.bin/playwright ]; then
+pw=${PLAYWRIGHT_BIN:-}
+if [ -z "$pw" ]; then
+  for p in node_modules/.bin/playwright */*/node_modules/.bin/playwright; do
+    if [ -x "$p" ]; then pw=$p; break; fi
+  done
+fi
+
+if [ -n "$pw" ] && [ -x "$pw" ]; then
   tried=1
   rm -f "$pdf"
-  node_modules/.bin/playwright pdf --paper-format=A4 --wait-for-timeout=1000 "$url" "$pdf" 2>&1 && ok && exit 0
+  "$pw" pdf --paper-format=A4 --wait-for-timeout=1000 "$url" "$pdf" 2>&1 && ok && exit 0
+  # Playwright's own browser may not be downloaded: retry with the installed Chrome.
+  echo "render: playwright failed, retrying with the installed Chrome channel" >&2
+  rm -f "$pdf"
+  "$pw" pdf --channel=chrome --paper-format=A4 --wait-for-timeout=1000 "$url" "$pdf" 2>&1 && ok && exit 0
 fi
 
 if [ "$tried" = 1 ]; then
   echo "render: PDF not produced; see references/sandbox.md" >&2
   exit 3
 fi
-echo "render: no Chrome/Chromium on PATH and no project Playwright (set CHROME_BIN)" >&2
+echo "render: no Chrome/Chromium on PATH and no Playwright found (set CHROME_BIN or PLAYWRIGHT_BIN)" >&2
 exit 2
