@@ -35,6 +35,6 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
 
 9. **Check:** `Read` the PDF (`pages: "1-3"`). Right language, images show, no `{{…}}` or comment text, no empty section, nothing cut off. If not, fix the HTML and re-render once.
 
-10. **Clean up:** `rm -rf "$TMPDIR/release-report"`. Report the PDF path, page count and what was skipped (internal PRs, unreachable images). Do not commit it; suggest `release-report-*.pdf` in `.gitignore`.
+10. **Clean up:** `rm -rf "$TMPDIR/release-report"`. Report the PDF path, page count and what was skipped (internal PRs, unreachable images). Do not commit it; suggest `release-report-*.pdf` in `.gitignore`. If the version came from `next-version.sh` and the project has a `release:dry` script, end with one line: after merging `dev` into `main`, run `release:dry` on `main` to confirm the version matches (it only works there).
 
 Out of scope: publishing or emailing the report, tags, GitHub releases, merging `dev`, and anything customer-facing that names PRs, authors or ticket keys.
