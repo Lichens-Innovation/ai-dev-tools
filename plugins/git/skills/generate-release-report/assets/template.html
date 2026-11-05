@@ -26,11 +26,13 @@
 
   <!-- OMIT this whole block when the section has no new feature -->
   <h3>{{LABEL_NEW}}</h3>
-  <!-- REPEAT: one .feature per user-visible capability -->
-  <div class="feature">
-    <h4>{{FEATURE_TITLE}}</h4>
-    <p>{{FEATURE_TEXT}}</p>
-    <!-- OMIT this <figure> when the feature has no screenshot from its own PR. At most one; src is a file name next to this HTML. There is no separate screenshot section. -->
+  <!-- REPEAT: one .entry (feature box + optional screenshot) per user-visible capability -->
+  <div class="entry">
+    <div class="feature">
+      <h4>{{FEATURE_TITLE}}</h4>
+      <p>{{FEATURE_TEXT}}</p>
+    </div>
+    <!-- OMIT this <figure> when the feature has no screenshot from its own PR. At most one; src is a file name next to this HTML. It stays inside .entry but outside .feature, so the image sits on the white page under the box. There is no separate screenshot section. -->
     <figure><img src="{{IMAGE_FILE}}" alt="{{CAPTION}}"><figcaption>{{CAPTION}}</figcaption></figure>
   </div>
 

@@ -53,7 +53,7 @@ Date format: `3 novembre 2026` (fr), `November 3, 2026` (en).
 ## Screenshots
 
 - Source: the "Screen capture(s)" section of each PR body in the release. Keep only entries that point at a screenshot of the product.
-- **A screenshot belongs to the feature built from its own PR**, and is shown inside that feature, under its text. There is no "Preview" heading and never a gallery or a block of screenshots apart from the features.
+- **A screenshot belongs to the feature built from its own PR**, and is shown directly under that feature's box (outside the coloured box, on the white page). There is no "Preview" heading and never a gallery or a block of screenshots apart from the features.
 - At most one per feature (the most representative; a feature merged from several PRs still gets one) and 6 in the report. A screenshot whose PR produced no feature (a fix, an internal PR) is dropped, not parked elsewhere. A feature without a screenshot simply has none.
-- Layout: full width of the feature box, so it stays readable. A PDF has no click-to-enlarge; readers zoom in the viewer, which is why the full-resolution PNG is embedded as is.
+- Layout: full text width, so it stays readable. A PDF has no click-to-enlarge; readers zoom in the viewer, which is why the full-resolution PNG is embedded as is.
 - Caption: the PR's caption, translated, shortened to a few words and written for the user ("Work timer", not "TaskTimer component, running state").

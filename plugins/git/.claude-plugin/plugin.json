@@ -1,6 +1,6 @@
 {
   "name": "git",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Git and version control tools and skills for Claude Code",
   "author": {
     "name": "Samuel Daigle",

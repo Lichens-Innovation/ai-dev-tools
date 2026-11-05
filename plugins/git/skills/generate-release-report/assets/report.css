@@ -42,10 +42,12 @@ h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: .1em; color: va
 .feature h4 { margin: 0 0 1.5mm; font-size: 14pt; line-height: 1.25; font-weight: 700; color: var(--accent-dark); }
 .feature p { margin: 0; color: #2f3b49; }
 
-/* The screenshot sits inside its feature, full width of the box, so it stays readable. */
-.feature figure { margin: 3mm 0 0; }
-.feature img { display: block; width: 100%; height: auto; max-height: 170mm; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 2mm; }
-.feature figcaption { margin-top: 2.5mm; text-align: center; font-size: 9pt; line-height: 1.3; color: var(--muted); }
+/* .entry keeps a feature box and its screenshot on one page. The screenshot sits under the box, on the white page. */
+.entry { margin-bottom: 6mm; break-inside: avoid; }
+.entry .feature { margin-bottom: 3mm; }
+.entry figure { margin: 0; }
+.entry img { display: block; width: 100%; height: auto; max-height: 170mm; object-fit: contain; border: 1px solid var(--line); border-radius: 2mm; }
+.entry figcaption { margin-top: 2.5mm; text-align: center; font-size: 9pt; line-height: 1.3; color: var(--muted); }
 
 ul.fixes { margin: 0; padding: 0; list-style: none; }
 ul.fixes li { position: relative; padding: 1.5mm 0 1.5mm 6mm; border-bottom: 1px solid var(--line); break-inside: avoid; }

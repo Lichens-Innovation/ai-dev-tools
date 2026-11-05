@@ -24,6 +24,22 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
 
 5. **Write the content** following `references/writing.md`, then show a plan (title line with product, version, language; each section with its feature titles, each marked with the screenshot it will show if any, and the fix count; count of internal PRs omitted) and ask "Generate the PDF? [Y/n]" (default **Y**).
 
+   **Present it as compact tables, not prose, in one message** that also carries the product and version questions of step 4 (the user answers both at once). Use the user's language. Layout:
+
+   | | |
+   |---|---|
+   | Product | Reglo (from CLAUDE.md) |
+   | Version | 3.12.0 suggested (1 feat, 0 fix since v3.11.0) |
+   | Language, date | fr, 5 novembre 2026 |
+
+   | Section | Feature | Screenshot |
+   |---|---|---|
+   | Évaluations | Lien vers le protocole | Grille header |
+   | | *Fixes* | 2 bullets |
+   | | *Omitted* | 1 internal PR, 2 commits without a PR |
+
+   One line per feature (title only, no description), `none` in the Screenshot column when it has none. Then at most one line each for a `warn=` from the version script, and the closing question: "Generate the PDF? [Y/n], or give another version / `date only`." No other prose.
+
 6. **Fetch screenshots** (skip if no PR body has any). A PR screenshot links `https://github.com/{owner}/{repo}/blob/<sha>/<path>?raw=true`. Run `git fetch origin pr-assets`, `mkdir -p "$TMPDIR/release-report"`, then per image `git show <sha>:<path> > "$TMPDIR/release-report/<n>-<name>.png"` (reading from git avoids private-repo download auth). Skip images hosted elsewhere (`user-attachments`, other sites) and tell the user how many. Drop empty files.
 
 7. **Build the HTML.** `cp <skill-dir>/assets/report.css "$TMPDIR/release-report/"`, then `Write` `$TMPDIR/release-report/report.html` from `assets/template.html`: fill every `{{TOKEN}}`, expand or omit the `REPEAT`/`OMIT` blocks, use bare PNG file names as `src`, strip the comments, leave no `{{…}}`. Never `sed` or `perl`.
