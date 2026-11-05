@@ -5,7 +5,7 @@ Generates a customer-facing release report as an A4 PDF from the PRs that are in
 ## What it does
 
 - Finds the unreleased PRs (merge, squash, rebase or fast-forward) and reads their titles and bodies.
-- Rewrites them as an announcement: an intro, then per product a "What's new" list, a screenshot preview (max 3 per section) and an "Improvements & fixes" list. Internal PRs (chores, CI, tests, refactors) are left out.
+- Rewrites them as an announcement: an intro, then per product a "What's new" list where each feature carries the screenshot from its own PR, and an "Improvements & fixes" list. Internal PRs (chores, CI, tests, refactors) are left out.
 - Renders the PDF with headless Chrome or Chromium, or the project's Playwright.
 
 French by default; ask for English to get an English report.

@@ -30,12 +30,7 @@
   <div class="feature">
     <h4>{{FEATURE_TITLE}}</h4>
     <p>{{FEATURE_TEXT}}</p>
-  </div>
-
-  <!-- OMIT this whole block when the section has no screenshot. 1 to 3 figures, each on its own row. -->
-  <h3>{{LABEL_PREVIEW}}</h3>
-  <div class="shots">
-    <!-- REPEAT: one figure per screenshot; src is a file name next to this HTML -->
+    <!-- OMIT this <figure> when the feature has no screenshot from its own PR. At most one; src is a file name next to this HTML. There is no separate screenshot section. -->
     <figure><img src="{{IMAGE_FILE}}" alt="{{CAPTION}}"><figcaption>{{CAPTION}}</figcaption></figure>
   </div>
 
