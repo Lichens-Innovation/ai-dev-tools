@@ -27,8 +27,7 @@ Builds a polished A4 PDF describing what the next release contains, from the PRs
 3. **Load each PR** (parallel calls): `gh pr view <n> --json number,title,body,url,labels`. Use only this data and the screenshots. Never read code to enrich it.
 
 4. **Settings**
-   - **Product name:** the repo name from `gh repo view --json name --jq .name` unless the user gave one.
-   - **Version:** from the request. If absent, ask once ("Release version, e.g. `1.5.0`? Leave empty for date only.").
+   - **Product name** and **version:** take what the request gives. For whatever is missing, ask once, in a single message. The product name shown to customers is often not the repo name, so always ask for it when it was not given; suggest the repo name (`gh repo view --json name --jq .name`) as the default. Example: "Product name as customers know it? (default: `my-repo`) and release version, e.g. `1.5.0`? Leave the version empty for date only."
    - **Date:** today.
 
 5. **Write the content**: read `references/writing.md` and follow it (which PRs become features or fixes, sections, tone, labels, what never to include). Then show a plan and ask "Generate the PDF? [Y/n]" (default **Y**):
