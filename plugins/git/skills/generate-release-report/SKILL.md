@@ -20,11 +20,11 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
 
 3. **Load each PR** (parallel): `gh pr view <n> --json number,title,body,url,labels`. Use only this and the screenshots; never read code.
 
-4. **Ask once, in one message, for what the request lacks:** the product name as customers know it (often not the repo name; suggest `gh repo view --json name --jq .name` as default) and the version (empty = date only). Date is today. **Suggest the version** instead of asking blind: run `bash <skill-dir>/scripts/next-version.sh` (emulates semantic-release's default commit-analyzer rules offline; prints `tag`, `last`, `bump`, `next`, `feat`, `fix`, `breaking`, `warn`). Offer e.g. "Suggested version: 1.5.0 (1 feat, 3 fix since v1.4.2). Use it? [Y/n/other]". `bump=none`: say semantic-release would not release these commits and ask for a version. Any `warn=` line: repeat it. It is an emulation, not the real output: if the project has a `release:dry` script, mention the user can run it to confirm. Never run it yourself (it needs tokens and the network). Exit 3 (unknown ref): skip the suggestion and ask.
+4. **Ask once, in one message, for what the request lacks:** the product name as customers know it (often not the repo name; suggest `gh repo view --json name --jq .name` as default) and the version (empty = date only). Date is today. **Suggest the version** instead of asking blind: run `bash <skill-dir>/scripts/next-version.sh` (emulates semantic-release's default commit-analyzer rules offline; prints `tag`, `last`, `bump`, `next`, `feat`, `fix`, `breaking`, `warn`). Offer it as an option of the question tool (step 5): "1.5.0 (Recommended)", with the counts in its description ("1 feat, 3 fix since v1.4.2"), next to "Date only"; "Other" lets the user type a version. `bump=none`: say semantic-release would not release these commits and ask for a version. Any `warn=` line: repeat it. It is an emulation, not the real output: if the project has a `release:dry` script, mention the user can run it to confirm. Never run it yourself (it needs tokens and the network). Exit 3 (unknown ref): skip the suggestion and ask.
 
-5. **Write the content** following `references/writing.md`, then show a plan (title line with product, version, language; each section with its feature titles, each marked with the screenshot it will show if any, and the fix count; count of internal PRs omitted) and ask "Generate the PDF? [Y/n]" (default **Y**).
+5. **Write the content** following `references/writing.md`, then show a plan (title line with product, version, language; each section with its feature titles, each marked with the screenshot it will show if any, and the fix count; count of internal PRs omitted) and ask whether to generate the PDF.
 
-   **Present it as compact tables, not prose, in one message** that also carries the product and version questions of step 4 (the user answers both at once). Use the user's language. Layout:
+   **Present the plan as compact tables, not prose, then ask with one question-tool call** (never typed `[Y/n]`) holding up to three questions, so the user answers everything at once: product name (options: the detected name marked "(Recommended)", the repo name; "Other" to type), version (step 4), and "Generate the PDF?" ("Yes (Recommended)" / "No"). The user may see only the dialog, so each question states what it needs (the suggested version and its counts, the product) instead of pointing at the tables. Use the user's language. Table layout:
 
    | | |
    |---|---|
@@ -38,7 +38,7 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
    | | *Fixes* | 2 bullets |
    | | *Omitted* | 1 internal PR, 2 commits without a PR |
 
-   One line per feature (title only, no description), `none` in the Screenshot column when it has none. Then at most one line each for a `warn=` from the version script, and the closing question: "Generate the PDF? [Y/n], or give another version / `date only`." No other prose.
+   One line per feature (title only, no description), `none` in the Screenshot column when it has none. Then at most one line for a `warn=` from the version script. No other prose.
 
 6. **Fetch screenshots** (skip if no PR body has any). A PR screenshot links `https://github.com/{owner}/{repo}/blob/<sha>/<path>?raw=true`. Run `git fetch origin pr-assets`, `mkdir -p "$TMPDIR/release-report"`, then per image `git show <sha>:<path> > "$TMPDIR/release-report/<n>-<name>.png"` (reading from git avoids private-repo download auth). Skip images hosted elsewhere (`user-attachments`, other sites) and tell the user how many. Drop empty files.
 

@@ -83,7 +83,7 @@ Generate a concise pull request description by analyzing git changes and using t
    - **Empty sections are removed, not marked.** A section with nothing to say ("Related Issue(s)" with no tickets, "Screen capture(s)" with no screenshots) is deleted entirely, heading included. Never write `🚫`, "N/A" or "None". Do this at the end of step 8, once every section's content is known.
 
 7. **Related tickets**
-   - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask the user:** "Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none."
+   - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask with the question tool:** "Ticket IDs for this PR?", options "No ticket" / "Other" (the user types the IDs, comma-separated, e.g. `PROJ-123, PROJ-456`).
    - **Parsing:** Accept ticket IDs in forms like `tickets: NN-123, TB-456` or inline (e.g. `NN-123`, `TB-456`). Normalize to a trimmed list.
    - **Jira MCP availability:** Before filling related issues, determine whether a **Jira-capable Atlassian MCP server** is enabled (e.g. tools such as `getJiraIssue` in the workspace MCP descriptors). If it is **not** available, **tell the user explicitly** that the Atlassian/Jira MCP is not connected and they should **install and enable it** if they want ticket rows with fetched summaries and correct Jira URLs. Still proceed with the rest of the PR; for "Related Issue(s)" use plain text keys only (e.g. `- PROJ-123`), or drop the section if they confirm there are no tickets.
    - If one or more IDs are available **and** the Jira MCP is available:
@@ -118,7 +118,7 @@ Generate a concise pull request description by analyzing git changes and using t
       - The required scope is `repo` (shown as `Token scopes: ...` per account in the output). If the active account is missing it but another logged-in account has it, prefix every `gh` command for the rest of this step (existing-PR check, PATCH, POST) with `env -u GITHUB_TOKEN -u GH_TOKEN`.
       - If no account has `repo` scope, tell the user to run `gh auth refresh -h github.com -s repo` (or log in with a token that has it) and stop.
       - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh api` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
-   4. Ask the user to confirm: "Push the branch and post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
+   4. Ask the user to confirm with the question tool: "Push the branch and post this PR via `gh api`?", options "Yes (Recommended)" / "No, keep pr-description.md".
    5. On confirm, first push so GitHub has the commits (the POST fails if the branch is not on the remote): `git push -u origin HEAD`, in a call of its own. Then check if a PR already exists for the current branch (prefix with the `env -u ...` from step 3 if one was needed): `gh pr view --json number --jq .number 2>/dev/null`
       - **PR exists (PATCH — update):**
         ```bash

@@ -22,7 +22,7 @@ One command per call; never `cd`.
    | Check | Default |
    |---|---|
    | lint, format check, typecheck | Run |
-   | tests | Ask first: "Run the tests too? [y/N]" (default **N**) |
+   | tests | Ask first with the question tool: "Run the tests too?", options "No (Recommended)" / "Yes" |
    | build, e2e, anything long | Skip, unless the user asks |
 
    - Skip a check this conversation already shows passing on the same changes.
@@ -47,7 +47,7 @@ One command per call; never `cd`.
 
    Scope is the package, plugin or folder most of the change lives in; omit it if unclear. Add a short body only when the *why* is not obvious from the title. **No `Co-Authored-By` or any other Claude attribution line.**
 
-6. **Confirm.** Show the files to stage, the branch (new or current) and the message. Mention in one line that the changes could be split into several commits if they clearly mix types, but default to one. Ask "Commit? [Y/n]" (default **Y**).
+6. **Confirm.** Show the files to stage, the branch (new or current) and the message. Mention in one line that the changes could be split into several commits if they clearly mix types, but default to one. Then ask with the question tool (never a typed `[Y/n]`): "Commit?", options "Yes (Recommended)" / "No". The user may pick "Other" to change the message or the files.
 
 7. **Commit.** `git add <paths>`, then `git commit -m '<message>'` (a second `-m` for the body). Never `--no-verify`. If a hook fails, fix what it reports and make a **new** commit; do not amend.
 
