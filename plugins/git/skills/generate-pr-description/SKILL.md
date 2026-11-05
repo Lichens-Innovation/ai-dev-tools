@@ -12,9 +12,10 @@ Generate a concise pull request description by analyzing git changes and using t
 
 ## Workflow
 
-1. **Identify parent branch**
-   - Current branch: `git branch --show-current`
-   - Parent branch: default `main`; if absent, `master` (`git show-ref --verify --quiet refs/heads/main || echo master`)
+1. **Identify the parent branch and make sure there is something to PR**
+   - Current branch: `git branch --show-current`. Changes (including untracked files, ignoring `pr-description.md`): `git status --short`.
+   - **Parent branch:** the user's choice if they named one ("against main"); else `dev` if `refs/heads/dev` or `refs/remotes/origin/dev` exists; else `main`; else `master` (check with `git show-ref --verify --quiet <ref>`). In the commands below use `origin/<parent>` when that ref exists (it is fresher than a stale local branch), else the local one. The PR `base` is the bare name, without `origin/`.
+   - **Invoke the `commit` skill** (Skill tool) if any of these holds, then re-run this step, since it may have created the feature branch: the working tree has changes; the current branch is the parent, `main`, `master`, `dev` or `develop`; or there are no commits ahead of the parent (`git log --oneline <parent>..HEAD` is empty). If `commit` stops (failing checks, user declines), stop too.
 
 2. **Analyze changes**
    - Get diff stats: `git diff --stat <parent-branch>..HEAD`
@@ -116,8 +117,8 @@ Generate a concise pull request description by analyzing git changes and using t
       - The required scope is `repo` (shown as `Token scopes: ...` per account in the output). If the active account is missing it but another logged-in account has it, prefix every `gh` command for the rest of this step (existing-PR check, PATCH, POST) with `env -u GITHUB_TOKEN -u GH_TOKEN`.
       - If no account has `repo` scope, tell the user to run `gh auth refresh -h github.com -s repo` (or log in with a token that has it) and stop.
       - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh api` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
-   4. Ask the user to confirm: "Post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
-   5. On confirm, check if a PR already exists for the current branch (prefix with the `env -u ...` from step 3 if one was needed): `gh pr view --json number --jq .number 2>/dev/null`
+   4. Ask the user to confirm: "Push the branch and post this PR via `gh api`? [Y/n]" — default **Y**, empty input proceeds.
+   5. On confirm, first push so GitHub has the commits (the POST fails if the branch is not on the remote): `git push -u origin HEAD`, in a call of its own. Then check if a PR already exists for the current branch (prefix with the `env -u ...` from step 3 if one was needed): `gh pr view --json number --jq .number 2>/dev/null`
       - **PR exists (PATCH — update):**
         ```bash
         jq -n \
