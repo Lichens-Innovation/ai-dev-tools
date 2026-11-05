@@ -2,15 +2,26 @@
 
 Goal: 1–3 images giving a general overview of the change, not exhaustive coverage. Every failure here removes the "Screen capture(s)" section; it never blocks the PR.
 
-## 1. Pick at most 3 targets, Storybook first
+## 1. Pick at most 3 targets
+
+Storybook is a shortcut, not a requirement. No Storybook in the project is the normal case, and it means "use the running app", never "skip". Do not drop the section until you have tried the app page and either it failed or the user declined.
 
 | Situation | Target |
 |---|---|
 | `.storybook/` exists and a changed component has a story (sibling `<Name>.stories.*`, or listed in Storybook's `index.json`) | The story: the default or primary variant, one shot per component. |
-| Changed page or route with no story | The running app page. The route must be derivable from the diff (route files, page file path); otherwise ask the user for the URL path or skip. |
-| Only shared or internal changes (hooks, utils, tokens) | Skip, unless they visibly change a story or page already picked. |
+| No Storybook, or the changed component has no story | The page that shows the change in the running app (see "Finding the page" below). |
+| Only shared or internal changes (hooks, utils, tokens) | The page or story that visibly uses them, if one is obvious. Otherwise skip, and say so in one line. |
 
-Show the planned shots (one line each) and ask: "Capture these screenshots? [Y/n]". Default **Y**. The user may drop or swap targets.
+Never skip silently: whenever you give up on a target, tell the user why in one line.
+
+Show the planned shots (one line each, with the URL) and ask: "Capture these screenshots? [Y/n]". Default **Y**. The user may drop or swap targets.
+
+### Finding the page
+
+1. **Start the app** with the project's script (`dev`, `start`, `serve`: read `package.json` scripts, or the README) in the background, and read the URL it prints. Do not assume a port.
+2. **Find the route** from the diff: file-based routers (`pages/`, `app/`, `routes/`, `src/views/`) give it from the path; otherwise search the router config for the changed component and follow its imports upward to the page that renders it.
+3. **Ask when unsure.** Route not derivable, route needs an id (`/orders/:id`), or needs data you do not have: ask the user for the URL path to capture. One question, then proceed.
+4. **Login wall.** If the shot comes back as a login page, do not give up at once: ask whether a dev login, a seeded user, or an auth bypass exists, and use what the user gives. Never type credentials you were not given, never read `.env*`. If nothing works, drop the section and say it was blocked by authentication.
 
 ## 2. Capture
 
@@ -18,7 +29,8 @@ Show the planned shots (one line each) and ask: "Capture these screenshots? [Y/n
 
 - Exit `2` (no tool): tell the user screenshots were skipped, and that Playwright in the project or Chrome on `PATH` enables them. Drop the section.
 - Exit `3` (capture failed) or a server that will not start: read `sandbox.md` (this folder), apply it, report what is missing, drop the section.
-- Start the dev server in the background with the project's script (`storybook`, or `dev`/`start`) and wait until it answers. Always stop it afterwards, even on failure.
+- **A server that is not running is the normal case, never a reason to skip.** Check whether the port answers; if not, start it yourself in the background with the project's script (`storybook`, or `dev`/`start`) and wait until it answers. Do not ask the user to open it. Stop only the servers you started, afterwards, even on failure.
+- If Storybook will not start (missing dependencies, build error), fall back to the app page for the same component before giving up, and tell the user why.
 - Storybook: read `http://localhost:<port>/index.json` (port as printed by the server), find the entry whose `importPath` matches the story file and use its `id`. URL: `http://localhost:<port>/iframe.html?id=<story-id>&viewMode=story`.
 - One call per shot, PNGs in `$TMPDIR`, never in the project tree:
   ```bash

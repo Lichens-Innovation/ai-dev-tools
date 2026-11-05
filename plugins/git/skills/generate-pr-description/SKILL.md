@@ -100,7 +100,7 @@ Generate a concise pull request description by analyzing git changes and using t
 
    Applies only if the step 2 file list touches frontend files (`*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`, `*.css`, `*.scss`, `*.stories.*`) outside test files. Otherwise skip silently and do not load anything below.
 
-   If it applies, read `references/screenshots.md` and follow it: 1–3 shots, Storybook first, published to the `pr-assets` branch, then embedded in "Screen capture(s)". Any failure there removes the "Screen capture(s)" section and never blocks the PR.
+   If it applies, read `references/screenshots.md` and follow it: 1–3 shots, from Storybook when the project has it, otherwise from the running app (no Storybook is not a reason to skip), published to the `pr-assets` branch, then embedded in "Screen capture(s)". Any failure there removes the "Screen capture(s)" section and never blocks the PR.
 
 9. **Enforce 1000 character limit**
    - Count total characters including markdown syntax, **excluding the "Screen capture(s)" section** (image URLs are long and not prose).
