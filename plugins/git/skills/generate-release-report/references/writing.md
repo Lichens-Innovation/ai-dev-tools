@@ -35,10 +35,9 @@ One section per product or area when the user-facing PRs split cleanly across tw
 - Include PR numbers, ticket keys, branch names, file or function names, author names, or internal jargon (store, hook, endpoint, migration…) unless the product's own UI uses that word.
 - Promise dates or future work.
 
-## Intro and closing
+## Intro
 
-- Intro: 2–3 sentences naming the two or three headline changes and where they ship (for example web and mobile). No greeting formulas longer than a few words.
-- Closing: one line inviting questions.
+2–3 sentences naming the two or three headline changes and where they ship (for example web and mobile). No greeting formulas longer than a few words. The report has no closing line or sign-off.
 
 ## Language
 
@@ -50,8 +49,6 @@ French by default; English when the user asks for it. Translate everything, incl
 | `LABEL_NEW` | Nouveautés | What's new |
 | `LABEL_PREVIEW` | Aperçu | Preview |
 | `LABEL_FIXES` | Améliorations & corrections | Improvements & fixes |
-| `CLOSING` | N'hésitez pas à nous contacter pour toute question. | Feel free to contact us with any questions. |
-
 Date format: `3 novembre 2026` (fr), `November 3, 2026` (en).
 
 ## Screenshots

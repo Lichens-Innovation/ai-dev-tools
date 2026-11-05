@@ -58,7 +58,6 @@
   ul.fixes li:last-child { border-bottom: 0; }
   ul.fixes li::before { content: ""; position: absolute; left: 0; top: 3.4mm; width: 2.2mm; height: 2.2mm; border-radius: 50%; background: var(--accent); }
 
-  .closing { break-before: avoid; break-inside: avoid; margin-top: 8mm; padding-top: 4mm; border-top: 2px solid var(--accent); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -100,9 +99,6 @@
     <!-- REPEAT: one li per improvement or fix -->
     <li>{{FIX_TEXT}}</li>
   </ul>
-
-  <!-- LAST SECTION ONLY: keep the closing line here, as a sibling of the last list, so it never lands alone on a page. Delete this comment. -->
-  <p class="closing">{{CLOSING}}</p>
 </section>
 </div>
 
