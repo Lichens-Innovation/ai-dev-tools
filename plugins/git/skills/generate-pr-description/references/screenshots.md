@@ -25,11 +25,13 @@ Show the planned shots (one line each, with the URL) and ask: "Capture these scr
 1. **Start the app** with the project's script (`dev`, `start`, `serve`: read `package.json` scripts, or the README) in the background, and read the URL it prints. Do not assume a port.
 2. **Find the route** from the diff: file-based routers (`pages/`, `app/`, `routes/`, `src/views/`) give it from the path; otherwise search the router config for the changed component and follow its imports upward to the page that renders it.
 3. **Ask when unsure.** Route not derivable, route needs an id (`/orders/:id`), or needs data you do not have: ask the user for the URL path to capture. One question, then proceed.
-4. **Login wall.** If the shot comes back as a login page, do not give up at once: ask whether a dev login, a seeded user, or an auth bypass exists, and use what the user gives. Never type credentials you were not given, never read `.env*`. If nothing works, drop the section and say it was blocked by authentication.
+4. **Login wall.** If the app needs a login (or a shot comes back as a login page), do not give up and do not touch the app's code. Offer a saved session, which the user creates once with `!` (Playwright only):
+   `<playwright-bin> codegen --save-storage=$TMPDIR/pr-shot-auth.json <app-url>` (log in in the window, then close it; `<playwright-bin>` is the one `capture.sh` found, e.g. `apps/<name>/node_modules/.bin/playwright`).
+   Then capture with `capture.sh --storage-state $TMPDIR/pr-shot-auth.json ...`. Never open, print or copy that file, never type credentials you were not given, never read `.env*`, never ask for a token in the chat. The session expires with the login token: a login page after that means "session expired, re-run the codegen command". If the user declines or nothing works, drop the section and say it was blocked by authentication.
 
 ## 2. Capture
 
-`scripts/capture.sh` uses the project's Playwright (`node_modules/.bin/playwright`) if present, else headless Chrome/Chromium from `PATH` or `$CHROME_BIN`. Never install either.
+`scripts/capture.sh` uses the project's Playwright if present (repo root, else `apps/*` or `packages/*`, or `$PLAYWRIGHT_BIN`; it retries with the installed Chrome channel when Playwright's own browser is missing), else headless Chrome/Chromium from `PATH` or `$CHROME_BIN`. Run it from the project root, never with `cd`. Never install either.
 
 - Exit `2` (no tool): tell the user screenshots were skipped, and that Playwright in the project or Chrome on `PATH` enables them. Drop the section.
 - Exit `3` (capture failed) or a server that will not start: read `sandbox.md` (this folder), apply it, report what is missing, drop the section.

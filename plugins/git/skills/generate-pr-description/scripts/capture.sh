@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # Screenshot a URL to a PNG: project Playwright first, then headless Chrome/Chromium.
-# Usage: bash capture.sh <url> <out.png> [width,height]
-# Env:   CHROME_BIN  explicit Chrome/Chromium binary (else looked up on PATH)
+# Usage: bash capture.sh [--storage-state <file>] <url> <out.png> [width,height]
+# Env:   PLAYWRIGHT_BIN  explicit Playwright binary (else the repo root, then apps/*, packages/*)
+#        CHROME_BIN      explicit Chrome/Chromium binary (else looked up on PATH)
+# --storage-state: a Playwright session file (cookies + localStorage) to reuse a login.
+#   Only Playwright can load it; the Chrome fallback is refused so a login page is never shot by mistake.
+#   The file is never read or printed here.
 # Exit:  0 ok | 2 no capture tool available | 3 tool found but capture failed
 set -u
 
-url=${1:?usage: capture.sh <url> <out.png> [width,height]}
-out=${2:?usage: capture.sh <url> <out.png> [width,height]}
+state=
+if [ "${1:-}" = "--storage-state" ]; then
+  state=${2:?--storage-state needs a file}
+  [ -s "$state" ] || { echo "capture: storage state '$state' not found" >&2; exit 3; }
+  shift 2
+fi
+
+url=${1:?usage: capture.sh [--storage-state <file>] <url> <out.png> [width,height]}
+out=${2:?usage: capture.sh [--storage-state <file>] <url> <out.png> [width,height]}
 size=${3:-1280,800}
 w=${size%,*}
 h=${size#*,}
@@ -15,10 +26,30 @@ ok() { [ -s "$out" ]; }
 
 tried=0
 
-if [ -x node_modules/.bin/playwright ]; then
+pw=${PLAYWRIGHT_BIN:-}
+if [ -z "$pw" ]; then
+  for p in node_modules/.bin/playwright */*/node_modules/.bin/playwright; do
+    if [ -x "$p" ]; then pw=$p; break; fi
+  done
+fi
+
+if [ -n "$pw" ] && [ -x "$pw" ]; then
   tried=1
-  node_modules/.bin/playwright screenshot --viewport-size="$size" --wait-for-timeout=1500 "$url" "$out" 2>&1 && ok && exit 0
-  echo "capture: playwright failed, trying Chrome/Chromium" >&2
+  args=(--viewport-size="$size" --wait-for-timeout=1500)
+  [ -n "$state" ] && args+=(--load-storage="$state")
+  rm -f "$out"
+  "$pw" screenshot "${args[@]}" "$url" "$out" 2>&1 && ok && exit 0
+  # Playwright's own browser may not be downloaded: retry with the installed Chrome.
+  echo "capture: playwright failed, retrying with the installed Chrome channel" >&2
+  rm -f "$out"
+  "$pw" screenshot --channel=chrome "${args[@]}" "$url" "$out" 2>&1 && ok && exit 0
+  echo "capture: playwright failed" >&2
+fi
+
+if [ -n "$state" ]; then
+  echo "capture: a stored login needs Playwright and it failed or is missing (PLAYWRIGHT_BIN)" >&2
+  [ "$tried" = 1 ] && exit 3
+  exit 2
 fi
 
 chrome=${CHROME_BIN:-}
@@ -35,7 +66,7 @@ fi
 
 if [ -z "$chrome" ]; then
   [ "$tried" = 1 ] && exit 3
-  echo "capture: no project Playwright and no Chrome/Chromium on PATH (set CHROME_BIN)" >&2
+  echo "capture: no Playwright and no Chrome/Chromium on PATH (set PLAYWRIGHT_BIN or CHROME_BIN)" >&2
   exit 2
 fi
 

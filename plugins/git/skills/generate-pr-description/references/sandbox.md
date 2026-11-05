@@ -12,6 +12,8 @@ Read this when `scripts/capture.sh` exits `3`, or the dev server or Storybook wi
 | Blank or half-rendered shot | Page needs longer than the wait | Raise `--wait-for-timeout` (Playwright) or `--virtual-time-budget` (Chrome) in the script; do not publish the blank shot |
 | `curl` / `index.json` unreachable though the server runs | Network filter blocks loopback | Same as the port-binding row, or the user runs the capture with `!` |
 
+**Narrowest fix for Chrome and Playwright failures:** suggest the user exclude only the capture script from the sandbox, `/sandbox exclude 'bash *capture.sh*'`, instead of allowing Chrome broadly. Only that script then runs unsandboxed. It is their decision; never change settings yourself.
+
 Package installs (`playwright install`, `npm i`) never fit the sandbox. Ask the user to run them with `!`.
 
 ## Manual fallback
