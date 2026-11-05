@@ -61,6 +61,8 @@ gi "$r4" tag release-2.0.0
 gi "$r4" switch -q -c dev
 commit "$r4" "fix: bug"
 check "custom tagFormat" "$r4" next 2.0.1
+check "custom tag prefix" "$r4" prefix release-
+check "default tag prefix" "$r2" prefix v
 check "releaseRules warns" "$r4" warn "custom releaseRules in the config: this result may differ from semantic-release"
 
 # 5. Unknown ref fails

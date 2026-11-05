@@ -15,7 +15,10 @@ French by default; ask for English to get an English report.
 ```
 /generate-release-report version 1.5.0
 /generate-release-report version 1.5.0 in English
+/generate-release-report attach 1.5.0
 ```
+
+The PDF is written at the project root for you to send. With a version, the skill also offers to attach it to the matching GitHub release (after you confirm, and warning if the repo is public). If the release is not published yet, run `attach` once it is.
 
 Screenshots come from the "Screen capture(s)" section written by `generate-pr-description`.
 

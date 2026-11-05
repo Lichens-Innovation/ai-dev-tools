@@ -5,7 +5,7 @@
 # Rules: BREAKING CHANGE footer or "!" after the type = major | feat = minor | fix, perf, revert = patch.
 #        Every other type (docs, chore, refactor, build, ci, test, style) and non-conventional subjects release nothing.
 #        No previous tag: first release is 1.0.0.
-# Output (key=value, one per line): tag, last, bump, next, feat, fix, breaking, warn (zero or more).
+# Output (key=value, one per line): tag, prefix (tag format before the version, e.g. v), last, bump, next, feat, fix, breaking, warn (zero or more).
 # It never contacts the network and never runs semantic-release. It reads .releaserc* from base only to
 # honour tagFormat and to warn when custom rules make the result unreliable.
 set -u
@@ -100,6 +100,7 @@ EOF
 fi
 
 echo "tag=$tag"
+echo "prefix=$prefix"
 echo "last=$last"
 echo "bump=$bump"
 echo "next=$next"

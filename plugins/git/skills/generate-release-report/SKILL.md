@@ -10,6 +10,8 @@ Builds an A4 PDF of what the next release contains, from the PRs in `dev` but no
 
 **Language:** French by default, English when the user asks ("in English", "en anglais").
 
+**Attach mode:** `/generate-release-report attach 3.12.0` skips steps 1–10 and runs only step 11 on the existing `release-report-3.12.0.pdf` at the project root (missing: tell the user to generate the report first, stop). Use it after the release is published.
+
 ## Workflow
 
 One command per call; `git fetch`, `git push` and `gh` need the network, so keep them alone in their call.
@@ -55,4 +57,10 @@ One command per call; `git fetch`, `git push` and `gh` need the network, so keep
 
 10. **Clean up:** `rm -rf "$TMPDIR/release-report"`. Report the PDF path, page count and what was skipped (internal PRs, unreachable images). Do not commit it; suggest `release-report-*.pdf` in `.gitignore`. If the version came from `next-version.sh` and the project has a `release:dry` script, end with one line: after merging `dev` into `main`, run `release:dry` on `main` to confirm the version matches (it only works there).
 
-Out of scope: publishing or emailing the report, tags, GitHub releases, merging `dev`, and anything customer-facing that names PRs, authors or ticket keys.
+11. **Attach to the GitHub release (optional, only with a version).** Gives the team a copy in the cloud; the local PDF stays at the project root for the user to send. Skip silently for a date-only report.
+    1. Tag = `prefix` from `next-version.sh` + version (`v3.12.0`). Check the release exists: `gh release view <tag> --json url`. Missing: do not create it (semantic-release will); say one line: "No release <tag> yet. After it is published, run `/generate-release-report attach <version>`." Stop.
+    2. Visibility: `gh repo view --json visibility --jq .visibility`. If `PUBLIC`, the asset is world-readable: say so in the question and make "No" the recommended option.
+    3. Ask with the question tool: "Attach release-report-<version>.pdf to release <tag>?", options "Yes (Recommended)" / "No". Uploading is visible to everyone with access to the repo, so never skip the question.
+    4. On yes: `gh release upload <tag> release-report-<version>.pdf --clobber` (replaces an earlier upload of the same name), in a call of its own. Report the release URL.
+
+Out of scope: emailing or otherwise sending the report to customers, creating tags or releases, merging `dev`, and anything customer-facing that names PRs, authors or ticket keys.
