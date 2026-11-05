@@ -2,6 +2,10 @@
 
 Goal: 1–3 images giving a general overview of the change, not exhaustive coverage. Every failure here removes the "Screen capture(s)" section; it never blocks the PR.
 
+## 0. Locate the frontend package (monorepos)
+
+Do not look for `.storybook/` or `dev`/`storybook` scripts at the repo root only. Take the directory of each changed frontend file and walk up to the nearest `package.json`: that is the package to work in. Look for `.storybook/` and the scripts there (it is often `apps/<name>/` or `packages/<name>/`). Run its scripts from the root with the workspace tool (`pnpm --filter <name> run storybook`, `npm -w <dir> run ...`, `yarn workspace <name> ...`), never with `cd`. Root scripts that only call `turbo`/`nx` are not the dev server. If several packages changed, pick targets across them, still at most 3 shots. Read the port from the server output or the script (`-p 6006`), not from a default.
+
 ## 1. Pick at most 3 targets
 
 Storybook is a shortcut, not a requirement. No Storybook in the project is the normal case, and it means "use the running app", never "skip". Do not drop the section until you have tried the app page and either it failed or the user declined.
