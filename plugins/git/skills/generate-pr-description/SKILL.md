@@ -78,7 +78,7 @@ Generate a concise pull request description by analyzing git changes and using t
    - Mark checklist items appropriately:
      - **Documentation:** check the box if the PR introduces documentation (JSDoc in changed files, or markdown files `.md` detected in the diff).
      - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories.
-   - Leave "Screen capture(s)" as 🚫 if not applicable.
+   - Leave "Screen capture(s)" as 🚫 for now; step 8 fills it when the PR has UI changes.
 
 7. **Related tickets**
    - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask the user:** "Ticket IDs for this PR (comma-separated, e.g. `PROJ-123, PROJ-456`). Leave empty if none."
@@ -94,15 +94,21 @@ Generate a concise pull request description by analyzing git changes and using t
    - If one or more IDs are available **without** Jira MCP (user notified as above): list keys as plain bullets, e.g. `- PROJ-123`, or a single line listing keys—do not invent browse URLs.
    - If none, keep "Related Issue(s)" as `- 🚫`.
 
-8. **Enforce 1000 character limit**
-   - Count total characters including markdown syntax.
+8. **Screenshots (only when the PR changes the UI)**
+
+   Applies only if the step 2 file list touches frontend files (`*.tsx`, `*.jsx`, `*.vue`, `*.svelte`, `*.html`, `*.css`, `*.scss`, `*.stories.*`) outside test files. Otherwise skip silently and do not load anything below.
+
+   If it applies, read `references/screenshots.md` and follow it: 1–3 shots, Storybook first, published to the `pr-assets` branch, then embedded in "Screen capture(s)". Any failure there leaves `- 🚫` and never blocks the PR.
+
+9. **Enforce 1000 character limit**
+   - Count total characters including markdown syntax, **excluding the "Screen capture(s)" section** (image URLs are long and not prose).
    - If over limit, apply in order:
      1. Keep the title.
      2. Keep all Level-1 theme bullets.
      3. Shorten or remove Level-2 sub-bullets starting from the least critical theme.
      4. Condense remaining lines.
 
-9. **Write file, confirm, execute**
+10. **Write file, confirm, execute**
    1. At **PR project root**, write `pr-description.md`: **line 1** = semantic title, **line 2** = blank, **line 3+** = the filled template body. This exact shape is required — the commands below split the file on it (`head -1` for title, `tail -n +3` for body).
    2. Verify `gh` and `jq` are available: `gh --version` / `jq --version`. If either is missing, tell the user to install it and stop — both are required, there is no fallback.
    3. Verify `gh` auth has sufficient scope: run `gh auth status`.
