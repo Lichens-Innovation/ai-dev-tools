@@ -45,5 +45,5 @@ For [rules installation](./docs/rules.md#installation):
 Use this method when installing a single [skill installation](./docs/skills-cli.md#installation) without using plugins. Note that for Claude Code, the only downside is that skill are installed in a separated `.agents` folder and not directly in the `.claude` in order to respect the AGENT.md convention that Anthropic seems to avoid at all cost to stay "special".
 
 1. Clone the repository `git clone https://github.com/Lichens-Innovation/ai-dev-tools.git`
-2. `npx skills add ./ai-dev-tools/skills/my-skills` e.g. `npx skills add ./ai-dev-tools/skills/generate-pr-description`.
+2. `npx skills add ./ai-dev-tools/skills/my-skills` e.g. `npx skills add ./ai-dev-tools/skills/create-pr`.
 3. The skill CLI will enter an interractive mode, you will select your agent (e.g. claude code) and the scope (project / global).
