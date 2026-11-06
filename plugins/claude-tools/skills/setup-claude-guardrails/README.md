@@ -6,7 +6,7 @@ Installs personal (untracked) guardrails into a project's `.claude/`: permission
 
 Keep Claude away from sensitive data, on the user's computer and in the repository:
 
-1. Don't read or edit anything outside the defined directories (the project, its worktrees and `additionalDirectories`). With the sandbox on, `sandbox.filesystem.allowRead` paths may also be read, and `allowWrite` ones written by sandboxed Bash, where the OS enforces it. So never put secrets (`~/.aws`, `~/.ssh`, `~/.config/gh`) in either list.
+1. Don't read or edit anything outside the defined directories (the project, its worktrees, `additionalDirectories` and `~/.claude` minus its secrets). With the sandbox on, `sandbox.filesystem.allowRead` paths may also be read, and `allowWrite` ones written by sandboxed Bash, where the OS enforces it. So never put secrets (`~/.aws`, `~/.ssh`, `~/.config/gh`) in either list.
 2. Don't read or edit env files and secrets inside them.
 
 Everything else should stay easy. A guardrail that makes Claude take extra steps without protecting either goal is friction to remove, not safety. Judge every change against these two goals.
@@ -63,7 +63,7 @@ Add a new `FAILURE_HINTS` entry (and a case in `test-guardrails.sh`) when a mist
 
 - **Re-injecting the whole rule on every denial or failure:** noise. The hint carries only the relevant fix.
 
-- **Adding `~/.claude/projects` (or its `tool-results` dirs) to `sandbox.filesystem.allowRead` so Bash can read saved tool outputs:** that directory holds the transcripts of every project, which can contain pasted secrets (goal 1). The paths are per session and project, so a narrow grant can't be written up front either. The file tools read them fine: a failure hint (`Grep` to find lines when the build has it, `Read` with `offset`/`limit` to page) and the rule's symptom text save the wasted Bash attempt instead.
+- **Adding `~/.claude/projects` (or its `tool-results` dirs) to `sandbox.filesystem.allowRead` so Bash can read saved tool outputs:** that directory holds the transcripts of every project, which can contain pasted secrets (goal 1). The paths are per session and project, so a narrow grant can't be written up front either. The file tools read them fine: a failure hint (`Grep` to find lines when the build has it, `Read` with `offset`/`limit` to page) and the rule's symptom text save the wasted Bash attempt instead. This keeps out sandboxed Bash only, so one command can't sweep every transcript: the file tools can still open them, on purpose, because saved tool outputs live in the same directory.
 - **Commit, push and PR in one call:** `git commit` would run outside the sandbox, and so would the repo's git hooks (husky, lint-staged). Two calls is the floor.
 - **Skipping the hook's Bash path checks when the sandbox is on:** the sandbox still lets Bash read `/etc`, `/usr` and `/var/folders`, which holds other apps' temp files.
 - **Scanning less of env-file wildcards** (`grep ".env*"`): the shell expands them after the hook runs.
