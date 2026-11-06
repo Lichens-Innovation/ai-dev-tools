@@ -1,12 +1,12 @@
 ---
-name: generate-pr-description
-description: "Generates pull request descriptions by comparing current branch with parent branch. Creates semantic commit-style PR titles and fills PR templates. Use when the user asks to generate PR description, prepare pull request, or create merge request description. The user may include ticket IDs in the request (e.g. tickets: NN-123, TB-456) from the company tracking system; treat those as the related issue IDs for the PR."
+name: create-pr
+description: "Creates or updates a pull request: commits pending work (via the commit skill), generates a semantic PR title and a description from the branch diff using the project's PR template, adds UI screenshots, pushes, and posts the PR with gh. Use when the user asks to create a PR, open a pull request, generate or update a PR description, or prepare a merge request. The user may include ticket IDs in the request (e.g. tickets: NN-123, TB-456) from the company tracking system; treat those as the related issue IDs for the PR."
 disable-model-invocation: true
 ---
 
-# Generate PR Description
+# Create PR
 
-Generate a concise pull request description by analyzing git changes and using the project's PR template.
+Create or update a pull request: commit pending work, analyze the git changes, fill the project's PR template with a concise description, then push and post it.
 
 **Language:** Always generate PR titles and descriptions in **English**, regardless of the user's language or the language of commit messages.
 

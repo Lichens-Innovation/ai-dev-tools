@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Generate Release Report
 
-Builds an A4 PDF of what the next release contains, from the PRs in `dev` but not yet in `main` and the screenshots they carry (see `generate-pr-description`). A customer announcement, not a changelog. A release is always `dev` → `main` (merge or fast-forward); other branches are out of scope, say so and stop.
+Builds an A4 PDF of what the next release contains, from the PRs in `dev` but not yet in `main` and the screenshots they carry (see `create-pr`). A customer announcement, not a changelog. A release is always `dev` → `main` (merge or fast-forward); other branches are out of scope, say so and stop.
 
 **Language:** French by default, English when the user asks ("in English", "en anglais").
 

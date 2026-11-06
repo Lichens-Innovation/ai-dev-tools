@@ -1,11 +1,11 @@
 ---
 name: commit
-description: "Commits the working changes: runs the project checks, creates a feature branch when on main/dev, and makes one semantic commit. Use when the user asks to commit, or when generate-pr-description finds uncommitted changes or no feature branch."
+description: "Commits the working changes: runs the project checks, creates a feature branch when on main/dev, and makes one semantic commit. Use when the user asks to commit, or when create-pr finds uncommitted changes or no feature branch."
 ---
 
 # Commit
 
-Turns uncommitted work into one clean semantic commit on a feature branch. It never pushes and never opens a PR; `generate-pr-description` does that afterwards.
+Turns uncommitted work into one clean semantic commit on a feature branch. It never pushes and never opens a PR; `create-pr` does that afterwards.
 
 **Language:** commit messages in English, whatever the user's language.
 
