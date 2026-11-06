@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<title>{{PRODUCT}} {{VERSION}}</title>
+<link rel="stylesheet" href="report.css">
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">{{LABEL_RELEASE}}</div>
+  <h1>{{PRODUCT}}</h1>
+  <div class="meta"><span class="pill">{{VERSION}}</span><span>{{DATE}}</span></div>
+</div>
+
+<div class="page">
+<p class="intro">{{INTRO}}</p>
+
+<!-- REPEAT: one <section class="product"> per product/area. A single-area release has exactly one, with its h2 set to the product name. -->
+<section class="product">
+  <!-- OMIT this whole <header> when the release has a single section (the cover and intro already name the product). -->
+  <header>
+    <h2>{{SECTION_TITLE}}</h2>
+    <p class="tagline">{{SECTION_TAGLINE}}</p>
+  </header>
+
+  <!-- OMIT this whole block when the section has no new feature -->
+  <h3>{{LABEL_NEW}}</h3>
+  <!-- REPEAT: one .entry (feature box + optional screenshot) per user-visible capability -->
+  <div class="entry">
+    <div class="feature">
+      <h4>{{FEATURE_TITLE}}</h4>
+      <p>{{FEATURE_TEXT}}</p>
+    </div>
+    <!-- OMIT this <figure> when the feature has no screenshot from its own PR. At most one; src is a file name next to this HTML. It stays inside .entry but outside .feature, so the image sits on the white page under the box. There is no separate screenshot section. -->
+    <figure><img src="{{IMAGE_FILE}}" alt="{{CAPTION}}"><figcaption>{{CAPTION}}</figcaption></figure>
+  </div>
+
+  <!-- OMIT this whole block when the section has no improvement or fix -->
+  <h3>{{LABEL_FIXES}}</h3>
+  <ul class="fixes">
+    <!-- REPEAT: one li per improvement or fix -->
+    <li>{{FIX_TEXT}}</li>
+  </ul>
+</section>
+</div>
+
+</body>
+</html>
