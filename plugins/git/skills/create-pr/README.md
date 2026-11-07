@@ -6,7 +6,7 @@ Creates or updates a pull request from your current work: one command from uncom
 
 - Calls the `commit` skill when there is uncommitted work or no feature branch yet.
 - Targets `dev` when it exists, otherwise `main` (or the branch you name).
-- Writes a semantic PR title and fills the project's PR template (or the bundled one) with a short, themed description in English. Empty sections are left out.
+- Writes a semantic PR title and fills the project's PR template (or the bundled one) with a short, themed description in English. Empty sections are left out, and no "Generated with Claude Code" or other Claude attribution line is added.
 - Adds Jira links when you give ticket IDs and the Atlassian MCP is connected.
 - When the PR changes the UI, adds 1–3 screenshots, from Storybook or the running app, hosted on a `pr-assets` branch.
 - Remembers how to screenshot your app in a gitignored `.claude/pr-screenshots.local.md` (start script, port, routes, login session path, waits), asking before it saves it. No passwords or tokens go in it.

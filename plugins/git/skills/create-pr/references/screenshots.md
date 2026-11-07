@@ -38,7 +38,7 @@ Storybook is a shortcut, not a requirement. No Storybook in the project is the n
 | No Storybook, or the changed component has no story | The page that shows the change in the running app (see "Finding the page" below). |
 | Only shared or internal changes (hooks, utils, tokens) | The page or story that visibly uses them, if one is obvious. Otherwise skip, and say so in one line. |
 
-Never skip silently: whenever you give up on a target, tell the user why in one line.
+Never skip silently: whenever you give up on a target, tell the user why in one line. Giving up is the last resort, after the project's own instructions were searched (step 4 of "Finding the page") and the user was asked; "needs a login" or "needs a backend" alone is not a reason.
 
 Show the planned shots (one line each, with the URL) and ask with the question tool: "Capture these screenshots?", options "Yes (Recommended)" / "No, no screenshots". The user may pick "Other" to drop or swap targets.
 
@@ -47,7 +47,10 @@ Show the planned shots (one line each, with the URL) and ask with the question t
 1. **Start the app** with the project's script (`dev`, `start`, `serve`: read `package.json` scripts, or the README) in the background, and read the URL it prints. Do not assume a port.
 2. **Find the route** from the diff: file-based routers (`pages/`, `app/`, `routes/`, `src/views/`) give it from the path; otherwise search the router config for the changed component and follow its imports upward to the page that renders it.
 3. **Ask when unsure.** Route not derivable, route needs an id (`/orders/:id`), or needs data you do not have: ask with the question tool for the URL path to capture: options "Skip this screenshot" / "Other" (the user types the path). One question, then proceed.
-4. **Login wall.** If the app needs a login (or a shot comes back as a login page), do not give up and do not touch the app's code. Offer a saved session, which the user creates once with `!` (Playwright only):
+4. **Login wall or backend needed.** If the app needs a login, a live backend or seeded data (or a shot comes back as a login page), do not give up and do not touch the app's code. "No saved session" and "no recipe" are not reasons to skip: they are the start of this step.
+   - **First look for the project's own instructions** (the recipe, then `README*`, `CLAUDE.md`/`AGENTS.md`, `docs/`, `.claude/skills` and `.claude/rules`, `e2e/` or `tests/` Playwright setup and auth fixtures, `playwright.config.*` `storageState`/`globalSetup`, `.env.example` for test-account variable names, `docker-compose*`, `Makefile`/`justfile`). They usually say how to start the backend, which test account to use and how its session is created. Follow them: start the backend yourself if they say how, and reuse an existing auth setup (e.g. run its setup project) instead of inventing one.
+   - **Then ask, never just skip.** When a step needs the user (credentials you were not given, a login in a browser window), say precisely which, and ask with the question tool: "Capture with a saved session?", options "Yes, I'll log in (Recommended)" / "No, no screenshots". Never tell the user to add the screenshots to the description themselves.
+   - Otherwise offer a saved session, which the user creates once with `!` (Playwright only):
    `<playwright-bin> codegen --save-storage=$TMPDIR/pr-shot-auth.json <app-url>` (log in in the window, then close it; `<playwright-bin>` is the one `capture.sh` found, e.g. `apps/<name>/node_modules/.bin/playwright`).
    Then capture with `capture.sh --storage-state $TMPDIR/pr-shot-auth.json ...`. Never open, print or copy that file, never type credentials you were not given, never read `.env*`, never ask for a token in the chat. The session expires with the login token: a login page after that means "session expired, re-run the codegen command". If the user declines or nothing works, drop the section and say it was blocked by authentication.
 
