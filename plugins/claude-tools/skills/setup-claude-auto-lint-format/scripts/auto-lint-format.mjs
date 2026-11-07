@@ -14,6 +14,9 @@
 // `match` globs are tested against the project-relative path (a pattern without `/` matches the file
 // name only). `{file}` is replaced by the quoted absolute path; `cwd` is relative to the project root;
 // `timeout` (seconds per command, default 30, max 120) drops a slow command silently.
+// A file in another git worktree of the same repo (e.g. `git worktree add ../wt`, or a nested
+// .claude/worktrees/<name>) uses that worktree as its root: its relative path, `cwd`, and its own
+// config (falling back to the project's config) all resolve there, not in CLAUDE_PROJECT_DIR.
 // Every command of every matching rule runs, in order, so a formatter that rewrites the file can come
 // first. A command that exits non-zero is a finding.
 //
@@ -63,6 +66,35 @@ const matches = (globs, relPath) =>
 
 const shellQuote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 
+const realpath = (p) => {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+};
+
+const git = (cwd, ...args) => {
+  const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: 5000 });
+  return result.status === 0 ? result.stdout.trim() : null;
+};
+
+const gitCommonDir = (dir) => {
+  const common = git(dir, "rev-parse", "--git-common-dir");
+  return common ? realpath(path.resolve(dir, common)) : null;
+};
+
+// The root of the git worktree holding `file` when it is another checkout of the project's repo
+// (same git common dir), else null: the file is handled against the project dir as before.
+const worktreeRoot = (projectDir, file) => {
+  const top = git(path.dirname(file), "rev-parse", "--show-toplevel");
+  if (!top) return null;
+  const root = realpath(top);
+  if (root === realpath(projectDir)) return null;
+  const common = gitCommonDir(root);
+  return common && common === gitCommonDir(projectDir) ? root : null;
+};
+
 const truncate = (text) => (text.length > MAX_OUTPUT ? `${text.slice(0, MAX_OUTPUT)}\n... (output truncated)` : text);
 
 const main = () => {
@@ -71,16 +103,29 @@ const main = () => {
   if (typeof target !== "string" || !target) return 0;
 
   const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd());
-  const file = path.resolve(input.cwd || projectDir, target);
-  if (!file.startsWith(projectDir + path.sep) || !fs.existsSync(file)) return 0;
-  const relPath = path.relative(projectDir, file).split(path.sep).join("/");
+  let file = path.resolve(input.cwd || projectDir, target);
+  if (!fs.existsSync(file)) return 0;
+  // A file in a git worktree of this repo (sibling dir or nested under .claude/worktrees) belongs to
+  // that checkout: paths, config and `cwd` resolve against the worktree root, not the main checkout.
+  let root = projectDir;
+  const worktree = worktreeRoot(projectDir, file);
+  if (worktree) {
+    root = worktree;
+    file = realpath(file);
+  }
+  if (!file.startsWith(root + path.sep)) return 0;
+  const relPath = path.relative(root, file).split(path.sep).join("/");
 
   let config;
-  try {
-    config = JSON.parse(fs.readFileSync(path.join(projectDir, CONFIG), "utf8"));
-  } catch {
-    return 0;
+  for (const dir of root === projectDir ? [projectDir] : [root, projectDir]) {
+    try {
+      config = JSON.parse(fs.readFileSync(path.join(dir, CONFIG), "utf8"));
+      break;
+    } catch {
+      // try the next location
+    }
   }
+  if (!config) return 0;
   if (!Array.isArray(config.rules)) return 0;
   if (matches([...ALWAYS_IGNORED, ...(config.ignore ?? [])], relPath)) return 0;
 
@@ -88,7 +133,7 @@ const main = () => {
   const setupProblems = [];
   for (const rule of config.rules) {
     if (!Array.isArray(rule.match) || !Array.isArray(rule.commands) || !matches(rule.match, relPath)) continue;
-    const cwd = path.resolve(projectDir, rule.cwd ?? ".");
+    const cwd = path.resolve(root, rule.cwd ?? ".");
     const seconds = Number(rule.timeout) > 0 ? Math.min(Number(rule.timeout), MAX_TIMEOUT_S) : DEFAULT_TIMEOUT_S;
     for (const template of rule.commands) {
       const command = String(template).split("{file}").join(shellQuote(file));
