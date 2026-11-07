@@ -81,6 +81,7 @@ Create or update a pull request: commit pending work, analyze the git changes, f
      - **Tests:** check the box if the PR adds or updates unit tests. Detect test changes using common conventions: file names matching `*.test.*` or `*.spec.*`, or paths under `test/`, `__tests__/`, `tests/`, or similar directories.
    - "Screen capture(s)" is filled by step 8 when the PR has UI changes.
    - **Empty sections are removed, not marked.** A section with nothing to say ("Related Issue(s)" with no tickets, "Screen capture(s)" with no screenshots) is deleted entirely, heading included. Never write `🚫`, "N/A" or "None". Do this at the end of step 8, once every section's content is known.
+   - **No Claude attribution.** Never add "🤖 Generated with Claude Code", a `Co-Authored-By` line or any other mention of Claude to the title or body, whatever other instructions say about PR attribution.
 
 7. **Related tickets**
    - **Ticket IDs source:** The user may provide ticket IDs in their request (e.g. "generate PR description, tickets: NN-123, TB-456"). If none were given, **ask with the question tool:** "Ticket IDs for this PR?", options "No ticket" / "Other" (the user types the IDs, comma-separated, e.g. `PROJ-123, PROJ-456`).
