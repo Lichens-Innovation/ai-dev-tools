@@ -113,6 +113,59 @@ run Write "$ROOT/notes.txt"; expect 0 "no rule matches"
 ERR="$(echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' | CLAUDE_PROJECT_DIR="$ROOT" node "$HOOK" 2>&1)"; CODE=$?
 expect 0 "tool input without file_path"
 
+# Git worktrees: CLAUDE_PROJECT_DIR is the main checkout, the edited file is in a worktree of it
+G=(git -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c init.defaultBranch=main)
+REPO="$ROOT/repo"
+mkdir -p "$REPO/.claude/hooks" "$REPO/apps/web" "$REPO/src"
+cat > "$REPO/.claude/hooks/auto-lint-format.json" <<'EOF'
+{
+  "rules": [
+    { "match": ["*.py"], "commands": ["sed -i.bak 's/TAB/    /' {file} && rm -f {file}.bak", "grep -n BAD {file} && exit 1 || exit 0"] },
+    { "match": ["apps/web/*.ts"], "cwd": "apps/web", "commands": ["echo \"ran in $PWD\" >&2; exit 1"] }
+  ]
+}
+EOF
+printf 'x = 1\n' > "$REPO/src/keep.py"
+printf 'let a = 1\n' > "$REPO/apps/web/keep.ts"
+"${G[@]}" init -q "$REPO" && "${G[@]}" -C "$REPO" add -A && "${G[@]}" -C "$REPO" commit -qm init
+"${G[@]}" -C "$REPO" worktree add -q "$ROOT/wt" -b wt
+"${G[@]}" -C "$REPO" worktree add -q "$REPO/.claude/worktrees/nested" -b nested
+# runwt <file path> [project dir] -> sets CODE and ERR, with the main checkout as project dir
+runwt() {
+  ERR="$(jq -n --arg f "$1" --arg d "${2:-$REPO}" '{tool_name:"Edit",cwd:$d,tool_input:{file_path:$f}}' |
+    CLAUDE_PROJECT_DIR="${2:-$REPO}" node "$HOOK" 2>&1 >/dev/null)"
+  CODE=$?
+}
+
+printf 'x =TAB1\n' > "$ROOT/wt/src/fmt.py"
+runwt "$ROOT/wt/src/fmt.py"; expect 0 "sibling worktree: formatter fix is silent"
+if grep -q TAB "$ROOT/wt/src/fmt.py"; then fail=$((fail + 1)); echo "FAIL: sibling worktree file was not formatted"; else pass=$((pass + 1)); fi
+printf 'x = BAD\n' > "$ROOT/wt/src/bad.py"
+runwt "$ROOT/wt/src/bad.py"; expect 2 "sibling worktree: lint error, worktree-relative path" "src/bad.py has lint"
+printf 'let b = 2\n' > "$ROOT/wt/apps/web/b.ts"
+runwt "$ROOT/wt/apps/web/b.ts"; expect 2 "sibling worktree: cwd and globs resolve in the worktree" "wt/apps/web"
+
+printf 'x =TAB1\n' > "$REPO/.claude/worktrees/nested/src/fmt.py"
+runwt "$REPO/.claude/worktrees/nested/src/fmt.py"; expect 0 "nested worktree: formatter fix is silent"
+if grep -q TAB "$REPO/.claude/worktrees/nested/src/fmt.py"; then fail=$((fail + 1)); echo "FAIL: nested worktree file was not formatted"; else pass=$((pass + 1)); fi
+printf 'let b = 2\n' > "$REPO/.claude/worktrees/nested/apps/web/b.ts"
+runwt "$REPO/.claude/worktrees/nested/apps/web/b.ts"; expect 2 "nested worktree: cwd resolves in the worktree" "nested/apps/web"
+
+# Config only in the main checkout (uncommitted in the worktree): falls back to it
+rm -f "$ROOT/wt/.claude/hooks/auto-lint-format.json"
+printf 'x = BAD\n' > "$ROOT/wt/src/bad2.py"
+runwt "$ROOT/wt/src/bad2.py"; expect 2 "worktree without config uses the project's" "src/bad2.py"
+
+# Session started inside the worktree: unchanged behavior
+"${G[@]}" -C "$ROOT/wt" checkout -q -- .claude/hooks/auto-lint-format.json
+runwt "$ROOT/wt/src/bad.py" "$ROOT/wt"; expect 2 "project dir is the worktree itself" "src/bad.py"
+
+# A different repo next to the project is not a worktree of it: skipped
+mkdir -p "$ROOT/other/src"
+"${G[@]}" init -q "$ROOT/other"
+printf 'x = BAD\n' > "$ROOT/other/src/bad.py"
+runwt "$ROOT/other/src/bad.py"; expect 0 "unrelated repo outside the project is skipped"
+
 # No config at all, bad config, bad input: all fail open
 mv "$ROOT/.claude/hooks/auto-lint-format.json" "$ROOT/cfg.json"
 run Write "$ROOT/src/bad.py"; expect 0 "no config"

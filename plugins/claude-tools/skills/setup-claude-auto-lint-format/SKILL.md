@@ -17,7 +17,7 @@ After each `Write`, `Edit` or `MultiEdit` (subagents included), run the project'
 
 Committed by default (a team convention); `.claude/settings.local.json` if the user wants it personal.
 
-Hook behavior: all commands pass → exit 0, no output. One fails → exit 2, its output on stderr, which PostToolUse shows to Claude (nothing is blocked). A command that cannot run (not installed) → exit 1, shown to the user only. Internal errors, timeouts (30 s, or the rule's `timeout` up to 120), files outside the project, deleted files and `node_modules` are ignored silently.
+Hook behavior: all commands pass → exit 0, no output. One fails → exit 2, its output on stderr, which PostToolUse shows to Claude (nothing is blocked). A command that cannot run (not installed) → exit 1, shown to the user only. Internal errors, timeouts (30 s, or the rule's `timeout` up to 120), files outside the project, deleted files and `node_modules` are ignored silently. A file in another git worktree of the same repo (`git worktree add ../wt`, `.claude/worktrees/<name>`) is formatted against that worktree: its root, its config (else the project's) and `cwd` resolve there.
 
 Config (`{file}` = quoted absolute path; `match` globs test the project-relative path, or the file name if the glob has no `/`; `cwd` is relative to the root; `timeout` is seconds per command; both optional):
 
