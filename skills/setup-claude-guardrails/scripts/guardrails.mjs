@@ -421,6 +421,17 @@ const FAILURE_HINTS = [
       "with ! (e.g. ! rm <path>/.mcp.json && git pull).",
   },
   {
+    // A rebase or merge that touches .claude/hooks|skills stops half done: Claude Code denies sandboxed writes there.
+    // Retrying, --continue, git restore or --abort all fail the same way (or get blocked as destructive).
+    program: /^\s*(?:\w+=\S*\s+)*git\s+(?:(?:-C|-c)\s+\S+\s+)*(?:switch|checkout|pull|merge|rebase|cherry-pick|revert|restore|stash|reset|am)\b/,
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system|unable to (?:unlink|create)|cannot (?:unlink|create)|could not (?:unlink|create)))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
+    hint:
+      "The sandbox can't write .claude/hooks, .claude/skills or settings files, and this git command changes them, so it " +
+      "may be half done. Check git status, then stop: don't retry, --continue, --abort or git restore inside the sandbox. " +
+      "Ask the user to finish it with ! (e.g. ! git rebase --continue), and next time to run such a rebase or merge with ! " +
+      "from the start.",
+  },
+  {
     // Claude Code itself denies sandboxed writes to these paths (denyWithinAllow), whatever allowWrite says.
     error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
     hint:
