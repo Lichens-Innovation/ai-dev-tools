@@ -240,6 +240,51 @@ sbx deny  Bash '{"command":"npm test && gh pr create --fill"}'
 sbx deny  Bash '{"command":"open ~/x.html && echo done"}'
 CLAUDE_PROJECT_DIR="$PROJECT" check allow Bash '{"command":"git commit -m x && git push"}'
 
+echo "branch change"
+# With the sandbox on, a switch, merge, rebase or cherry-pick that changes a path the sandbox won't let
+# Bash write (.claude/skills, the scripts a hook runs, .mcp.json) is denied up front with one ! command.
+BR="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$BR"' EXIT
+mkdir -p "$BR/.claude/skills/s" "$BR/.claude/scripts/lib" "$BR/src"
+cat > "$BR/.claude/settings.local.json" <<'JSON'
+{ "sandbox": { "enabled": true, "excludedCommands": ["git push", "git push *", "git fetch", "git fetch *"] } }
+JSON
+cat > "$BR/.claude/settings.json" <<'JSON'
+{ "hooks": { "SessionStart": [ { "hooks": [ { "type": "command",
+  "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/step0.cjs\"" } ] } ] } }
+JSON
+brgit() { git -C "$BR" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
+echo a > "$BR/src/a.ts"; echo s > "$BR/.claude/skills/s/SKILL.md"; echo l > "$BR/.claude/scripts/lib/l.cjs"
+echo "/$MARKER" > "$BR/.gitignore"
+brgit init -q -b main && brgit add -A && brgit commit -qm base
+brgit switch -qc skills && echo s2 > "$BR/.claude/skills/s/SKILL.md" && brgit commit -qam skills
+brgit switch -q main && brgit switch -qc scripts && echo l2 > "$BR/.claude/scripts/lib/l.cjs" && brgit commit -qam scripts
+brgit switch -q main && brgit switch -qc mcp && echo '{}' > "$BR/.mcp.json" && brgit add -A && brgit commit -qm mcp
+brgit switch -q main && brgit switch -qc plain && echo b > "$BR/src/a.ts" && brgit commit -qam plain
+brgit switch -q main
+br() { CLAUDE_PROJECT_DIR="$BR" check "$1" Bash "{\"command\":\"$2\"}" "$BR"; }
+br deny  'git switch skills'
+br deny  'git checkout scripts'
+br deny  'git switch mcp'
+br deny  'git merge --ff-only skills'
+br deny  'git rebase scripts'
+br deny  'git cherry-pick skills'
+br deny  "git -C $BR merge scripts"
+br allow 'git switch plain'
+br allow 'git merge plain'
+br allow 'git switch -c new'
+br allow 'git switch -c new plain'
+br deny  'git switch -c new skills'
+br allow 'git switch no-such-branch'
+br allow 'git rebase --continue'
+br allow 'git checkout -- src/a.ts'
+br allow 'git push origin skills'
+sk_out="$(printf '{"tool_name":"Bash","tool_input":{"command":"git switch skills"},"cwd":"%s"}' "$BR" | CLAUDE_PROJECT_DIR="$BR" node "$SCRIPT" 2>/dev/null)"
+if [[ "$sk_out" == *'.claude/skills/s/SKILL.md'* && "$sk_out" == *'! git switch skills'* ]]; then echo "  ok    branch change message names the file and the ! command"
+else echo "  FAIL  branch change message: $sk_out"; failures=$((failures + 1)); fi
+sed -i.bak 's/"enabled": true/"enabled": false/' "$BR/.claude/settings.local.json"
+br allow 'git switch skills'
+
 echo "sandbox grants"
 # With the sandbox on, sandbox.filesystem.allowRead opens a path to reads (Read, Grep, Glob, Bash
 # commands that only read it), allowWrite to Bash writes too (the OS enforces it there, not for the
@@ -247,7 +292,7 @@ echo "sandbox grants"
 # Like the extra roots, the granted dirs under $HOME are never created.
 GRANT="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
 GRANT_OFF="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$BR" "$GRANT" "$GRANT_OFF"' EXIT
 RO="$HOME/.guardrails-test-ro"
 ABS="$HOME/.guardrails-test-abs"
 RW="$HOME/.guardrails-test-rw"
@@ -302,7 +347,7 @@ echo "read block"
 # With blockReadsOutsideWorkingDirectories, Claude Code asks the user about a file read after a cd in
 # the same call, even in auto mode, so the hook sends the model back to rewrite it instead.
 RB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$BR" "$GRANT" "$GRANT_OFF" "$RB"' EXIT
 mkdir -p "$RB/.claude" "$RB/src"
 echo '{ "permissions": { "blockReadsOutsideWorkingDirectories": true } }' > "$RB/.claude/settings.local.json"
 rb() { CLAUDE_PROJECT_DIR="$RB" check "$1" "$2" "$3" "$RB"; }
@@ -348,6 +393,7 @@ hint_check hint 'git push -u origin HEAD' "$PROXY" '--body-file'
 hint_check hint 'git push -u origin HEAD && gh pr create --fill' 'fatal: Could not read from remote repository.' 'ask the user to run it with !'
 hint_check hint 'git switch main' "error: unable to unlink old 'plugins/design-studio/.mcp.json': Operation not permitted" 'ask the user to run the command'
 hint_check hint 'git pull' "error: unable to create file plugins/design-studio/.mcp.json: Operation not permitted" 'git status'
+hint_check hint 'git merge feat' "error: unable to unlink old '.claude/scripts/lib/x.cjs': Operation not permitted" 'git steps still to come'
 hint_check hint 'gh pr list' 'error connecting: Could not resolve host: api.github.com' 'sandbox'
 hint_check hint 'git -C /tmp/wt push -u origin feat/x' 'fatal: Could not read from remote repository.' 'worktrees share branches'
 hint_check hint 'git -C /tmp/wt push -u origin feat/x' "deny network-outbound github-x:22 (not in this command's allowed_domains)" 'git push -u origin <branch>'
@@ -391,7 +437,7 @@ echo "sandbox stubs"
 # .claude/agents, ...). SKILL.md step 7 excludes them, re-including directories with a trailing
 # slash so a real .vscode/ or .claude/agents/ still shows in git status.
 STUB="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$BR" "$GRANT" "$GRANT_OFF" "$RB" "$STUB"' EXIT
 # stub_check <expected git status --porcelain output, one path per line>
 stub_check() {
   local want="$1" got
@@ -419,7 +465,7 @@ echo "allow rules"
 SUGGEST="$(dirname "$0")/suggest-allow-rules.mjs"
 [ -f "$SUGGEST" ] || die "suggest-allow-rules.mjs not found next to this script"
 AR="$(make_scratch)" || die "could not create a scratch dir under $TMP_ROOT"
-trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$GRANT" "$GRANT_OFF" "$RB" "$STUB" "$AR"' EXIT
+trap 'cleanup "$PROJECT" "$OTHER" "$CONFIG" "$SBX" "$BR" "$GRANT" "$GRANT_OFF" "$RB" "$STUB" "$AR"' EXIT
 mkdir -p "$AR/.claude"
 : > "$AR/pnpm-lock.yaml"
 cat > "$AR/package.json" <<'JSON'

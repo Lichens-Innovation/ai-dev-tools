@@ -29,6 +29,7 @@ Everything else should stay easy. A guardrail that makes Claude take extra steps
 - **Programs outside the system bin dirs** (`~/.local/bin/...`): run them by name from `PATH`.
 - **Calls that can't leave the sandbox:** an excluded command (`gh`, `git push`, `open`) mixed with a backtick, `$(...)`, heredoc, pipe or other command. Denied up front, with the fix in the message, instead of failing later on the proxy.
 - **File reads after a `cd`** (with `blockReadsOutsideWorkingDirectories`): `cd src; sed -n 1,9p a.ts`. Claude Code can't resolve that path ahead of time and asks the user even in auto mode, so the hook denies it and tells Claude to drop the `cd`. Same for `sed -i` / `perl -i` edits: the hook sends Claude to the Edit tool.
+- **Branch changes the sandbox can't finish** (sandbox only): a `git switch|checkout|merge|rebase|cherry-pick|revert` whose diff touches `.claude/hooks|skills|agents|commands`, settings, `.mcp.json` or the scripts the project's hooks run. Claude Code won't let sandboxed Bash write those, so it would stop half done. Denied up front, asking for one `!` command for every git step left. Allowing the switch instead (an `excludedCommands` entry, or making those paths writable) would let Claude commit a weaker hook and check it out, so the `!` stays.
 - **Ask, don't block:** edits to any checkout's `.claude/settings*.json`, the hook itself and `~/.claude/settings.json` (it can turn hooks off).
 - **Fail closed:** malformed input or a hook error blocks the call.
 

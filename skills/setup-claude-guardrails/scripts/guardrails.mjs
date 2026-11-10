@@ -18,6 +18,7 @@
 // This is a heuristic layer on top of the native controls the skill also installs
 // (permissions.deny, blockReadsOutsideWorkingDirectories, sandbox). It is not a sandbox.
 
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -421,19 +422,19 @@ const FAILURE_HINTS = [
       "with ! (e.g. ! rm <path>/.mcp.json && git pull).",
   },
   {
-    // A rebase or merge that touches .claude/hooks|skills stops half done: Claude Code denies sandboxed writes there.
-    // Retrying, --continue, git restore or --abort all fail the same way (or get blocked as destructive).
+    // A rebase or merge that touches .claude/hooks|skills (or a script a hook runs) stops half done: Claude Code
+    // denies sandboxed writes there. Retrying, --continue, git restore or --abort all fail the same way.
     program: /^\s*(?:\w+=\S*\s+)*git\s+(?:(?:-C|-c)\s+\S+\s+)*(?:switch|checkout|pull|merge|rebase|cherry-pick|revert|restore|stash|reset|am)\b/,
-    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system|unable to (?:unlink|create)|cannot (?:unlink|create)|could not (?:unlink|create)))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system|unable to (?:unlink|create)|cannot (?:unlink|create)|could not (?:unlink|create)))[\s\S]*\.claude\/(?:hooks|skills|agents|commands|scripts|settings[\w.]*\.json)/i,
     hint:
-      "The sandbox can't write .claude/hooks, .claude/skills or settings files, and this git command changes them, so it " +
-      "may be half done. Check git status, then stop: don't retry, --continue, --abort or git restore inside the sandbox. " +
-      "Ask the user to finish it with ! (e.g. ! git rebase --continue), and next time to run such a rebase or merge with ! " +
-      "from the start.",
+      "The sandbox can't write .claude/hooks|skills|agents|commands, settings files or the scripts hooks run, and this " +
+      "git command changes them, so it may be half done. Check git status, then stop: don't retry, --continue, --abort " +
+      "or git restore inside the sandbox. Ask the user to finish it with ! as one command that also covers the git " +
+      "steps still to come (e.g. ! git rebase --continue && git switch main && git merge --ff-only <branch>).",
   },
   {
     // Claude Code itself denies sandboxed writes to these paths (denyWithinAllow), whatever allowWrite says.
-    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|settings[\w.]*\.json)/i,
+    error: /(?=[\s\S]*(?:Operation not permitted|Read-only file system))[\s\S]*\.claude\/(?:hooks|skills|agents|commands|settings[\w.]*\.json)/i,
     hint:
       "Claude Code keeps sandboxed commands from writing .claude/hooks, .claude/skills and settings files. Use the Write " +
       "tool (it asks the user) or ask the user to run the command with !. Don't suggest making these paths writable: a " +
@@ -799,6 +800,112 @@ const main = () => {
             `If that is not possible, ask the user to run the command with !.`
         );
       }
+    }
+  }
+
+  // --- branch change ---------------------------------------------------------------------------
+
+  // Claude Code keeps sandboxed Bash from writing .claude/hooks|skills|agents|commands, settings files,
+  // .mcp.json and the scripts its hooks run. A switch, merge or rebase that changes one of them stops half
+  // done, and finishing it costs more round trips. Diff against the target first and hand the user one `!`
+  // command instead. Best effort: an unknown ref or a git error lets the call run (the failure hint follows).
+  if (command !== null && sandboxOn && lexedCommand) {
+    const hookScriptDirs = settingsFiles
+      .slice(0, 2)
+      .flatMap((f) => Object.values(readJson(f).hooks ?? {}))
+      .flat()
+      .flatMap((m) => (Array.isArray(m?.hooks) ? m.hooks : []))
+      .map((h) => h?.command)
+      .filter((c) => typeof c === "string")
+      .flatMap((c) => [...c.matchAll(/\.claude\/[\w./-]+\.\w+/g)].map((m) => path.posix.dirname(m[0])))
+      .filter((d) => d !== ".claude");
+    const LOCKED = /^(?:\.mcp\.json$|\.claude\/(?:hooks|skills|agents|commands)\/|\.claude\/settings(?:\.local)?\.json$)/;
+    const isLocked = (f) => LOCKED.test(f) || hookScriptDirs.some((d) => f.startsWith(d + "/"));
+    const git = (dir, ...a) =>
+      execFileSync("git", ["-C", dir, ...a], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 3000 });
+    const isCommit = (dir, ref) => {
+      try {
+        git(dir, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    // The non-option arguments, skipping the values of the options that take one.
+    const positional = (args, valued) => {
+      const out = [];
+      for (let k = 0; k < args.length; k++) {
+        if (valued.includes(args[k])) k++;
+        else if (!args[k].startsWith("-")) out.push(args[k]);
+      }
+      return out;
+    };
+    // [from, to] pairs whose diff is what the command writes to the work tree.
+    const diffs = (dir, sub, args) => {
+      if (args.some((a) => /^--(?:continue|abort|skip|quit|orphan)$/.test(a)) || args.includes("--")) return [];
+      const ref = (r) => (r === "-" ? "@{-1}" : r);
+      if (sub === "switch" || sub === "checkout") {
+        const create = args.findIndex((a) => /^(?:-[cCbB]|--create|--force-create)$/.test(a));
+        const target = create >= 0 ? positional(args.slice(create + 2), [])[0] : positional(args, ["--conflict"])[0];
+        return target ? [["HEAD", ref(target)]] : [];
+      }
+      if (sub === "merge") {
+        const target = positional(args, ["-m", "-F", "-s", "-X", "--strategy", "--strategy-option", "--into-name"])[0];
+        return target ? [["HEAD", ref(target), "merge"]] : [];
+      }
+      if (sub === "rebase") {
+        const onto = args.indexOf("--onto");
+        const target = onto >= 0 ? args[onto + 1] : positional(args, ["-s", "-X", "--strategy", "--exec", "-x"])[0] ?? "@{u}";
+        return [["HEAD", ref(target), "merge"]];
+      }
+      if (sub === "cherry-pick" || sub === "revert") {
+        return positional(args, ["-m", "--mainline", "-s", "-X", "--strategy"])
+          .filter((r) => !r.includes(".."))
+          .map((r) => [`${r}^`, r]);
+      }
+      return [];
+    };
+    const isExcludedCall = (words) => excluded.some((e) => e.every((w, i) => words[i] === w));
+    const calls = lexedCommand.segments
+      .map(({ words }) => words.map((w) => w.value))
+      .map((words) => words.slice(Math.max(0, words.findIndex((w) => !/^\w+=/.test(w)))))
+      .filter((words) => words.length);
+    const locked = new Set();
+    if (!calls.every(isExcludedCall)) {
+      for (const words of calls.filter((w) => w[0] === "git")) {
+        let dir = cwd;
+        let k = 1;
+        for (; k < words.length && words[k].startsWith("-"); k++) {
+          if (words[k] === "-C") dir = resolvePath(words[++k] ?? ".", dir);
+          else if (words[k] === "-c") k++;
+        }
+        const [sub, ...args] = words.slice(k);
+        for (const [from, to, mode] of diffs(dir, sub, args)) {
+          if (!isCommit(dir, from) || !isCommit(dir, to)) continue;
+          try {
+            const range = mode === "merge" ? [`${from}...${to}`] : [from, to];
+            git(dir, "diff", "--name-only", "--no-renames", ...range, "--")
+              .split("\n")
+              .filter(isLocked)
+              .forEach((f) => locked.add(f));
+          } catch {
+            // Best effort: let the call run.
+          }
+        }
+      }
+    }
+    if (locked.size) {
+      const files = [...locked];
+      respond(
+        "deny",
+        "branch-change",
+        `This changes ${files.slice(0, 3).join(", ")}${files.length > 3 ? ` and ${files.length - 3} more` : ""}, which ` +
+          `the sandbox doesn't let Bash write (.claude/hooks|skills|agents|commands, settings, .mcp.json and the ` +
+          `scripts the project's hooks run), so it would stop half done. Don't run it in the sandbox, and don't split ` +
+          `it into smaller git steps. Ask the user to run it with !, as one command that also covers the git steps ` +
+          `still to come in this task (switch, merge, branch delete), joined with &&, e.g. ` +
+          `! ${command.trim()} && <next git step>. Then check git status.`
+      );
     }
   }
 };
