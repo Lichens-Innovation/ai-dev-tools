@@ -20,15 +20,15 @@
     "./syntax-line": "./src/syntax-line.tsx"
   },
   "dependencies": {
-    "@base-ui/react": "1.0.0"
+    "@base-ui/react": "1.9.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/react": "19.2.0",
-    "react": "19.2.0",
-    "typescript": "6.0.2"
+    "react": "19.3.1",
+    "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "react": "19.2.0"
+    "react": "19.3.1"
   }
 }
