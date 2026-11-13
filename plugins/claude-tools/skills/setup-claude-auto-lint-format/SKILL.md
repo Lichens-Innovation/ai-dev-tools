@@ -93,7 +93,7 @@ Every command of every matching rule runs in order: put a rewriting formatter be
    - With `CLAUDE_PROJECT_DIR=<root>`, pipe `{"tool_name":"Edit","cwd":"<root>","tool_input":{"file_path":"<a tracked file per rule>"}}` to the hook: exit 0, no output. Then create a probe file in the project (`<dir>/zz_lint_probe.<ext>`) with an obvious error, expect exit 2 with the linter's message, and delete it. Never alter a user's file.
    - If the rule was written: its extensions and tools match the config, no `<` placeholder is left.
 
-7. **Report** the rules, the files written (tracked or not) and the limits. Hooks load at session start: restart Claude Code.
+7. **Record, then report.** Merge `"setup-claude-auto-lint-format": "<version>"` (the `version` of `${CLAUDE_SKILL_DIR}/../../.claude-plugin/plugin.json`) into `<root>/.claude/claude-tools.json` (`{}` if absent, 2-space indentation) and add `.claude/claude-tools.json` to the shared `.git/info/exclude` unless listed; `/claude-tools-manager` reads it to spot outdated setups. Then report the rules, the files written (tracked or not) and the limits. Hooks load at session start: restart Claude Code.
 
 ## Limits: tell the user
 
