@@ -84,7 +84,7 @@ How the hook decides: for each command in a Bash call (split on `;`, `&&`, `|`, 
    - `bash scripts/test-use-just-commands.sh <root>/.claude/hooks/use-just-commands.mjs` from this skill's directory (always `bash`). It builds a throwaway project under `$TMPDIR`; report failures verbatim. `rm:` errors outside `$TMPDIR`: stop and tell the user.
    - For each level, check its config against the real project: pipe a `{"tool_name":"Bash","cwd":"<level dir>","tool_input":{"command":"<blocked command>"}}` JSON to the hook with `CLAUDE_PROJECT_DIR=<root>` and confirm it denies, and that `just <recipe>` is allowed. Check every blocked command once.
 
-8. **Report** the levels with their recipe counts and blocked commands, the files written (tracked or not), and the limits below. Hooks load at session start: restart Claude Code.
+8. **Record, then report.** Merge `"setup-claude-just-usage": "<version>"` (the `version` of `${CLAUDE_SKILL_DIR}/../../.claude-plugin/plugin.json`) into `<root>/.claude/claude-tools.json` (`{}` if absent, 2-space indentation) and add `.claude/claude-tools.json` to the shared `.git/info/exclude` unless listed; `/claude-tools-manager` reads it to spot outdated setups. Then report the levels with their recipe counts and blocked commands, the files written (tracked or not), and the limits below. Hooks load at session start: restart Claude Code.
 
 ## Limits: tell the user
 
