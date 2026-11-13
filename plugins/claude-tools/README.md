@@ -5,6 +5,12 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
 
 ## What's inside
 
+- **claude-tools-manager** — sets up a project with the setups below: detects which are
+  missing, outdated or worth re-running (installed scripts compared with the plugin's, plus the
+  version each setup records in `.claude/claude-tools.json`), runs the chosen ones in order
+  (claude-light, auto-lint-format, just-usage, guardrails last), then suggests other
+  `lichens-ai-dev-tools` plugins that match the project's dependencies, with the `!` commands to
+  install them.
 - **claude-light** — applies a lightweight local Claude Code configuration
   (`.claude/settings.local.json`) that disables connectors, workflows, bundled skills,
   artifacts, and a set of noisy/expensive tools, and optionally enables auto-compact at a
@@ -44,6 +50,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 
 ## Use it
 
+- `/claude-tools-manager` — install or update the claude-tools setups in this project, then get plugin suggestions for its stack.
 - `/claude-light` — apply the light-mode local settings to the current project.
 - `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project, pick allow rules for its verification commands, and optionally let an exact Electron launch command run outside the sandbox for GUI app testing.
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
