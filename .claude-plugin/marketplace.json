@@ -21,6 +21,11 @@
       "description": "React development tools and skills for Claude Code"
     },
     {
+      "name": "react-stack",
+      "source": "./plugins/react-stack",
+      "description": "Preferred React library stack for Claude Code"
+    },
+    {
       "name": "react-mobile",
       "source": "./plugins/react-mobile",
       "description": "React Native and mobile development tools and skills for Claude Code"
