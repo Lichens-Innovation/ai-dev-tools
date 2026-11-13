@@ -1,0 +1,10 @@
+{
+  "name": "react-stack",
+  "version": "0.1.0",
+  "description": "Preferred React library stack for Claude Code",
+  "author": {
+    "name": "Samuel Daigle",
+    "email": "daigles@lichens.ai"
+  },
+  "keywords": ["react", "react-native", "libraries", "stack", "dependencies", "plugins"]
+}
