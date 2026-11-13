@@ -1,0 +1,54 @@
+# Weekly dependency report: one issue listing what to fix locally before the
+# weekly release (security PRs the Claude CVE gate rejected, pnpm overrides no
+# longer needed, remaining pnpm audit findings). Updated each run, closed when
+# everything is clear. No Claude call.
+#
+# Copied from Lichens-Innovation/renovate-runner templates/dependency-report/
+# with .github/scripts/dependency-report.cjs. See docs/dependency-report.md there.
+name: Dependency report
+
+on:
+  schedule:
+    # Thursday 12:00 UTC: 8 am Eastern in summer (EDT), 7 am in winter (EST).
+    - cron: '0 12 * * 4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: dependency-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-26.04
+    env:
+      # Assigned to the issue when it is opened.
+      REVIEWER: sdaigle-lichens
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install report helpers
+        run: npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/report-deps" semver@7 yaml@2
+
+      - name: Publish the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_DEPS_DIR: ${{ runner.temp }}/report-deps
+        run: node .github/scripts/dependency-report.cjs --publish
