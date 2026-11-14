@@ -60,7 +60,7 @@ Make a branch from an up-to-date `<default>`: ask the user to run `! git -C <rep
 1. **Gate workflow.** Copy `/tmp/claude-<uid>/src/ai-dev-tools/.github/workflows/claude-cve-gate.yml` (a standalone copy; renovate-runner's original is a reusable `workflow_call` workflow) to `<repo>/.github/workflows/claude-cve-gate.yml`, then edit:
    - **Header comment:** "Copy of Lichens-Innovation/renovate-runner/.github/workflows/claude-cve-gate.yml (docs: docs/claude-cve-gate.md in that repo). Keep it in step with the original; `/setup-dependency-automation` flags drift." Drop the line about the repo being public.
    - **`REVIEWER`:** the user's GitHub login (`gh api user --jq .login`).
-   - **`node-version`:** the repo's Node major from the audit.
+   - **Node:** `node-version-file: .nvmrc` in place of `node-version` when the repo has an `.nvmrc`, so the gate follows a later Node bump; else `node-version:` the repo's Node major from the audit.
    - Don't call the reusable workflow, even from a private repo. That only works if renovate-runner's Actions access setting allows it, and only its admins can check that setting.
 2. **Report.** Copy `templates/dependency-report/dependency-report.yml` to `.github/workflows/` and `dependency-report.cjs` to `.github/scripts/`, from the renovate-runner clone. Set `REVIEWER` to the same login, and the actions to the versions the repo's CI uses (or newer).
 3. **`@types/node` cap,** if the audit says it is missing. Add it to `renovate.json` `packageRules`; this rule is safe before the gate:
