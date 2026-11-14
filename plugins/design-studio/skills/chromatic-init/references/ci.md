@@ -36,7 +36,7 @@ Add to the job that builds (or can build) the target's Storybook:
 
 ```yaml
 - name: Checkout
-  uses: actions/checkout@v6
+  uses: actions/checkout@v7
   with:
     fetch-depth: 0
 
