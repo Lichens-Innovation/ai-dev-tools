@@ -35,5 +35,5 @@ On GitHub: merges or closes the Renovate PRs you choose (`gh pr merge`, `gh pr c
 
 ## Known limits
 
-- pnpm repos only, with the dependency-report script copied to `.github/scripts/`.
+- pnpm repos only, with the dependency-report script copied to `.github/scripts/`. In a repo without it, `fix-cve` lists what is missing and suggests `/setup-dependency-automation`.
 - It does not open the PR: `git:create-pr` can't be called from another skill.

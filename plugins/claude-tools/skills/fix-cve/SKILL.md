@@ -18,9 +18,15 @@ One command per call, never `cd`. Commands below run from the repo root.
 ## 1. Read the report
 
 - With a URL: `gh issue view <url> --json number,title,body,url`.
-- Without one: `gh issue list --state open --search '"Weekly dependency report" in:title' --json number,title,url`, keep the exact title match. None open: say "nothing to fix" and stop.
+- Without one: `gh issue list --state open --search '"Weekly dependency report" in:title' --json number,title,url`, keep the exact title match.
+- None open: check the repo is set up before saying "nothing to fix":
+  - `.github/workflows/dependency-report.yml` and `.github/scripts/dependency-report.cjs` exist;
+  - `renovate.json` extends `local>Lichens-Innovation/renovate-runner:claude-cve-gate` and `:automerge-routine`.
+
+  If something is missing, list it and suggest `/setup-dependency-automation`, then stop. If all of it is there, say "nothing to fix" and stop: the report closes its issue when nothing is left.
+- With a report but no presets: work through it, and mention `/setup-dependency-automation` once in the summary.
 - The report is a snapshot from its last run. Re-check it now:
-  - Overrides and audit: `node .github/scripts/dependency-report.cjs --no-prs`.
+  - Overrides and audit: `node .github/scripts/dependency-report.cjs --no-prs`. `yaml@2 not found` (or `semver@7`) means the repo doesn't install them: set `REPORT_DEPS_DIR` to an **absolute** directory whose `node_modules` has them, e.g. a `node_modules/.pnpm/yaml@2.x.y` folder of another pnpm repo (`find .. -maxdepth 4 -type d -name 'yaml@2.*' -path '*node_modules/.pnpm*'`).
   - Each listed PR: `gh pr view <n> --json state,statusCheckRollup`.
   - Items already fixed, merged or closed since the report: drop them.
 
@@ -99,7 +105,7 @@ Then ask with AskUserQuestion, one PR per question, offering only the options th
 
 | Option | When | What you do |
 | --- | --- | --- |
-| **Merge** | Checks green (or only the sandbox-free CI is pending: say so) | `gh pr merge <n> --merge` (the repo's usual method; `gh repo view --json mergeCommitAllowed,squashMergeAllowed`). Add its manual checks to the list. |
+| **Merge** | Checks green (or only the sandbox-free CI is pending: say so) | `gh pr merge <n> --merge`, or `--squash` when merge commits aren't allowed (`gh repo view --json mergeCommitAllowed,squashMergeAllowed`) or the branch rules require linear history (`gh api repos/{owner}/{repo}/rules/branches/<base>`). Add its manual checks to the list. |
 | **Fix first** | Checks fail, or the update needs code changes (common for majors) | On the `fix/deps-…` branch: apply the same version changes as the PR, `! pnpm install`, fix what breaks, verify (step 5). Renovate closes its PR once the default branch has those versions. |
 | **Fix, minus the culprit** | A group PR where one package breaks and isn't worth fixing now | Apply the other bumps locally and leave that one. Next week Renovate's PR holds only the culprit, and it comes back here. |
 | **Close** | The user doesn't want this version | `gh pr close <n> --comment '<user's reason>'`. Say first what closing means: Renovate skips that version; for a major, the whole major until the next one. |
