@@ -32,6 +32,10 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   biome, ...) and installs a `PostToolUse` hook that runs them on every file Claude or its subagents write
   or edit. Silent when the file is clean; only lint/format problems are sent back to Claude to fix.
   Optionally adds a rule so Claude doesn't run those tools itself.
+- **fix-cve** — works through the weekly dependency report issue of a pnpm repo (security PRs the
+  Claude CVE gate rejected, pnpm overrides to remove, `pnpm audit` findings): fixes the easy items,
+  goes through the others with you one by one, and records the ones you ignore, with a reason and an
+  expiry date, in `.github/dependency-report-ignore.yml`.
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
@@ -55,6 +59,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 - `/setup-claude-guardrails` — install the scope and `.env` guardrails in the current project, pick allow rules for its verification commands, and optionally let an exact Electron launch command run outside the sandbox for GUI app testing.
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
 - `/setup-claude-auto-lint-format` — lint and format every file Claude edits, reporting only problems.
+- `/fix-cve [report issue URL]` — fix this week's dependency report on a branch, deciding the hard items with you.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
 - `/help-server` — start the help server and open its dashboard in the browser.
 - `/manage-marketplace` — ask about plugin/marketplace install, update, or removal commands.
