@@ -3,10 +3,12 @@
 // Lichens-Innovation/renovate-runner templates/dependency-report/; see
 // docs/dependency-report.md there.
 //
-// Collects what to fix locally before the weekly release:
+// Collects what needs a person before the weekly release:
 //   1. open Renovate security PRs the Claude CVE gate rejected (or never judged),
-//   2. pnpm overrides that no installed package needs anymore,
-//   3. the findings `pnpm audit` still reports.
+//   2. the other open Renovate PRs Renovate won't merge by itself (automerge off,
+//      a failing check, or open more than 14 days),
+//   3. pnpm overrides that no installed package needs anymore,
+//   4. the findings `pnpm audit` still reports.
 // Advisories and overrides listed in the ignore file (.github/dependency-report-ignore.yml)
 // move to a collapsed "Ignored" section and don't keep the issue open, until
 // their `until` date; entries that match nothing are reported for removal.
@@ -101,27 +103,65 @@ function applyIgnores(items, kind, keysOf, ignores) {
   return { kept, ignored };
 }
 
-// 1. Security PRs and the gate's verdict -------------------------------------
-function securityPrs() {
-  const prs = ghJson([
-    'pr', 'list', '--state', 'open', '--author', renovateAuthor, '--limit', '100',
-    '--json', 'number,title,url,headRefName,labels',
-  ]).filter(
-    (pr) => pr.headRefName.includes('-vulnerability') || pr.labels.some((l) => l.name === 'security'),
-  );
-  const rejected = [];
-  const pending = [];
-  for (const pr of prs) {
-    const { comments } = ghJson(['pr', 'view', String(pr.number), '--json', 'comments']);
-    const verdicts = comments.filter((c) => /^Claude CVE gate: (APPROVED|REJECTED)/.test(c.body.trim()));
-    const last = verdicts[verdicts.length - 1];
-    if (!last) pending.push(pr);
-    else if (last.body.trim().startsWith('Claude CVE gate: REJECTED')) rejected.push({ ...pr, review: last.body.trim() });
-  }
-  return { rejected, pending };
+// 1-2. Renovate PRs ------------------------------------------------------------
+// Security PRs: the Claude CVE gate's verdict. Other PRs: only those that need a
+// person. A PR with automerge on, no failing check and open at most STALE_DAYS
+// is left out: Renovate merges it on its next run.
+const STALE_DAYS = 14;
+const FAILED = new Set(['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
+const isSecurity = (pr) => pr.headRefName.includes('-vulnerability') || pr.labels.some((l) => l.name === 'security');
+
+function checksOf(pr) {
+  const runs = pr.statusCheckRollup || [];
+  const failing = runs.filter((c) => FAILED.has(c.conclusion || c.state)).map((c) => c.name || c.context);
+  const running = runs.some((c) => (c.status && c.status !== 'COMPLETED') || ['PENDING', 'EXPECTED'].includes(c.state));
+  const label = failing.length ? `failing: ${failing.join(', ')}` : running ? 'running' : runs.length ? 'passing' : 'none';
+  return { failing, label };
 }
 
-// 2. Overrides no installed package needs ------------------------------------
+function kindOf(pr) {
+  const labels = pr.labels.map((l) => l.name);
+  if (labels.includes('lockfile-maintenance')) return 'lock file';
+  if (labels.includes('major')) return 'major';
+  if (/(^|: )pin /i.test(pr.title)) return 'pin';
+  return 'non-major';
+}
+
+function renovatePrs() {
+  const prs = ghJson([
+    'pr', 'list', '--state', 'open', '--author', renovateAuthor, '--limit', '100',
+    '--json', 'number,title,url,headRefName,labels,body,createdAt,isDraft,statusCheckRollup',
+  ]);
+  const rejected = [];
+  const pending = [];
+  const waiting = [];
+  for (const pr of prs) {
+    if (isSecurity(pr)) {
+      const { comments } = ghJson(['pr', 'view', String(pr.number), '--json', 'comments']);
+      const verdicts = comments.filter((c) => /^Claude CVE gate: (APPROVED|REJECTED)/.test(c.body.trim()));
+      const last = verdicts[verdicts.length - 1];
+      if (!last) pending.push(pr);
+      else if (last.body.trim().startsWith('Claude CVE gate: REJECTED')) rejected.push({ ...pr, review: last.body.trim() });
+      continue;
+    }
+    // Renovate writes "**Automerge**: Enabled." in the PR body when it will merge it.
+    const automerge = /\*\*Automerge\*\*: Enabled/.test(pr.body || '');
+    const age = Math.floor((Date.now() - Date.parse(pr.createdAt)) / 86400000);
+    const checks = checksOf(pr);
+    if (automerge && !pr.isDraft && !checks.failing.length && age <= STALE_DAYS) continue;
+    const why = !automerge
+      ? 'needs your review'
+      : checks.failing.length
+        ? 'auto-merge blocked: failing check'
+        : `auto-merge stalled: open ${age} days`;
+    waiting.push({ ...pr, kind: kindOf(pr), checks: checks.label, age, why, blocked: automerge });
+  }
+  // Blocked auto-merges first: they were meant to need nobody.
+  waiting.sort((a, b) => b.blocked - a.blocked || a.number - b.number);
+  return { rejected, pending, waiting };
+}
+
+// 3. Overrides no installed package needs ------------------------------------
 function readOverrides() {
   const wsFile = path.join(root, 'pnpm-workspace.yaml');
   const ws = fs.existsSync(wsFile) ? YAML.parse(fs.readFileSync(wsFile, 'utf8')) || {} : {};
@@ -211,7 +251,7 @@ function staleOverrides() {
   return stale;
 }
 
-// 3. pnpm audit ---------------------------------------------------------------
+// 4. pnpm audit ---------------------------------------------------------------
 const SEVERITY = ['critical', 'high', 'moderate', 'low', 'info'];
 function auditFindings() {
   const run = spawnSync('pnpm', ['audit', '--json'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -244,11 +284,11 @@ function auditFindings() {
 // Report -----------------------------------------------------------------------
 const expiredNote = (item) => (item.expired ? ` (ignore expired ${item.expired})` : '');
 
-function render({ rejected, pending, stale, findings, ignored, cleanup }) {
+function render({ rejected, pending, waiting, stale, findings, ignored, cleanup }) {
   const out = [
     `# ${TITLE}`,
     '',
-    `Generated ${today}. Fix these locally before the weekly release (in Claude Code: \`/fix-cve <this issue's URL>\`); the next run updates this issue, or closes it once everything is clear.`,
+    `Generated ${today}. Handle these before the weekly release (in Claude Code: \`/fix-cve <this issue's URL>\`); the next run updates this issue, or closes it once everything is clear.`,
   ];
   if (rejected.length) {
     out.push('', `## Security PRs rejected by the Claude CVE gate (${rejected.length})`, '');
@@ -261,6 +301,14 @@ function render({ rejected, pending, stale, findings, ignored, cleanup }) {
     out.push('', `## Security PRs without a gate verdict (${pending.length})`, '');
     out.push('The gate has not commented yet, or its run failed: check the PR\'s checks.', '');
     for (const pr of pending) out.push(`- [#${pr.number} ${oneLine(pr.title)}](${pr.url})`);
+  }
+  if (waiting.length) {
+    out.push('', `## Renovate PRs waiting for you (${waiting.length})`, '');
+    out.push('Renovate won\'t merge these by itself. Merge, fix or close each one; closing tells Renovate to skip that version (a major: until the next major).', '');
+    out.push('| PR | Type | Checks | Open | Why |', '| --- | --- | --- | --- | --- |');
+    for (const pr of waiting) {
+      out.push(`| [#${pr.number} ${oneLine(pr.title)}](${pr.url}) | ${pr.kind} | ${oneLine(pr.checks)} | ${pr.age} d | ${pr.why} |`);
+    }
   }
   if (stale.length) {
     out.push('', `## pnpm overrides to remove (${stale.length})`, '');
@@ -314,7 +362,9 @@ function upsertIssue(body, count) {
   }
 }
 
-const { rejected, pending } = process.argv.includes('--no-prs') ? { rejected: [], pending: [] } : securityPrs();
+const { rejected, pending, waiting } = process.argv.includes('--no-prs')
+  ? { rejected: [], pending: [], waiting: [] }
+  : renovatePrs();
 const ignores = readIgnores();
 const overrides = applyIgnores(staleOverrides(), 'overrides', (o) => [o.key], ignores);
 const audit = applyIgnores(auditFindings(), 'advisories', (f) => f.ids, ignores);
@@ -327,7 +377,7 @@ const cleanup = [
 const stale = overrides.kept;
 const findings = audit.kept;
 const ignored = [...overrides.ignored, ...audit.ignored];
-const count = rejected.length + pending.length + stale.length + findings.length + cleanup.length;
-const body = render({ rejected, pending, stale, findings, ignored, cleanup });
+const count = rejected.length + pending.length + waiting.length + stale.length + findings.length + cleanup.length;
+const body = render({ rejected, pending, waiting, stale, findings, ignored, cleanup });
 if (publish) upsertIssue(body, count);
 else process.stdout.write(count || ignored.length ? body : 'All clear.\n');
