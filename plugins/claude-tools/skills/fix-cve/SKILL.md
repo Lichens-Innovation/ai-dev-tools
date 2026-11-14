@@ -26,7 +26,7 @@ One command per call, never `cd`. Commands below run from the repo root.
   If something is missing, list it and suggest `/setup-dependency-automation`, then stop. If all of it is there, say "nothing to fix" and stop: the report closes its issue when nothing is left.
 - With a report but no presets: work through it, and mention `/setup-dependency-automation` once in the summary.
 - The report is a snapshot from its last run. Re-check it now:
-  - Overrides and audit: `node .github/scripts/dependency-report.cjs --no-prs`.
+  - Overrides and audit: `node .github/scripts/dependency-report.cjs --no-prs`. `yaml@2 not found` (or `semver@7`) means the repo doesn't install them: set `REPORT_DEPS_DIR` to an **absolute** directory whose `node_modules` has them, e.g. a `node_modules/.pnpm/yaml@2.x.y` folder of another pnpm repo (`find .. -maxdepth 4 -type d -name 'yaml@2.*' -path '*node_modules/.pnpm*'`).
   - Each listed PR: `gh pr view <n> --json state,statusCheckRollup`.
   - Items already fixed, merged or closed since the report: drop them.
 
