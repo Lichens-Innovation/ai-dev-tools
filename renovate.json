@@ -3,5 +3,12 @@
   "extends": [
     "local>Lichens-Innovation/renovate-runner",
     "local>Lichens-Innovation/renovate-runner:claude-cve-gate"
+  ],
+  "packageRules": [
+    {
+      "description": "Keep @types/node on the Node major we run (node:24 in the Dockerfiles).",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<25"
+    }
   ]
 }
