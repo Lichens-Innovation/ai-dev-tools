@@ -7,6 +7,9 @@
 //   1. open Renovate security PRs the Claude CVE gate rejected (or never judged),
 //   2. pnpm overrides that no installed package needs anymore,
 //   3. the findings `pnpm audit` still reports.
+// Advisories and overrides listed in the ignore file (.github/dependency-report-ignore.yml)
+// move to a collapsed "Ignored" section and don't keep the issue open, until
+// their `until` date; entries that match nothing are reported for removal.
 //
 // Usage: node dependency-report.cjs [--publish] [--no-prs]
 //   Without --publish, prints the report as Markdown.
@@ -16,7 +19,8 @@
 // Needs `pnpm install` done and `gh` authenticated (GH_TOKEN in Actions).
 // Env:
 //   REPORT_ROOT      repo to report on (default: the current directory)
-//   REVIEWER        GitHub login assigned to a new issue (optional)
+//   REVIEWER         GitHub login assigned to a new issue (optional)
+//   REPORT_IGNORE_FILE  ignore file, relative to the repo (default .github/dependency-report-ignore.yml)
 //   RENOVATE_AUTHOR  Renovate's PR author for gh (default app/lichens-renovate)
 //   REPORT_DEPS_DIR  directory whose node_modules has semver and yaml; falls back
 //                    to the newest semver@7 / yaml@2 in node_modules/.pnpm
@@ -57,6 +61,45 @@ function gh(args) {
 }
 const ghJson = (args) => JSON.parse(gh(args));
 const oneLine = (s) => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+const today = new Date().toISOString().slice(0, 10);
+
+// Ignore list ------------------------------------------------------------------
+// advisories: [{id, reason, until}]  id = GHSA, CVE or npm advisory number
+// overrides:  [{key, reason, until}] key = the override key as written
+const ignoreRel = process.env.REPORT_IGNORE_FILE || '.github/dependency-report-ignore.yml';
+function readIgnores() {
+  const file = path.join(root, ignoreRel);
+  const entries = [];
+  const problems = [];
+  if (!fs.existsSync(file)) return { entries, problems };
+  const data = YAML.parse(fs.readFileSync(file, 'utf8')) || {};
+  for (const [kind, field] of [['advisories', 'id'], ['overrides', 'key']]) {
+    for (const e of data[kind] || []) {
+      const key = e && e[field] != null ? String(e[field]) : '';
+      const until = e && e.until instanceof Date ? e.until.toISOString().slice(0, 10) : String((e && e.until) || '');
+      if (!key || !e.reason || !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+        problems.push(`\`${kind}\` entry \`${oneLine(JSON.stringify(e))}\` needs \`${field}\`, \`reason\` and \`until\` (YYYY-MM-DD).`);
+        continue;
+      }
+      entries.push({ kind, key, reason: String(e.reason), until, expired: until < today, used: false });
+    }
+  }
+  return { entries, problems };
+}
+
+// Splits items into kept (reported) and ignored. An expired entry no longer
+// hides its item; the item is reported with `expired` set to the date.
+function applyIgnores(items, kind, keysOf, ignores) {
+  const kept = [];
+  const ignored = [];
+  for (const item of items) {
+    const entry = ignores.entries.find((e) => e.kind === kind && keysOf(item).includes(e.key));
+    if (entry) entry.used = true;
+    if (entry && !entry.expired) ignored.push({ label: kind === 'advisories' ? `${item.id} (\`${item.module}\` ${item.installed})` : `\`${item.key}\``, entry });
+    else kept.push(entry ? { ...item, expired: entry.until } : item);
+  }
+  return { kept, ignored };
+}
 
 // 1. Security PRs and the gate's verdict -------------------------------------
 function securityPrs() {
@@ -190,6 +233,7 @@ function auditFindings() {
         title: a.title,
         url: a.url,
         id: a.github_advisory_id || a.id,
+        ids: [a.github_advisory_id, String(a.id), ...(a.cves || [])].filter(Boolean),
         via: paths[0] ? paths[0].replace(/__/g, '/').split('>').join(' > ') : '',
         more: paths.length - 1,
       };
@@ -198,11 +242,13 @@ function auditFindings() {
 }
 
 // Report -----------------------------------------------------------------------
-function render({ rejected, pending, stale, findings }) {
+const expiredNote = (item) => (item.expired ? ` (ignore expired ${item.expired})` : '');
+
+function render({ rejected, pending, stale, findings, ignored, cleanup }) {
   const out = [
     `# ${TITLE}`,
     '',
-    `Generated ${new Date().toISOString().slice(0, 10)}. Fix these locally before the weekly release; the next run updates this issue, or closes it once everything is clear.`,
+    `Generated ${today}. Fix these locally before the weekly release (in Claude Code: \`/fix-cve <this issue's URL>\`); the next run updates this issue, or closes it once everything is clear.`,
   ];
   if (rejected.length) {
     out.push('', `## Security PRs rejected by the Claude CVE gate (${rejected.length})`, '');
@@ -220,15 +266,27 @@ function render({ rejected, pending, stale, findings }) {
     out.push('', `## pnpm overrides to remove (${stale.length})`, '');
     out.push('Remove them, run `pnpm install`, then check `pnpm audit` stays clean.', '');
     out.push('| Override | Target | Status | Installed |', '| --- | --- | --- | --- |');
-    for (const o of stale) out.push(`| \`${o.key}\` | \`${o.target}\` | ${o.status} | ${o.installed} |`);
+    for (const o of stale) out.push(`| \`${o.key}\` | \`${o.target}\` | ${o.status}${expiredNote(o)} | ${o.installed} |`);
   }
   if (findings.length) {
     out.push('', `## pnpm audit findings (${findings.length})`, '');
     out.push('| Severity | Package | Installed | Fixed in | Advisory | Via |', '| --- | --- | --- | --- | --- | --- |');
     for (const f of findings) {
       const via = f.via ? `${oneLine(f.via)}${f.more ? ` (+${f.more} more)` : ''}` : '';
-      out.push(`| ${f.severity} | \`${f.module}\` | ${f.installed} | \`${oneLine(f.patched)}\` | [${f.id}](${f.url}): ${oneLine(f.title)} | ${via} |`);
+      out.push(`| ${f.severity} | \`${f.module}\` | ${f.installed} | \`${oneLine(f.patched)}\` | [${f.id}](${f.url}): ${oneLine(f.title)}${expiredNote(f)} | ${via} |`);
     }
+  }
+  if (cleanup.length) {
+    out.push('', `## Ignore list to clean up (${cleanup.length})`, '');
+    out.push(`In \`${ignoreRel}\`:`, '');
+    for (const line of cleanup) out.push(`- ${line}`);
+  }
+  if (ignored.length) {
+    out.push('', `## Ignored (${ignored.length})`, '');
+    out.push(`<details><summary>Not counted: listed in <code>${ignoreRel}</code></summary>`, '');
+    out.push('| Item | Reason | Until |', '| --- | --- | --- |');
+    for (const { label, entry } of ignored) out.push(`| ${label} | ${oneLine(entry.reason)} | ${entry.until} |`);
+    out.push('', '</details>');
   }
   return out.join('\n') + '\n';
 }
@@ -257,9 +315,19 @@ function upsertIssue(body, count) {
 }
 
 const { rejected, pending } = process.argv.includes('--no-prs') ? { rejected: [], pending: [] } : securityPrs();
-const stale = staleOverrides();
-const findings = auditFindings();
-const count = rejected.length + pending.length + stale.length + findings.length;
-const body = render({ rejected, pending, stale, findings });
+const ignores = readIgnores();
+const overrides = applyIgnores(staleOverrides(), 'overrides', (o) => [o.key], ignores);
+const audit = applyIgnores(auditFindings(), 'advisories', (f) => f.ids, ignores);
+const cleanup = [
+  ...ignores.problems,
+  ...ignores.entries
+    .filter((e) => !e.used)
+    .map((e) => `\`${e.key}\` (${e.kind}) no longer matches anything in the report: remove the entry.`),
+];
+const stale = overrides.kept;
+const findings = audit.kept;
+const ignored = [...overrides.ignored, ...audit.ignored];
+const count = rejected.length + pending.length + stale.length + findings.length + cleanup.length;
+const body = render({ rejected, pending, stale, findings, ignored, cleanup });
 if (publish) upsertIssue(body, count);
-else process.stdout.write(count ? body : 'All clear.\n');
+else process.stdout.write(count || ignored.length ? body : 'All clear.\n');
