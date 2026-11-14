@@ -1,0 +1,51 @@
+# Checks every pull request: install from the lockfile, lint, typecheck, build
+# and test. Renovate's automerge-routine preset (renovate.json) merges pin PRs
+# and non-major devDependency updates only when these checks are green, so they
+# are the only review those PRs get.
+#
+# Typecheck covers design-studio only: help-server has type errors to fix first
+# (TanStack Start server functions), then add a "typecheck" script there too.
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Same major as the Dockerfiles (node:24).
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
