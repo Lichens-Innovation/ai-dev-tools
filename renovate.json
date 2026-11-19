@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "local>Lichens-Innovation/renovate-runner",
+    "local>Lichens-Innovation/lichens-dependency-scan//renovate-presets/default",
     "local>Lichens-Innovation/renovate-runner:claude-cve-gate",
     "local>Lichens-Innovation/renovate-runner:automerge-routine"
   ],
