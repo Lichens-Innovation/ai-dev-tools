@@ -23,7 +23,7 @@
 //   REPORT_ROOT      repo to report on (default: the current directory)
 //   REVIEWER         GitHub login assigned to a new issue (optional)
 //   REPORT_IGNORE_FILE  ignore file, relative to the repo (default .github/dependency-report-ignore.yml)
-//   RENOVATE_AUTHOR  Renovate's PR author for gh (default app/lichens-renovate)
+//   RENOVATE_BRANCH_PREFIX  branch prefix of Renovate's PRs (default renovate/)
 //   REPORT_DEPS_DIR  directory whose node_modules has semver and yaml; falls back
 //                    to the newest semver@7 / yaml@2 in node_modules/.pnpm
 'use strict';
@@ -37,7 +37,9 @@ const TITLE = 'Weekly dependency report';
 const root = path.resolve(process.env.REPORT_ROOT || process.cwd());
 const pnpmDir = path.join(root, 'node_modules/.pnpm');
 const publish = process.argv.includes('--publish');
-const renovateAuthor = process.env.RENOVATE_AUTHOR || 'app/lichens-renovate';
+// Renovate PRs are found by branch, not author: the org's bot changed
+// (lichens-renovate, then lichens-dependency-scan) and may change again.
+const renovatePrefix = process.env.RENOVATE_BRANCH_PREFIX || 'renovate/';
 
 function load(name, major) {
   if (process.env.REPORT_DEPS_DIR) {
@@ -131,9 +133,9 @@ function kindOf(pr) {
 
 function renovatePrs() {
   const prs = ghJson([
-    'pr', 'list', '--state', 'open', '--author', renovateAuthor, '--limit', '100',
-    '--json', 'number,title,url,headRefName,labels,body,createdAt,isDraft,statusCheckRollup',
-  ]);
+    'pr', 'list', '--state', 'open', '--limit', '200',
+    '--json', 'number,title,url,headRefName,isCrossRepository,labels,body,createdAt,isDraft,statusCheckRollup',
+  ]).filter((pr) => !pr.isCrossRepository && pr.headRefName.startsWith(renovatePrefix));
   const rejected = [];
   const pending = [];
   const waiting = [];
