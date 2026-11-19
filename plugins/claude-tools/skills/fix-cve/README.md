@@ -2,10 +2,12 @@
 
 Works through the **Weekly dependency report** issue that the opt-in dependency-report workflow keeps in a pnpm repo (template and docs: `docs/dependency-report.md` in Lichens-Innovation/renovate-runner). Run with `/fix-cve <issue URL>`, or `/fix-cve` alone to find the open report in the current repo.
 
-It fixes the easy items in one batch (removable overrides, same-major bumps, dev tooling, stale ignore entries), then goes through the others with you one at a time:
+It fixes the easy items in one batch (removable overrides, same-major bumps, dev tooling, stale ignore entries), then researches the others and shows one table with its recommendation for each, the reason and the manual checks:
 
-- **Renovate PRs waiting for you** (runtime updates, majors, lock file maintenance, and auto-merge PRs whose checks fail): what changes, the release notes that matter for your code, the checks, and the manual checks to do. You pick merge, fix first (locally, on the fix branch), close, or skip.
+- **Renovate PRs waiting for you** (runtime updates, majors, lock file maintenance, and auto-merge PRs whose checks fail): merge, fix first (locally, on the fix branch), close, hold with a Renovate rule, or skip.
 - **Everything else** (major jumps in app code, PRs the Claude CVE gate rejected or never judged, overrides to check by hand): fix now, ignore with a reason and an expiry date, or skip until next week.
+
+You answer "agree", or name the rows you want changed and why; it then does what the table says.
 
 It ends with one commit and the list of manual checks to do before merging; you open the PR with `/git:create-pr`.
 
@@ -21,8 +23,9 @@ It pairs with the `automerge-routine` Renovate preset: what passes CI merges by 
 
 - `package.json` files, `pnpm-workspace.yaml` (`overrides`, `minimumReleaseAgeExclude`), and `pnpm-lock.yaml` through your `pnpm install`.
 - `.github/dependency-report-ignore.yml`: what you chose to ignore, read by the next report.
+- `renovate.json`: a `packageRules` entry for a version to hold (types capped at the runtime's major, a plugin waiting for its host's major).
 
-On GitHub: merges or closes the Renovate PRs you choose (`gh pr merge`, `gh pr close`).
+On GitHub: merges or closes the Renovate PRs whose rows you approved (`gh pr merge`, `gh pr close`).
 
 ## Design choices
 
@@ -30,10 +33,11 @@ On GitHub: merges or closes the Renovate PRs you choose (`gh pr merge`, `gh pr c
 - **Auto vs ask.** Same-major and dev-only fixes are verified by audit, lint, build and tests, so they don't need you. A new major in code the app runs, or a judgement Claude's gate already questioned, does.
 - **Overrides are scoped** to the vulnerable range (`pkg@<fixed`), so they can be removed by the report once no parent needs them.
 - **Ignores expire.** Every entry has a reason and an `until` date (90 days by default); after it, the item is reported again.
-- **One PR, one answer.** It merges or closes a Renovate PR only after you picked that option for that PR, never several on one answer. Closing tells Renovate to skip that version, so it says so before closing.
+- **Recommend, then ask once.** "Merge, close or skip?" without an opinion hands the work back to you. A table with a recommendation and its reason per item lets you agree in one word and argue only the rows you disagree with. Nothing is merged or closed before you answer.
+- **Group PRs aren't closed.** Renovate recreates a closed group PR on its next run, so a version you don't want from a group is held with a `renovate.json` rule instead. Closing a single-package PR does skip that version (a major: until the next one).
 - **You run `pnpm install`.** Installs don't fit the guardrails sandbox, so the skill asks for `! pnpm install`.
 
 ## Known limits
 
-- pnpm repos only, with the dependency-report script copied to `.github/scripts/`.
+- pnpm repos only, with the dependency-report script copied to `.github/scripts/`. In a repo without it, `fix-cve` lists what is missing and suggests `/setup-dependency-automation`.
 - It does not open the PR: `git:create-pr` can't be called from another skill.

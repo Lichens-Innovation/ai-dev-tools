@@ -34,9 +34,13 @@ belong to a specific stack (CI, React, etc.) but are broadly useful across proje
   Optionally adds a rule so Claude doesn't run those tools itself.
 - **fix-cve** — works through the weekly dependency report issue of a pnpm repo (security PRs the
   Claude CVE gate rejected, Renovate PRs waiting for you, pnpm overrides to remove, `pnpm audit`
-  findings): fixes the easy items, goes through the others with you one by one (merging or closing
-  only the Renovate PRs you pick), and records the ones you ignore, with a reason and an
-  expiry date, in `.github/dependency-report-ignore.yml`.
+  findings): fixes the easy items, recommends a decision for each of the others in one table
+  (merging or closing a Renovate PR only once you approve its row), and records the ones you
+  ignore, with a reason and an expiry date, in `.github/dependency-report-ignore.yml`.
+- **setup-dependency-automation** — audits a pnpm repo of the Lichens-Innovation org and opts it in to
+  the Claude CVE gate, the weekly dependency report and the `automerge-routine` Renovate preset: a
+  workflows PR first, then, once it is merged and the `CLAUDE_CODE_OAUTH_TOKEN` secret is set, a
+  presets PR. It flags copies that drifted from their renovate-runner source.
 - **super-help** — general-purpose Q&A skill for the Claude Code AI Dev Tools ecosystem
   (plugins, skills, subagents, hooks, marketplaces, rules, MCP, memory, CLI commands).
 - **`/help-server` command** — starts (or opens) the AI Dev Tools help server dashboard
@@ -61,6 +65,7 @@ claude plugin install claude-tools@lichens-ai-dev-tools
 - `/setup-claude-just-usage` — make Claude use the repo's `just` recipes, per justfile level.
 - `/setup-claude-auto-lint-format` — lint and format every file Claude edits, reporting only problems.
 - `/fix-cve [report issue URL]` — fix this week's dependency report on a branch and walk through the waiting Renovate PRs, deciding the hard items with you.
+- `/setup-dependency-automation [repo path]` — make a repo handle Renovate PRs like ai-dev-tools: CVE gate, weekly report, auto-merge of routine updates.
 - `/super-help` — ask a question about the Claude Code AI Dev Tools ecosystem.
 - `/help-server` — start the help server and open its dashboard in the browser.
 - `/manage-marketplace` — ask about plugin/marketplace install, update, or removal commands.
