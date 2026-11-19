@@ -63,6 +63,8 @@ function gh(args) {
 }
 const ghJson = (args) => JSON.parse(gh(args));
 const oneLine = (s) => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+// pnpm audit gives null, or "<0.0.0", when no version fixes the advisory yet.
+const fixedIn = (patched) => (!patched || patched === '<0.0.0' ? 'no fix yet' : `\`${oneLine(patched)}\``);
 const today = new Date().toISOString().slice(0, 10);
 
 // Ignore list ------------------------------------------------------------------
@@ -154,7 +156,9 @@ function renovatePrs() {
       : checks.failing.length
         ? 'auto-merge blocked: failing check'
         : `auto-merge stalled: open ${age} days`;
-    waiting.push({ ...pr, kind: kindOf(pr), checks: checks.label, age, why, blocked: automerge });
+    // A group PR says it "will be recreated if closed unmerged": closing it skips nothing.
+    const group = /recreated if closed unmerged/i.test(pr.body || '');
+    waiting.push({ ...pr, kind: `${kindOf(pr)}${group ? ' (group)' : ''}`, checks: checks.label, age, why, blocked: automerge });
   }
   // Blocked auto-merges first: they were meant to need nobody.
   waiting.sort((a, b) => b.blocked - a.blocked || a.number - b.number);
@@ -284,11 +288,17 @@ function auditFindings() {
 // Report -----------------------------------------------------------------------
 const expiredNote = (item) => (item.expired ? ` (ignore expired ${item.expired})` : '');
 
-function render({ rejected, pending, waiting, stale, findings, ignored, cleanup }) {
+// The command to paste in a new Claude Code session, in a fenced block so GitHub
+// shows a copy button. Before the issue exists (first run) its URL is unknown.
+const fixCommand = (issueUrl) => ['```', `/fix-cve ${issueUrl || "<this issue's URL>"}`, '```'];
+
+function render({ rejected, pending, waiting, stale, findings, ignored, cleanup }, issueUrl) {
   const out = [
     `# ${TITLE}`,
     '',
-    `Generated ${today}. Handle these before the weekly release (in Claude Code: \`/fix-cve <this issue's URL>\`); the next run updates this issue, or closes it once everything is clear.`,
+    `Generated ${today}. Handle these before the weekly release; the next run updates this issue, or closes it once everything is clear. In Claude Code, from this repository:`,
+    '',
+    ...fixCommand(issueUrl),
   ];
   if (rejected.length) {
     out.push('', `## Security PRs rejected by the Claude CVE gate (${rejected.length})`, '');
@@ -304,7 +314,7 @@ function render({ rejected, pending, waiting, stale, findings, ignored, cleanup 
   }
   if (waiting.length) {
     out.push('', `## Renovate PRs waiting for you (${waiting.length})`, '');
-    out.push('Renovate won\'t merge these by itself. Merge, fix or close each one; closing tells Renovate to skip that version (a major: until the next major).', '');
+    out.push('Renovate won\'t merge these by itself. Merge, fix or close each one. Closing a single-package PR tells Renovate to skip that version (a major: until the next major); a `(group)` PR comes back on the next run, so hold its version with a `packageRules` entry in `renovate.json` instead.', '');
     out.push('| PR | Type | Checks | Open | Why |', '| --- | --- | --- | --- | --- |');
     for (const pr of waiting) {
       out.push(`| [#${pr.number} ${oneLine(pr.title)}](${pr.url}) | ${pr.kind} | ${oneLine(pr.checks)} | ${pr.age} d | ${pr.why} |`);
@@ -321,7 +331,7 @@ function render({ rejected, pending, waiting, stale, findings, ignored, cleanup 
     out.push('| Severity | Package | Installed | Fixed in | Advisory | Via |', '| --- | --- | --- | --- | --- | --- |');
     for (const f of findings) {
       const via = f.via ? `${oneLine(f.via)}${f.more ? ` (+${f.more} more)` : ''}` : '';
-      out.push(`| ${f.severity} | \`${f.module}\` | ${f.installed} | \`${oneLine(f.patched)}\` | [${f.id}](${f.url}): ${oneLine(f.title)}${expiredNote(f)} | ${via} |`);
+      out.push(`| ${f.severity} | \`${f.module}\` | ${f.installed} | ${fixedIn(f.patched)} | [${f.id}](${f.url}): ${oneLine(f.title)}${expiredNote(f)} | ${via} |`);
     }
   }
   if (cleanup.length) {
@@ -339,8 +349,9 @@ function render({ rejected, pending, waiting, stale, findings, ignored, cleanup 
   return out.join('\n') + '\n';
 }
 
-function upsertIssue(body, count) {
-  const open = ghJson(['issue', 'list', '--state', 'open', '--search', `"${TITLE}" in:title`, '--json', 'number,title']).filter(
+// bodyFor(issueUrl) renders the report with the issue's own URL in the command.
+function upsertIssue(bodyFor, count) {
+  const open = ghJson(['issue', 'list', '--state', 'open', '--search', `"${TITLE}" in:title`, '--json', 'number,title,url']).filter(
     (i) => i.title === TITLE,
   );
   const existing = open[0];
@@ -349,16 +360,25 @@ function upsertIssue(body, count) {
     console.log(existing ? `Closed #${existing.number}: all clear.` : 'All clear: no issue to open.');
     return;
   }
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dep-report-')), 'body.md');
-  fs.writeFileSync(file, body);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dep-report-'));
+  const write = (name, text) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, text);
+    return file;
+  };
   if (existing) {
-    gh(['issue', 'edit', String(existing.number), '--body-file', file]);
-    gh(['issue', 'comment', String(existing.number), '--body', `Updated: ${count} item(s) to fix before the weekly release.`]);
+    gh(['issue', 'edit', String(existing.number), '--body-file', write('body.md', bodyFor(existing.url))]);
+    // Editing the body sends no email; this comment does, so it carries the command too.
+    const comment = [`Updated: ${count} item(s) to fix before the weekly release. In Claude Code, from this repository:`, '', ...fixCommand(existing.url)];
+    gh(['issue', 'comment', String(existing.number), '--body-file', write('comment.md', comment.join('\n') + '\n')]);
     console.log(`Updated #${existing.number}.`);
   } else {
-    const args = ['issue', 'create', '--title', TITLE, '--body-file', file];
+    // The URL exists only once the issue does: create, then write the command in.
+    const args = ['issue', 'create', '--title', TITLE, '--body-file', write('body.md', bodyFor(null))];
     if (process.env.REVIEWER) args.push('--assignee', process.env.REVIEWER);
-    console.log(gh(args).trim());
+    const url = gh(args).trim();
+    gh(['issue', 'edit', url, '--body-file', write('body.md', bodyFor(url))]);
+    console.log(url);
   }
 }
 
@@ -378,6 +398,6 @@ const stale = overrides.kept;
 const findings = audit.kept;
 const ignored = [...overrides.ignored, ...audit.ignored];
 const count = rejected.length + pending.length + waiting.length + stale.length + findings.length + cleanup.length;
-const body = render({ rejected, pending, waiting, stale, findings, ignored, cleanup });
-if (publish) upsertIssue(body, count);
-else process.stdout.write(count || ignored.length ? body : 'All clear.\n');
+const sections = { rejected, pending, waiting, stale, findings, ignored, cleanup };
+if (publish) upsertIssue((issueUrl) => render(sections, issueUrl), count);
+else process.stdout.write(count || ignored.length ? render(sections, null) : 'All clear.\n');

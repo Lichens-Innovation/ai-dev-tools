@@ -17,6 +17,12 @@ permissions:
   contents: read
   issues: write
   pull-requests: read
+  # The PR list reads each Renovate PR's CI result (statusCheckRollup): check
+  # runs need `checks`, commit statuses (Renovate's stability-days) `statuses`,
+  # and the workflow run each check belongs to `actions`.
+  actions: read
+  checks: read
+  statuses: read
 
 concurrency:
   group: dependency-report

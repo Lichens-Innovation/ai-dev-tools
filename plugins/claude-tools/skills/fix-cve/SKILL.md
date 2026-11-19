@@ -96,7 +96,7 @@ The user can't judge a bare "merge, close or skip?": the point of this step is y
 Renovate PRs:
 
 - **What changes:** `gh pr view <n> --json title,body,files` and `gh pr diff <n>`: each package, old → new version, dev or runtime, which workspace. A pin PR: does the pinned version match the lockfile, and does it pin anything the report flags (a vulnerable version, an override this branch removes)?
-- **Group or not:** a group PR (body says "This PR will be recreated if closed unmerged", or several packages under one group name) comes back after a close. See **Close** below.
+- **Group or not:** a group PR (typed `(group)` in the report; body says "This PR will be recreated if closed unmerged", or several packages under one group name) comes back after a close. See **Close** below.
 - **Checks:** `gh pr checks <n>`; for a failure, `gh run view <run-id> --log-failed` and name the package that breaks it (in a group, the error usually points at one tool: a new lint rule, a stricter type).
 - **Release notes** between the two versions, for runtime packages and majors: the Release Notes section of the PR body, or the package's releases (`pnpm view <pkg> repository.url`). Peer requirements matter: a plugin major that needs a new major of its host (vite, eslint, react) is a migration, not an update.
 - **Fit with the project:** a `@types/*` major should match the runtime's major (`@types/node` the Node in `.nvmrc`/CI/Dockerfile, `@types/react` the installed `react`).
