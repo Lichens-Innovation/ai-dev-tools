@@ -21,7 +21,7 @@ One command per call, never `cd`. Commands below run from the repo root.
 - Without one: `gh issue list --state open --search '"Weekly dependency report" in:title' --json number,title,url`, keep the exact title match.
 - None open: check the repo is set up before saying "nothing to fix":
   - `.github/workflows/dependency-report.yml` and `.github/scripts/dependency-report.cjs` exist;
-  - `renovate.json` extends `local>Lichens-Innovation/renovate-runner:claude-cve-gate` and `:automerge-routine`.
+  - `renovate.json` extends the `claude-cve-gate` and `automerge-routine` presets: `local>Lichens-Innovation/lichens-dependency-scan//renovate-presets/<name>`, or the older `local>Lichens-Innovation/renovate-runner:<name>`.
 
   If something is missing, list it and suggest `/setup-dependency-automation`, then stop. If all of it is there, say "nothing to fix" and stop: the report closes its issue when nothing is left.
 - With a report but no presets: work through it, and mention `/setup-dependency-automation` once in the summary.
