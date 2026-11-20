@@ -21,7 +21,7 @@ Creates or updates a pull request from your current work: one command from uncom
 
 ## Requirements
 
-- `git`, `gh` (authenticated with the `repo` scope) and `jq`.
+- `git` and `gh` (authenticated with the `repo` scope).
 - For screenshots: Playwright in the project, or Chrome/Chromium (`CHROME_BIN` if not on `PATH`).
 
 ## Files
