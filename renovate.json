@@ -10,6 +10,12 @@
       "description": "Keep @types/node on the Node major we run (node:24 in the Dockerfiles).",
       "matchPackageNames": ["@types/node"],
       "allowedVersions": "<25"
+    },
+    {
+      "description": "Keep CI's node-version on the Node major we run (node:24 in the Dockerfiles). Lift together with the Dockerfiles and the @types/node rule.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["node"],
+      "allowedVersions": "<25"
     }
   ]
 }

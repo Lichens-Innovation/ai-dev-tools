@@ -1,0 +1,6 @@
+# Items the weekly dependency report lists as "Ignored" until their date.
+# Format: renovate-runner docs/dependency-report.md
+advisories:
+  - id: GHSA-238p-pmpm-9mq7 # katex via excalidraw > mermaid-to-excalidraw > mermaid 11
+    reason: Reached only via excalidraw's Mermaid dialog in the local design studio; needs an existing prototype pollution; no mermaid 11 release supports katex 0.18. Revisit when excalidraw moves to mermaid 12.
+    until: 2027-02-18
