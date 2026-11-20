@@ -12,7 +12,7 @@ It audits the repo first (pnpm lockfile, PR CI that lints, typechecks, builds an
 
 1. **Workflows PR:** the gate workflow, the report workflow and script, and a `@types/node` cap matching the Node major the repo runs.
 2. **You:** add the `CLAUDE_CODE_OAUTH_TOKEN` secret (`claude setup-token`, then `gh secret set`) and merge the PR.
-3. **Presets PR** (run the skill again after the merge): `claude-cve-gate` and `automerge-routine` in `renovate.json`.
+3. **Presets PR** (run the skill again after the merge): `claude-cve-gate` and `automerge-routine` in `renovate.json`, from `renovate-presets/` in Lichens-Innovation/lichens-dependency-scan (the org's Renovate bot).
 
 ## Files
 

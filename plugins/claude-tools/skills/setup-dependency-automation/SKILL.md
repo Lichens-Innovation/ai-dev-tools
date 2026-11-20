@@ -40,7 +40,7 @@ Check each row and show the table (item, state, what the skill will do) before w
 | Secret | `gh secret list --repo <O/R>` | `CLAUDE_CODE_OAUTH_TOKEN` is listed |
 | Gate workflow | `.github/workflows/claude-cve-gate.yml` | Exists. It is up to date when it matches the ai-dev-tools copy apart from the header comment, `REVIEWER` and `node-version`. |
 | Report | `.github/workflows/dependency-report.yml` and `.github/scripts/dependency-report.cjs` | Both exist. They are up to date when they match `templates/dependency-report/` apart from the header comment, `REVIEWER` and the action versions. |
-| Presets | `renovate.json` (or `.github/renovate.json`) `extends` | `local>Lichens-Innovation/renovate-runner:claude-cve-gate` and `:automerge-routine` |
+| Presets | `renovate.json` (or `.github/renovate.json`) `extends` | `local>Lichens-Innovation/lichens-dependency-scan//renovate-presets/claude-cve-gate` and `…/automerge-routine`. The old `local>Lichens-Innovation/renovate-runner:claude-cve-gate` and `:automerge-routine` still work: count them as present, the bot opens a *Migrate config* PR for them. |
 | Node major | `.nvmrc`, `engines.node`, `FROM node:<n>` in Dockerfiles, `node-version` in the CI workflow | One major. If they disagree, ask the user which one production runs (the Dockerfile usually wins). |
 | `@types/node` cap | A `packageRules` entry for `@types/node` with `allowedVersions: "<N+1>"` in `renovate.json` | Present, or `@types/node` isn't a dependency (`grep -rl '"@types/node"' --include=package.json <repo>`, leaving out `node_modules`) |
 
@@ -89,14 +89,16 @@ Commit and open the PR with the `git:commit` and `git:create-pr` skills (title l
 On a new branch from the updated `<default>` (`chore/renovate-presets`), add to `extends` in `renovate.json`, after the base preset:
 
 ```json
-"local>Lichens-Innovation/renovate-runner:claude-cve-gate",
-"local>Lichens-Innovation/renovate-runner:automerge-routine"
+"local>Lichens-Innovation/lichens-dependency-scan//renovate-presets/claude-cve-gate",
+"local>Lichens-Innovation/lichens-dependency-scan//renovate-presets/automerge-routine"
 ```
+
+The presets live in lichens-dependency-scan, the org's Renovate bot. The workflow templates and their docs are still in renovate-runner.
 
 - Leave out `automerge-routine` when step 2 found no PR CI that tests, or a required approval. Say why.
 - Keep the repo's other `extends` and `packageRules` as they are.
 
-Commit and open the PR as in step 3, with a short body: what each preset changes (from the docs), and that Renovate applies them on its next weekly run (Tuesday 03:00 UTC).
+Commit and open the PR as in step 3, with a short body: what each preset changes (from the docs), and that Renovate applies them on its next daily run (02:00 UTC). It proposes a version only once it is 7 days old; security fixes don't wait.
 
 ## 6. Report
 
@@ -111,4 +113,4 @@ Commit and open the PR as in step 3, with a short body: what each preset changes
 - Merge its own PRs, or push to anyone else's branch.
 - Touch a repo outside Lichens-Innovation, one where the user isn't admin, or another member's repo without the user's confirmation.
 - Extend the presets before the gate workflow is on the default branch.
-- Edit renovate-runner, or the org-wide `default.json`: the setup is opt-in, per repo.
+- Edit renovate-runner or lichens-dependency-scan, or the org-wide `default.json`: the setup is opt-in, per repo.
