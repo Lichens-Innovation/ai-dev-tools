@@ -112,35 +112,21 @@ Create or update a pull request: commit pending work, analyze the git changes, f
      4. Condense remaining lines.
 
 10. **Write file, confirm, execute**
-   1. At **PR project root**, write `pr-description.md`: **line 1** = semantic title, **line 2** = blank, **line 3+** = the filled template body. This exact shape is required — the commands below split the file on it (`head -1` for title, `tail -n +3` for body).
-   2. Verify `gh` and `jq` are available: `gh --version` / `jq --version`. If either is missing, tell the user to install it and stop — both are required, there is no fallback.
+   **Every `gh` call below is one plain command:** no pipe, redirection (`2>/dev/null`, `> file`), `$(...)`, process substitution or `env` prefix. When the sandbox is on, only such a call runs outside it; anything else keeps `gh` inside, where it fails with `failed to read configuration … gh/config.yml` or a proxy error. `git push … && gh …` is fine.
+
+   1. At **PR project root**, write `pr-description.md` with the Write tool: the filled template body only. The title goes in the command, so show it to the user next to the file.
+   2. Verify `gh` is available: `gh --version`. If it is missing, tell the user to install it and stop.
    3. Verify `gh` auth has sufficient scope: run `gh auth status`.
-      - A `GITHUB_TOKEN` (or `GH_TOKEN`) environment variable silently overrides `gh`'s stored credentials, even when a properly-scoped account is already logged in. Check whether one is set (`env | grep -i _TOKEN=`); if so, also run `env -u GITHUB_TOKEN -u GH_TOKEN gh auth status` and compare.
-      - The required scope is `repo` (shown as `Token scopes: ...` per account in the output). If the active account is missing it but another logged-in account has it, prefix every `gh` command for the rest of this step (existing-PR check, PATCH, POST) with `env -u GITHUB_TOKEN -u GH_TOKEN`.
+      - The required scope is `repo` (shown as `Token scopes: ...` per account in the output).
+      - A `GITHUB_TOKEN` (or `GH_TOKEN`) environment variable silently overrides `gh`'s stored credentials, even when a properly-scoped account is already logged in. If `gh auth status` reports a token from one of them without `repo` scope, give the user the step 5 commands prefixed with `env -u GITHUB_TOKEN -u GH_TOKEN`, to run with `!` (the prefix keeps the call in the sandbox), and stop.
       - If no account has `repo` scope, tell the user to run `gh auth refresh -h github.com -s repo` (or log in with a token that has it) and stop.
-      - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh api` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
-   4. Ask the user to confirm with the question tool: "Push the branch and post this PR via `gh api`?", options "Yes (Recommended)" / "No, keep pr-description.md".
-   5. On confirm, first push so GitHub has the commits (the POST fails if the branch is not on the remote): `git push -u origin HEAD`, in a call of its own. Then check if a PR already exists for the current branch (prefix with the `env -u ...` from step 3 if one was needed): `gh pr view --json number --jq .number 2>/dev/null`
-      - **PR exists (PATCH — update):**
-        ```bash
-        jq -n \
-          --rawfile body <(tail -n +3 pr-description.md) \
-          --arg title "$(head -1 pr-description.md)" \
-          '{title: $title, body: $body}' \
-        | gh api repos/{owner}/{repo}/pulls/<number> -X PATCH --input -
-        ```
-      - **No PR (POST — create):**
-        ```bash
-        jq -n \
-          --rawfile body <(tail -n +3 pr-description.md) \
-          --arg title "$(head -1 pr-description.md)" \
-          --arg head "$(git branch --show-current)" \
-          --arg base "<parent-branch>" \
-          '{title: $title, body: $body, head: $head, base: $base}' \
-        | gh api repos/{owner}/{repo}/pulls -X POST --input -
-        ```
-      - `{owner}/{repo}` are literal — `gh api` resolves them from the repo detected in the current directory. PATCH cannot create a PR; POST cannot update an existing one — never substitute one for the other.
-   6. Capture the PR URL from the response JSON's `.html_url`.
+      - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh pr create` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
+   4. Ask the user to confirm with the question tool: "Push the branch and post this PR?", options "Yes (Recommended)" / "No, keep pr-description.md".
+   5. On confirm, check whether a PR already exists for the current branch: `gh pr view --json number,url`. A "no pull requests found" error means there is none.
+      - **No PR (create):** `git push -u origin HEAD && gh pr create --base <parent-branch> --title '<title>' --body-file pr-description.md`. It prints the PR URL.
+      - **PR exists (update):** `git push -u origin HEAD && gh pr edit <number> --title '<title>' --body-file pr-description.md`. The URL is the one `gh pr view` returned.
+      - Quote the title in single quotes (`'\''` for an apostrophe).
+   6. Keep the PR URL from step 5.
    7. Remove `pr-description.md`.
    8. Open the PR URL in the browser:
       - macOS: `open <url>`
