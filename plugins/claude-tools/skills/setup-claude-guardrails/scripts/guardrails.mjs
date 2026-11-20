@@ -124,7 +124,8 @@ const MESSAGE_FLAGS = {
 const GIT_MESSAGE_COMMANDS = new Set(["commit", "tag", "merge", "stash", "notes"]);
 
 // Words of a command with their spans, grouped into simple commands, plus heredoc bodies. A word
-// after `>` (a redirection target) has `redirect: true`. Returns null for anything it doesn't follow.
+// after `>` (a redirection target) has `redirect: true`, and a segment with any `<` or `>` redirection
+// has `redirected: true`. Returns null for anything it doesn't follow.
 const lexCommand = (command) => {
   const len = command.length;
   const segments = [];
@@ -217,6 +218,7 @@ const lexCommand = (command) => {
       i += m[0].length;
     } else if (c === ">" || c === "<") {
       endWord(i);
+      segment.redirected = true;
       redirect = c === ">" || command[i + 1] === ">";
       i++;
       while (i < len && /[>&|]/.test(command[i])) i++;
@@ -449,6 +451,17 @@ const FAILURE_HINTS = [
       "Bash can't read ~/.claude/projects (saved tool outputs, plus the transcripts of every project): the sandbox blocks " +
       "it on purpose. Don't retry with another Bash command. Use the Grep tool (if you have it) to find lines in the " +
       "file and the Read tool with offset/limit to page through it.",
+  },
+  {
+    // gh inside the sandbox can't read its config, which holds the token and is kept out on purpose. No program
+    // test: a script that calls gh fails the same way.
+    error: /failed to read configuration|gh\/(config|hosts)\.yml/i,
+    hint:
+      "gh ran inside the sandbox, which can't read gh's config (it holds the token, so it stays out on purpose). gh runs " +
+      "outside only as a call of its own, or joined to other excluded commands by &&, with no redirection, pipe, " +
+      "heredoc or $(...): rebuild it that way and retry once (a large output is saved for you to page with Read). A " +
+      "script that calls gh can't run in the sandbox: test its other parts (e.g. a --no-prs flag) or ask the user to " +
+      "run it with !.",
   },
   {
     error: /Operation not permitted|Read-only file system/i,
@@ -787,6 +800,7 @@ const main = () => {
       if (hasSubstitution) reasons.push("a backtick or `$(...)`");
       if (lexed?.heredocs.length) reasons.push("a heredoc");
       if (lexed?.segments.some((s) => s.piped)) reasons.push("a pipe");
+      if (lexed?.segments.some((s) => s.redirected)) reasons.push("a redirection (`>`, `2>&1`, `<`)");
       const others = simple.filter((w) => !isExcluded(w)).map((w) => program(w)[0]);
       if (others.length) reasons.push(`other commands (${[...new Set(others)].join(", ")})`);
       if (aimed && reasons.length) {
@@ -797,6 +811,7 @@ const main = () => {
             `fail on credentials or the network. Only a call made entirely of excluded commands joined by && runs outside. ` +
             `Run the other commands in a separate call, and put a PR or commit body that has backticks, $ or a heredoc in a ` +
             `file made with Write (real path /tmp/claude-<uid>/..., not $TMPDIR) and pass it with --body-file. ` +
+            `Drop a redirection: a large output is saved for you and the Read tool pages through it. ` +
             `If that is not possible, ask the user to run the command with !.`
         );
       }
