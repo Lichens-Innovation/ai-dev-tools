@@ -1,7 +1,7 @@
 ---
 name: create-pr
-description: "Creates or updates a pull request: commits pending work (via the commit skill), generates a semantic PR title and a description from the branch diff using the project's PR template, adds UI screenshots, pushes, and posts the PR with gh. Use when the user asks to create a PR, open a pull request, generate or update a PR description, or prepare a merge request. The user may include ticket IDs in the request (e.g. tickets: NN-123, TB-456) from the company tracking system; treat those as the related issue IDs for the PR."
-disable-model-invocation: true
+description: "Creates or updates a pull request: commits pending work (via the commit skill), generates a semantic PR title and a description from the branch diff using the project's PR template, adds UI screenshots, pushes, and posts the PR with gh. Use when the user asks to create a PR, open a pull request, generate or update a PR description, or prepare a merge request. The user may include ticket IDs in the request (e.g. tickets: NN-123, TB-456) from the company tracking system; treat those as the related issue IDs for the PR. Takes an optional base branch to merge into (e.g. base: dev, or \"into main\"); when invoking it, pass the base and tickets as arguments."
+argument-hint: "[base: <branch>] [tickets: <ID>, ...]"
 ---
 
 # Create PR
@@ -10,11 +10,20 @@ Create or update a pull request: commit pending work, analyze the git changes, f
 
 **Language:** Always generate PR titles and descriptions in **English**, regardless of the user's language or the language of commit messages.
 
+## Arguments
+
+Arguments: `$ARGUMENTS`
+
+Read them together with the user's request; both are optional and may come in any order:
+
+- **Base branch:** `base: <branch>`, `--base <branch>`, `into <branch>`, `against <branch>`, or a bare branch name (e.g. `dev`, `release/1.4`). Strip a leading `origin/`. This is the parent branch of step 1.
+- **Tickets:** `tickets: NN-123, TB-456` or bare keys matching `[A-Z][A-Z0-9]+-\d+`. These are the ticket IDs of step 7.
+
 ## Workflow
 
 1. **Identify the parent branch and make sure there is something to PR**
    - Current branch: `git branch --show-current`. Changes (including untracked files, ignoring `pr-description.md`): `git status --short`.
-   - **Parent branch:** the user's choice if they named one ("against main"); else `dev` if `refs/heads/dev` or `refs/remotes/origin/dev` exists; else `main`; else `master` (check with `git show-ref --verify --quiet <ref>`). In the commands below use `origin/<parent>` when that ref exists (it is fresher than a stale local branch), else the local one. The PR `base` is the bare name, without `origin/`.
+   - **Parent branch:** the base branch from the arguments or the request, if one was given. It must exist as `refs/remotes/origin/<base>` or `refs/heads/<base>`; if neither does, tell the user and stop (never fall back silently). Else `dev` if `refs/heads/dev` or `refs/remotes/origin/dev` exists; else `main`; else `master` (check with `git show-ref --verify --quiet <ref>`). In the commands below use `origin/<parent>` when that ref exists (it is fresher than a stale local branch), else the local one. The PR `base` is the bare name, without `origin/`.
    - **Invoke the `commit` skill** (Skill tool) if any of these holds, then re-run this step, since it may have created the feature branch: the working tree has changes; the current branch is the parent, `main`, `master`, `dev` or `develop`; or there are no commits ahead of the parent (`git log --oneline <parent>..HEAD` is empty). If `commit` stops (failing checks, user declines), stop too.
 
 2. **Analyze changes**
@@ -122,9 +131,9 @@ Create or update a pull request: commit pending work, analyze the git changes, f
       - If no account has `repo` scope, tell the user to run `gh auth refresh -h github.com -s repo` (or log in with a token that has it) and stop.
       - **Troubleshooting tip:** `GraphQL: Could not resolve to a Repository with the name '...'` (or a 403) from `gh pr view` / `gh pr create` is very often an auth/scope problem, not a wrong repo path — check `gh auth status` and env var overrides before assuming the owner/repo values are wrong.
    4. Ask the user to confirm with the question tool: "Push the branch and post this PR?", options "Yes (Recommended)" / "No, keep pr-description.md".
-   5. On confirm, check whether a PR already exists for the current branch: `gh pr view --json number,url`. A "no pull requests found" error means there is none.
+   5. On confirm, check whether a PR already exists for the current branch: `gh pr view --json number,url,baseRefName`. A "no pull requests found" error means there is none.
       - **No PR (create):** `git push -u origin HEAD && gh pr create --base <parent-branch> --title '<title>' --body-file pr-description.md`. It prints the PR URL.
-      - **PR exists (update):** `git push -u origin HEAD && gh pr edit <number> --title '<title>' --body-file pr-description.md`. The URL is the one `gh pr view` returned.
+      - **PR exists (update):** `git push -u origin HEAD && gh pr edit <number> --title '<title>' --body-file pr-description.md`. The URL is the one `gh pr view` returned. If a base branch was given explicitly, add `--base <parent-branch>` so the existing PR is retargeted; otherwise leave its base alone. When it differs from `baseRefName`, tell the user the PR is retargeted from `<baseRefName>` to `<parent-branch>`.
       - Quote the title in single quotes (`'\''` for an apostrophe).
    6. Keep the PR URL from step 5.
    7. Remove `pr-description.md`.
