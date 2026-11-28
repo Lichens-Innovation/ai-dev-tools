@@ -19,5 +19,6 @@ claude plugin install git@lichens-ai-dev-tools
 ```
 /commit
 /create-pr tickets: PROJ-123
+/create-pr base: dev
 /generate-release-report version 1.5.0
 ```
